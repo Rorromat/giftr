@@ -46,10 +46,10 @@ export default async function MiLista() {
                 <div className="flex justify-between gap-2">
                   <div>
                     <p className="font-semibold">{item.titulo}</p>
-                    <p className="flex items-center gap-1 text-sm text-stone-500">
+                    <div className="flex items-center gap-1 text-sm text-stone-500">
                       <span>{item.precio ?? item.rangoPrecio ?? ''}</span> ·
                       <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
-                    </p>
+                    </div>
                     {item.notas && <p className="mt-1 text-sm text-stone-600">{item.notas}</p>}
                   </div>
                   <form action={archiveItemAction} className="flex flex-col gap-1 text-xs">
