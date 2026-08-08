@@ -20,6 +20,8 @@ const str = (fd: FormData, k: string) => {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
 }
 
+const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
+
 async function itemPerteneceAToken(itemId: string, token: string) {
   const [row] = await db.select({ id: items.id }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
@@ -33,17 +35,19 @@ export async function addItemAction(formData: FormData) {
   const tipo = str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto'
   const titulo = str(formData, 'titulo')
   if (!titulo) redirect('/agregar')
+  const p = str(formData, 'prioridad')
+  const cant = Math.trunc(Number(str(formData, 'cantidad') ?? '1'))
   const data: NewItemData = {
     tipo, titulo,
     notas: str(formData, 'notas'),
     precio: str(formData, 'precio'),
     rangoPrecio: str(formData, 'rangoPrecio'),
     categoria: str(formData, 'categoria'),
-    prioridad: (str(formData, 'prioridad') as NewItemData['prioridad']) ?? 'gustaria',
-    cantidad: Number(str(formData, 'cantidad') ?? '1') || 1,
+    prioridad: p === 'mucho' || p === 'suelta' ? p : 'gustaria',
+    cantidad: Number.isFinite(cant) && cant >= 1 ? cant : 1,
     repetible: formData.get('repetible') === 'on',
-    linkTienda: str(formData, 'linkTienda'),
-    fotoUrl: str(formData, 'fotoUrl'),
+    linkTienda: httpUrl(str(formData, 'linkTienda')),
+    fotoUrl: httpUrl(str(formData, 'fotoUrl')),
   }
   await createItem(db, session.userId, data)
   revalidatePath('/mi-lista')
@@ -70,10 +74,10 @@ async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {
 }
 
 export async function reserveAction(formData: FormData) {
-  const viewer = await viewerIdentificandoGuest(formData)
   const token = str(formData, 'token')!
   const itemId = str(formData, 'itemId')!
   if (!(await itemPerteneceAToken(itemId, token))) return
+  const viewer = await viewerIdentificandoGuest(formData)
   await reserveItem(db, itemId, viewer)
   revalidatePath(`/l/${token}`)
 }
