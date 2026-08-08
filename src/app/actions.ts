@@ -109,4 +109,5 @@ export async function commentAction(formData: FormData) {
 
 export async function markNotifsReadAction() {
   await markNotificationsRead(db, await getViewer())
+  revalidatePath('/', 'layout')
 }
