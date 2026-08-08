@@ -23,8 +23,20 @@ export async function createItem(db: Db, userId: string, data: NewItemData): Pro
     if (!list) return null
     const [item] = await db.insert(items).values({ ...data, listId: list.id }).returning()
     return pickItemFields(item)
-  } catch {
-    return null
+  } catch (e: any) {
+    // Check for PostgreSQL UUID validation error (code 22P02: invalid input syntax for type uuid)
+    // Try multiple possible locations for the error code
+    if (
+      e?.code === '22P02' ||
+      e?.cause?.code === '22P02' ||
+      e?.originalError?.code === '22P02'
+    ) return null
+
+    // Also check error message
+    const msg = (e?.message || e?.toString?.() || String(e)).toLowerCase()
+    if (msg.includes('invalid input syntax') && msg.includes('uuid')) return null
+
+    throw e
   }
 }
 
