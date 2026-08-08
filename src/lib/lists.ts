@@ -88,6 +88,8 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     return { role: 'owner', item: pickItemFields(row.item) }
   }
 
+  if (row.item.estadoDueno !== 'activo') return null
+
   await expireStaleClaims(db, itemId)
   const claimMap = await loadClaimViews(db, [itemId], viewer)
   const commentRows = await db.select({
