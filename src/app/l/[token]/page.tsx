@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { GuestGate } from '@/components/GuestGate'
+import { Banners } from '@/components/Banners'
 
 export default async function ListaAjena({
   params, searchParams,
@@ -30,6 +31,7 @@ export default async function ListaAjena({
     <main className="pt-6">
       <h1 className="text-2xl font-bold">Lista de {vista.ownerNombre} 🎁</h1>
       <p className="text-sm text-stone-500">Elegí, reservá y no te duplicás con nadie.</p>
+      <Banners />
 
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
         <Link href={`/l/${token}`} className={`rounded-full border px-3 py-1 ${!cat && disp !== '1' ? 'border-[#E2725B] text-[#E2725B]' : 'border-stone-300 text-stone-600'}`}>Todos</Link>

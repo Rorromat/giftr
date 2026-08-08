@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { archiveItemAction } from '@/app/actions'
+import { Banners } from '@/components/Banners'
 
 const PRIORIDAD = { mucho: '❤️❤️❤️ Lo quiero mucho', gustaria: '❤️❤️ Me gustaría', suelta: '❤️ Idea suelta' } as const
 
@@ -24,6 +25,7 @@ export default async function MiLista() {
         <h1 className="text-2xl font-bold">Mi lista</h1>
         <Link href="/agregar" className="rounded-full bg-[#E2725B] px-4 py-2 text-sm font-semibold text-white">+ Agregar</Link>
       </div>
+      <Banners />
 
       <a href={`https://wa.me/?text=${waText}`} target="_blank"
          className="mt-4 block rounded-2xl bg-green-600 py-3 text-center font-semibold text-white shadow-md">
