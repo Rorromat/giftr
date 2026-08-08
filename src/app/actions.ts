@@ -8,7 +8,7 @@ import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer, GUEST_COOKIE } from '@/lib/viewer'
 import { auth } from '@/auth'
-import { createItem, archiveItem, type NewItemData } from '@/lib/items'
+import { createItem, archiveItem, updateItem, type NewItemData } from '@/lib/items'
 import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
@@ -62,6 +62,15 @@ export async function archiveItemAction(formData: FormData) {
   revalidatePath('/mi-lista')
 }
 
+export async function updatePriorityAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const p = str(formData, 'prioridad')
+  if (p !== 'mucho' && p !== 'gustaria' && p !== 'suelta') return
+  await updateItem(db, str(formData, 'itemId')!, session.userId, { prioridad: p })
+  revalidatePath('/mi-lista')
+}
+
 async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {
   let viewer = await getViewer()
   const nombre = str(formData, 'nombre')
@@ -80,6 +89,7 @@ export async function reserveAction(formData: FormData) {
   const viewer = await viewerIdentificandoGuest(formData)
   await reserveItem(db, itemId, viewer)
   revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
 }
 
 export async function boughtAction(formData: FormData) {

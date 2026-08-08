@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { claims, comments, guestIdentities, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -50,7 +50,7 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
     .where(eq(lists.shareToken, shareToken))
   if (!row) return null
 
-  const allItems = await db.select().from(items).where(eq(items.listId, row.list.id))
+  const allItems = await db.select().from(items).where(eq(items.listId, row.list.id)).orderBy(asc(items.createdAt))
 
   if (viewer.userId === row.list.ownerId) {
     return { role: 'owner', shareToken, items: allItems.map(pickItemFields) }
@@ -68,7 +68,7 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
 export async function getOwnList(db: Db, userId: string) {
   const [list] = await db.select().from(lists).where(eq(lists.ownerId, userId))
   if (!list) return null
-  const rows = await db.select().from(items).where(eq(items.listId, list.id))
+  const rows = await db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt))
   return { shareToken: list.shareToken, items: rows.map(pickItemFields) }
 }
 

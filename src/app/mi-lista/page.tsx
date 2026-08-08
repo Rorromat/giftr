@@ -5,8 +5,7 @@ import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { archiveItemAction } from '@/app/actions'
 import { Banners } from '@/components/Banners'
-
-const PRIORIDAD = { mucho: '❤️❤️❤️ Lo quiero mucho', gustaria: '❤️❤️ Me gustaría', suelta: '❤️ Idea suelta' } as const
+import { PrioritySelect } from '@/components/PrioritySelect'
 
 export default async function MiLista() {
   const session = await auth()
@@ -47,8 +46,9 @@ export default async function MiLista() {
                 <div className="flex justify-between gap-2">
                   <div>
                     <p className="font-semibold">{item.titulo}</p>
-                    <p className="text-sm text-stone-500">
-                      {item.precio ?? item.rangoPrecio ?? ''} · {PRIORIDAD[item.prioridad]}
+                    <p className="flex items-center gap-1 text-sm text-stone-500">
+                      <span>{item.precio ?? item.rangoPrecio ?? ''}</span> ·
+                      <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
                     </p>
                     {item.notas && <p className="mt-1 text-sm text-stone-600">{item.notas}</p>}
                   </div>
