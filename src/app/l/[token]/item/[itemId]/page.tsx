@@ -32,7 +32,10 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
       <section className="mt-4 space-y-2">
         {item.claims.map((c) => (
           <p key={c.id} className="text-sm text-stone-600">
-            {c.estado === 'comprado' ? '✓' : '🔒'} {c.esMia ? 'Vos' : c.claimerNombre} lo {c.estado === 'comprado' ? 'compró' : 'reservó'}
+            {c.estado === 'comprado' ? '✓' : '🔒'}{' '}
+            {c.esMia
+              ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
+              : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
             {c.notaQueCompre && <span className="text-stone-400"> — compró: {c.notaQueCompre}</span>}
           </p>
         ))}

@@ -49,6 +49,7 @@ export default async function ListaAjena({
       <ul className="mt-4 space-y-3">
         {mostrados.map((item) => {
           const comprado = !item.disponible && item.claims.some((c) => c.estado === 'comprado')
+          const yaEsMio = item.claims.some((c) => c.esMia)
           return (
             <li key={item.id} className={`rounded-2xl bg-white p-4 shadow-sm ${!item.disponible ? 'opacity-60' : ''}`}>
               <div className="flex gap-3">
@@ -62,7 +63,9 @@ export default async function ListaAjena({
                   {item.cantidad > 1 && <p className="text-xs text-stone-400">quedan {item.quedan} de {item.cantidad}</p>}
                   <div className="mt-2 flex items-center justify-between">
                     {item.disponible
-                      ? <GuestGate token={token} itemId={item.id} identified={identified} />
+                      ? (yaEsMio
+                          ? <span className="text-sm font-medium text-[#E2725B]">Ya lo reservaste 🤫</span>
+                          : <GuestGate token={token} itemId={item.id} identified={identified} />)
                       : <span className={`text-sm font-medium ${comprado ? 'text-green-700' : 'text-[#E2725B]'}`}>
                           {comprado ? '✓ Comprado' : `Reservado por ${item.claims[0]?.claimerNombre ?? 'alguien'}`}
                         </span>}

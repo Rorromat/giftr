@@ -30,6 +30,7 @@ export function GuestGate({ token, itemId, identified }: { token: string; itemId
           <input name="nombre" required placeholder="Tu nombre" className="w-full rounded-xl border border-stone-300 p-2" />
           <input name="email" type="email" placeholder="Email (opcional, para recuperar tu reserva)" className="w-full rounded-xl border border-stone-300 p-2" />
           <button className="w-full rounded-xl bg-[#E2725B] py-2 font-semibold text-white">Reservar 🤫</button>
+          <button type="button" onClick={() => dialogRef.current?.close()} className="w-full text-sm text-stone-400">Cancelar</button>
         </form>
       </dialog>
     </>
