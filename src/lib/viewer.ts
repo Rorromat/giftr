@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { auth } from '@/auth'
 import type { Viewer } from '@/lib/types'
 
-export const GUEST_COOKIE = 'wishy_guest'
+export const GUEST_COOKIE = 'giftr_guest'
 
 export async function getViewer(): Promise<Viewer> {
   const session = await auth()

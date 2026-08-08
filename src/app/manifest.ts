@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Wishy',
-    short_name: 'Wishy',
+    name: 'GiftR',
+    short_name: 'GiftR',
     description: 'Pedí lo que querés sin pedirlo.',
     start_url: '/',
     display: 'standalone',

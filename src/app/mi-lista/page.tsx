@@ -16,7 +16,7 @@ export default async function MiLista() {
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const porCategoria = Object.groupBy(activos, (i) => i.categoria ?? 'Sin categoría')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
-  const waText = encodeURIComponent(`Armé mi lista de deseos en Wishy 🎁 ${shareUrl}`)
+  const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
 
   return (
     <main className="pt-6">
