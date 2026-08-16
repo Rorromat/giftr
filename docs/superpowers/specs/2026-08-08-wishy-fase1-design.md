@@ -1,5 +1,7 @@
 # Wishy Fase 1 (PoC) — Diseño técnico
 
+> **Superado (2026-08-16):** el stack cambió a AWS (DynamoDB · Lambda + API Gateway · Cognito User Pools). Ver [2026-08-16-wishy-fase1-aws-design.md](./2026-08-16-wishy-fase1-aws-design.md). El alcance funcional de este documento sigue vigente.
+
 **Fecha:** 2026-08-08 · **Fuente:** [wishy-concepto.md](../../../wishy-concepto.md) (secciones 4, 5, 7 y 8)
 
 ## Alcance
