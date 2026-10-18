@@ -1,10 +1,10 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getItemForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { GuestGate } from '@/components/GuestGate'
+import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
 export default async function DetalleItem({ params }: { params: Promise<{ token: string; itemId: string }> }) {
   const { token, itemId } = await params
@@ -16,71 +16,93 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
   const { item, comments, ownerNombre } = detalle
   const identified = !!viewer.userId || !!viewer.guestId
   const miClaim = item.claims.find((c) => c.esMia && c.estado === 'reservado')
+  const precio = item.precio ?? item.rangoPrecio
 
   return (
-    <main className="pt-6">
-      <Link href={`/l/${token}`} className="text-sm text-stone-400">← Volver a la lista</Link>
-      {item.fotoUrl && (
-        // eslint-disable-next-line @next/next/no-img-element -- PoC: remote host images, no next/image config
-        <img src={item.fotoUrl} alt="" className="mt-4 w-full rounded-2xl object-cover" />
-      )}
-      <h1 className="mt-4 text-2xl font-bold">{item.titulo}</h1>
-      <p className="text-lg text-stone-600">{item.precio ?? item.rangoPrecio ?? ''}</p>
-      {item.notas && <p className="mt-2 rounded-xl bg-orange-50 p-3 text-sm">📝 {ownerNombre} dice: {item.notas}</p>}
-      {item.linkTienda && <a href={item.linkTienda} target="_blank" className="mt-2 block text-sm text-[#E2725B] underline">Ver en la tienda ↗</a>}
+    <main className="flex flex-col gap-4 pb-12 pt-[52px]">
+      <BackLink href={`/l/${token}`} label="Volver a la lista" />
 
-      <section className="mt-4 space-y-2">
+      <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
+        <div className="relative">
+          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!item.disponible && !miClaim} />
+          <PriorityTag prioridad={item.prioridad} className="absolute left-3 top-3 h-[30px]" />
+          {precio && <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{precio}</PriceSticker>}
+        </div>
+        <div className="flex flex-col gap-3 p-3.5">
+          <h1 className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
+          {item.notas && (
+            <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug">
+              <span className="font-bold">{ownerNombre} dice:</span> {item.notas}
+            </p>
+          )}
+          {item.linkTienda && (
+            <a href={item.linkTienda} target="_blank" className="gr-btn self-start font-sans text-sm font-bold">
+              Ver en la tienda <Icon name="external" size={16} strokeWidth={2.4} />
+            </a>
+          )}
+        </div>
+      </article>
+
+      <section className="flex flex-col gap-2.5">
         {item.claims.map((c) => (
-          <p key={c.id} className="text-sm text-stone-600">
-            {c.estado === 'comprado' ? '✓' : '🔒'}{' '}
-            {c.esMia
-              ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
-              : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
-            {c.notaQueCompre && <span className="text-stone-400"> — compró: {c.notaQueCompre}</span>}
+          <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
+            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border-2 border-gr-ink`}>
+              <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
+            </span>
+            <span>
+              {c.esMia
+                ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
+                : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
+              {c.notaQueCompre && <span className="text-gr-muted"> — compró: {c.notaQueCompre}</span>}
+            </span>
           </p>
         ))}
 
-        {item.disponible && !miClaim && <GuestGate token={token} itemId={item.id} identified={identified} />}
+        {item.disponible && !miClaim && <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" />}
 
         {miClaim && (
-          <div className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
-            <form action={boughtAction} className="flex gap-2">
+          <div className="gr-sticker flex flex-col gap-3 p-3.5">
+            <form action={boughtAction} className="flex flex-col gap-2.5">
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
               <input type="hidden" name="claimId" value={miClaim.id} />
-              <input name="nota" placeholder="¿Qué compraste? (opcional)" className="flex-1 rounded-xl border border-stone-300 p-2 text-sm" />
-              <button className="rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white">Ya lo compré</button>
+              <input name="nota" placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
+              <button className="gr-btn-primary gr-btn--sm w-full">Ya lo compré</button>
             </form>
             <form action={releaseAction}>
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
               <input type="hidden" name="claimId" value={miClaim.id} />
-              <button className="text-sm text-stone-400 underline">Liberar reserva</button>
+              <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Liberar reserva</button>
             </form>
           </div>
         )}
       </section>
 
-      <section className="mt-6">
-        <h2 className="font-semibold">🤫 Esto no lo ve {ownerNombre}</h2>
-        <ul className="mt-2 space-y-2">
+      <section className="mt-2 flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
+          <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
+          Esto no lo ve {ownerNombre}
+        </h2>
+        <ul className="flex flex-col gap-2">
           {comments.map((c) => (
-            <li key={c.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
-              <span className="font-medium">{c.autorNombre}:</span> {c.texto}
+            <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm">
+              <span className="font-bold">{c.autorNombre}:</span> {c.texto}
             </li>
           ))}
         </ul>
         {identified ? (
-          <form action={commentAction} className="mt-3 flex gap-2">
+          <form action={commentAction} className="flex gap-2">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
-            <input name="texto" required placeholder="Coordiná con los demás…" className="flex-1 rounded-xl border border-stone-300 p-2 text-sm" />
-            <button className="rounded-xl bg-stone-800 px-3 py-2 text-sm text-white">Enviar</button>
+            <input name="texto" required placeholder="Coordiná con los demás…" className="gr-input flex-1 shadow-none" />
+            <button className="gr-btn bg-gr-ink text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</button>
           </form>
         ) : (
-          <p className="mt-3 text-sm text-stone-400">Reservá algo para participar de la coordinación.</p>
+          <p className="text-sm text-gr-muted">Reservá algo para participar de la coordinación.</p>
         )}
       </section>
+
     </main>
   )
 }

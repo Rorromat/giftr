@@ -1,26 +1,17 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "./tokens.css";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  --color-gr-bg: var(--gr-bg);
+  --color-gr-ink: var(--gr-ink);
+  --color-gr-surface: var(--gr-surface);
+  --color-gr-accent: var(--gr-accent);
+  --color-gr-muted: var(--gr-muted);
+  --color-gr-dot: var(--gr-dot);
+  --font-display: var(--gr-font-display);
+  --font-sans: var(--gr-font-body);
+  --shadow-sticker: var(--gr-shadow);
+  --shadow-sticker-sm: var(--gr-shadow-sm);
+  --shadow-sticker-accent: var(--gr-shadow-accent);
+  --radius-sticker: var(--gr-radius-lg);
 }
