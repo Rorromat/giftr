@@ -1,0 +1,284 @@
+/* GiftR — sistema visual "Sticker" (ver HANDOFF del rediseño).
+   Las fuentes las carga next/font en layout.tsx y exponen --font-bricolage / --font-instrument.
+   Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
+
+:root {
+  /* Color */
+  --gr-bg: #FFF6E5;
+  --gr-ink: #121212;
+  --gr-surface: #FFFFFF;
+  --gr-accent: #C8F31D;
+  --gr-muted: #5C574F;
+  --gr-dot: #E4D9C6;
+
+  /* Tipografía */
+  --gr-font-display: var(--font-bricolage), sans-serif;
+  --gr-font-body: var(--font-instrument), sans-serif;
+
+  /* Forma */
+  --gr-border: 3px solid var(--gr-ink);
+  --gr-border-sm: 2.5px solid var(--gr-ink);
+  --gr-radius-lg: 22px;
+  --gr-radius-md: 16px;
+  --gr-radius-pill: 999px;
+  --gr-shadow: 5px 5px 0 var(--gr-ink);
+  --gr-shadow-sm: 3px 3px 0 var(--gr-ink);
+  --gr-shadow-accent: 5px 5px 0 var(--gr-accent);
+
+  /* Espaciado */
+  --gr-gutter: 18px;
+  --gr-gap: 16px;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--gr-bg);
+    color: var(--gr-ink);
+    font-family: var(--gr-font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* Tipografía */
+  .gr-title {
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 52px;
+    line-height: 0.92;
+    letter-spacing: -0.05em;
+    font-variation-settings: 'opsz' 96;
+    margin: 0;
+  }
+  .gr-heading {
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .gr-label {
+    font-family: var(--gr-font-body);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .gr-muted { color: var(--gr-muted); }
+
+  /* Sticker card */
+  .gr-sticker {
+    background: var(--gr-surface);
+    border: var(--gr-border);
+    border-radius: var(--gr-radius-lg);
+    box-shadow: var(--gr-shadow);
+    overflow: hidden;
+  }
+  .gr-sticker--dark { background: var(--gr-ink); color: var(--gr-bg); }
+  .gr-sticker__img {
+    display: block;
+    width: 100%;
+    object-fit: cover;
+    border-bottom: var(--gr-border);
+  }
+
+  /* Foto troquelada (collages) */
+  .gr-diecut {
+    display: block;
+    object-fit: cover;
+    border: 6px solid var(--gr-surface);
+    outline: 2.5px solid var(--gr-ink);
+    border-radius: 18px;
+    box-shadow: 6px 6px 0 var(--gr-ink);
+    box-sizing: border-box;
+  }
+
+  /* Etiquetas sobre fotos */
+  .gr-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: var(--gr-border-sm);
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-surface);
+    padding: 4px 10px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .gr-tag--dark { background: var(--gr-ink); color: var(--gr-accent); }
+  .gr-price {
+    border: var(--gr-border-sm);
+    border-radius: 10px;
+    background: var(--gr-surface);
+    padding: 3px 8px;
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 15px;
+  }
+
+  /* Botones */
+  .gr-btn,
+  .gr-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 18px;
+    border: var(--gr-border-sm);
+    border-radius: var(--gr-radius-md);
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 17px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 80ms ease, box-shadow 80ms ease;
+  }
+  .gr-btn-primary {
+    background: var(--gr-accent);
+    box-shadow: var(--gr-shadow);
+    min-height: 56px;
+    font-size: 19px;
+  }
+  .gr-btn-primary:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--gr-ink); }
+  .gr-btn--sm { min-height: 50px; font-size: 17px; }
+  .gr-btn-primary.gr-btn--sm { box-shadow: var(--gr-shadow-sm); }
+  .gr-btn-primary.gr-btn--sm:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--gr-ink); }
+  .gr-btn--dark { background: var(--gr-ink); color: var(--gr-accent); box-shadow: var(--gr-shadow-accent); }
+  .gr-btn--dark:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--gr-accent); }
+  .gr-icon-btn {
+    width: 44px;
+    height: 44px;
+    border: var(--gr-border-sm);
+    border-radius: 14px;
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    box-shadow: var(--gr-shadow-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+
+  /* Chips */
+  .gr-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 14px;
+    border: var(--gr-border-sm);
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    font-family: var(--gr-font-body);
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .gr-chip[aria-pressed="true"],
+  .gr-chip[aria-current="page"],
+  .gr-chip:has(:checked) { background: var(--gr-ink); color: var(--gr-bg); }
+
+  /* Segmentado */
+  .gr-segmented {
+    display: flex;
+    height: 48px;
+    border: var(--gr-border-sm);
+    border-radius: var(--gr-radius-md);
+    overflow: hidden;
+    background: var(--gr-surface);
+  }
+  .gr-segmented > * {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 17px;
+    cursor: pointer;
+  }
+  .gr-segmented > * + * { border-left: var(--gr-border-sm); }
+  .gr-segmented > [aria-pressed="true"],
+  .gr-segmented > :has(:checked) { background: var(--gr-ink); color: var(--gr-accent); }
+
+  /* Foco visible en chips y segmentos hechos con radios ocultos */
+  .gr-chip:has(:focus-visible) { outline: 2.5px solid var(--gr-ink); outline-offset: 2px; }
+  .gr-segmented > :has(:focus-visible) { outline: 2.5px dashed currentColor; outline-offset: -7px; }
+
+  /* Input */
+  .gr-input {
+    width: 100%;
+    min-height: 50px;
+    border: var(--gr-border-sm);
+    border-radius: var(--gr-radius-md);
+    background: var(--gr-surface);
+    box-shadow: var(--gr-shadow-sm);
+    padding: 0 14px;
+    font-family: var(--gr-font-body);
+    font-size: 15px;
+    color: var(--gr-ink);
+  }
+  textarea.gr-input { padding: 12px 14px; }
+  .gr-input::placeholder { color: var(--gr-muted); }
+  .gr-input:focus { outline: 2.5px solid var(--gr-ink); outline-offset: 2px; }
+
+  /* Avatares */
+  .gr-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: var(--gr-border-sm);
+    background: var(--gr-surface);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .gr-avatar + .gr-avatar { margin-left: -9px; }
+
+  /* Navegación inferior: píldora flotante, se adapta a la cantidad de destinos */
+  .gr-nav {
+    position: fixed;
+    left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    right: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    bottom: 22px;
+    z-index: 20;
+    height: 64px;
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-ink);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: center;
+    padding: 0 6px;
+  }
+  .gr-nav a { display: flex; justify-content: center; align-items: center; height: 48px; color: var(--gr-bg); }
+  .gr-nav a > span {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gr-nav a[aria-current="page"] > span { background: var(--gr-accent); color: var(--gr-ink); }
+  .gr-nav a > .gr-nav__add {
+    width: 50px; height: 50px; border-radius: 16px;
+    border: 2.5px solid var(--gr-bg); background: var(--gr-accent); color: var(--gr-ink);
+    transform: rotate(-6deg);
+  }
+
+  /* Rotaciones decorativas */
+  .gr-tilt-l { transform: rotate(-1.2deg); }
+  .gr-tilt-r { transform: rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gr-btn, .gr-btn-primary { transition: none; }
+}
