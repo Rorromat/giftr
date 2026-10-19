@@ -42,8 +42,8 @@ export default async function ListaAjena({
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
 
-  // Foto hero: el deseo disponible que más quiere (o el primero disponible).
-  const hero = mostrados.find((i) => i.disponible && i.prioridad === 'mucho') ?? mostrados.find((i) => i.disponible)
+  // Foto hero: el primer deseo de la lista tal como viene ordenada (solo si está disponible).
+  const hero = mostrados[0]?.disponible ? mostrados[0] : undefined
   const resto = mostrados.filter((i) => i !== hero)
 
   return (

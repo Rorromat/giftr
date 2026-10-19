@@ -50,6 +50,10 @@ export default async function Agregar() {
                 <input type="radio" name="categoria" value={c} className="sr-only" />{c}
               </label>
             ))}
+            {/* Equivale a la opción vacía del select original: se puede volver a "sin categoría". */}
+            <label className="gr-chip has-[:checked]:-rotate-2">
+              <input type="radio" name="categoria" value="" defaultChecked className="sr-only" />Sin categoría
+            </label>
           </div>
         </div>
 
