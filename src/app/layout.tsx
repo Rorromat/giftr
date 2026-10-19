@@ -8,6 +8,8 @@ const instrument = Instrument_Sans({ subsets: ['latin'], variable: '--font-instr
 export const metadata: Metadata = {
   title: 'GiftR',
   description: 'Pedí lo que querés sin pedirlo.',
+  // "Agregar a inicio" en iPhone: abre a pantalla completa y con el nombre corto bajo el ícono.
+  appleWebApp: { capable: true, title: 'GiftR', statusBarStyle: 'default' },
 }
 
 export const viewport: Viewport = { themeColor: '#FFF6E5' }
