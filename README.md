@@ -1,57 +1,62 @@
-# Wishy — backend serverless (AWS)
+# GiftR
 
-Backend de la Fase 1 de Wishy sobre **DynamoDB + Lambda + API Gateway + Cognito User Pools**.
+Pedí lo que querés sin pedirlo. Armás tu lista de deseos, la compartís por WhatsApp y tu gente
+coordina los regalos en secreto: reservan, se avisan y nadie se duplica. Vos nunca ves quién
+reservó qué.
 
 - Concepto de producto: [wishy-concepto.md](./wishy-concepto.md)
-- Diseño técnico AWS: [docs/superpowers/specs/2026-08-16-wishy-fase1-aws-design.md](./docs/superpowers/specs/2026-08-16-wishy-fase1-aws-design.md)
+- Diseño técnico de la Fase 1: [docs/superpowers/specs/2026-08-08-wishy-fase1-design.md](./docs/superpowers/specs/2026-08-08-wishy-fase1-design.md)
 
 ## Estructura
 
 ```
-template.yaml        Infra SAM: tabla DynamoDB, HTTP API + JWT authorizer, Cognito, Lambdas
-src/domain/          Reglas de negocio puras (regla de la sorpresa, planes de reserva)
-src/store/           Acceso a DynamoDB — ejecuta los planes con TransactWriteItems
-src/http/            Identidad (JWT Cognito / guest por header) y helpers de respuesta
-src/handlers/        me.ts (rutas autenticadas) · public.ts (link compartido y guests)
-tests/               Vitest: reglas de negocio + test de oro de la sorpresa
+src/app/          Pantallas (Next.js App Router) y server actions
+src/components/   Componentes del sistema visual "Sticker" (ui.tsx) y piezas con estado
+src/lib/          Reglas de negocio: regla de la sorpresa, reservas, invitados, avisos
+src/db/           Esquema Drizzle y cliente de Neon
+drizzle/          Migraciones SQL
+tests/            Vitest con PGlite (Postgres en memoria), incluido el test de oro de la sorpresa
+aws-backend/      Backend serverless alternativo (DynamoDB + Lambda + Cognito), proyecto aparte
 ```
 
-## Desarrollo
+## Desarrollo local
 
 ```bash
 npm install
-npm test          # 27 tests, incluye el test de oro de la regla de la sorpresa
-npm run typecheck
+cp .env.example .env.local   # completar DATABASE_URL, AUTH_* y NEXT_PUBLIC_BASE_URL
+npm run db:migrate           # crea las tablas
+npm run dev                  # http://localhost:3000
+npm test
 ```
 
-## Deploy
+## Publicarla en Vercel
 
-Requiere [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) y credenciales de AWS.
+Hacen falta una cuenta de Vercel, una base Neon (se crea desde Vercel) y credenciales de Google
+para el login.
 
-```bash
-sam build
-sam deploy --guided
-```
+1. **Importar el repo.** En Vercel: *Add New → Project*, elegí `rodrigomateus-debug/wishy` (rama
+   `main`). Vercel detecta Next.js solo; no cambies el *Root Directory*. El primer deploy va a
+   fallar porque todavía no hay base de datos: es esperable.
+2. **Base de datos.** En el proyecto: *Storage → Create Database → Neon* y conectala al proyecto.
+   Eso crea la variable `DATABASE_URL` en todos los entornos.
+3. **Login con Google.** En Google Cloud Console: *APIs & Services → Credentials → Create
+   credentials → OAuth client ID* (tipo *Web application*). En *Authorized redirect URIs* poné
+   `https://TU-PROYECTO.vercel.app/api/auth/callback/google`. Mientras la pantalla de
+   consentimiento esté en modo *Testing*, agregá como *test users* los emails que van a probar.
+4. **Variables de entorno.** En Vercel, *Settings → Environment Variables*:
 
-Parámetros opcionales: `GoogleClientId` / `GoogleClientSecret` (login con Google vía Cognito),
-`CallbackUrl` (frontend), `CognitoDomainPrefix` (hosted UI). Los outputs incluyen la URL de la
-API, el `UserPoolId`/`UserPoolClientId` y el dominio del hosted UI.
+   | Variable | Valor |
+   |---|---|
+   | `AUTH_SECRET` | una clave larga al azar (`npx auth secret` o `openssl rand -base64 32`) |
+   | `AUTH_GOOGLE_ID` | el *Client ID* de Google |
+   | `AUTH_GOOGLE_SECRET` | el *Client secret* de Google |
+   | `NEXT_PUBLIC_BASE_URL` | `https://TU-PROYECTO.vercel.app` (arma el link que se comparte) |
 
-## Autenticación
+5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) aplica las
+   migraciones y después compila, así que la base queda lista sola en cada deploy.
 
-- **Usuarios:** OAuth code flow contra el hosted UI de Cognito (Google federado). El cliente
-  manda el **id token** en `Authorization: Bearer …`. Las rutas `/me/*` las valida el JWT
-  authorizer de API Gateway; en las rutas públicas la Lambda verifica el Bearer con
-  `aws-jwt-verify` para reconocer al dueño (y mostrarle su vista ciega).
-- **Guests:** `POST /guests` devuelve `guestId` + `secret`; se mandan en
-  `x-wishy-guest: <guestId>.<secret>`. Al crear cuenta con el mismo email, `POST /me/bootstrap`
-  hereda sus reservas y comentarios.
+## Backend AWS
 
-## Garantías clave
-
-- **Regla de la sorpresa:** única función serializadora por allowlist
-  (`src/domain/serialize.ts`); el dueño recibe 404 en detalle/claims/comments incluso por ID
-  directo. Cubierto por `tests/surprise-rule.test.ts`.
-- **Reserva atómica:** `TransactWriteItems` con `ConditionExpression claimCount < cantidad`;
-  el segundo en llegar recibe 409 "recién lo reservó otra persona".
-- **Expiración sin cron:** lazy en cada lectura, idempotente por condición (14 días).
+`aws-backend/` es una re-arquitectura de la Fase 1 sobre DynamoDB, Lambda, API Gateway y Cognito.
+Es independiente de la app: tiene su propio `package.json`, tests e infraestructura SAM. Ver
+[aws-backend/README.md](./aws-backend/README.md).

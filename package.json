@@ -1,24 +1,38 @@
 {
-  "name": "wishy-backend",
+  "name": "giftr",
   "version": "0.1.0",
   "private": true,
-  "description": "Backend serverless de Wishy — DynamoDB + Lambda + API Gateway + Cognito",
-  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "vercel-build": "drizzle-kit migrate && next build",
+    "start": "next start",
+    "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "build": "sam build",
-    "deploy": "sam deploy --guided"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.600.0",
-    "@aws-sdk/lib-dynamodb": "^3.600.0",
-    "aws-jwt-verify": "^4.0.1"
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "16.3.0",
+    "next-auth": "^5.0.0-beta.32",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.140",
-    "@types/node": "^20.14.0",
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "@electric-sql/pglite": "^0.5.4",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

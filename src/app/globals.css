@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  --color-gr-bg: var(--gr-bg);
+  --color-gr-ink: var(--gr-ink);
+  --color-gr-surface: var(--gr-surface);
+  --color-gr-accent: var(--gr-accent);
+  --color-gr-muted: var(--gr-muted);
+  --color-gr-dot: var(--gr-dot);
+  --font-display: var(--gr-font-display);
+  --font-sans: var(--gr-font-body);
+  --shadow-sticker: var(--gr-shadow);
+  --shadow-sticker-sm: var(--gr-shadow-sm);
+  --shadow-sticker-accent: var(--gr-shadow-accent);
+  --radius-sticker: var(--gr-radius-lg);
+}
