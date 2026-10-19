@@ -55,6 +55,10 @@ para el login.
 5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) aplica las
    migraciones y después compila, así que la base queda lista sola en cada deploy.
 
+**Región.** `vercel.json` corre las funciones en `gru1` (São Paulo), la misma región que la base
+Neon. Si la base se crea en otra región, cambiá `regions` a esa: cada pantalla hace varias consultas
+seguidas y con la app y la base en continentes distintos cada clic tarda segundos.
+
 ## Backend AWS
 
 `aws-backend/` es una re-arquitectura de la Fase 1 sobre DynamoDB, Lambda, API Gateway y Cognito.

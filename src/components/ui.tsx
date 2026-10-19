@@ -174,13 +174,14 @@ export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
 export function BottomNav({ active }: { active: 'mi-lista' | 'perfil' }) {
   return (
     <nav aria-label="Navegación principal" className="gr-nav">
-      <Link href="/mi-lista" aria-label="Mi lista" aria-current={active === 'mi-lista' ? 'page' : undefined}>
+      {/* prefetch: las 3 secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
+      <Link href="/mi-lista" prefetch aria-label="Mi lista" aria-current={active === 'mi-lista' ? 'page' : undefined}>
         <span><Icon name="home" /></span>
       </Link>
-      <Link href="/agregar" aria-label="Agregar deseo">
+      <Link href="/agregar" prefetch aria-label="Agregar deseo">
         <span className="gr-nav__add"><Icon name="plus" size={24} strokeWidth={3} /></span>
       </Link>
-      <Link href="/perfil" aria-label="Perfil" aria-current={active === 'perfil' ? 'page' : undefined}>
+      <Link href="/perfil" prefetch aria-label="Perfil" aria-current={active === 'perfil' ? 'page' : undefined}>
         <span><Icon name="user" strokeWidth={active === 'perfil' ? 2.4 : 2.2} /></span>
       </Link>
     </nav>
