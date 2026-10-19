@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Backend AWS: proyecto aparte con su propio tooling.
+    "aws-backend/**",
   ]),
 ]);
 

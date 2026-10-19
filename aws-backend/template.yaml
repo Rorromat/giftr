@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Wishy Fase 1 — backend serverless.
+  DynamoDB (single-table) + Lambda + API Gateway HTTP API + Cognito User Pools.
+
+Parameters:
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: Client ID de Google OAuth para el IdP federado de Cognito (opcional).
+  GoogleClientSecret:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Client secret de Google OAuth (opcional).
+  CallbackUrl:
+    Type: String
+    Default: 'http://localhost:3000/auth/callback'
+    Description: Callback OAuth del frontend.
+  CognitoDomainPrefix:
+    Type: String
+    Default: 'wishy-poc'
+    Description: Prefijo del dominio hosted UI de Cognito (único por región).
+
+Conditions:
+  HasGoogle: !Not [!Equals [!Ref GoogleClientId, '']]
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 10
+    Environment:
+      Variables:
+        WISHY_TABLE: !Ref WishyTable
+
+Resources:
+  WishyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-wishy'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+        - { AttributeName: GSI2PK, AttributeType: S }
+        - { AttributeName: GSI2SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - { AttributeName: GSI1PK, KeyType: HASH }
+            - { AttributeName: GSI1SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: GSI2
+          KeySchema:
+            - { AttributeName: GSI2PK, KeyType: HASH }
+            - { AttributeName: GSI2SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-users'
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
+      Schema:
+        - { Name: email, Required: true, Mutable: true }
+        - { Name: name, Required: false, Mutable: true }
+
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Condition: HasGoogle
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: 'openid email profile'
+      AttributeMapping:
+        email: email
+        name: name
+        email_verified: email_verified
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPool
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: wishy-web
+      GenerateSecret: false
+      AllowedOAuthFlows: [code]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs: [!Ref CallbackUrl]
+      SupportedIdentityProviders: !If [HasGoogle, [COGNITO, Google], [COGNITO]]
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref CognitoDomainPrefix
+
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [GET, POST, PATCH, DELETE, OPTIONS]
+        AllowHeaders: [content-type, authorization, x-wishy-guest]
+      Auth:
+        Authorizers:
+          CognitoJwt:
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+              audience:
+                - !Ref UserPoolClient
+            IdentitySource: '$request.header.Authorization'
+
+  MeFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2022
+        Format: esm
+        OutExtension: ['.js=.mjs']
+        Sourcemap: false
+        EntryPoints: [src/handlers/me.ts]
+    Properties:
+      Handler: src/handlers/me.handler
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref WishyTable }
+      Events:
+        Bootstrap: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: /me/bootstrap, Auth: { Authorizer: CognitoJwt } } }
+        MyList: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: /me/list, Auth: { Authorizer: CognitoJwt } } }
+        CreateItem: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: /me/items, Auth: { Authorizer: CognitoJwt } } }
+        EditItem: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: PATCH, Path: '/me/items/{itemId}', Auth: { Authorizer: CognitoJwt } } }
+        DeleteItem: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: DELETE, Path: '/me/items/{itemId}', Auth: { Authorizer: CognitoJwt } } }
+        ItemStatus: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: '/me/items/{itemId}/status', Auth: { Authorizer: CognitoJwt } } }
+        MyClaims: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: /me/claims, Auth: { Authorizer: CognitoJwt } } }
+        MyNotifs: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: /me/notifications, Auth: { Authorizer: CognitoJwt } } }
+        ReadNotifs: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: /me/notifications/read, Auth: { Authorizer: CognitoJwt } } }
+
+  PublicFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2022
+        Format: esm
+        OutExtension: ['.js=.mjs']
+        Sourcemap: false
+        EntryPoints: [src/handlers/public.ts]
+    Properties:
+      Handler: src/handlers/public.handler
+      CodeUri: .
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          USER_POOL_CLIENT_ID: !Ref UserPoolClient
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref WishyTable }
+      Events:
+        CreateGuest: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: /guests } }
+        GuestNotifs: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: /guests/me/notifications } }
+        ListView: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: '/l/{token}' } }
+        ItemDetail: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: GET, Path: '/l/{token}/items/{itemId}' } }
+        Reserve: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: '/l/{token}/items/{itemId}/claims' } }
+        Purchase: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: '/l/{token}/items/{itemId}/claims/{claimId}/purchase' } }
+        Release: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: '/l/{token}/items/{itemId}/claims/{claimId}/release' } }
+        Comment: { Type: HttpApi, Properties: { ApiId: !Ref Api, Method: POST, Path: '/l/{token}/items/{itemId}/comments' } }
+
+Outputs:
+  ApiUrl:
+    Description: URL base de la API
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  CognitoHostedUi:
+    Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+  TableName:
+    Value: !Ref WishyTable
