@@ -9,6 +9,8 @@ import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
 import { miFoto } from '@/lib/perfil'
 import { FotoPerfil } from '@/components/FotoPerfil'
+import { ActivarAvisos } from '@/components/ActivarAvisos'
+import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
@@ -22,7 +24,7 @@ export default async function Perfil() {
   const [lista, cumple, cuentas, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId), misGustos(db, session.userId),
   ])
-  const foto = await miFoto(db, session.userId)
+  const [foto, vapid] = await Promise.all([miFoto(db, session.userId), clavesVapid(db)])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
@@ -79,6 +81,15 @@ export default async function Perfil() {
       <Link href={`/l/${lista.shareToken}/perfil`} className="-mt-1.5 self-end text-sm font-bold underline decoration-2 underline-offset-4">
         Ver cómo me ven los demás
       </Link>
+
+      {/* Avisos push: así llegan los codazos */}
+      <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
+        <div>
+          <p className="font-display text-lg font-extrabold">Avisos</p>
+          <p className="text-[13px] font-medium leading-snug">Cuando alguien te da un codazo para que cargues tu lista, te llega una notificación.</p>
+        </div>
+        <ActivarAvisos vapidPublica={vapid.publica} />
+      </section>
 
       {/* Cuentas de los regalos grupales: a quién le debés y quién te debe */}
       <Link href="/cuentas" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">

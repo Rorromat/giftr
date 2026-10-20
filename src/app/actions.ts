@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { items, lists } from '@/db/schema'
+import { guestIdentities, items, lists, users } from '@/db/schema'
 import { getViewer, GUEST_COOKIE } from '@/lib/viewer'
 import { auth } from '@/auth'
 import { createItem, archiveItem, updateItem, type NewItemData } from '@/lib/items'
@@ -16,6 +16,7 @@ import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
+import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
 import type { Viewer } from '@/lib/types'
@@ -269,4 +270,45 @@ export async function markPaidAction(formData: FormData) {
 export async function settleUpAction(formData: FormData) {
   await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '')
   revalidarRegalo(formData)
+}
+
+// ---------- Avisos push y codazos ----------
+
+export async function suscribirAvisosAction(suscripcion: unknown): Promise<boolean> {
+  const session = await auth()
+  if (!session?.userId) return false
+  return guardarSuscripcion(db, session.userId, suscripcion)
+}
+
+export async function desuscribirAvisosAction(endpoint: string) {
+  const session = await auth()
+  if (session?.userId) await borrarSuscripcion(db, session.userId, endpoint)
+}
+
+/** Un aviso de prueba a los dispositivos de uno mismo. Devuelve a cuántos llegó. */
+export async function probarAvisoAction(): Promise<number> {
+  const session = await auth()
+  if (!session?.userId) return 0
+  return avisar(db, session.userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' })
+}
+
+async function nombreDe(viewer: Viewer): Promise<string> {
+  const [fila] = viewer.userId
+    ? await db.select({ nombre: users.nombre }).from(users).where(eq(users.id, viewer.userId))
+    : viewer.guestId ? await db.select({ nombre: guestIdentities.nombre }).from(guestIdentities).where(eq(guestIdentities.id, viewer.guestId)) : []
+  return fila?.nombre ?? 'Alguien'
+}
+
+export async function codazoAction(formData: FormData) {
+  const token = str(formData, 'token') ?? ''
+  const viewer = await viewerIdentificandoGuest(formData)
+  const r = await mandarCodazo(db, token, viewer, await nombreDe(viewer))
+  redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)
+}
+
+export async function vistoCodazosAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  await marcarCodazosVistos(db, session.userId)
+  revalidatePath('/', 'layout')
 }

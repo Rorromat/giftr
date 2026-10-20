@@ -138,3 +138,31 @@ export const groupGiftMembers = pgTable('group_gift_members', {
   pagadoAt: timestamp('pagado_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.giftId, t.userId] }), index('group_gift_members_user_id_idx').on(t.userId)])
+
+// Configuración que genera la app sola (las claves VAPID de los avisos push): nadie las carga a mano.
+export const config = pgTable('config', {
+  clave: text('clave').primaryKey(),
+  valor: text('valor').notNull(),
+})
+
+// Dispositivos donde un usuario activó los avisos (Web Push). Uno por navegador/teléfono.
+export const pushSubs = pgTable('push_subs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('push_subs_user_id_idx').on(t.userId)])
+
+// Codazos: alguien que regala le pide a un dueño que cargue su lista. Uno por persona y lista cada 24 h.
+export const codazos = pgTable('codazos', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  listId: uuid('list_id').notNull().references(() => lists.id),
+  paraUserId: uuid('para_user_id').notNull().references(() => users.id),
+  deUserId: uuid('de_user_id').references(() => users.id),
+  deGuestId: uuid('de_guest_id').references(() => guestIdentities.id),
+  deNombre: text('de_nombre').notNull(),
+  visto: boolean('visto').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('codazos_para_user_id_idx').on(t.paraUserId)])
