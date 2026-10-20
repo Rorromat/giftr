@@ -135,7 +135,10 @@ export function gustosDesdeForm(fd: FormData): Gustos {
   })
 }
 
-export type SeccionGustos = { titulo: string; items: string[] }
+/** Ícono de cada sección (nombres de <Icon>; acá van como texto para no depender de los componentes). */
+export type IconoGusto = 'cake' | 'ball' | 'shield' | 'star' | 'paw' | 'bag' | 'hanger' | 'palette' | 'shirt' | 'cup' | 'ban' | 'note'
+
+export type SeccionGustos = { clave: string; titulo: string; icono: IconoGusto; items: string[] }
 
 /** Los gustos en secciones para mostrar ("Hincha de", "Talles", "No le regales"…). Vacío si no cargó nada. */
 export function seccionesDeGustos(g: Gustos | null, propio = false): SeccionGustos[] {
@@ -145,19 +148,19 @@ export function seccionesDeGustos(g: Gustos | null, propio = false): SeccionGust
   const sinFutbol = g.club === NO_FUTBOL
   const club = g.club === SOLO_SELECCION ? 'La Selección' : g.club
   const secciones: SeccionGustos[] = [
-    { titulo: 'Deportes', items: g.deportes },
+    { clave: 'deportes', titulo: 'Deportes', icono: 'ball', items: g.deportes },
     sinFutbol
-      ? { titulo: propio ? 'No me interesa' : 'No le interesa', items: ['El fútbol'] }
-      : { titulo: 'Hincha de', items: club ? [club] : [] },
-    { titulo: 'Hobbies y planes', items: g.hobbies },
-    { titulo: 'Mascotas', items: g.mascotas.filter((m) => m !== 'No tengo') },
-    { titulo: 'Marcas', items: g.marcas },
-    { titulo: 'Estilo', items: g.estilos },
-    { titulo: 'Colores', items: g.colores },
-    { titulo: 'Talles', items: talles },
-    { titulo: 'Bebidas y antojos', items: g.bebidas },
-    { titulo: propio ? 'No me regalen' : 'No le regales', items: g.noRegalar },
-    { titulo: 'Algo más', items: g.nota ? [g.nota] : [] },
+      ? { clave: 'club', titulo: propio ? 'No me interesa' : 'No le interesa', icono: 'shield', items: ['El fútbol'] }
+      : { clave: 'club', titulo: 'Hincha de', icono: 'shield', items: club ? [club] : [] },
+    { clave: 'hobbies', titulo: 'Hobbies y planes', icono: 'star', items: g.hobbies },
+    { clave: 'mascotas', titulo: 'Mascotas', icono: 'paw', items: g.mascotas.filter((m) => m !== 'No tengo') },
+    { clave: 'marcas', titulo: 'Marcas', icono: 'bag', items: g.marcas },
+    { clave: 'estilos', titulo: 'Estilo', icono: 'hanger', items: g.estilos },
+    { clave: 'colores', titulo: 'Colores', icono: 'palette', items: g.colores },
+    { clave: 'talles', titulo: 'Talles', icono: 'shirt', items: talles },
+    { clave: 'bebidas', titulo: 'Bebidas y antojos', icono: 'cup', items: g.bebidas },
+    { clave: 'noRegalar', titulo: propio ? 'No me regalen' : 'No le regales', icono: 'ban', items: g.noRegalar },
+    { clave: 'nota', titulo: 'Algo más', icono: 'note', items: g.nota ? [g.nota] : [] },
   ]
   return secciones.filter((s) => s.items.length)
 }

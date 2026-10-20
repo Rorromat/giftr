@@ -4,12 +4,13 @@ import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { duenosDeLista, juntarNombres } from '@/lib/groups'
+import { duenosDeLista, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
 // Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
-type ListaRegalador = { listId: string; ownerNombre: string; duenos: string[]; grupoNombre: string | null }
+// perfiles: para la foto y el link al perfil de cada dueño (sin nada de reservas).
+type ListaRegalador = { listId: string; ownerNombre: string; duenos: string[]; perfiles: Dueno[]; grupoNombre: string | null }
 
 export type ListView =
   | ({ role: 'owner'; shareToken: string; items: OwnerItemView[] } & ListaDueno)
@@ -65,9 +66,9 @@ function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimVi
   return { ...row, claims: itemClaims, quedan, disponible: row.repetible || quedan > 0 }
 }
 
-function paraRegalador(list: typeof lists.$inferSelect, duenos: { nombre: string }[]): ListaRegalador {
+function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaRegalador {
   const nombres = duenos.map((d) => d.nombre)
-  return { listId: list.id, ownerNombre: juntarNombres(nombres), duenos: nombres, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
+  return { listId: list.id, ownerNombre: juntarNombres(nombres), duenos: nombres, perfiles: duenos, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
 }
 
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {

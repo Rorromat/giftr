@@ -67,7 +67,7 @@ export default async function Grupos() {
                     <h2 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{g.nombre}</h2>
                     <p className="text-sm font-medium leading-snug [overflow-wrap:anywhere]">{detalle}</p>
                   </div>
-                  <AvatarStack nombres={g.duenos.map((d) => d.nombre)} />
+                  <AvatarStack nombres={g.duenos.map((d) => d.nombre)} fotos={g.duenos.map((d) => d.foto)} />
                 </div>
               </Link>
             </li>

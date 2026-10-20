@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, customType } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
 
 export const users = pgTable('users', {
@@ -14,6 +14,20 @@ export const users = pgTable('users', {
   gustos: jsonb('gustos').$type<Gustos>(),
   // Cuándo pasó por la bienvenida (la completó o la salteó). Vacío: se la mostramos al entrar.
   bienvenidaAt: timestamp('bienvenida_at', { withTimezone: true }),
+  // Cuándo subió su foto de perfil (versiona la URL /foto/:id). Vacío: se usa la de Google o las iniciales.
+  fotoAt: timestamp('foto_at', { withTimezone: true }),
+})
+
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
+  dataType: () => 'bytea',
+  fromDriver: (v) => Buffer.from(v),
+})
+
+// Foto de perfil subida por el usuario: JPEG chico (400x400, sin metadatos). Aparte de users para no traerla en cada consulta.
+export const fotosPerfil = pgTable('fotos_perfil', {
+  userId: uuid('user_id').primaryKey().references(() => users.id),
+  datos: bytea('datos').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 // Dos tipos de lista:

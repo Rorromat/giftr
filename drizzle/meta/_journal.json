@@ -36,6 +36,13 @@
       "when": 1792464516648,
       "tag": "0004_bienvenida",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792496879969,
+      "tag": "0005_foto_perfil",
+      "breakpoints": true
     }
   ]
 }

@@ -25,7 +25,7 @@ export async function saltearBienvenida(db: Db, userId: string) {
   await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, userId))
 }
 
-export type GustosDeDueno = { nombre: string; secciones: SeccionGustos[] }
+export type GustosDeDueno = { id: string; nombre: string; secciones: SeccionGustos[] }
 
 /** Para quien regala: los gustos de los dueños de la lista que los cargaron (en un grupo, de cada uno). */
 export async function gustosDeLista(db: Db, listId: string): Promise<GustosDeDueno[]> {
@@ -35,6 +35,6 @@ export async function gustosDeLista(db: Db, listId: string): Promise<GustosDeDue
   if (!duenos.length) return []
   const filas = await db.select({ id: users.id, gustos: users.gustos }).from(users).where(inArray(users.id, duenos.map((d) => d.id)))
   return duenos
-    .map((d) => ({ nombre: d.nombre, secciones: seccionesDeGustos(filas.find((f) => f.id === d.id)?.gustos ?? null) }))
+    .map((d) => ({ id: d.id, nombre: d.nombre, secciones: seccionesDeGustos(filas.find((f) => f.id === d.id)?.gustos ?? null) }))
     .filter((d) => d.secciones.length)
 }

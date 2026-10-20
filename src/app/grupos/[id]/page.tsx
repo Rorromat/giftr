@@ -70,7 +70,7 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
       <section className="gr-sticker flex flex-col gap-3 p-3.5">
         <div className="flex items-center gap-3">
-          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} />
+          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} />
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg leading-tight font-extrabold">
               {otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora'}

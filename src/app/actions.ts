@@ -124,7 +124,9 @@ export async function saveGustosAction(formData: FormData) {
   revalidatePath('/perfil')
   revalidatePath('/eventos')
   revalidatePath('/mi-lista')
-  redirect(str(formData, 'volver') === 'perfil' ? '/perfil' : '/mi-lista')
+  const desdePerfil = str(formData, 'volver') === 'perfil'
+  if (formData.has('corte')) redirect(desdePerfil ? '/perfil' : '/mi-lista')
+  redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/listo')
 }
 
 export async function joinGroupAction(formData: FormData) {

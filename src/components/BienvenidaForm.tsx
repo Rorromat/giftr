@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import { saveGustosAction } from '@/app/actions'
+import { FotoPerfil } from '@/components/FotoPerfil'
+import { Icon, type IconName } from '@/components/ui'
 import {
   BEBIDAS, CLUBES, COLORES, DEPORTES, ESTILOS, HOBBIES, MARCAS, MASCOTAS, NO_FUTBOL, NO_REGALAR, SOLO_SELECCION, TALLES,
   TODAS_LAS_MARCAS, type Gustos,
@@ -10,15 +12,15 @@ import {
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-const PASOS = [
-  { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.' },
-  { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.' },
-  { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…' },
-  { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.' },
-  { titulo: '¿Qué ropa te gusta?', sub: 'Tus marcas y tu estilo.' },
-  { titulo: 'Colores y talles', sub: 'Así nadie tiene que ir a cambiar nada.' },
-  { titulo: 'Bebidas y antojos', sub: 'Para el regalito de último momento.' },
-  { titulo: 'Lo que NO querés', sub: 'Tan importante como lo que sí.' },
+const PASOS: { titulo: string; sub: string; icono: IconName }[] = [
+  { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.', icono: 'cake' },
+  { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.', icono: 'ball' },
+  { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…', icono: 'shield' },
+  { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.', icono: 'star' },
+  { titulo: '¿Qué ropa te gusta?', sub: 'Tus marcas y tu estilo.', icono: 'bag' },
+  { titulo: 'Colores y talles', sub: 'Así nadie tiene que ir a cambiar nada.', icono: 'shirt' },
+  { titulo: 'Bebidas y antojos', sub: 'Para el regalito de último momento.', icono: 'cup' },
+  { titulo: 'Lo que NO querés', sub: 'Tan importante como lo que sí.', icono: 'ban' },
 ]
 
 function Chip({ name, value, checked, type = 'checkbox', children }: {
@@ -44,13 +46,16 @@ function Subtitulo({ children }: { children: ReactNode }) {
   return <p className="gr-label mt-2">{children}</p>
 }
 
-export function BienvenidaForm({ nombre, inicial, cumple, editar }: {
+export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, editar, pasoInicial = 0 }: {
   nombre: string
+  nombreCompleto: string
+  foto: string | null
   inicial: Gustos
   cumple: { dia: number; mes: number } | null
   editar: boolean
+  pasoInicial?: number
 }) {
-  const [paso, setPaso] = useState(0)
+  const [paso, setPaso] = useState(Math.min(Math.max(pasoInicial, 0), PASOS.length - 1))
   const [busqueda, setBusqueda] = useState('')
   const clubPropio = inicial.club && ![...CLUBES, NO_FUTBOL, SOLO_SELECCION].includes(inicial.club) ? inicial.club : null
   const [club, setClub] = useState(clubPropio ? 'otro' : inicial.club ?? '')
@@ -86,21 +91,33 @@ export function BienvenidaForm({ nombre, inicial, cumple, editar }: {
           ))}
         </div>
         <span className="text-sm font-bold tabular-nums">{paso + 1} de {PASOS.length}</span>
-        {/* Se puede cortar en cualquier momento: se guarda lo elegido hasta ahí. */}
-        <button className="min-h-11 flex-none text-[13px] font-bold underline underline-offset-4">
+        {/* Se puede cortar en cualquier momento: se guarda lo elegido hasta ahí (y no pasa por "¡Todo listo!"). */}
+        <button name="corte" value="1" className="min-h-11 flex-none text-[13px] font-bold underline underline-offset-4">
           {editar ? 'Guardar' : 'Más tarde'}
         </button>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-[34px] leading-[0.95] font-extrabold tracking-[-0.04em]">
-          {paso === 0 ? `¡Hola, ${nombre}!` : PASOS[paso].titulo}
-        </h1>
-        <p className="text-[15px] font-medium leading-snug">{PASOS[paso].sub}</p>
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="mt-0.5 flex size-12 flex-none -rotate-6 items-center justify-center rounded-2xl border-[3px] border-gr-ink bg-gr-accent shadow-sticker-sm">
+          <Icon name={PASOS[paso].icono} size={26} strokeWidth={2.4} />
+        </span>
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display text-[34px] leading-[0.95] font-extrabold tracking-[-0.04em]">
+            {paso === 0 ? `¡Hola, ${nombre}!` : PASOS[paso].titulo}
+          </h1>
+          <p className="text-[15px] font-medium leading-snug">{PASOS[paso].sub}</p>
+        </div>
       </div>
 
       {/* Todos los pasos están en el mismo formulario: los ocultos también se mandan al final. */}
       <section className={ver(0, 'flex flex-col gap-3')}>
+        <div className="gr-sticker flex items-center gap-4 p-3.5">
+          <FotoPerfil nombre={nombreCompleto} foto={foto} size={72} propia />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="font-display text-lg font-extrabold">Tu foto</p>
+            <p className="text-[13px] font-medium leading-snug">Tocala para subir una. Así te reconocen en sus listas y grupos.</p>
+          </div>
+        </div>
         <div className="gr-sticker flex flex-col gap-2.5 p-3.5">
           <p className="font-display text-lg font-extrabold">¿Cuándo es tu cumple?</p>
           <div className="flex gap-2">

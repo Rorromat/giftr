@@ -2,13 +2,13 @@ import { randomBytes } from 'node:crypto'
 import { and, asc, count, desc, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { items, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { newShareToken } from '@/lib/users'
+import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
 
-export type Dueno = { id: string; nombre: string }
+export type Dueno = { id: string; nombre: string; foto: string | null }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const esUuid = (s: string) => UUID.test(s)
@@ -42,14 +42,12 @@ export function noEsDuenoSql(db: Db, userId: string) {
 
 /** Dueños de una lista en orden: el de la lista personal, o los miembros del grupo por antigüedad. */
 export async function duenosDeLista(db: Db, list: { id: string; ownerId: string | null }): Promise<Dueno[]> {
-  if (list.ownerId) {
-    const [u] = await db.select({ id: users.id, nombre: users.nombre }).from(users).where(eq(users.id, list.ownerId))
-    return u ? [u] : []
-  }
-  return db.select({ id: users.id, nombre: users.nombre })
-    .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
-    .where(eq(listMembers.listId, list.id))
-    .orderBy(asc(listMembers.createdAt))
+  const campos = { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }
+  const filas = list.ownerId
+    ? await db.select(campos).from(users).where(eq(users.id, list.ownerId))
+    : await db.select(campos).from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
+      .where(eq(listMembers.listId, list.id)).orderBy(asc(listMembers.createdAt))
+  return filas.map((u) => ({ id: u.id, nombre: u.nombre, foto: urlFoto(u) }))
 }
 
 export async function esDuenoDeLista(db: Db, listId: string, userId: string): Promise<boolean> {
@@ -101,7 +99,7 @@ export async function misGrupos(db: Db, userId: string): Promise<GrupoResumen[]>
   const ids = grupos.map((g) => g.id)
 
   const [miembros, conteos, conFoto] = await Promise.all([
-    db.select({ listId: listMembers.listId, id: users.id, nombre: users.nombre })
+    db.select({ listId: listMembers.listId, id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl })
       .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
       .where(inArray(listMembers.listId, ids)).orderBy(asc(listMembers.createdAt)),
     db.select({ listId: items.listId, n: count() }).from(items)
@@ -117,7 +115,7 @@ export async function misGrupos(db: Db, userId: string): Promise<GrupoResumen[]>
     descripcion: g.descripcion,
     eventoFecha: g.eventoFecha,
     eventoAnual: g.eventoAnual,
-    duenos: miembros.filter((m) => m.listId === g.id).map(({ id, nombre }) => ({ id, nombre })),
+    duenos: miembros.filter((m) => m.listId === g.id).map((m) => ({ id: m.id, nombre: m.nombre, foto: urlFoto(m) })),
     cantidad: conteos.find((c) => c.listId === g.id)?.n ?? 0,
     fotos: conFoto.filter((i) => i.listId === g.id && i.fotoUrl).map((i) => i.fotoUrl!).slice(0, 3),
   }))

@@ -7,10 +7,12 @@ import { saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
+import { miFoto } from '@/lib/perfil'
+import { FotoPerfil } from '@/components/FotoPerfil'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
-import { AvatarSticker, BottomNav, Icon, Starburst } from '@/components/ui'
+import { BottomNav, Icon, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
@@ -20,6 +22,7 @@ export default async function Perfil() {
   const [lista, cumple, cuentas, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId), misGustos(db, session.userId),
   ])
+  const foto = await miFoto(db, session.userId)
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
@@ -32,7 +35,7 @@ export default async function Perfil() {
   return (
     <main className="flex flex-col gap-3.5 pb-32 pt-[60px]">
       <div className="flex items-center gap-4">
-        <AvatarSticker nombre={nombre} size={84} />
+        <FotoPerfil nombre={nombre} foto={foto} size={84} propia />
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="font-display text-[32px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">{nombre}</h1>
           {email && <p className="truncate text-sm text-gr-muted">{email}</p>}
@@ -72,6 +75,9 @@ export default async function Perfil() {
           <p className="truncate text-[13px] font-medium">{secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}</p>
         </div>
         <span className="text-sm font-bold underline decoration-2 underline-offset-4">{secciones.length ? 'Editar' : 'Completar'}</span>
+      </Link>
+      <Link href={`/l/${lista.shareToken}/perfil`} className="-mt-1.5 self-end text-sm font-bold underline decoration-2 underline-offset-4">
+        Ver cómo me ven los demás
       </Link>
 
       {/* Cuentas de los regalos grupales: a quién le debés y quién te debe */}

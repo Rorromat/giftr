@@ -21,3 +21,8 @@ export async function upsertUserFromGoogle(
   await promoteGuest(db, p.email, user.id)
   return user
 }
+
+/** La foto subida (versionada para poder cachearla para siempre), si no la de Google, si no nada (iniciales). */
+export function urlFoto(u: { id: string; fotoAt: Date | null; avatarUrl: string | null }): string | null {
+  return u.fotoAt ? `/foto/${u.id}?v=${u.fotoAt.getTime()}` : u.avatarUrl
+}
