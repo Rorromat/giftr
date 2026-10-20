@@ -9,7 +9,7 @@ import type { GiverItemView } from '@/lib/serialize'
 import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
-import { GustosDe } from '@/components/Gustos'
+import { TarjetaPerfil } from '@/components/Gustos'
 import { GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { Banners } from '@/components/Banners'
@@ -79,7 +79,12 @@ export default async function ListaAjena({
   return (
     <main className="flex flex-col gap-3 pb-32 pt-[52px]">
       <div className="flex items-center gap-3">
-        {vista.grupoNombre ? <AvatarStack nombres={vista.duenos} size={48} /> : <AvatarSticker nombre={vista.ownerNombre} />}
+        {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
+        <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
+          {vista.grupoNombre
+            ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={48} />
+            : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} />}
+        </Link>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="font-display text-[34px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">
             {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
@@ -101,7 +106,10 @@ export default async function ListaAjena({
         {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
       </p>
 
-      {gustos.map((g) => <GustosDe key={g.nombre} nombre={g.nombre.split(' ')[0]} secciones={g.secciones} />)}
+      {gustos.map((g) => (
+        <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
+                       href={`/l/${token}/perfil${vista.perfiles[0]?.id === g.id ? '' : `?quien=${g.id}`}`} />
+      ))}
 
       <Banners />
 

@@ -19,7 +19,7 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 pb-12 text-center">
-      <AvatarStack nombres={nombres} size={64} />
+      <AvatarStack nombres={nombres} fotos={grupo.duenos.map((d) => d.foto)} size={64} />
       <p className="text-[15px] font-medium">{invitan} a armar juntos</p>
       <h1 className="font-display text-[40px] leading-[0.95] font-extrabold tracking-[-0.05em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}

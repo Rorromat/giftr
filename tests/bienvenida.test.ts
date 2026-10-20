@@ -73,11 +73,12 @@ test('quien regala ve los gustos de cada dueño que los cargó', async () => {
   await guardarGustos(db, euge.id, sanitizarGustos({ club: NO_FUTBOL, hobbies: ['Leer'], mascotas: ['No tengo'], talles: { remera: 'S' } }))
   const [personal] = await db.select().from(lists).where(eq(lists.ownerId, euge.id))
   expect(await gustosDeLista(db, personal.id)).toEqual([{
+    id: euge.id,
     nombre: 'Euge Mateus',
     secciones: [
-      { titulo: 'No le interesa', items: ['El fútbol'] },
-      { titulo: 'Hobbies y planes', items: ['Leer'] },
-      { titulo: 'Talles', items: ['Remera S'] },
+      { clave: 'club', titulo: 'No le interesa', icono: 'shield', items: ['El fútbol'] },
+      { clave: 'hobbies', titulo: 'Hobbies y planes', icono: 'star', items: ['Leer'] },
+      { clave: 'talles', titulo: 'Talles', icono: 'shirt', items: ['Remera S'] },
     ],
   }])
 
@@ -86,7 +87,7 @@ test('quien regala ve los gustos de cada dueño que los cargó', async () => {
   await unirseAGrupo(db, grupo.inviteToken!, martin.id)
   expect(await gustosDeLista(db, grupoId)).toEqual([]) // nadie cargó nada todavía
   await guardarGustos(db, martin.id, sanitizarGustos({ club: SOLO_SELECCION }))
-  expect(await gustosDeLista(db, grupoId)).toEqual([{ nombre: 'Martín', secciones: [{ titulo: 'Hincha de', items: ['La Selección'] }] }])
+  expect(await gustosDeLista(db, grupoId)).toEqual([{ id: martin.id, nombre: 'Martín', secciones: [{ clave: 'club', titulo: 'Hincha de', icono: 'shield', items: ['La Selección'] }] }])
 })
 
 test('en tu perfil los títulos hablan de vos', () => {
