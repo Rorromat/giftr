@@ -97,7 +97,7 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
-      <OwnerItemsGrid items={activos} />
+      <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} />
 
       {grupo.duenos.length > 1 && (
         <form action={leaveGroupAction} className="mt-4 self-center">

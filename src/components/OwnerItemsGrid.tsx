@@ -2,6 +2,7 @@ import { archiveItemAction } from '@/app/actions'
 import { PrioritySelect } from '@/components/PrioritySelect'
 import { Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
+import { textoDueno } from '@/lib/compartir'
 
 // Collage de 2 columnas: alto de foto, giro de la card y giro del precio, alternados cada 4.
 const COLLAGE = [
@@ -12,7 +13,7 @@ const COLLAGE = [
 ]
 
 /** Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas. */
-export function OwnerItemsGrid({ items }: { items: OwnerItemView[] }) {
+export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; shareToken: string }) {
   const porCategoria = Object.groupBy(items, (i) => i.categoria ?? 'Sin categoría')
   return Object.entries(porCategoria).map(([cat, catItems]) => (
     <section key={cat} className="mt-1.5 flex flex-col gap-3">
@@ -34,12 +35,18 @@ export function OwnerItemsGrid({ items }: { items: OwnerItemView[] }) {
                       <Icon name="more" size={18} strokeWidth={2.6} />
                     </span>
                   </summary>
-                  <form action={archiveItemAction}
-                        className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface shadow-sticker-sm">
-                    <input type="hidden" name="itemId" value={item.id} />
-                    <button name="estado" value="lo_tengo" className="min-h-11 px-3 text-left text-sm font-bold">Ya lo tengo</button>
-                    <button name="estado" value="no_lo_quiero" className="min-h-11 border-t-[2.5px] border-gr-ink px-3 text-left text-sm font-bold">Ya no lo quiero</button>
-                  </form>
+                  <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface shadow-sticker-sm">
+                    {/* El link del deseo es el de quien regala: WhatsApp muestra la foto y el precio */}
+                    <a target="_blank" className="flex min-h-11 items-center px-3 text-sm font-bold"
+                       href={`https://wa.me/?text=${encodeURIComponent(textoDueno(item, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${item.id}`))}`}>
+                      Mandar por WhatsApp
+                    </a>
+                    <form action={archiveItemAction} className="flex flex-col">
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <button name="estado" value="lo_tengo" className="min-h-11 border-t-[2.5px] border-gr-ink px-3 text-left text-sm font-bold">Ya lo tengo</button>
+                      <button name="estado" value="no_lo_quiero" className="min-h-11 border-t-[2.5px] border-gr-ink px-3 text-left text-sm font-bold">Ya no lo quiero</button>
+                    </form>
+                  </div>
                 </details>
               </div>
               <div className="flex flex-col gap-0.5 px-[11px] pb-[11px] pt-[9px]">
