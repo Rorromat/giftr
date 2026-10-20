@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/regalos'
-import { markPaidAction, settleUpAction } from '@/app/actions'
+import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { AvatarSticker, BackLink, BottomNav, Icon, Starburst } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
@@ -109,6 +109,17 @@ export default async function Cuentas() {
                   </span>
                   <Icon name="chevron" size={18} strokeWidth={2.6} />
                 </Link>
+                {!r.sigueEnLaLista && (
+                  <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
+                    <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>
+                    {r.soyEncargado && (
+                      <form action={cancelGroupGiftAction}>
+                        <input type="hidden" name="giftId" value={r.giftId} />
+                        <button className="min-h-11 font-bold underline decoration-2 underline-offset-4">Cancelar el regalo</button>
+                      </form>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

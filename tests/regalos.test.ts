@@ -5,7 +5,7 @@ import { claims, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
-import { createItem } from '@/lib/items'
+import { archiveItem, createItem } from '@/lib/items'
 import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
@@ -172,6 +172,17 @@ test('bajarse y cancelar: el encargado no se baja, cancela y libera el deseo', a
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
   expect(vista.items.find((i) => i.id === bici.id)).toMatchObject({ disponible: true, claims: [] })
   expect(await sumarseARegalo(db, giftId, martin.id)).toBe(false)
+})
+
+test('si la dueña lo saca de la lista, el encargado lo ve en Cuentas y lo puede cancelar', async () => {
+  const { db, mama, rodri, sofi, bici, giftId } = await conRegalo()
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  const enCurso = (await misCuentas(db, rodri.id)).enCurso
+  expect(enCurso).toEqual([expect.objectContaining({ giftId, sigueEnLaLista: false, soyEncargado: true })])
+  expect(enCurso[0].href).not.toContain(bici.id) // el detalle ya no existe para quien regala
+  expect((await misCuentas(db, sofi.id)).enCurso[0]).toMatchObject({ sigueEnLaLista: false, soyEncargado: false })
+  expect(await cancelarRegalo(db, giftId, rodri.id)).toBe(true)
+  expect((await misCuentas(db, sofi.id)).enCurso).toEqual([])
 })
 
 test('historial: quién se ocupó de cada regalo y cuántos compró cada uno', async () => {

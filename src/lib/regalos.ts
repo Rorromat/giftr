@@ -226,7 +226,11 @@ export type CuentaPersona = Persona & {
   lineas: LineaCuenta[]
 }
 
-export type RegaloEnCurso = { giftId: string; itemTitulo: string; para: string; href: string; encargado: string; soyEncargado: boolean; personas: string[] }
+export type RegaloEnCurso = {
+  giftId: string; itemTitulo: string; para: string; href: string; encargado: string; soyEncargado: boolean; personas: string[]
+  /** false si el dueño lo sacó de su lista: el encargado lo cancela desde Cuentas. */
+  sigueEnLaLista: boolean
+}
 
 export type Cuentas = {
   debes: number
@@ -324,7 +328,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     personas: [...porPersona.values()].sort((a, b) => a.neto - b.neto),
     enCurso: abiertos.map((a) => ({
       giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a),
-      encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId,
+      encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
       personas: nombres.filter((n) => n.giftId === a.giftId).map((n) => n.nombre),
     })),
     saldadas: saldadas.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 10),
