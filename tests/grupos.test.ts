@@ -4,7 +4,7 @@ import { createTestDb } from './helpers'
 import { claims, comments, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { getListForViewer, getItemForViewer, getOwnList } from '@/lib/lists'
-import { crearGrupo, grupoParaDueno, grupoPorInvitacion, juntarNombres, misGrupos, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, grupoParaDueno, grupoPorInvitacion, juntarNombres, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
@@ -49,7 +49,7 @@ test('EL TEST DE ORO, grupos: ningún dueño del grupo ve reservas ni comentario
     const vistaGrupo = await grupoParaDueno(db, grupo.id, dueno.id)
     expect(Object.keys(vistaGrupo!.items[0]).sort()).toEqual(OWNER_KEYS)
 
-    for (const json of [porToken, detalle, vistaGrupo, await misGrupos(db, dueno.id)].map((v) => JSON.stringify(v).toLowerCase())) {
+    for (const json of [porToken, detalle, vistaGrupo].map((v) => JSON.stringify(v).toLowerCase())) {
       for (const palabra of SPOILERS) expect(json).not.toContain(palabra.toLowerCase())
     }
   }
@@ -83,16 +83,6 @@ test('la invitación muestra el grupo, es idempotente y no sirve una inválida',
   expect(await unirseAGrupo(db, 'no-existe', martin.id)).toBeNull()
   // el link para regalar no sirve como invitación
   expect(await grupoPorInvitacion(db, grupo.shareToken)).toBeNull()
-})
-
-test('Mis grupos: dueños, regalos activos y fotos', async () => {
-  const { db, delfina, martin, grupo } = await setup()
-  await createItem(db, martin.id, { tipo: 'idea', titulo: 'Plantas' }, grupo.id)
-  const archivado = (await createItem(db, martin.id, { tipo: 'idea', titulo: 'Velas', fotoUrl: 'https://x/velas.jpg' }, grupo.id))!
-  await archiveItem(db, archivado.id, delfina.id, 'no_lo_quiero')
-  const [g] = await misGrupos(db, martin.id)
-  expect(g).toMatchObject({ id: grupo.id, nombre: 'Nuestra casa', cantidad: 2, fotos: ['https://x/copas.jpg'] })
-  expect(g.duenos.map((d) => d.nombre)).toEqual(['Delfina', 'Martín'])
 })
 
 test('cualquier dueño agrega, edita y archiva; un extraño no', async () => {

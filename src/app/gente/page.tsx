@@ -1,0 +1,96 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
+import { db } from '@/db'
+import { getOwnList } from '@/lib/lists'
+import { miGente, type Contacto } from '@/lib/gente'
+import { juntarNombres } from '@/lib/groups'
+import { MESES } from '@/lib/events'
+import { unfollowAction } from '@/app/actions'
+import { AvatarStack, AvatarSticker, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
+
+/** "Cumple el 22 de agosto · en 14 días", "El 12 de octubre", "Sin cumple cargado". La cuenta no se corta en dos renglones. */
+function cuando(c: Contacto) {
+  if (!c.proxima) return c.tipo === 'personal' ? 'Sin cumple cargado' : null
+  const { fecha, dias } = c.proxima
+  const falta = dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : dias <= 60 ? `en\u00a0${dias}\u00a0días` : null
+  return [`${c.tipo === 'personal' ? 'Cumple el' : 'El'} ${fecha.getUTCDate()} de ${MESES[fecha.getUTCMonth()]}`, falta].filter(Boolean).join(' · ')
+}
+
+function Persona({ c }: { c: Contacto }) {
+  const detalle = [
+    c.tipo === 'grupo' && `De ${juntarNombres(c.duenos.map((d) => d.nombre.split(' ')[0]))}`,
+    `${c.deseos} ${c.deseos === 1 ? 'deseo' : 'deseos'}`,
+  ].filter(Boolean).join(' · ')
+  const fecha = cuando(c)
+  return (
+    <li className="gr-sticker flex items-center gap-1 overflow-visible py-2.5 pl-3 pr-1.5">
+      <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">
+        {c.tipo === 'personal'
+          ? <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={48} />
+          : <AvatarStack nombres={c.duenos.map((d) => d.nombre).slice(0, 3)} fotos={c.duenos.map((d) => d.foto).slice(0, 3)} />}
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">{c.nombre}</p>
+          {fecha && <p className="text-[13px] font-semibold leading-snug">{fecha}</p>}
+          <p className="text-[13px] font-medium leading-snug text-gr-muted [overflow-wrap:anywhere]">{detalle}</p>
+        </div>
+      </Link>
+      {/* Quitar pide dos toques: sin el link, no hay otra forma de volver a su lista */}
+      <details className="relative flex-none">
+        <summary aria-label={`Opciones de ${c.nombre}`}
+                 className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
+          <Icon name="more" size={22} strokeWidth={2.6} />
+        </summary>
+        <form action={unfollowAction}
+              className="absolute right-0 top-full z-20 mt-1 flex w-60 flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3 shadow-sticker-sm">
+          <input type="hidden" name="listId" value={c.listId} />
+          <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
+          <button className="gr-btn gr-btn--sm min-h-11 font-sans text-sm font-bold">Quitar de tu gente</button>
+        </form>
+      </details>
+    </li>
+  )
+}
+
+export default async function Gente() {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const [gente, lista] = await Promise.all([miGente(db, session.userId), getOwnList(db, session.userId)])
+  const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista?.shareToken ?? ''}`
+  const wa = encodeURIComponent(`Te paso mi lista de deseos en GiftR 🎁 ${shareUrl} ¿Me pasás la tuya así sé qué regalarte?`)
+
+  return (
+    <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
+      <div className="flex flex-col gap-1">
+        <h1 className="gr-title">Tu gente</h1>
+        <p className="text-[15px] font-medium">A quienes les regalás, con sus listas a mano.</p>
+      </div>
+
+      {gente.length === 0 ? (
+        <div className="relative mt-4 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">
+          <Starburst size={52} fontSize={46} className="absolute -right-2 -top-6 rotate-12">!</Starburst>
+          <p>Acá aparece la gente cuyas listas abrís con tu cuenta.</p>
+          <p>Es solo para vos: nadie ve a quién tenés.</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {gente.map((c) => <Persona key={c.listId} c={c} />)}
+        </ul>
+      )}
+
+      <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
+        <div>
+          <p className="font-display text-lg leading-tight font-extrabold">¿Falta alguien?</p>
+          <p className="text-[13px] font-medium leading-snug">Pedile el link de su lista y abrilo con tu cuenta: queda acá y su cumple aparece en Eventos.</p>
+        </div>
+        {lista && (
+          <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn min-h-11 gap-2 font-sans text-sm font-bold">
+            <Icon name="chat" size={18} strokeWidth={2.4} />Pedile su lista por WhatsApp
+          </a>
+        )}
+      </section>
+
+      <BottomNav active="gente" />
+    </Seccion>
+  )
+}

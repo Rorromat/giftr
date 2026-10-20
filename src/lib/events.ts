@@ -163,6 +163,12 @@ export async function seguirLista(db: Db, userId: string, listId: string) {
   await db.insert(listFollows).values({ userId, listId }).onConflictDoNothing()
 }
 
+/** La saca de las que sigue: deja de estar en Tu gente y en Eventos (vuelve si abre la lista de nuevo). */
+export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
+  if (!esUuid(listId)) return
+  await db.delete(listFollows).where(and(eq(listFollows.userId, userId), eq(listFollows.listId, listId)))
+}
+
 /** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
 export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
   if (!esUuid(listId)) return null

@@ -1,5 +1,5 @@
 import { SkeletonPage } from '@/components/Skeleton'
 
 export default function Loading() {
-  return <SkeletonPage nav="grupos" cards={2} />
+  return <SkeletonPage nav="gente" cards={2} />
 }

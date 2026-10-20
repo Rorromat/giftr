@@ -3,15 +3,18 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
+import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { Banners } from '@/components/Banners'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { BottomNav, Icon, LogoSticker, Starburst } from '@/components/ui'
+import { BottomNav, Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
 
 export default async function MiLista() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida] = await Promise.all([getOwnList(db, session.userId), necesitaBienvenida(db, session.userId)])
+  const [lista, bienvenida, grupos] = await Promise.all([
+    getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId),
+  ])
   if (!lista) redirect('/')
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
@@ -21,7 +24,7 @@ export default async function MiLista() {
   const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
 
   return (
-    <main className="flex flex-col gap-3.5 pb-48 pt-[52px]">
+    <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
         <LogoSticker />
         <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
@@ -37,6 +40,13 @@ export default async function MiLista() {
           </Starburst>
         )}
       </div>
+
+      {/* Tus listas: la tuya y las que armás con otros (grupos) */}
+      <nav aria-label="Tus listas" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1">
+        <Link href="/mi-lista" aria-current="page" className="gr-chip">Mi lista</Link>
+        {grupos.map((g) => <Link key={g.id} href={`/grupos/${g.id}`} className="gr-chip">{g.nombre}</Link>)}
+        <Link href="/grupos/nuevo" className="gr-chip">+ Lista en común</Link>
+      </nav>
 
       <Banners />
 
@@ -56,6 +66,6 @@ export default async function MiLista() {
       </a>
 
       <BottomNav active="mi-lista" />
-    </main>
+    </Seccion>
   )
 }

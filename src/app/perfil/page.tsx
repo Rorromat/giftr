@@ -14,7 +14,7 @@ import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
-import { BottomNav, Icon, Starburst } from '@/components/ui'
+import { BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
@@ -35,7 +35,7 @@ export default async function Perfil() {
   const nombre = session.user?.name ?? email
 
   return (
-    <main className="flex flex-col gap-3.5 pb-32 pt-[60px]">
+    <Seccion className="flex flex-col gap-3.5 pb-32 pt-[60px]">
       <div className="flex items-center gap-4">
         <FotoPerfil nombre={nombre} foto={foto} size={84} propia />
         <div className="flex min-w-0 flex-col gap-0.5">
@@ -127,6 +127,6 @@ export default async function Perfil() {
       </form>
 
       <BottomNav active="perfil" />
-    </main>
+    </Seccion>
   )
 }

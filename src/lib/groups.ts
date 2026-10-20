@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { and, asc, count, desc, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { items, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { newShareToken, urlFoto } from '@/lib/users'
@@ -67,58 +67,13 @@ export async function crearGrupo(db: Db, userId: string, p: { nombre: string; de
   })
 }
 
-/** Solo id y nombre de los grupos del usuario (para elegir lista al agregar un deseo). */
+/** Solo id y nombre de los grupos del usuario (para elegir lista al agregar un deseo y arriba de Mi lista). */
 export async function nombresDeMisGrupos(db: Db, userId: string) {
   const rows = await db.select({ id: lists.id, nombre: lists.nombre })
     .from(lists).innerJoin(listMembers, eq(listMembers.listId, lists.id))
     .where(and(eq(listMembers.userId, userId), eq(lists.tipo, 'grupo')))
     .orderBy(desc(lists.createdAt))
   return rows.map((r) => ({ id: r.id, nombre: r.nombre ?? 'Grupo' }))
-}
-
-export type GrupoResumen = {
-  id: string
-  nombre: string
-  descripcion: string | null
-  eventoFecha: string | null
-  eventoAnual: boolean
-  duenos: Dueno[]
-  cantidad: number
-  fotos: string[]
-}
-
-/** Los grupos del usuario para la pantalla Grupos: dueños, cuántos regalos activos y hasta 3 fotos. */
-export async function misGrupos(db: Db, userId: string): Promise<GrupoResumen[]> {
-  const grupos = await db.select({
-    id: lists.id, nombre: lists.nombre, descripcion: lists.descripcion, eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual,
-  })
-    .from(lists).innerJoin(listMembers, eq(listMembers.listId, lists.id))
-    .where(and(eq(listMembers.userId, userId), eq(lists.tipo, 'grupo')))
-    .orderBy(desc(lists.createdAt))
-  if (!grupos.length) return []
-  const ids = grupos.map((g) => g.id)
-
-  const [miembros, conteos, conFoto] = await Promise.all([
-    db.select({ listId: listMembers.listId, id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl })
-      .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
-      .where(inArray(listMembers.listId, ids)).orderBy(asc(listMembers.createdAt)),
-    db.select({ listId: items.listId, n: count() }).from(items)
-      .where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo'))).groupBy(items.listId),
-    db.select({ listId: items.listId, fotoUrl: items.fotoUrl }).from(items)
-      .where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo')))
-      .orderBy(asc(items.createdAt)),
-  ])
-
-  return grupos.map((g) => ({
-    id: g.id,
-    nombre: g.nombre ?? 'Grupo',
-    descripcion: g.descripcion,
-    eventoFecha: g.eventoFecha,
-    eventoAnual: g.eventoAnual,
-    duenos: miembros.filter((m) => m.listId === g.id).map((m) => ({ id: m.id, nombre: m.nombre, foto: urlFoto(m) })),
-    cantidad: conteos.find((c) => c.listId === g.id)?.n ?? 0,
-    fotos: conFoto.filter((i) => i.listId === g.id && i.fotoUrl).map((i) => i.fotoUrl!).slice(0, 3),
-  }))
 }
 
 /** El grupo visto por uno de sus dueños (nunca incluye reservas ni comentarios). Null si no es dueño. */

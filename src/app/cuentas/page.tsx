@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/regalos'
 import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
-import { AvatarSticker, BackLink, BottomNav, Icon, Starburst } from '@/components/ui'
+import { AvatarSticker, BackLink, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (
@@ -58,7 +58,7 @@ export default async function Cuentas() {
   const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length
 
   return (
-    <main className="flex flex-col gap-4 pb-32 pt-[52px]">
+    <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
       <div className="flex items-center gap-3.5">
         <BackLink href="/perfil" label="Volver a Perfil" />
         <div className="flex flex-col gap-0.5">
@@ -144,6 +144,6 @@ export default async function Cuentas() {
       )}
 
       <BottomNav active="perfil" />
-    </main>
+    </Seccion>
   )
 }
