@@ -43,6 +43,13 @@
       "when": 1792496879969,
       "tag": "0005_foto_perfil",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792498101820,
+      "tag": "0006_codazo",
+      "breakpoints": true
     }
   ]
 }

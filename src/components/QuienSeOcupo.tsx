@@ -44,7 +44,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
         </figure>
       ) : (
         <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold">
-          {ranking[0].esYo ? 'Vos te ocupaste' : `${ranking[0].nombre} se ocupó`} de {entradas.length === 1 ? 'el único regalo' : `los ${entradas.length} regalos`} hasta ahora.
+          {ranking[0].esYo ? 'Vos te ocupaste' : `${ranking[0].nombre} se ocupó`} {entradas.length === 1 ? 'del único regalo' : `de los ${entradas.length} regalos`} hasta ahora.
         </p>
       )}
 

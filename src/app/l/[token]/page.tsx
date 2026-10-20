@@ -10,6 +10,7 @@ import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
 import { TarjetaPerfil } from '@/components/Gustos'
+import { Codazo } from '@/components/Codazo'
 import { GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { Banners } from '@/components/Banners'
@@ -43,10 +44,10 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string }>
 }) {
   const { token } = await params
-  const { cat, disp } = await searchParams
+  const { cat, disp, codazo } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) notFound()
@@ -126,7 +127,7 @@ export default async function ListaAjena({
 
       {mostrados.length === 0 && (
         <p className="mt-8 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
-          Todavía no cargó nada — mandale un codazo
+          {vista.items.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
         </p>
       )}
 
@@ -197,6 +198,11 @@ export default async function ListaAjena({
           })}
         </ul>
       )}
+
+      <div className="mt-4">
+        <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
+                identified={identified} resultado={codazo} />
+      </div>
 
       {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}
 
