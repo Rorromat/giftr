@@ -40,7 +40,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
   return (
     <main className="flex flex-col gap-5 pb-12 pt-[52px]">
       <div className="relative flex flex-col items-center gap-3 pt-4 text-center">
-        <Starburst size={120} fontSize={38} label="Listo" className="rotate-12">¡Listo!</Starburst>
+        <Starburst size={136} fontSize={30} label="Listo" className="rotate-12">¡Listo!</Starburst>
         <h1 className="gr-title">¡Todo listo{nombre ? `, ${nombre.split(' ')[0]}` : ''}!</h1>
         <p className="text-[15px] font-medium leading-snug">
           {completas === filas.length ? 'Cargaste todo. ' : `Cargaste ${completas} de ${filas.length}. `}
