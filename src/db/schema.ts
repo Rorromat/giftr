@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, primaryKey, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index } from 'drizzle-orm/pg-core'
+import type { Gustos } from '@/lib/gustos'
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -9,6 +10,10 @@ export const users = pgTable('users', {
   // Cumpleaños sin año (alimenta Eventos de la gente que sigue su lista).
   cumpleDia: smallint('cumple_dia'),
   cumpleMes: smallint('cumple_mes'),
+  // Gustos de la bienvenida (deportes, club, marcas, talles…): pistas para los que regalan.
+  gustos: jsonb('gustos').$type<Gustos>(),
+  // Cuándo pasó por la bienvenida (la completó o la salteó). Vacío: se la mostramos al entrar.
+  bienvenidaAt: timestamp('bienvenida_at', { withTimezone: true }),
 })
 
 // Dos tipos de lista:

@@ -15,6 +15,8 @@ import { createGuest } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { guardarCumple, guardarFechaGrupo } from '@/lib/events'
+import { guardarGustos } from '@/lib/bienvenida'
+import { gustosDesdeForm } from '@/lib/gustos'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
 import type { Viewer } from '@/lib/types'
 
@@ -103,13 +105,26 @@ export async function setGroupDateAction(formData: FormData) {
   revalidatePath('/eventos')
 }
 
+const numero = (fd: FormData, k: string) => { const v = Number(str(fd, k)); return Number.isInteger(v) && v > 0 ? v : null }
+
 export async function saveBirthdayAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const n = (k: string) => { const v = Number(str(formData, k)); return Number.isInteger(v) && v > 0 ? v : null }
-  await guardarCumple(db, session.userId, n('dia'), n('mes'))
+  await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
   revalidatePath('/perfil')
   revalidatePath('/eventos')
+}
+
+/** Bienvenida (o editar gustos desde Perfil): guarda lo elegido, aunque se corte a mitad de camino. */
+export async function saveGustosAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await guardarGustos(db, session.userId, gustosDesdeForm(formData))
+  if (formData.has('dia')) await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+  revalidatePath('/perfil')
+  revalidatePath('/eventos')
+  revalidatePath('/mi-lista')
+  redirect(str(formData, 'volver') === 'perfil' ? '/perfil' : '/mi-lista')
 }
 
 export async function joinGroupAction(formData: FormData) {

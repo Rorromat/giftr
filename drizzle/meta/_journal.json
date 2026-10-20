@@ -29,6 +29,13 @@
       "when": 1792462862428,
       "tag": "0003_regalos_grupales",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792464516648,
+      "tag": "0004_bienvenida",
+      "breakpoints": true
     }
   ]
 }
