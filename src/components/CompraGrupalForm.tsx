@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { buyGroupGiftAction } from '@/app/actions'
 import { dividir, parsePesos, pesos } from '@/lib/pesos'
 
-const soloDigitos = (v: string) => v.replace(/\D/g, '')
+const soloDigitos = (v: string) => v.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+/** "45000" → "45.000" mientras se escribe. */
+const conPuntos = (v: string) => (v ? pesos(Number(v)).slice(1) : '')
 
 /**
  * "Lo compré": el encargado pone cuánto salió y cómo se divide.
@@ -45,8 +47,8 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido }: 
         <span className="gr-label">¿Cuánto salió en total?</span>
         <span className="flex items-center gap-1 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5">
           <span className="font-display text-xl font-extrabold">$</span>
-          <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90000"
-                 value={total} onChange={(e) => setTotal(soloDigitos(e.target.value))}
+          <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
+                 value={conPuntos(total)} onChange={(e) => setTotal(soloDigitos(e.target.value))}
                  className="min-h-[50px] w-full bg-transparent font-display text-xl font-extrabold outline-none" />
         </span>
       </label>
@@ -64,7 +66,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido }: 
               <span className="flex items-center gap-1 rounded-xl border-2 border-gr-ink px-2">
                 <span className="font-bold">$</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`}
-                       value={partes[m.userId] ?? ''} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}
+                       value={conPuntos(partes[m.userId] ?? '')} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}
                        className="min-h-10 w-24 bg-transparent text-right font-display text-lg font-extrabold outline-none" />
               </span>
             ) : (

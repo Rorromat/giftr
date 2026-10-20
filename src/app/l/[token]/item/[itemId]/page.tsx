@@ -69,7 +69,8 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {regalos.map((r) => (
           <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
-                        precio={parsePesos(precio)} logueado={logueado} error={r.soyEncargado ? error : undefined} />
+                        precio={parsePesos(precio)} logueado={logueado}
+                        nota={item.claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} error={r.soyEncargado ? error : undefined} />
         ))}
 
         {item.disponible && !miClaim && !enUnRegalo && (

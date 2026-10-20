@@ -55,11 +55,13 @@ const ERRORES: Record<string, string> = {
   no_permitido: 'No se pudo: puede que alguien se haya sumado o bajado recién. Probá de nuevo.',
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, logueado, error }: Ctx & {
+export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, nota, logueado, error }: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
   precio: number | null
+  /** Lo que anotó el encargado al comprarlo. */
+  nota?: string | null
   logueado: boolean
   error?: string
 }) {
@@ -147,6 +149,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
       ) : (
         <>
           {/* Comprado: quién puso cuánto y quién ya le pagó al encargado, a lo Splitwise */}
+          {nota && <p className="text-sm"><span className="font-bold">Compró:</span> {nota}</p>}
           <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3">
             {regalo.miembros.map((m) => {
               const puedoMarcar = !m.esEncargado && (regalo.soyEncargado || m.esYo)
@@ -154,7 +157,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                 <li key={m.userId} className="flex min-h-12 items-center gap-2 py-1.5">
                   <span className="min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">
                     {m.esYo ? 'Vos' : m.nombre}
-                    {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">lo pagó</span>}
+                    {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                   </span>
                   <span className="font-display text-lg font-extrabold tabular-nums">{pesos(m.monto ?? 0)}</span>
                   <span className={`flex-none rounded-full border-2 border-gr-ink px-2 py-0.5 text-xs font-bold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-ink text-gr-bg'}`}>
