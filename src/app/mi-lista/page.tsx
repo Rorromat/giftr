@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
+import { necesitaBienvenida } from '@/lib/bienvenida'
 import { Banners } from '@/components/Banners'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { BottomNav, Icon, LogoSticker, Starburst } from '@/components/ui'
@@ -10,8 +11,10 @@ import { BottomNav, Icon, LogoSticker, Starburst } from '@/components/ui'
 export default async function MiLista() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const lista = await getOwnList(db, session.userId)
+  const [lista, bienvenida] = await Promise.all([getOwnList(db, session.userId), necesitaBienvenida(db, session.userId)])
   if (!lista) redirect('/')
+  // La primera vez que entra: los pasos de bienvenida con sus gustos.
+  if (bienvenida) redirect('/bienvenida')
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`

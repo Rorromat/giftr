@@ -6,6 +6,8 @@ import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import type { GiverItemView } from '@/lib/serialize'
 import { historialDeLista } from '@/lib/regalos'
+import { gustosDeLista } from '@/lib/bienvenida'
+import { GustosDe } from '@/components/Gustos'
 import { GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { Banners } from '@/components/Banners'
@@ -41,10 +43,11 @@ export default async function ListaAjena({
 
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
   const identified = !!viewer.userId || !!viewer.guestId
-  const [evento, historial] = await Promise.all([
+  const [evento, historial, gustos] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
     identified ? historialDeLista(db, vista.listId, viewer) : null,
+    gustosDeLista(db, vista.listId),
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
   ])
   const cuenta = evento && evento.dias <= 60
@@ -86,6 +89,8 @@ export default async function ListaAjena({
         <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
         {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
       </p>
+
+      {gustos.map((g) => <GustosDe key={g.nombre} nombre={g.nombre.split(' ')[0]} secciones={g.secciones} />)}
 
       <Banners />
 

@@ -6,6 +6,9 @@ import { getOwnList } from '@/lib/lists'
 import { saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
 import { misCuentas, pesos } from '@/lib/regalos'
+import { misGustos } from '@/lib/bienvenida'
+import { seccionesDeGustos } from '@/lib/gustos'
+import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { AvatarSticker, BottomNav, Icon, Starburst } from '@/components/ui'
 
@@ -14,7 +17,10 @@ const GIROS_FOTOS = [-8, 3, 9]
 export default async function Perfil() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, cumple, cuentas] = await Promise.all([getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId)])
+  const [lista, cumple, cuentas, gustos] = await Promise.all([
+    getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId), misGustos(db, session.userId),
+  ])
+  const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
@@ -57,6 +63,16 @@ export default async function Perfil() {
         </div>
         <CopyLinkButton url={shareUrl} />
       </div>
+
+      {/* Tus gustos: los ve tu gente arriba de tu lista */}
+      <Link href="/bienvenida?editar=1" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
+        <span aria-hidden className="flex size-[46px] flex-none -rotate-6 items-center justify-center rounded-xl border-[2.5px] border-gr-ink bg-gr-accent font-display text-2xl font-extrabold">♥</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl font-extrabold">Tus gustos</p>
+          <p className="truncate text-[13px] font-medium">{secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}</p>
+        </div>
+        <span className="text-sm font-bold underline decoration-2 underline-offset-4">{secciones.length ? 'Editar' : 'Completar'}</span>
+      </Link>
 
       {/* Cuentas de los regalos grupales: a quién le debés y quién te debe */}
       <Link href="/cuentas" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
