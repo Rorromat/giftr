@@ -14,7 +14,11 @@ export const metadata: Metadata = {
   // "Agregar a inicio" en iPhone: abre a pantalla completa y con el nombre corto bajo el ícono.
   appleWebApp: { capable: true, title: 'GiftR', statusBarStyle: 'default' },
   // El ícono de inicio del iPhone con una URL fija y nueva (el ?v= hace que no reuse uno viejo guardado).
-  icons: { apple: [{ url: '/apple-touch-icon.png?v=3', sizes: '180x180', type: 'image/png' }] },
+  // Declarar íconos acá pisa los de archivo, así que el de la pestaña (app/icon.png) va también.
+  icons: {
+    icon: [{ url: '/icon.png', sizes: '96x96', type: 'image/png' }],
+    apple: [{ url: '/apple-touch-icon.png?v=3', sizes: '180x180', type: 'image/png' }],
+  },
   // La etiqueta clásica de Apple: Next solo pone la genérica (mobile-web-app-capable).
   other: { 'apple-mobile-web-app-capable': 'yes' },
 }
