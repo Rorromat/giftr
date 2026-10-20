@@ -29,6 +29,13 @@ export default async function NuevoGrupo() {
           <span className="gr-label">¿Para qué es? (opcional)</span>
           <input name="descripcion" maxLength={120} placeholder="Para equipar la casa" className="gr-input" />
         </label>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="fecha" className="gr-label">¿Hay una fecha? (opcional)</label>
+          <input id="fecha" name="fecha" type="date" className="gr-input" />
+          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+            <input type="checkbox" name="anual" defaultChecked className="size-[22px] accent-gr-ink" /> Se repite todos los años (un cumple)
+          </label>
+        </div>
         <p className="rounded-sticker border-[2.5px] border-dashed border-gr-ink px-4 py-3 text-sm font-medium leading-snug">
           Después invitás a quien la arma con vos. Los que regalan la ven como una sola lista, y ninguno de ustedes ve quién reserva qué.
         </p>

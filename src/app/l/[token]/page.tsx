@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
+import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import type { GiverItemView } from '@/lib/serialize'
 import { GuestGate } from '@/components/GuestGate'
 import { Banners } from '@/components/Banners'
@@ -34,6 +35,15 @@ export default async function ListaAjena({
   if (!vista) notFound()
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
+  // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
+  const [evento] = await Promise.all([
+    eventoDeLista(db, vista.listId),
+    viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
+  ])
+  const cuenta = evento && evento.dias <= 60
+    ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
+    : null
+
   const identified = !!viewer.userId || !!viewer.guestId
   const categorias = [...new Set(vista.items.map((i) => i.categoria).filter(Boolean))] as string[]
   let mostrados = vista.items
@@ -59,6 +69,12 @@ export default async function ListaAjena({
           </p>
         </div>
       </div>
+
+      {cuenta && (
+        <p className="self-start -rotate-1 rounded-full border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-1.5 font-display text-[15px] font-extrabold">
+          {cuenta}
+        </p>
+      )}
 
       <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
         <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />

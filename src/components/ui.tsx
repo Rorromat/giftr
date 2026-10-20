@@ -14,8 +14,10 @@ const STAR_POINTS =
   '50.0,2.0 59.8,13.3 74.0,8.4 76.9,23.1 91.6,26.0 86.7,40.2 98.0,50.0 86.7,59.8 91.6,74.0 76.9,76.9 74.0,91.6 59.8,86.7 50.0,98.0 40.2,86.7 26.0,91.6 23.1,76.9 8.4,74.0 13.3,59.8 2.0,50.0 13.3,40.2 8.4,26.0 23.1,23.1 26.0,8.4 40.2,13.3'
 
 /** Estrella de 12 puntas (contador). `label` la vuelve accesible; sin label es decorativa. */
-export function Starburst({ children, label, size = 62, fontSize = 40, className = '', style }: {
+export function Starburst({ children, sub, label, size = 62, fontSize = 40, className = '', style }: {
   children?: React.ReactNode
+  /** Segunda línea chica debajo del número ("días"). */
+  sub?: string
   label?: string
   size?: number
   fontSize?: number
@@ -29,9 +31,15 @@ export function Starburst({ children, label, size = 62, fontSize = 40, className
     >
       <polygon points={STAR_POINTS} fill="var(--gr-accent)" stroke="var(--gr-ink)" strokeWidth="3.5" strokeLinejoin="round" />
       {children != null && (
-        <text x="50" y="50" dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
+        <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
               fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {children}
+        </text>
+      )}
+      {sub && (
+        <text x="50" y="70" dy="0.35em" textAnchor="middle" fontSize={17} fontWeight={800}
+              fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+          {sub}
         </text>
       )}
     </svg>
@@ -163,6 +171,7 @@ const ICONS = {
   close: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   home: <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
+  gift: <><rect x="3" y="8" width="18" height="13" rx="2" /><path d="M12 8v13" /><path d="M3 12h18" /><path d="M12 8c-2-4-6-4-6-1.5S9 8 12 8c3 0 6-.5 6-1.5S14 4 12 8z" /></>,
   users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5c2.4 0 4 1.6 4.5 4.5" /></>,
   lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   camera: <><rect x="3" y="6" width="18" height="14" rx="3" /><circle cx="12" cy="13" r="3.5" /><path d="M9 6l1.5-2h3L15 6" /></>,
@@ -187,12 +196,15 @@ export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
 }
 
 /** Píldora negra flotante. Solo lista los destinos que existen hoy. */
-export function BottomNav({ active }: { active: 'mi-lista' | 'grupos' | 'perfil' }) {
+export function BottomNav({ active }: { active: 'mi-lista' | 'eventos' | 'grupos' | 'perfil' }) {
   return (
     <nav aria-label="Navegación principal" className="gr-nav">
       {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
       <Link href="/mi-lista" prefetch aria-label="Mi lista" aria-current={active === 'mi-lista' ? 'page' : undefined}>
         <span><Icon name="home" /></span>
+      </Link>
+      <Link href="/eventos" prefetch aria-label="Eventos" aria-current={active === 'eventos' ? 'page' : undefined}>
+        <span><Icon name="gift" /></span>
       </Link>
       <Link href="/agregar" prefetch aria-label="Agregar deseo">
         <span className="gr-nav__add"><Icon name="plus" size={24} strokeWidth={3} /></span>

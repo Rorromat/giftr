@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, primaryKey, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, primaryKey, index } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -6,6 +6,9 @@ export const users = pgTable('users', {
   nombre: text('nombre').notNull(),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
+  // Cumpleaños sin año (alimenta Eventos de la gente que sigue su lista).
+  cumpleDia: smallint('cumple_dia'),
+  cumpleMes: smallint('cumple_mes'),
 })
 
 // Dos tipos de lista:
@@ -20,8 +23,18 @@ export const lists = pgTable('lists', {
   nombre: text('nombre'),
   descripcion: text('descripcion'),
   inviteToken: text('invite_token').unique(),
+  // Fecha del grupo ("cumplen el 12/10"); anual se repite todos los años, si no es una sola vez.
+  eventoFecha: date('evento_fecha'),
+  eventoAnual: boolean('evento_anual').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Listas que un usuario abrió como regalador: su gente. Sus cumples y fechas aparecen en Eventos.
+export const listFollows = pgTable('list_follows', {
+  userId: uuid('user_id').notNull().references(() => users.id),
+  listId: uuid('list_id').notNull().references(() => lists.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.listId] })])
 
 export const listMembers = pgTable('list_members', {
   listId: uuid('list_id').notNull().references(() => lists.id),

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
+import { saveBirthdayAction } from '@/app/actions'
+import { MESES, miCumple } from '@/lib/events'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { AvatarSticker, BottomNav, Icon, Starburst } from '@/components/ui'
 
@@ -11,7 +13,7 @@ const GIROS_FOTOS = [-8, 3, 9]
 export default async function Perfil() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const lista = await getOwnList(db, session.userId)
+  const [lista, cumple] = await Promise.all([getOwnList(db, session.userId), miCumple(db, session.userId)])
   if (!lista) redirect('/')
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
@@ -54,6 +56,27 @@ export default async function Perfil() {
         </div>
         <CopyLinkButton url={shareUrl} />
       </div>
+
+      {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista */}
+      <form id="cumple" action={saveBirthdayAction} className="gr-sticker flex flex-col gap-3 p-3.5">
+        <div>
+          <p className="font-display text-lg font-extrabold">Tu cumple</p>
+          <p className="text-[13px] font-medium leading-snug">
+            {cumple ? `El ${cumple.dia} de ${MESES[cumple.mes - 1]}. ` : ''}Tu gente lo ve en Eventos, con tiempo para elegir.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <select name="dia" aria-label="Día" defaultValue={cumple?.dia ?? ''} className="gr-input w-[30%] min-w-0">
+            <option value="">Día</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select name="mes" aria-label="Mes" defaultValue={cumple?.mes ?? ''} className="gr-input min-w-0 flex-1">
+            <option value="">Mes</option>
+            {MESES.map((m, i) => <option key={m} value={i + 1}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
+          </select>
+          <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
+        </div>
+      </form>
 
       <BottomNav active="perfil" />
     </main>

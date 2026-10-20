@@ -14,6 +14,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import type { Viewer } from '@/lib/types'
 
 const str = (fd: FormData, k: string) => {
@@ -83,8 +84,31 @@ export async function createGroupAction(formData: FormData) {
   const nombre = str(formData, 'nombre')
   if (!nombre) redirect('/grupos/nuevo')
   const id = await crearGrupo(db, session.userId, { nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120) })
+  const fecha = str(formData, 'fecha')
+  if (fecha) await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
   revalidatePath('/grupos')
+  revalidatePath('/eventos')
   redirect(`/grupos/${id}`)
+}
+
+export async function setGroupDateAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const fecha = formData.get('quitar') ? null : str(formData, 'fecha') ?? null
+  await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
+  revalidatePath(`/grupos/${id}`)
+  revalidatePath('/grupos')
+  revalidatePath('/eventos')
+}
+
+export async function saveBirthdayAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const n = (k: string) => { const v = Number(str(formData, k)); return Number.isInteger(v) && v > 0 ? v : null }
+  await guardarCumple(db, session.userId, n('dia'), n('mes'))
+  revalidatePath('/perfil')
+  revalidatePath('/eventos')
 }
 
 export async function joinGroupAction(formData: FormData) {
