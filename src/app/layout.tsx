@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
+import { ICONO_INICIO } from '@/app/icono-inicio'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
@@ -13,11 +14,12 @@ export const metadata: Metadata = {
   openGraph: { siteName: 'GiftR', locale: 'es_AR', type: 'website' },
   // "Agregar a inicio" en iPhone: abre a pantalla completa y con el nombre corto bajo el ícono.
   appleWebApp: { capable: true, title: 'GiftR', statusBarStyle: 'default' },
-  // El ícono de inicio del iPhone con una URL fija y nueva (el ?v= hace que no reuse uno viejo guardado).
+  // El ícono de inicio del iPhone va adentro del HTML (data:): el instalador de iOS 27 no carga los que
+  // vienen por red y pone la inicial sobre gris. /apple-touch-icon.png sigue en public/ para quien lo pida.
   // Declarar íconos acá pisa los de archivo, así que el de la pestaña (app/icon.png) va también.
   icons: {
     icon: [{ url: '/icon.png', sizes: '96x96', type: 'image/png' }],
-    apple: [{ url: '/apple-touch-icon.png?v=3', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: ICONO_INICIO, sizes: '180x180', type: 'image/png' }],
   },
   // La etiqueta clásica de Apple: Next solo pone la genérica (mobile-web-app-capable).
   other: { 'apple-mobile-web-app-capable': 'yes' },
