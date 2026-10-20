@@ -208,6 +208,7 @@
   }
   .gr-segmented > * + * { border-left: var(--gr-border-sm); }
   .gr-segmented > [aria-pressed="true"],
+  .gr-segmented > [aria-current="page"],
   .gr-segmented > :has(:checked) { background: var(--gr-ink); color: var(--gr-accent); }
 
   /* Foco visible en chips y segmentos hechos con radios ocultos */

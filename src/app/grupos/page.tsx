@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { juntarNombres, misGrupos, type GrupoResumen } from '@/lib/groups'
+import { diaMes, hoyLocal, proximaDeGrupo } from '@/lib/events'
 import { AvatarStack, BottomNav, ItemPhoto, Starburst } from '@/components/ui'
 
 /** Mosaico de fotos del grupo: una grande y, si hay más, una chica arriba y "+N" abajo. */
@@ -27,7 +28,7 @@ function Mosaico({ g }: { g: GrupoResumen }) {
 export default async function Grupos() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const grupos = await misGrupos(db, session.userId)
+  const [grupos, hoy] = [await misGrupos(db, session.userId), hoyLocal()]
 
   return (
     <main className="flex flex-col gap-4 pb-32 pt-[52px]">
@@ -50,9 +51,11 @@ export default async function Grupos() {
       <ul className="flex flex-col gap-5">
         {grupos.map((g, i) => {
           const otros = g.duenos.filter((d) => d.id !== session.userId).map((d) => d.nombre)
+          const fecha = proximaDeGrupo(g.eventoFecha, g.eventoAnual, hoy)
           const detalle = [
             otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora',
             g.descripcion,
+            fecha && `el ${diaMes(fecha)}`,
             `${g.cantidad} ${g.cantidad === 1 ? 'regalo' : 'regalos'}`,
           ].filter(Boolean).join(' · ')
           return (

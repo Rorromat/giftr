@@ -3,7 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { grupoParaDueno, juntarNombres } from '@/lib/groups'
-import { leaveGroupAction } from '@/app/actions'
+import { leaveGroupAction, setGroupDateAction } from '@/app/actions'
+import { diasEntre, fechaLarga, hoyLocal, proximaDeGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
@@ -17,6 +18,8 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
   if (!grupo) notFound()
 
   const activos = grupo.items.filter((i) => i.estadoDueno === 'activo')
+  const hoy = hoyLocal()
+  const fecha = proximaDeGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy)
   const otros = grupo.duenos.filter((d) => d.id !== session.userId).map((d) => d.nombre)
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? ''
   const shareUrl = `${base}/l/${grupo.shareToken}`
@@ -34,6 +37,26 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
       <div className="relative flex flex-col gap-1 pr-20">
         <h1 className="gr-title [overflow-wrap:anywhere]">{grupo.nombre}</h1>
         {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
+        {/* Fecha del grupo: aparece en Eventos de los dueños y de quienes siguen la lista */}
+        {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
+        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}`} className="group self-start">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+            {fecha ? `${fechaLarga(fecha)} · ${diasEntre(hoy, fecha) === 0 ? '¡hoy!' : `en ${diasEntre(hoy, fecha)} días`}` : 'Agregar una fecha'}
+          </summary>
+          <form action={setGroupDateAction} className="mt-1 flex flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3">
+            <input type="hidden" name="grupoId" value={grupo.id} />
+            <input name="fecha" type="date" required defaultValue={grupo.eventoFecha ?? ''} aria-label="Fecha del grupo" className="gr-input" />
+            <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+              <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
+            </label>
+            <div className="flex gap-2">
+              <button className="gr-btn-primary gr-btn--sm flex-1 rounded-[14px]">Guardar</button>
+              {grupo.eventoFecha && (
+                <button name="quitar" value="1" formNoValidate className="gr-btn gr-btn--sm flex-none rounded-[14px] font-sans text-sm font-bold">Quitar</button>
+              )}
+            </div>
+          </form>
+        </details>
         {activos.length > 0 && (
           <Starburst label={`${activos.length} ${activos.length === 1 ? 'deseo' : 'deseos'}`}
                      fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[10px] rotate-12">

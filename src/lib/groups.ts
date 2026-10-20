@@ -74,6 +74,8 @@ export type GrupoResumen = {
   id: string
   nombre: string
   descripcion: string | null
+  eventoFecha: string | null
+  eventoAnual: boolean
   duenos: Dueno[]
   cantidad: number
   fotos: string[]
@@ -81,7 +83,9 @@ export type GrupoResumen = {
 
 /** Los grupos del usuario para la pantalla Grupos: dueños, cuántos regalos activos y hasta 3 fotos. */
 export async function misGrupos(db: Db, userId: string): Promise<GrupoResumen[]> {
-  const grupos = await db.select({ id: lists.id, nombre: lists.nombre, descripcion: lists.descripcion })
+  const grupos = await db.select({
+    id: lists.id, nombre: lists.nombre, descripcion: lists.descripcion, eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual,
+  })
     .from(lists).innerJoin(listMembers, eq(listMembers.listId, lists.id))
     .where(and(eq(listMembers.userId, userId), eq(lists.tipo, 'grupo')))
     .orderBy(desc(lists.createdAt))
@@ -103,6 +107,8 @@ export async function misGrupos(db: Db, userId: string): Promise<GrupoResumen[]>
     id: g.id,
     nombre: g.nombre ?? 'Grupo',
     descripcion: g.descripcion,
+    eventoFecha: g.eventoFecha,
+    eventoAnual: g.eventoAnual,
     duenos: miembros.filter((m) => m.listId === g.id).map(({ id, nombre }) => ({ id, nombre })),
     cantidad: conteos.find((c) => c.listId === g.id)?.n ?? 0,
     fotos: conFoto.filter((i) => i.listId === g.id && i.fotoUrl).map((i) => i.fotoUrl!).slice(0, 3),
@@ -123,6 +129,8 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
     id: list.id,
     nombre: list.nombre ?? 'Grupo',
     descripcion: list.descripcion,
+    eventoFecha: list.eventoFecha,
+    eventoAnual: list.eventoAnual,
     shareToken: list.shareToken,
     inviteToken: list.inviteToken!,
     duenos,

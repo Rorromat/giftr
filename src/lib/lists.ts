@@ -8,7 +8,7 @@ import { duenosDeLista, juntarNombres } from '@/lib/groups'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
 // Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
-type ListaRegalador = { ownerNombre: string; duenos: string[]; grupoNombre: string | null }
+type ListaRegalador = { listId: string; ownerNombre: string; duenos: string[]; grupoNombre: string | null }
 
 export type ListView =
   | ({ role: 'owner'; shareToken: string; items: OwnerItemView[] } & ListaDueno)
@@ -51,7 +51,7 @@ function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimVi
 
 function paraRegalador(list: typeof lists.$inferSelect, duenos: { nombre: string }[]): ListaRegalador {
   const nombres = duenos.map((d) => d.nombre)
-  return { ownerNombre: juntarNombres(nombres), duenos: nombres, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
+  return { listId: list.id, ownerNombre: juntarNombres(nombres), duenos: nombres, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
 }
 
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {
