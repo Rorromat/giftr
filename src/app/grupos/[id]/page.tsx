@@ -30,7 +30,7 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
   return (
     <main className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
-        <BackLink href="/grupos" label="Volver a Grupos" />
+        <BackLink href="/mi-lista" label="Volver a Mi lista" />
         <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
       </div>
 
@@ -112,7 +112,7 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
         Mandala por WhatsApp
       </a>
 
-      <BottomNav active="grupos" />
+      <BottomNav active="mi-lista" />
     </main>
   )
 }

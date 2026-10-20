@@ -10,7 +10,7 @@ export default async function NuevoGrupo() {
   return (
     <main className="pb-8 pt-[52px]">
       <div className="flex items-center gap-3.5">
-        <BackLink href="/grupos" label="Volver a Grupos" />
+        <BackLink href="/mi-lista" label="Volver a Mi lista" />
         <div className="flex flex-col gap-0.5">
           <h1 className="font-display text-[30px] leading-none font-extrabold tracking-[-0.04em]">Nuevo grupo</h1>
           <p className="text-sm font-medium">Una lista en común para pedir juntos.</p>

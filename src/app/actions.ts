@@ -14,7 +14,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
-import { guardarCumple, guardarFechaGrupo } from '@/lib/events'
+import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
@@ -90,7 +90,7 @@ export async function createGroupAction(formData: FormData) {
   const id = await crearGrupo(db, session.userId, { nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120) })
   const fecha = str(formData, 'fecha')
   if (fecha) await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
-  revalidatePath('/grupos')
+  revalidatePath('/mi-lista')
   revalidatePath('/eventos')
   redirect(`/grupos/${id}`)
 }
@@ -102,7 +102,6 @@ export async function setGroupDateAction(formData: FormData) {
   const fecha = formData.get('quitar') ? null : str(formData, 'fecha') ?? null
   await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
   revalidatePath(`/grupos/${id}`)
-  revalidatePath('/grupos')
   revalidatePath('/eventos')
 }
 
@@ -135,7 +134,8 @@ export async function joinGroupAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect(`/grupos/unirme/${invite}`)
   const id = await unirseAGrupo(db, invite, session.userId)
-  if (!id) redirect('/grupos')
+  if (!id) redirect('/mi-lista')
+  revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect(`/grupos/${id}`)
 }
@@ -144,8 +144,18 @@ export async function leaveGroupAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   await salirDeGrupo(db, str(formData, 'grupoId') ?? '', session.userId)
+  revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
-  redirect('/grupos')
+  redirect('/mi-lista')
+}
+
+/** Saca una lista de Tu gente (y su cumple o fecha de Eventos). */
+export async function unfollowAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await dejarDeSeguir(db, session.userId, str(formData, 'listId') ?? '')
+  revalidatePath('/gente')
+  revalidatePath('/eventos')
 }
 
 async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {

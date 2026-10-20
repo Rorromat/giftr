@@ -213,7 +213,7 @@ export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
 }
 
 /** Píldora negra flotante. Solo lista los destinos que existen hoy. */
-export function BottomNav({ active }: { active: 'mi-lista' | 'eventos' | 'grupos' | 'perfil' }) {
+export function BottomNav({ active }: { active: 'mi-lista' | 'eventos' | 'gente' | 'perfil' }) {
   return (
     <nav aria-label="Navegación principal" className="gr-nav">
       {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
@@ -226,7 +226,7 @@ export function BottomNav({ active }: { active: 'mi-lista' | 'eventos' | 'grupos
       <Link href="/agregar" prefetch aria-label="Agregar deseo">
         <span className="gr-nav__add"><Icon name="plus" size={24} strokeWidth={3} /></span>
       </Link>
-      <Link href="/grupos" prefetch aria-label="Grupos" aria-current={active === 'grupos' ? 'page' : undefined}>
+      <Link href="/gente" prefetch aria-label="Tu gente" aria-current={active === 'gente' ? 'page' : undefined}>
         <span><Icon name="users" strokeWidth={2.4} /></span>
       </Link>
       <Link href="/perfil" prefetch aria-label="Perfil" aria-current={active === 'perfil' ? 'page' : undefined}>
