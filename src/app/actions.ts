@@ -13,6 +13,7 @@ import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import type { Viewer } from '@/lib/types'
 
 const str = (fd: FormData, k: string) => {
@@ -49,9 +50,12 @@ export async function addItemAction(formData: FormData) {
     linkTienda: httpUrl(str(formData, 'linkTienda')),
     fotoUrl: httpUrl(str(formData, 'fotoUrl')),
   }
-  await createItem(db, session.userId, data)
+  // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
+  const listaId = str(formData, 'listaId')
+  const creado = await createItem(db, session.userId, data, listaId)
   revalidatePath('/mi-lista')
-  redirect('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  redirect(listaId && creado ? `/grupos/${listaId}` : '/mi-lista')
 }
 
 export async function archiveItemAction(formData: FormData) {
@@ -60,6 +64,7 @@ export async function archiveItemAction(formData: FormData) {
   const estado = str(formData, 'estado') === 'no_lo_quiero' ? 'no_lo_quiero' : 'lo_tengo'
   await archiveItem(db, str(formData, 'itemId')!, session.userId, estado)
   revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
 }
 
 export async function updatePriorityAction(formData: FormData) {
@@ -69,6 +74,35 @@ export async function updatePriorityAction(formData: FormData) {
   if (p !== 'mucho' && p !== 'gustaria' && p !== 'suelta') return
   await updateItem(db, str(formData, 'itemId')!, session.userId, { prioridad: p })
   revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+}
+
+export async function createGroupAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const nombre = str(formData, 'nombre')
+  if (!nombre) redirect('/grupos/nuevo')
+  const id = await crearGrupo(db, session.userId, { nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120) })
+  revalidatePath('/grupos')
+  redirect(`/grupos/${id}`)
+}
+
+export async function joinGroupAction(formData: FormData) {
+  const invite = str(formData, 'invite') ?? ''
+  const session = await auth()
+  if (!session?.userId) redirect(`/grupos/unirme/${invite}`)
+  const id = await unirseAGrupo(db, invite, session.userId)
+  if (!id) redirect('/grupos')
+  revalidatePath('/grupos', 'layout')
+  redirect(`/grupos/${id}`)
+}
+
+export async function leaveGroupAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await salirDeGrupo(db, str(formData, 'grupoId') ?? '', session.userId)
+  revalidatePath('/grupos', 'layout')
+  redirect('/grupos')
 }
 
 async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {

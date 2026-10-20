@@ -6,7 +6,7 @@ import { getViewer } from '@/lib/viewer'
 import type { GiverItemView } from '@/lib/serialize'
 import { GuestGate } from '@/components/GuestGate'
 import { Banners } from '@/components/Banners'
-import { AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
+import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
 function estadoNoDisponible(item: GiverItemView) {
   const comprado = item.claims.some((c) => c.estado === 'comprado')
@@ -32,7 +32,7 @@ export default async function ListaAjena({
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) notFound()
-  if (vista.role === 'owner') redirect('/mi-lista')
+  if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
   const identified = !!viewer.userId || !!viewer.guestId
   const categorias = [...new Set(vista.items.map((i) => i.categoria).filter(Boolean))] as string[]
@@ -49,18 +49,20 @@ export default async function ListaAjena({
   return (
     <main className="flex flex-col gap-3 pb-32 pt-[52px]">
       <div className="flex items-center gap-3">
-        <AvatarSticker nombre={vista.ownerNombre} />
+        {vista.grupoNombre ? <AvatarStack nombres={vista.duenos} size={48} /> : <AvatarSticker nombre={vista.ownerNombre} />}
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="font-display text-[34px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">
-            Lista de {vista.ownerNombre}
+            {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
           </h1>
-          <p className="text-sm font-medium">Elegí, reservá y no te duplicás con nadie.</p>
+          <p className="text-sm font-medium">
+            {vista.grupoNombre && `De ${vista.ownerNombre}. `}Elegí, reservá y no te duplicás con nadie.
+          </p>
         </div>
       </div>
 
       <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
         <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-        {vista.ownerNombre} no ve quién reserva qué
+        {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
       </p>
 
       <Banners />

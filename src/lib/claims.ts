@@ -2,6 +2,7 @@ import { and, count, eq, inArray, lt, or, sql } from 'drizzle-orm'
 import { claims, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
+import { esDuenoDeLista } from '@/lib/groups'
 
 export async function expireStaleClaims(db: Db, itemId?: string) {
   const vencida = and(eq(claims.estado, 'reservado'), lt(claims.expiresAt, new Date()))
@@ -20,12 +21,13 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer): Promi
   if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
   return await db.transaction(async (tx): Promise<ReserveResult> => {
     // lock del item: serializa reservas concurrentes sobre el mismo item
-    const [row] = await tx.select({ item: items, ownerId: lists.ownerId })
+    const [row] = await tx.select({ item: items, listId: lists.id })
       .from(items).innerJoin(lists, eq(items.listId, lists.id))
       .where(eq(items.id, itemId))
       .for('update', { of: items })
     if (!row) return { ok: false, reason: 'no_existe' }
-    if (viewer.userId && viewer.userId === row.ownerId) return { ok: false, reason: 'propio' }
+    // Ningún dueño (tampoco un co-dueño del grupo) reserva en su propia lista.
+    if (viewer.userId && await esDuenoDeLista(tx as unknown as Db, row.listId, viewer.userId)) return { ok: false, reason: 'propio' }
     if (row.item.estadoDueno !== 'activo') return { ok: false, reason: 'archivado' }
 
     await expireStaleClaims(tx as unknown as Db, itemId)

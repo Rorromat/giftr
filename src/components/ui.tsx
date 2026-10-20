@@ -123,6 +123,21 @@ export function AvatarSticker({ nombre, size = 56, className = '' }: { nombre: s
   )
 }
 
+/** Avatares redondos superpuestos con la inicial de cada dueño (el primero en ácido). */
+export function AvatarStack({ nombres, size = 40, className = '' }: { nombres: string[]; size?: number; className?: string }) {
+  return (
+    <div aria-hidden className={`flex flex-none ${className}`}>
+      {nombres.map((n, i) => (
+        <span key={i}
+              className={`flex items-center justify-center rounded-full border-[2.5px] border-gr-ink font-display font-extrabold ${i ? 'bg-gr-surface' : 'bg-gr-accent'}`}
+              style={{ width: size, height: size, fontSize: size * 0.42, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
+          {n.trim().charAt(0).toUpperCase()}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} aria-label={label} className="gr-icon-btn">
@@ -148,6 +163,7 @@ const ICONS = {
   close: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   home: <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
+  users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5c2.4 0 4 1.6 4.5 4.5" /></>,
   lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   camera: <><rect x="3" y="6" width="18" height="14" rx="3" /><circle cx="12" cy="13" r="3.5" /><path d="M9 6l1.5-2h3L15 6" /></>,
   chat: <path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z" />,
@@ -171,15 +187,18 @@ export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
 }
 
 /** Píldora negra flotante. Solo lista los destinos que existen hoy. */
-export function BottomNav({ active }: { active: 'mi-lista' | 'perfil' }) {
+export function BottomNav({ active }: { active: 'mi-lista' | 'grupos' | 'perfil' }) {
   return (
     <nav aria-label="Navegación principal" className="gr-nav">
-      {/* prefetch: las 3 secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
+      {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
       <Link href="/mi-lista" prefetch aria-label="Mi lista" aria-current={active === 'mi-lista' ? 'page' : undefined}>
         <span><Icon name="home" /></span>
       </Link>
       <Link href="/agregar" prefetch aria-label="Agregar deseo">
         <span className="gr-nav__add"><Icon name="plus" size={24} strokeWidth={3} /></span>
+      </Link>
+      <Link href="/grupos" prefetch aria-label="Grupos" aria-current={active === 'grupos' ? 'page' : undefined}>
+        <span><Icon name="users" strokeWidth={2.4} /></span>
       </Link>
       <Link href="/perfil" prefetch aria-label="Perfil" aria-current={active === 'perfil' ? 'page' : undefined}>
         <span><Icon name="user" strokeWidth={active === 'perfil' ? 2.4 : 2.2} /></span>
