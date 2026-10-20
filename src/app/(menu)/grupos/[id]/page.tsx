@@ -8,7 +8,7 @@ import { diasEntre, fechaLarga, hoyLocal, proximaDeGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { AvatarStack, BackLink, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
+import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
 export default async function Grupo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -111,8 +111,6 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
         <Icon name="chat" size={20} strokeWidth={2.4} />
         Mandala por WhatsApp
       </a>
-
-      <BottomNav active="mi-lista" />
     </Seccion>
   )
 }

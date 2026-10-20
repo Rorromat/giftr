@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/regalos'
 import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
-import { AvatarSticker, BackLink, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
+import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (
@@ -142,8 +142,6 @@ export default async function Cuentas() {
           </ul>
         </section>
       )}
-
-      <BottomNav active="perfil" />
     </Seccion>
   )
 }

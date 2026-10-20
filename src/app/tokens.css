@@ -262,13 +262,27 @@
     grid-auto-columns: minmax(0, 1fr);
     align-items: center;
     padding: 0 6px;
+    container-type: inline-size; /* para ubicar el círculo verde en columnas (100cqw) */
   }
-  .gr-nav a { display: flex; justify-content: center; align-items: center; height: 48px; color: var(--gr-bg); }
+  .gr-nav a {
+    position: relative; z-index: 1; /* arriba del círculo verde */
+    display: flex; justify-content: center; align-items: center; height: 48px;
+    color: var(--gr-bg); transition: color 80ms ease;
+  }
   .gr-nav a > span {
     width: 44px; height: 44px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
   }
-  .gr-nav a[aria-current="page"] > span { background: var(--gr-accent); color: var(--gr-ink); }
+  /* el ícono marcado se oscurece cuando llega el círculo, no antes (si no, queda negro sobre negro) */
+  .gr-nav a[data-marcado] { color: var(--gr-ink); transition: color 120ms ease 70ms; }
+  /* El círculo verde: una sola pieza que se desliza (con un rebote chico) hasta la columna marcada,
+     por debajo de los íconos y del +. 100cqw es el ancho útil de la barra, repartido en 5 columnas. */
+  .gr-nav__marca {
+    position: absolute; top: 10px; left: calc(6px + 100cqw / 10 - 22px);
+    width: 44px; height: 44px; border-radius: 50%; background: var(--gr-accent);
+    transform: translateX(calc(100cqw / 5 * var(--columna)));
+    transition: transform 320ms cubic-bezier(0.34, 1.4, 0.5, 1);
+  }
   .gr-nav a > .gr-nav__add {
     width: 50px; height: 50px; border-radius: 16px;
     border: 2.5px solid var(--gr-bg); background: var(--gr-accent); color: var(--gr-ink);
@@ -280,35 +294,12 @@
   .gr-tilt-r { transform: rotate(1deg); }
 }
 
-/* Cambio de sección desde la barra (<Seccion> y <BottomNav> en ui.tsx). La barra queda quieta, el círculo
-   verde se desliza con un rebote chico (por debajo del +) y el contenido sale rápido y entra subiendo apenas.
-   React no arranca otra transición hasta que termina la anterior: por eso todo es corto y lo que no es
-   un cambio de sección (otros refrescos) termina en el acto, así no demora el próximo toque. */
-::view-transition { pointer-events: none; } /* los toques pasan a la página durante la animación */
-::view-transition-group(root) { animation-duration: 0s; }
-::view-transition-group(gr-nav) { animation: none; z-index: 100; }
-::view-transition-group(gr-nav-activo) { animation-duration: 0s; z-index: 101; }
-::view-transition-group(gr-nav-agregar) { animation: none; z-index: 102; }
-::view-transition-old(gr-nav),
-::view-transition-old(gr-nav-agregar) { display: none; }
-::view-transition-new(gr-nav),
-::view-transition-new(gr-nav-agregar) { animation: none; }
-:root:active-view-transition-type(seccion)::view-transition-group(gr-nav-activo) {
-  animation-duration: 300ms; animation-timing-function: cubic-bezier(0.34, 1.4, 0.5, 1);
-}
-:root:active-view-transition-type(seccion)::view-transition-old(gr-nav-activo),
-:root:active-view-transition-type(seccion)::view-transition-new(gr-nav-activo) { animation-duration: 180ms; }
-/* hacia o desde una pantalla sin barra: el círculo no viaja solo */
-::view-transition-old(gr-nav-activo):only-child { display: none; }
-::view-transition-new(gr-nav-activo):only-child { animation: none; }
-::view-transition-old(.gr-seccion) { animation: 80ms ease-in both gr-sale; }
-::view-transition-new(.gr-seccion) { animation: 200ms cubic-bezier(0, 0, 0.2, 1) 50ms both gr-entra; }
-@keyframes gr-sale { to { opacity: 0; } }
-@keyframes gr-entra { from { opacity: 0; translate: 0 10px; } }
+/* Al llegar a una sección del menú (<Seccion> en ui.tsx) el contenido aparece con un fundido corto. Solo
+   opacidad: un transform haría que los botones fijos de la página (como "Mandala por WhatsApp") se corran. */
+.gr-seccion { animation: gr-aparece 180ms ease-out; }
+@keyframes gr-aparece { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .gr-btn, .gr-btn-primary { transition: none; }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) { animation-duration: 0s !important; animation-delay: 0s !important; }
+  .gr-btn, .gr-btn-primary, .gr-nav a, .gr-nav__marca { transition: none; }
+  .gr-seccion { animation: none; }
 }

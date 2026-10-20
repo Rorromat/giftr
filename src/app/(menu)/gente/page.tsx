@@ -7,7 +7,7 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { MESES } from '@/lib/events'
 import { unfollowAction } from '@/app/actions'
-import { AvatarStack, AvatarSticker, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
+import { AvatarStack, AvatarSticker, Icon, Seccion, Starburst } from '@/components/ui'
 
 /** "Cumple el 22 de agosto · en 14 días", "El 12 de octubre", "Sin cumple cargado". La cuenta no se corta en dos renglones. */
 function cuando(c: Contacto) {
@@ -89,8 +89,6 @@ export default async function Gente() {
           </a>
         )}
       </section>
-
-      <BottomNav active="gente" />
     </Seccion>
   )
 }

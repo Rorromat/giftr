@@ -1,10 +1,8 @@
-import { BottomNav, Seccion } from '@/components/ui'
-
 // Pantalla de carga con la silueta del sistema Sticker. Next la precarga junto con cada link
 // (loading.tsx), así que al tocar un botón aparece al instante mientras llegan los datos.
-export function SkeletonPage({ nav, cards = 4 }: { nav?: React.ComponentProps<typeof BottomNav>['active']; cards?: number }) {
+export function SkeletonPage({ cards = 4 }: { cards?: number }) {
   return (
-    <Seccion aria-busy="true" className="flex flex-col gap-3.5 pb-32 pt-[52px]">
+    <main aria-busy="true" className="flex flex-col gap-3.5 pb-32 pt-[52px]">
       <span className="sr-only" role="status">Cargando…</span>
       <div aria-hidden="true" className="flex flex-col gap-3.5 motion-safe:animate-pulse">
         <div className="h-11 w-36 rounded-[14px] bg-gr-dot" />
@@ -24,7 +22,6 @@ export function SkeletonPage({ nav, cards = 4 }: { nav?: React.ComponentProps<ty
           ))}
         </ul>
       </div>
-      {nav && <BottomNav active={nav} />}
-    </Seccion>
+    </main>
   )
 }
