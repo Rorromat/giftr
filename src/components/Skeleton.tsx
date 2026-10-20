@@ -2,7 +2,7 @@ import { BottomNav } from '@/components/ui'
 
 // Pantalla de carga con la silueta del sistema Sticker. Next la precarga junto con cada link
 // (loading.tsx), así que al tocar un botón aparece al instante mientras llegan los datos.
-export function SkeletonPage({ nav, cards = 4 }: { nav?: 'mi-lista' | 'perfil'; cards?: number }) {
+export function SkeletonPage({ nav, cards = 4 }: { nav?: React.ComponentProps<typeof BottomNav>['active']; cards?: number }) {
   return (
     <main aria-busy="true" className="flex flex-col gap-3.5 pb-32 pt-[52px]">
       <span className="sr-only" role="status">Cargando…</span>

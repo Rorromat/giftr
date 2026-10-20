@@ -12,7 +12,7 @@ reservó qué.
 ```
 src/app/          Pantallas (Next.js App Router) y server actions
 src/components/   Componentes del sistema visual "Sticker" (ui.tsx) y piezas con estado
-src/lib/          Reglas de negocio: regla de la sorpresa, reservas, invitados, avisos
+src/lib/          Reglas de negocio: regla de la sorpresa, reservas, invitados, avisos, grupos
 src/db/           Esquema Drizzle y cliente de Neon
 drizzle/          Migraciones SQL
 tests/            Vitest con PGlite (Postgres en memoria), incluido el test de oro de la sorpresa

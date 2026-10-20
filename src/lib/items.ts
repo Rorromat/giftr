@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { claims, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { pickItemFields, type OwnerItemView } from '@/lib/serialize'
+import { esDuenoSql, esUuid } from '@/lib/groups'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -17,9 +18,12 @@ export type NewItemData = {
   linkTienda?: string
 }
 
-export async function createItem(db: Db, userId: string, data: NewItemData): Promise<OwnerItemView | null> {
+/** Agrega a la lista personal del usuario o, con listId, a un grupo del que es dueño. */
+export async function createItem(db: Db, userId: string, data: NewItemData, listId?: string): Promise<OwnerItemView | null> {
   try {
-    const [list] = await db.select().from(lists).where(eq(lists.ownerId, userId))
+    if (listId !== undefined && !esUuid(listId)) return null
+    const [list] = await db.select().from(lists)
+      .where(listId ? and(eq(lists.id, listId), esDuenoSql(db, userId)) : eq(lists.ownerId, userId))
     if (!list) return null
     const [item] = await db.insert(items).values({ ...data, listId: list.id }).returning()
     return pickItemFields(item)
@@ -41,9 +45,10 @@ export async function createItem(db: Db, userId: string, data: NewItemData): Pro
 }
 
 async function itemDelDueno(db: Db, itemId: string, userId: string) {
+  if (!esUuid(itemId)) return false
   const [row] = await db.select({ id: items.id })
     .from(items).innerJoin(lists, eq(items.listId, lists.id))
-    .where(and(eq(items.id, itemId), eq(lists.ownerId, userId)))
+    .where(and(eq(items.id, itemId), esDuenoSql(db, userId)))
   return !!row
 }
 

@@ -11,9 +11,10 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
-  if (detalle.role === 'owner') redirect('/mi-lista')
+  if (detalle.role === 'owner') redirect(detalle.tipo === 'grupo' ? `/grupos/${detalle.listId}` : '/mi-lista')
 
   const { item, comments, ownerNombre } = detalle
+  const plural = detalle.duenos.length > 1
   const identified = !!viewer.userId || !!viewer.guestId
   const miClaim = item.claims.find((c) => c.esMia && c.estado === 'reservado')
   const precio = item.precio ?? item.rangoPrecio
@@ -32,7 +33,7 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
           <h1 className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
           {item.notas && (
             <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug">
-              <span className="font-bold">{ownerNombre} dice:</span> {item.notas}
+              <span className="font-bold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
           {item.linkTienda && (
@@ -82,7 +83,7 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
       <section className="mt-2 flex flex-col gap-3">
         <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
           <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-          Esto no lo ve {ownerNombre}
+          Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
         </h2>
         <ul className="flex flex-col gap-2">
           {comments.map((c) => (

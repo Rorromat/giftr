@@ -4,10 +4,15 @@ import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
+import { duenosDeLista, juntarNombres } from '@/lib/groups'
+
+type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
+// Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
+type ListaRegalador = { ownerNombre: string; duenos: string[]; grupoNombre: string | null }
 
 export type ListView =
-  | { role: 'owner'; shareToken: string; items: OwnerItemView[] }
-  | { role: 'giver'; shareToken: string; ownerNombre: string; items: GiverItemView[] }
+  | ({ role: 'owner'; shareToken: string; items: OwnerItemView[] } & ListaDueno)
+  | ({ role: 'giver'; shareToken: string; items: GiverItemView[] } & ListaRegalador)
 
 export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
 
@@ -44,23 +49,30 @@ function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimVi
   return { ...row, claims: itemClaims, quedan, disponible: row.repetible || quedan > 0 }
 }
 
+function paraRegalador(list: typeof lists.$inferSelect, duenos: { nombre: string }[]): ListaRegalador {
+  const nombres = duenos.map((d) => d.nombre)
+  return { ownerNombre: juntarNombres(nombres), duenos: nombres, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
+}
+
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {
-  const [row] = await db.select({ list: lists, ownerNombre: users.nombre })
-    .from(lists).innerJoin(users, eq(lists.ownerId, users.id))
-    .where(eq(lists.shareToken, shareToken))
-  if (!row) return null
+  const [list] = await db.select().from(lists).where(eq(lists.shareToken, shareToken))
+  if (!list) return null
 
-  const allItems = await db.select().from(items).where(eq(items.listId, row.list.id)).orderBy(asc(items.createdAt))
+  const [duenos, allItems] = await Promise.all([
+    duenosDeLista(db, list),
+    db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt)),
+  ])
 
-  if (viewer.userId === row.list.ownerId) {
-    return { role: 'owner', shareToken, items: allItems.map(pickItemFields) }
+  // Cualquier dueño (también un co-dueño del grupo) ve la vista sin reservas.
+  if (viewer.userId && duenos.some((d) => d.id === viewer.userId)) {
+    return { role: 'owner', listId: list.id, tipo: list.tipo, shareToken, items: allItems.map(pickItemFields) }
   }
 
   await expireStaleClaims(db)
   const activos = allItems.filter((i) => i.estadoDueno === 'activo')
   const claimMap = await loadClaimViews(db, activos.map((i) => i.id), viewer)
   return {
-    role: 'giver', shareToken, ownerNombre: row.ownerNombre,
+    role: 'giver', shareToken, ...paraRegalador(list, duenos),
     items: activos.map((i) => toGiverView(pickItemFields(i), claimMap.get(i.id) ?? [])),
   }
 }
@@ -73,19 +85,19 @@ export async function getOwnList(db: Db, userId: string) {
 }
 
 export type ItemDetail =
-  | { role: 'owner'; item: OwnerItemView }
-  | { role: 'giver'; ownerNombre: string; item: GiverItemView; comments: CommentView[] }
+  | ({ role: 'owner'; item: OwnerItemView } & ListaDueno)
+  | ({ role: 'giver'; item: GiverItemView; comments: CommentView[] } & ListaRegalador)
 
 export async function getItemForViewer(db: Db, shareToken: string, itemId: string, viewer: Viewer): Promise<ItemDetail | null> {
-  const [row] = await db.select({ item: items, ownerId: lists.ownerId, ownerNombre: users.nombre })
+  const [row] = await db.select({ item: items, list: lists })
     .from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
-    .innerJoin(users, eq(lists.ownerId, users.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, shareToken)))
   if (!row) return null
 
-  if (viewer.userId === row.ownerId) {
-    return { role: 'owner', item: pickItemFields(row.item) }
+  const duenos = await duenosDeLista(db, row.list)
+  if (viewer.userId && duenos.some((d) => d.id === viewer.userId)) {
+    return { role: 'owner', listId: row.list.id, tipo: row.list.tipo, item: pickItemFields(row.item) }
   }
 
   if (row.item.estadoDueno !== 'activo') return null
@@ -102,7 +114,7 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     .orderBy(comments.createdAt)
 
   return {
-    role: 'giver', ownerNombre: row.ownerNombre,
+    role: 'giver', ...paraRegalador(row.list, duenos),
     item: toGiverView(pickItemFields(row.item), claimMap.get(itemId) ?? []),
     comments: commentRows.map((c) => ({
       id: c.id, texto: c.texto, createdAt: c.createdAt,

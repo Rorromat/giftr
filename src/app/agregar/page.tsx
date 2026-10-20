@@ -1,19 +1,24 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
+import { db } from '@/db'
 import { addItemAction } from '@/app/actions'
+import { nombresDeMisGrupos } from '@/lib/groups'
 import { FotoField } from '@/components/FotoField'
 import { BackLink, Hearts, PRIORIDADES } from '@/components/ui'
 
 const CATEGORIAS = ['Tecnología', 'Casa', 'Ropa', 'Libros', 'Experiencias', 'Hobbies']
 
-export default async function Agregar() {
+export default async function Agregar({ searchParams }: { searchParams: Promise<{ lista?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
+  // Con grupos se elige la lista; ?lista=<id> llega preseleccionada desde la pantalla del grupo.
+  const [{ lista }, grupos] = await Promise.all([searchParams, nombresDeMisGrupos(db, session.userId)])
+  const desdeGrupo = grupos.find((g) => g.id === lista)
 
   return (
     <main className="pb-8 pt-[52px]">
       <div className="flex items-center gap-3.5">
-        <BackLink href="/mi-lista" label="Volver a Mi lista" />
+        <BackLink href={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'} label={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
         <div className="flex flex-col gap-0.5">
           <h1 className="font-display text-[30px] leading-none font-extrabold tracking-[-0.04em]">Agregar deseo</h1>
           <p className="text-sm font-medium">Menos de 30 segundos, prometido.</p>
@@ -21,6 +26,21 @@ export default async function Agregar() {
       </div>
 
       <form action={addItemAction} className="mt-3.5 flex flex-col gap-4">
+        {grupos.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span id="lista-label" className="gr-label">¿En qué lista?</span>
+            <div role="radiogroup" aria-labelledby="lista-label" className="flex flex-wrap gap-2">
+              <label className="gr-chip has-[:checked]:-rotate-2">
+                <input type="radio" name="listaId" value="" defaultChecked={!desdeGrupo} className="sr-only" />Mi lista
+              </label>
+              {grupos.map((g) => (
+                <label key={g.id} className="gr-chip has-[:checked]:-rotate-2">
+                  <input type="radio" name="listaId" value={g.id} defaultChecked={desdeGrupo?.id === g.id} className="sr-only" />{g.nombre}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="gr-sticker flex flex-col gap-3 p-3.5">
           <label className="flex flex-col gap-1">
             <span className="gr-label">¿Qué querés?</span>
