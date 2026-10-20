@@ -6,8 +6,11 @@ const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], vari
 const instrument = Instrument_Sans({ subsets: ['latin'], variable: '--font-instrument' })
 
 export const metadata: Metadata = {
+  // Base de las URLs absolutas de la vista previa al compartir (og:image, og:url).
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'),
   title: 'GiftR',
   description: 'Pedí lo que querés sin pedirlo.',
+  openGraph: { siteName: 'GiftR', locale: 'es_AR', type: 'website' },
   // "Agregar a inicio" en iPhone: abre a pantalla completa y con el nombre corto bajo el ícono.
   appleWebApp: { capable: true, title: 'GiftR', statusBarStyle: 'default' },
 }

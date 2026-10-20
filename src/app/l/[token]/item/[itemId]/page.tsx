@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getItemForViewer } from '@/lib/lists'
@@ -6,7 +7,19 @@ import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { GuestGate } from '@/components/GuestGate'
 import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
+import { esUuid } from '@/lib/groups'
+import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
+
+// La vista previa al compartir (WhatsApp): qué es, para quién y cuánto sale. La imagen sale de opengraph-image.
+export async function generateMetadata({ params }: { params: Promise<{ token: string; itemId: string }> }): Promise<Metadata> {
+  const { token, itemId } = await params
+  const i = esUuid(itemId) ? await itemParaCompartir(db, token, itemId) : null
+  if (!i) return {}
+  const titulo = `${i.titulo} · para ${i.grupoNombre ?? i.para.split(' ')[0]}`
+  const descripcion = [i.precio, i.prioridad === 'mucho' && 'Lo quiere mucho', 'Reservalo en GiftR sin que se entere.'].filter(Boolean).join(' · ')
+  return { title: titulo, description: descripcion, openGraph: { title: titulo, description: descripcion, url: `/l/${token}/item/${itemId}` } }
+}
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
@@ -44,11 +57,18 @@ export default async function DetalleItem({ params, searchParams }: {
               <span className="font-bold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
-          {item.linkTienda && (
-            <a href={item.linkTienda} target="_blank" className="gr-btn self-start font-sans text-sm font-bold">
-              Ver en la tienda <Icon name="external" size={16} strokeWidth={2.4} />
+          <div className="flex flex-wrap gap-2">
+            {item.linkTienda && (
+              <a href={item.linkTienda} target="_blank" className="gr-btn font-sans text-sm font-bold">
+                Ver en la tienda <Icon name="external" size={16} strokeWidth={2.4} />
+              </a>
+            )}
+            {/* Mandárselo a alguien: WhatsApp arma la vista previa con la foto (opengraph-image) */}
+            <a target="_blank" className="gr-btn gap-2 font-sans text-sm font-bold"
+               href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
+              <Icon name="chat" size={16} strokeWidth={2.4} />Mandarlo por WhatsApp
             </a>
-          )}
+          </div>
         </div>
       </article>
 

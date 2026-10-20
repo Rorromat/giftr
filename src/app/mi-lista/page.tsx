@@ -47,7 +47,7 @@ export default async function MiLista() {
         </div>
       )}
 
-      <OwnerItemsGrid items={activos} />
+      <OwnerItemsGrid items={activos} shareToken={lista.shareToken} />
 
       <a href={`https://wa.me/?text=${waText}`} target="_blank"
          className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">

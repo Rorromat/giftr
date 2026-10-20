@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
@@ -6,6 +7,7 @@ import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import type { GiverItemView } from '@/lib/serialize'
 import { historialDeLista } from '@/lib/regalos'
+import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
 import { GustosDe } from '@/components/Gustos'
 import { GuestGate } from '@/components/GuestGate'
@@ -26,6 +28,15 @@ function YaLoReservaste({ grupal = false }: { grupal?: boolean }) {
       <Icon name={grupal ? 'users' : 'lock'} size={14} strokeWidth={2.6} />{grupal ? 'En el regalo grupal' : 'Ya lo reservaste'}
     </span>
   )
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params
+  const l = await listaParaCompartir(db, token)
+  if (!l) return {}
+  const titulo = l.grupoNombre ?? `Lista de ${l.para.split(' ')[0]}`
+  const descripcion = `${l.cantidad} ${l.cantidad === 1 ? 'deseo' : 'deseos'}. Elegí, reservá y no te duplicás con nadie.`
+  return { title: titulo, description: descripcion, openGraph: { title: titulo, description: descripcion, url: `/l/${token}` } }
 }
 
 export default async function ListaAjena({
