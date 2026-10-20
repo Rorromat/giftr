@@ -3,6 +3,7 @@ import { claims, items, listFollows, listMembers, lists, users } from '@/db/sche
 import type { Db } from '@/db/types'
 import { esDuenoSql, esUuid } from '@/lib/groups'
 import { expireStaleClaims } from '@/lib/claims'
+import { ultimosRegalos } from '@/lib/regalos'
 
 // Eventos: los cumples de la gente cuyas listas abriste (las que "seguís") y las fechas de tus grupos,
 // más los tuyos. Las fechas se manejan como Date UTC a medianoche para que no se corran con la hora.
@@ -66,6 +67,8 @@ export type Evento = {
   fotos: string[]
   /** Solo para el regalador: cuántos deseos de esa lista reservaste vos. Nunca está en eventos propios. */
   misReservas?: number
+  /** Solo para el regalador: el último regalo comprado de esa lista y quién se ocupó. */
+  ultimo?: { encargado: string; titulo: string; fecha: Date }
 }
 
 type ListaRow = typeof lists.$inferSelect
@@ -100,7 +103,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       : [],
   ])
 
-  const conFecha: Omit<Evento, 'fotos' | 'misReservas'>[] = []
+  const conFecha: Omit<Evento, 'fotos' | 'misReservas' | 'ultimo'>[] = []
   for (const { list, propio } of todas) {
     if (list.tipo === 'personal') {
       const owner = owners.find((o) => o.id === list.ownerId)
@@ -130,7 +133,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   const ids = conFecha.map((e) => e.listId)
   const ajenas = conFecha.filter((e) => !e.propio).map((e) => e.listId)
   if (ajenas.length) await expireStaleClaims(db)
-  const [deseos, ocupados] = await Promise.all([
+  const [deseos, ocupados, ultimos] = await Promise.all([
     db.select({ id: items.id, listId: items.listId, fotoUrl: items.fotoUrl, prioridad: items.prioridad, createdAt: items.createdAt })
       .from(items).where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo'))),
     // reservas solo de listas ajenas: el dueño nunca recibe información de reservas
@@ -139,6 +142,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
         .from(claims).innerJoin(items, eq(claims.itemId, items.id))
         .where(and(inArray(items.listId, ajenas), inArray(claims.estado, ['reservado', 'comprado'])))
       : [],
+    ultimosRegalos(db, userId, ajenas),
   ])
   const reservados = new Set(ocupados.map((c) => c.itemId))
 
@@ -149,7 +153,8 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       .slice(0, 3).map((d) => d.fotoUrl!)
     if (e.propio) return { ...e, fotos }
     const misReservas = new Set(ocupados.filter((c) => c.listId === e.listId && c.claimerUserId === userId).map((c) => c.itemId)).size
-    return { ...e, fotos, misReservas }
+    const u = ultimos.get(e.listId)
+    return { ...e, fotos, misReservas, ...(u && { ultimo: { encargado: u.encargado, titulo: u.titulo, fecha: u.fecha } }) }
   }).sort((a, b) => a.dias - b.dias || a.titulo.localeCompare(b.titulo))
 }
 
