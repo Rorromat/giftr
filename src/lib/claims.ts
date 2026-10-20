@@ -1,5 +1,5 @@
-import { and, count, eq, inArray, lt, or, sql } from 'drizzle-orm'
-import { claims, items, lists } from '@/db/schema'
+import { and, count, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
+import { claims, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { esDuenoDeLista } from '@/lib/groups'
@@ -17,7 +17,8 @@ export type ReserveResult =
   | { ok: true; claimId: string }
   | { ok: false; reason: 'propio' | 'sin_stock' | 'archivado' | 'no_existe' | 'sin_identidad' }
 
-export async function reserveItem(db: Db, itemId: string, viewer: Viewer): Promise<ReserveResult> {
+// sinVencimiento: la reserva de un regalo grupal no vence (la maneja el encargado).
+export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: { sinVencimiento?: boolean } = {}): Promise<ReserveResult> {
   if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
   return await db.transaction(async (tx): Promise<ReserveResult> => {
     // lock del item: serializa reservas concurrentes sobre el mismo item
@@ -42,11 +43,14 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer): Promi
       itemId,
       claimerUserId: viewer.userId ?? null,
       claimerGuestId: viewer.guestId ?? null,
-      expiresAt: new Date(Date.now() + RESERVA_DIAS * 86400_000),
+      expiresAt: opts.sinVencimiento ? null : new Date(Date.now() + RESERVA_DIAS * 86400_000),
     }).returning()
     return { ok: true, claimId: claim.id }
   })
 }
+
+// La reserva de un regalo grupal se compra o se cancela desde el regalo, no como reserva suelta.
+const noEsDeRegaloGrupal = () => notInArray(claims.id, sql`(select ${groupGifts.claimId} from ${groupGifts})`)
 
 function claimEsDe(viewer: Viewer) {
   return viewer.userId
@@ -59,7 +63,7 @@ function claimEsDe(viewer: Viewer) {
 export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQueCompre?: string): Promise<boolean> {
   const updated = await db.update(claims)
     .set({ estado: 'comprado', notaQueCompre: notaQueCompre ?? null, updatedAt: new Date() })
-    .where(and(eq(claims.id, claimId), eq(claims.estado, 'reservado'), claimEsDe(viewer)))
+    .where(and(eq(claims.id, claimId), eq(claims.estado, 'reservado'), claimEsDe(viewer), noEsDeRegaloGrupal()))
     .returning({ id: claims.id })
   return updated.length > 0
 }
@@ -67,7 +71,7 @@ export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQu
 export async function releaseClaim(db: Db, claimId: string, viewer: Viewer): Promise<boolean> {
   const updated = await db.update(claims)
     .set({ estado: 'liberado', updatedAt: new Date() })
-    .where(and(eq(claims.id, claimId), eq(claims.estado, 'reservado'), claimEsDe(viewer)))
+    .where(and(eq(claims.id, claimId), eq(claims.estado, 'reservado'), claimEsDe(viewer), noEsDeRegaloGrupal()))
     .returning({ id: claims.id })
   return updated.length > 0
 }

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { and, asc, count, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { items, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { newShareToken } from '@/lib/users'
@@ -29,6 +29,14 @@ export function esDuenoSql(db: Db, userId: string) {
   return or(
     eq(lists.ownerId, userId),
     inArray(lists.id, db.select({ id: listMembers.listId }).from(listMembers).where(eq(listMembers.userId, userId))),
+  )!
+}
+
+/** Lo contrario de esDuenoSql, sin el NULL de owner_id vacío en los grupos (NOT NULL descartaría la fila). */
+export function noEsDuenoSql(db: Db, userId: string) {
+  return and(
+    or(isNull(lists.ownerId), ne(lists.ownerId, userId)),
+    notInArray(lists.id, db.select({ id: listMembers.listId }).from(listMembers).where(eq(listMembers.userId, userId))),
   )!
 }
 

@@ -97,3 +97,25 @@ export const notifications = pgTable('notifications', {
   leida: boolean('leida').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Regalo grupal: un encargado (organizer) lo compra y paga; los demás se suman y le deben su parte.
+// Reserva el deseo con un claim propio (sin vencimiento) para que nadie lo duplique.
+export const groupGifts = pgTable('group_gifts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id').notNull().references(() => items.id),
+  claimId: uuid('claim_id').notNull().references(() => claims.id).unique(),
+  organizerUserId: uuid('organizer_user_id').notNull().references(() => users.id),
+  estado: text('estado', { enum: ['abierto', 'comprado', 'cancelado'] }).notNull().default('abierto'),
+  montoTotal: integer('monto_total'), // pesos; se fija al comprar
+  compradoAt: timestamp('comprado_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const groupGiftMembers = pgTable('group_gift_members', {
+  giftId: uuid('gift_id').notNull().references(() => groupGifts.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  monto: integer('monto'), // su parte en pesos; el encargado también tiene la suya
+  pagado: boolean('pagado').notNull().default(false),
+  pagadoAt: timestamp('pagado_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.giftId, t.userId] }), index('group_gift_members_user_id_idx').on(t.userId)])

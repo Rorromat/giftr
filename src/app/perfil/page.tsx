@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
+import { misCuentas, pesos } from '@/lib/regalos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { AvatarSticker, BottomNav, Icon, Starburst } from '@/components/ui'
 
@@ -13,7 +14,7 @@ const GIROS_FOTOS = [-8, 3, 9]
 export default async function Perfil() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, cumple] = await Promise.all([getOwnList(db, session.userId), miCumple(db, session.userId)])
+  const [lista, cumple, cuentas] = await Promise.all([getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId)])
   if (!lista) redirect('/')
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
@@ -56,6 +57,20 @@ export default async function Perfil() {
         </div>
         <CopyLinkButton url={shareUrl} />
       </div>
+
+      {/* Cuentas de los regalos grupales: a quién le debés y quién te debe */}
+      <Link href="/cuentas" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
+        <span className="flex size-[46px] flex-none items-center justify-center rounded-xl border-[2.5px] border-gr-ink bg-gr-accent font-display text-2xl font-extrabold">$</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl font-extrabold">Cuentas</p>
+          <p className="text-[13px] font-medium">
+            {cuentas.debes || cuentas.teDeben
+              ? [cuentas.debes && `Debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `Te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+              : cuentas.enCurso.length ? `${cuentas.enCurso.length} ${cuentas.enCurso.length === 1 ? 'regalo grupal' : 'regalos grupales'} en curso` : 'Regalos entre varios, a lo Splitwise'}
+          </p>
+        </div>
+        <Icon name="chevron" size={20} strokeWidth={2.6} />
+      </Link>
 
       {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista */}
       <form id="cumple" action={saveBirthdayAction} className="gr-sticker flex flex-col gap-3 p-3.5">

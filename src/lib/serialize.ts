@@ -26,6 +26,8 @@ export type ClaimView = {
   claimerNombre: string
   esMia: boolean
   notaQueCompre: string | null
+  /** Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. */
+  grupal: { giftId: string; personas: string[]; soyParte: boolean } | null
 }
 
 export type GiverItemView = OwnerItemView & {
