@@ -31,7 +31,7 @@ export async function Banners() {
     <div className="flex flex-col gap-2.5">
       {codazos.length > 0 && (
         <div className="relative flex flex-col gap-2.5 rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent py-3 pl-3.5 pr-12 shadow-sticker-sm">
-          <Starburst size={44} fontSize={30} className="absolute -right-2 -top-3 rotate-12">👉</Starburst>
+          <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
           <p className="text-sm font-semibold leading-snug">
             <span className="font-extrabold">{juntarNombres(quienes)}</span> te {quienes.length > 1 ? 'dieron' : 'dio'} un codazo:
             {quienes.length > 1 ? ' quieren' : ' quiere'} saber qué regalarte{grupo ? ` en "${grupo.listaNombre ?? 'tu grupo'}"` : ''}.
