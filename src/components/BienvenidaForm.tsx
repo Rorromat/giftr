@@ -209,9 +209,11 @@ export function BienvenidaForm({ nombre, inicial, cumple, editar }: {
           {paso > 0
             ? <button type="button" onClick={() => ir(paso - 1)} className="gr-btn gr-btn--sm flex-none px-4 font-sans font-bold">Atrás</button>
             : editar && <Link href="/perfil" className="gr-btn gr-btn--sm flex-none px-4 font-sans font-bold">Cancelar</Link>}
+          {/* keys distintas: si React reusara el mismo <button>, el click en "Siguiente" del anteúltimo paso
+              lo convertiría en submit durante ese mismo click y mandaría el formulario sin mostrar el último paso */}
           {ultimo
-            ? <button className="gr-btn-primary gr-btn--sm flex-1">{editar ? 'Guardar' : '¡Listo!'}</button>
-            : <button type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary gr-btn--sm flex-1">{paso === 0 && !editar ? 'Empezar' : 'Siguiente'}</button>}
+            ? <button key="listo" className="gr-btn-primary gr-btn--sm flex-1">{editar ? 'Guardar' : '¡Listo!'}</button>
+            : <button key="siguiente" type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary gr-btn--sm flex-1">{paso === 0 && !editar ? 'Empezar' : 'Siguiente'}</button>}
         </div>
       </div>
     </form>
