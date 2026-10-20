@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
+import { misCuentas, pesos } from '@/lib/regalos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, hoyLocal, miCumple, misEventos, type Evento } from '@/lib/events'
-import { AvatarStack, BottomNav, ItemPhoto, Starburst } from '@/components/ui'
+import { AvatarStack, BottomNav, Icon, ItemPhoto, Starburst } from '@/components/ui'
 
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={150} />
@@ -20,9 +21,14 @@ function Fotos({ e }: { e: Evento }) {
 function Estado({ e }: { e: Evento }) {
   // Al dueño nunca se le dice nada de reservas: solo se le recuerda revisar su lista.
   if (e.propio) return <p className="text-[13px] font-semibold text-gr-muted">¿Tu lista está al día?</p>
-  return e.misReservas
-    ? <p className="text-[13px] font-semibold">Ya reservaste {e.misReservas} {e.misReservas === 1 ? 'regalo' : 'regalos'}</p>
-    : <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-[13px] font-bold">Todavía no reservaste nada</p>
+  return (
+    <>
+      {e.misReservas
+        ? <p className="text-[13px] font-semibold">Ya reservaste {e.misReservas} {e.misReservas === 1 ? 'regalo' : 'regalos'}</p>
+        : <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-[13px] font-bold">Todavía no reservaste nada</p>}
+      {e.ultimo && <p className="text-[13px] font-medium text-gr-muted [overflow-wrap:anywhere]">El último lo compró {e.ultimo.encargado}: {e.ultimo.titulo}</p>}
+    </>
+  )
 }
 
 function Proximos({ eventos }: { eventos: Evento[] }) {
@@ -91,7 +97,9 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [{ vista }, eventos, cumple] = await Promise.all([searchParams, misEventos(db, session.userId, hoy), miCumple(db, session.userId)])
+  const [{ vista }, eventos, cumple, cuentas] = await Promise.all([
+    searchParams, misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
+  ])
   const anio = vista === 'anio'
 
   return (
@@ -100,6 +108,16 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
         <h1 className="gr-title">Eventos</h1>
         <p className="text-[15px] font-medium">Los cumples y fechas de tu gente, con tiempo.</p>
       </div>
+
+      {(cuentas.debes > 0 || cuentas.teDeben > 0) && (
+        <Link href="/cuentas" className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink px-3.5 py-2 text-sm font-semibold text-gr-bg">
+          <span>
+            Cuentas pendientes:{' '}
+            {[cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')}
+          </span>
+          <Icon name="chevron" size={18} strokeWidth={2.6} className="text-gr-accent" />
+        </Link>
+      )}
 
       <nav aria-label="Vista" className="gr-segmented">
         <Link href="/eventos" aria-current={anio ? undefined : 'page'}>Próximos</Link>

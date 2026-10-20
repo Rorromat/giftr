@@ -4,19 +4,27 @@ import { getItemForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { GuestGate } from '@/components/GuestGate'
+import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
+import { parsePesos } from '@/lib/pesos'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
-export default async function DetalleItem({ params }: { params: Promise<{ token: string; itemId: string }> }) {
-  const { token, itemId } = await params
+export default async function DetalleItem({ params, searchParams }: {
+  params: Promise<{ token: string; itemId: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
+  const [{ token, itemId }, { error }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
   if (detalle.role === 'owner') redirect(detalle.tipo === 'grupo' ? `/grupos/${detalle.listId}` : '/mi-lista')
 
-  const { item, comments, ownerNombre } = detalle
+  const { item, comments, ownerNombre, regalos } = detalle
   const plural = detalle.duenos.length > 1
   const identified = !!viewer.userId || !!viewer.guestId
-  const miClaim = item.claims.find((c) => c.esMia && c.estado === 'reservado')
+  // La reserva de un regalo grupal se maneja desde el regalo; acá solo las sueltas.
+  const miClaim = item.claims.find((c) => c.esMia && c.estado === 'reservado' && !c.grupal)
+  const enUnRegalo = regalos.some((r) => r.soyParte)
+  const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
 
   return (
@@ -25,7 +33,7 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
 
       <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
         <div className="relative">
-          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!item.disponible && !miClaim} />
+          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!item.disponible && !miClaim && !enUnRegalo} />
           <PriorityTag prioridad={item.prioridad} className="absolute left-3 top-3 h-[30px]" />
           {precio && <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{precio}</PriceSticker>}
         </div>
@@ -45,7 +53,7 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
       </article>
 
       <section className="flex flex-col gap-2.5">
-        {item.claims.map((c) => (
+        {item.claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
             <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border-2 border-gr-ink`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
@@ -59,7 +67,17 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
           </p>
         ))}
 
-        {item.disponible && !miClaim && <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" />}
+        {regalos.map((r) => (
+          <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
+                        precio={parsePesos(precio)} logueado={logueado} error={r.soyEncargado ? error : undefined} />
+        ))}
+
+        {item.disponible && !miClaim && !enUnRegalo && (
+          <>
+            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" />
+            <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />
+          </>
+        )}
 
         {miClaim && (
           <div className="gr-sticker flex flex-col gap-3 p-3.5">
@@ -76,6 +94,7 @@ export default async function DetalleItem({ params }: { params: Promise<{ token:
               <input type="hidden" name="claimId" value={miClaim.id} />
               <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Liberar reserva</button>
             </form>
+            {logueado && <ArmarRegaloGrupal token={token} itemId={item.id} logueado convertir />}
           </div>
         )}
       </section>

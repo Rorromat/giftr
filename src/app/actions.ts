@@ -15,6 +15,7 @@ import { createGuest } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { guardarCumple, guardarFechaGrupo } from '@/lib/events'
+import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
 import type { Viewer } from '@/lib/types'
 
 const str = (fd: FormData, k: string) => {
@@ -178,4 +179,77 @@ export async function commentAction(formData: FormData) {
 export async function markNotifsReadAction() {
   await markNotificationsRead(db, await getViewer())
   revalidatePath('/', 'layout')
+}
+
+// ---------- Regalo grupal y cuentas (solo con cuenta de Google: las deudas tienen que tener dueño) ----------
+
+async function usuarioRegalador() {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  return session.userId
+}
+
+function revalidarRegalo(fd: FormData) {
+  const token = str(fd, 'token')
+  const itemId = str(fd, 'itemId')
+  if (token) revalidatePath(`/l/${token}`)
+  if (token && itemId) revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath('/cuentas')
+  revalidatePath('/perfil')
+  revalidatePath('/eventos')
+}
+
+export async function startGroupGiftAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await itemPerteneceAToken(itemId, token))) return
+  await iniciarRegaloGrupal(db, itemId, userId)
+  revalidarRegalo(formData)
+}
+
+export async function joinGroupGiftAction(formData: FormData) {
+  await sumarseARegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
+
+export async function leaveGroupGiftAction(formData: FormData) {
+  await salirDeRegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
+
+export async function cancelGroupGiftAction(formData: FormData) {
+  await cancelarRegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
+
+/** "0" es una parte válida (alguien que no pone); cualquier otra cosa se lee como pesos. */
+const parte = (v: string) => (/^\D*0+\D*$/.test(v) ? 0 : parsePesos(v) ?? Number.NaN)
+
+export async function buyGroupGiftAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const volver = `/l/${str(formData, 'token')}/item/${str(formData, 'itemId')}`
+  let partes: Record<string, number> | undefined
+  if (str(formData, 'modo') === 'manual') {
+    partes = {}
+    for (const [k, v] of formData.entries()) {
+      if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = parte(v)
+    }
+  }
+  const r = await comprarRegalo(db, str(formData, 'giftId') ?? '', userId, {
+    total: parsePesos(str(formData, 'total')) ?? 0, partes, nota: str(formData, 'nota'),
+  })
+  revalidarRegalo(formData)
+  redirect(r.ok ? volver : `${volver}?error=${r.reason}`)
+}
+
+export async function markPaidAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  await marcarPagado(db, str(formData, 'giftId') ?? '', str(formData, 'deudorId') ?? '', userId, str(formData, 'pagado') !== '0')
+  revalidarRegalo(formData)
+}
+
+export async function settleUpAction(formData: FormData) {
+  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '')
+  revalidarRegalo(formData)
 }

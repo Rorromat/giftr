@@ -5,29 +5,13 @@ import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { reserveItem, type ReserveResult } from '@/lib/claims'
 import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
+import { dividir } from '@/lib/pesos'
+
+export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
 // Regalo grupal, a lo Splitwise: un encargado reserva el deseo y los demás se suman.
 // El encargado lo compra, pone cuánto salió y lo reparte; cada uno le debe su parte hasta que le paga.
 // Regla de la sorpresa: los dueños de la lista no pueden armarlo ni sumarse, y nada de esto llega a sus vistas.
-
-/** "$45.000" → 45000, "$20.000 - $30.000" → 20000, "45k" → 45000. Null si no hay un número. */
-export function parsePesos(texto: string | null | undefined): number | null {
-  const m = texto?.match(/(\d[\d.]*)(?:,\d+)?\s*(k|mil)?/i)
-  if (!m) return null
-  const n = Number(m[1].replace(/\./g, '')) * (m[2] ? 1000 : 1)
-  return Number.isSafeInteger(n) && n > 0 ? n : null
-}
-
-/** 45000 → "$45.000" (separador de miles de Argentina, sin depender del ICU del servidor). */
-export function pesos(n: number): string {
-  return `${n < 0 ? '-' : ''}$${String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
-}
-
-/** Partes iguales en pesos enteros; los pesos que sobran van a los primeros (el encargado va primero). */
-export function dividir(total: number, n: number): number[] {
-  const base = Math.floor(total / n)
-  return Array.from({ length: n }, (_, i) => base + (i < total - base * n ? 1 : 0))
-}
 
 export const MONTO_MAXIMO = 100_000_000
 
