@@ -63,9 +63,9 @@ function Starburst({ size, texto, fontSize }: { size: number; texto: string; fon
   )
 }
 
-function Logo() {
+function Logo({ arriba = false }: { arriba?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', position: 'absolute', right: 52, bottom: 44 }}>
+    <div style={{ display: 'flex', alignItems: 'center', position: 'absolute', right: 52, ...(arriba ? { top: 52 } : { bottom: 44 }) }}>
       <div style={{
         display: 'flex', padding: '4px 22px 10px', background: C.surface, border: `4px solid ${C.ink}`, borderRadius: 22,
         boxShadow: `6px 6px 0 ${C.ink}`, transform: 'rotate(-3deg)', fontSize: 52, fontWeight: 800, letterSpacing: -3, color: C.ink,
@@ -98,8 +98,16 @@ function Etiqueta({ children, oscura = false }: { children: string; oscura?: boo
   )
 }
 
-function render(contenido: React.ReactElement) {
-  return fuentes.then((fonts) => new ImageResponse(contenido, { ...OG_SIZE, fonts }))
+/**
+ * Satori da PNG, que con fotos pesa 600–800 KB; WhatsApp no muestra vistas previas tan pesadas.
+ * Se pasa a JPEG (~100 KB). Se cachea un rato en la CDN: si cambia el deseo, se ve en minutos.
+ */
+async function render(contenido: React.ReactElement) {
+  const png = await new ImageResponse(contenido, { ...OG_SIZE, fonts: await fuentes }).arrayBuffer()
+  const jpg = await sharp(Buffer.from(png)).jpeg({ quality: 84, mozjpeg: true }).toBuffer()
+  return new Response(new Uint8Array(jpg), {
+    headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400' },
+  })
 }
 
 const fondo = { width: '100%', height: '100%', display: 'flex', background: C.bg, fontFamily: 'Bricolage', position: 'relative' } as const
@@ -134,12 +142,14 @@ export async function imagenItem(i: ItemCompartido) {
 /** Una lista: de quién es, cuántos deseos y hasta 3 fotos troqueladas. */
 export async function imagenLista(l: ListaCompartida) {
   const fotos = await Promise.all(l.fotos.map((f) => foto(f, 300, 300)))
+  const titulo = recortar(l.grupoNombre ?? `Lista de ${l.para.split(' ')[0]}`, 24)
   const giros = [-5, 3, -2]
   return render(
     <div style={{ ...fondo, flexDirection: 'column', padding: '56px 64px', gap: 34 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-        <div style={{ display: 'flex', fontSize: 82, fontWeight: 800, letterSpacing: -4, lineHeight: 1, color: C.ink }}>
-          {recortar(l.grupoNombre ?? `Lista de ${l.para.split(' ')[0]}`, 26)}
+        {/* largo acotado para no pisar el logo de arriba a la derecha */}
+        <div style={{ display: 'flex', fontSize: titulo.length > 16 ? 60 : 82, fontWeight: 800, letterSpacing: -3, lineHeight: 1, color: C.ink }}>
+          {titulo}
         </div>
         {l.cantidad > 0 && <Starburst size={120} texto={String(Math.min(l.cantidad, 99))} fontSize={52} />}
       </div>
@@ -149,7 +159,7 @@ export async function imagenLista(l: ListaCompartida) {
           <FotoSticker key={n} src={src} titulo={l.para} ancho={300} alto={300} giro={giros[n]} />
         ))}
       </div>
-      <Logo />
+      <Logo arriba />
     </div>,
   )
 }
