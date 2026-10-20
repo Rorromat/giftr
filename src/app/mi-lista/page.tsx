@@ -7,7 +7,7 @@ import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { Banners } from '@/components/Banners'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { BottomNav, Icon, LogoSticker, Starburst } from '@/components/ui'
+import { BottomNav, Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
 
 export default async function MiLista() {
   const session = await auth()
@@ -24,7 +24,7 @@ export default async function MiLista() {
   const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
 
   return (
-    <main className="flex flex-col gap-3.5 pb-48 pt-[52px]">
+    <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
         <LogoSticker />
         <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
@@ -66,6 +66,6 @@ export default async function MiLista() {
       </a>
 
       <BottomNav active="mi-lista" />
-    </main>
+    </Seccion>
   )
 }

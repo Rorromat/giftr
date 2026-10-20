@@ -7,7 +7,7 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { MESES } from '@/lib/events'
 import { unfollowAction } from '@/app/actions'
-import { AvatarStack, AvatarSticker, BottomNav, Icon, Starburst } from '@/components/ui'
+import { AvatarStack, AvatarSticker, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
 
 /** "Cumple el 22 de agosto · en 14 días", "El 12 de octubre", "Sin cumple cargado". La cuenta no se corta en dos renglones. */
 function cuando(c: Contacto) {
@@ -60,7 +60,7 @@ export default async function Gente() {
   const wa = encodeURIComponent(`Te paso mi lista de deseos en GiftR 🎁 ${shareUrl} ¿Me pasás la tuya así sé qué regalarte?`)
 
   return (
-    <main className="flex flex-col gap-4 pb-32 pt-[52px]">
+    <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Tu gente</h1>
         <p className="text-[15px] font-medium">A quienes les regalás, con sus listas a mano.</p>
@@ -91,6 +91,6 @@ export default async function Gente() {
       </section>
 
       <BottomNav active="gente" />
-    </main>
+    </Seccion>
   )
 }

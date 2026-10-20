@@ -280,6 +280,35 @@
   .gr-tilt-r { transform: rotate(1deg); }
 }
 
+/* Cambio de sección desde la barra (<Seccion> y <BottomNav> en ui.tsx). La barra queda quieta, el círculo
+   verde se desliza con un rebote chico (por debajo del +) y el contenido sale rápido y entra subiendo apenas.
+   React no arranca otra transición hasta que termina la anterior: por eso todo es corto y lo que no es
+   un cambio de sección (otros refrescos) termina en el acto, así no demora el próximo toque. */
+::view-transition { pointer-events: none; } /* los toques pasan a la página durante la animación */
+::view-transition-group(root) { animation-duration: 0s; }
+::view-transition-group(gr-nav) { animation: none; z-index: 100; }
+::view-transition-group(gr-nav-activo) { animation-duration: 0s; z-index: 101; }
+::view-transition-group(gr-nav-agregar) { animation: none; z-index: 102; }
+::view-transition-old(gr-nav),
+::view-transition-old(gr-nav-agregar) { display: none; }
+::view-transition-new(gr-nav),
+::view-transition-new(gr-nav-agregar) { animation: none; }
+:root:active-view-transition-type(seccion)::view-transition-group(gr-nav-activo) {
+  animation-duration: 300ms; animation-timing-function: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+:root:active-view-transition-type(seccion)::view-transition-old(gr-nav-activo),
+:root:active-view-transition-type(seccion)::view-transition-new(gr-nav-activo) { animation-duration: 180ms; }
+/* hacia o desde una pantalla sin barra: el círculo no viaja solo */
+::view-transition-old(gr-nav-activo):only-child { display: none; }
+::view-transition-new(gr-nav-activo):only-child { animation: none; }
+::view-transition-old(.gr-seccion) { animation: 80ms ease-in both gr-sale; }
+::view-transition-new(.gr-seccion) { animation: 200ms cubic-bezier(0, 0, 0.2, 1) 50ms both gr-entra; }
+@keyframes gr-sale { to { opacity: 0; } }
+@keyframes gr-entra { from { opacity: 0; translate: 0 10px; } }
+
 @media (prefers-reduced-motion: reduce) {
   .gr-btn, .gr-btn-primary { transition: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation-duration: 0s !important; animation-delay: 0s !important; }
 }

@@ -8,7 +8,7 @@ import { diasEntre, fechaLarga, hoyLocal, proximaDeGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { AvatarStack, BackLink, BottomNav, Icon, Starburst } from '@/components/ui'
+import { AvatarStack, BackLink, BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
 
 export default async function Grupo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -28,7 +28,7 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
   const waInvitar = encodeURIComponent(`Armemos juntos la lista "${grupo.nombre}" en GiftR: ${inviteUrl}`)
 
   return (
-    <main className="flex flex-col gap-3.5 pb-48 pt-[52px]">
+    <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
         <BackLink href="/mi-lista" label="Volver a Mi lista" />
         <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
@@ -113,6 +113,6 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
       </a>
 
       <BottomNav active="mi-lista" />
-    </main>
+    </Seccion>
   )
 }

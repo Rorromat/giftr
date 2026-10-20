@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ViewTransition } from 'react'
 
 // Piezas base del sistema "Sticker". Server components puros (sin estado).
 
@@ -212,26 +213,43 @@ export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
   )
 }
 
+// Cambio de sección desde la barra: el contenido se funde, la barra queda quieta y el círculo
+// verde se desliza hasta el destino (las animaciones están en tokens.css).
+const CAMBIO_DE_SECCION = 'seccion'
+const FUNDIDO = { [CAMBIO_DE_SECCION]: 'gr-seccion', default: 'none' }
+
+/** El <main> de una pantalla con la barra de abajo: al cambiar de sección se funde con la anterior. */
+export function Seccion(props: React.ComponentProps<'main'>) {
+  return (
+    <ViewTransition enter={FUNDIDO} exit={FUNDIDO} default="none">
+      <main {...props} />
+    </ViewTransition>
+  )
+}
+
+function Destino({ href, label, activo, children }: { href: string; label: string; activo: boolean; children: React.ReactNode }) {
+  return (
+    <Link href={href} prefetch transitionTypes={[CAMBIO_DE_SECCION]} aria-label={label} aria-current={activo ? 'page' : undefined}>
+      <span style={activo ? { viewTransitionName: 'gr-nav-activo' } : undefined}>{children}</span>
+    </Link>
+  )
+}
+
 /** Píldora negra flotante. Solo lista los destinos que existen hoy. */
 export function BottomNav({ active }: { active: 'mi-lista' | 'eventos' | 'gente' | 'perfil' }) {
   return (
-    <nav aria-label="Navegación principal" className="gr-nav">
+    <nav aria-label="Navegación principal" className="gr-nav" style={{ viewTransitionName: 'gr-nav' }}>
       {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
-      <Link href="/mi-lista" prefetch aria-label="Mi lista" aria-current={active === 'mi-lista' ? 'page' : undefined}>
-        <span><Icon name="home" /></span>
-      </Link>
-      <Link href="/eventos" prefetch aria-label="Eventos" aria-current={active === 'eventos' ? 'page' : undefined}>
-        <span><Icon name="gift" /></span>
-      </Link>
+      <Destino href="/mi-lista" label="Mi lista" activo={active === 'mi-lista'}><Icon name="home" /></Destino>
+      <Destino href="/eventos" label="Eventos" activo={active === 'eventos'}><Icon name="gift" /></Destino>
       <Link href="/agregar" prefetch aria-label="Agregar deseo">
-        <span className="gr-nav__add"><Icon name="plus" size={24} strokeWidth={3} /></span>
+        {/* con nombre propio para que el círculo verde pase por debajo al deslizarse */}
+        <span className="gr-nav__add" style={{ viewTransitionName: 'gr-nav-agregar' }}><Icon name="plus" size={24} strokeWidth={3} /></span>
       </Link>
-      <Link href="/gente" prefetch aria-label="Tu gente" aria-current={active === 'gente' ? 'page' : undefined}>
-        <span><Icon name="users" strokeWidth={2.4} /></span>
-      </Link>
-      <Link href="/perfil" prefetch aria-label="Perfil" aria-current={active === 'perfil' ? 'page' : undefined}>
-        <span><Icon name="user" strokeWidth={active === 'perfil' ? 2.4 : 2.2} /></span>
-      </Link>
+      <Destino href="/gente" label="Tu gente" activo={active === 'gente'}><Icon name="users" strokeWidth={2.4} /></Destino>
+      <Destino href="/perfil" label="Perfil" activo={active === 'perfil'}>
+        <Icon name="user" strokeWidth={active === 'perfil' ? 2.4 : 2.2} />
+      </Destino>
     </nav>
   )
 }
