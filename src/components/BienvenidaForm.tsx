@@ -178,7 +178,7 @@ export function BienvenidaForm({ nombre, inicial, cumple, editar }: {
         <div className="flex flex-wrap gap-2">
           {COLORES.map((c) => (
             <Chip key={c.nombre} name="colores" value={c.nombre} checked={inicial.colores.includes(c.nombre)}>
-              <span aria-hidden className="size-4 rounded-full border-2 border-gr-ink" style={{ background: c.hex }} />{c.nombre}
+              <span aria-hidden className="size-4 rounded-full border-2 border-current" style={{ background: c.hex }} />{c.nombre}
             </Chip>
           ))}
         </div>
