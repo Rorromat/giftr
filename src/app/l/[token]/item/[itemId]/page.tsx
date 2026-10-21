@@ -5,7 +5,7 @@ import { getItemForViewer } from '@/lib/lists'
 import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
-import { NoSoyYo, PreguntaInvitado, QuienSos } from '@/components/Identidad'
+import { ConfirmarLista, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
@@ -36,9 +36,11 @@ export default async function DetalleItem({ params, searchParams }: {
 
   const { item, ownerNombre } = detalle
   const plural = detalle.duenos.length > 1
+  // identified: tiene nombre (sesión o invitado). Sin ver la coordinación (puede ser el dueño sin su sesión, ver
+  // accesoALista) no se ve nada: ni reservas, ni regalos, ni comentarios.
   const identified = identificado(viewer)
-  // Sin identificarse no se ve nada de la coordinación (puede ser el dueño sin su sesión): ni reservas, ni regalos, ni comentarios.
   const giver = detalle.role === 'giver' ? detalle : null
+  const aqui = `/l/${token}/item/${item.id}`
   const claims = giver?.item.claims ?? []
   const regalos = giver?.regalos ?? []
   const comments = giver?.comments ?? []
@@ -89,8 +91,10 @@ export default async function DetalleItem({ params, searchParams }: {
       </article>
 
       <section className="flex flex-col gap-2.5">
-        {!identified && <QuienSos token={token} volver={`/l/${token}/item/${item.id}`} />}
-        <CartelReserva motivo={reserva} identified={identified} />
+        {detalle.role === 'anonimo' && (detalle.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+          : detalle.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+            : <QuienSos token={token} volver={aqui} />)}
+        <CartelReserva motivo={reserva} veTodo={!!giver} conNombre={identified} />
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
@@ -112,10 +116,11 @@ export default async function DetalleItem({ params, searchParams }: {
                         nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} error={r.soyEncargado ? error : undefined} />
         ))}
 
-        {disponible && !miClaim && !enUnRegalo && (
+        {/* como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá */}
+        {disponible && !miClaim && !enUnRegalo && !(detalle.role === 'anonimo' && detalle.motivo !== 'sin_identidad') && (
           <>
-            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" desde="detalle" />
-            {identified && <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />}
+            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva} />
+            {giver && <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />}
           </>
         )}
 
@@ -139,7 +144,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
       </section>
 
-      {identified && (
+      {giver && (
         <section className="mt-2 flex flex-col gap-3">
           <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
             <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
@@ -158,9 +163,10 @@ export default async function DetalleItem({ params, searchParams }: {
             <input name="texto" required placeholder="Coordiná con los demás…" className="gr-input flex-1 shadow-none" />
             <button className="gr-btn bg-gr-ink text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</button>
           </form>
-          {quien && <NoSoyYo nombre={quien} volver={`/l/${token}/item/${item.id}`} conCuenta={logueado} />}
         </section>
       )}
+
+      {quien && <NoSoyYo nombre={quien} volver={aqui} conCuenta={logueado} />}
 
     </main>
   )

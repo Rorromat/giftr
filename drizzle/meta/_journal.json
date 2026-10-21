@@ -57,6 +57,13 @@
       "when": 1792553335330,
       "tag": "0007_fotos_deseo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792580204429,
+      "tag": "0008_listas_de_invitado",
+      "breakpoints": true
     }
   ]
 }

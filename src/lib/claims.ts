@@ -2,7 +2,7 @@ import { and, count, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import { claims, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
+import { abrirListaAInvitado, accesoALista, listasAjenasSql } from '@/lib/acceso'
 
 export async function expireStaleClaims(db: Db, itemId?: string) {
   const vencida = and(eq(claims.estado, 'reservado'), lt(claims.expiresAt, new Date()))
@@ -27,11 +27,16 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: 
       .where(eq(items.id, itemId))
       .for('update', { of: items })
     if (!row) return { ok: false, reason: 'no_existe' }
-    // Ningún dueño (tampoco un co-dueño del grupo) reserva en su propia lista.
-    if (viewer.userId && await esDuenoDeLista(tx as unknown as Db, row.listId, viewer.userId)) return { ok: false, reason: 'propio' }
+    const t = tx as unknown as Db
+    // Ningún dueño (tampoco un co-dueño del grupo) reserva en su propia lista. Un invitado tampoco en las de una cuenta
+    // que tuvo sesión en este navegador: puede ser ese dueño sin su sesión (ver accesoALista).
+    const acceso = await accesoALista(t, row.listId, viewer)
+    if (acceso === 'dueno' || acceso === 'otra_cuenta') return { ok: false, reason: 'propio' }
+    // reservar es decir que la lista no es suya: desde ahora ve lo que reservaron los demás (también si no sale)
+    if (viewer.guestId) await abrirListaAInvitado(t, viewer.guestId, row.listId)
     if (row.item.estadoDueno !== 'activo') return { ok: false, reason: 'archivado' }
 
-    await expireStaleClaims(tx as unknown as Db, itemId)
+    await expireStaleClaims(t, itemId)
 
     if (!row.item.repetible) {
       const [{ n }] = await tx.select({ n: count() }).from(claims)
@@ -60,6 +65,13 @@ function claimEsDe(viewer: Viewer) {
       : sql`false`
 }
 
+/** Si el que mira ya tiene una reserva activa (reservada o comprada) de ese deseo. */
+export async function tieneReservaActiva(db: Db, itemId: string, viewer: Viewer): Promise<boolean> {
+  const [fila] = await db.select({ id: claims.id }).from(claims)
+    .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado']), claimEsDe(viewer)))
+  return !!fila
+}
+
 export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQueCompre?: string): Promise<boolean> {
   const updated = await db.update(claims)
     .set({ estado: 'comprado', notaQueCompre: notaQueCompre ?? null, updatedAt: new Date() })
@@ -84,7 +96,7 @@ export async function getMyClaimWarnings(db: Db, viewer: Viewer) {
     createdAt: claims.createdAt, expiresAt: claims.expiresAt,
   }).from(claims).innerJoin(items, eq(claims.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
     // por si una reserva quedó sobre una lista propia (venga de donde venga): ese cartel le contaría la sorpresa
-    .where(and(eq(claims.estado, 'reservado'), claimEsDe(viewer), viewer.userId ? noEsDuenoSql(db, viewer.userId) : undefined))
+    .where(and(eq(claims.estado, 'reservado'), claimEsDe(viewer), listasAjenasSql(db, viewer)))
   const ahora = Date.now()
   return rows
     .filter((r) => r.expiresAt && ahora > (r.createdAt.getTime() + r.expiresAt.getTime()) / 2)

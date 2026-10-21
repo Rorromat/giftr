@@ -7,13 +7,16 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
-import { firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO } from '@/lib/cookie-invitado'
+import {
+  anotarCuenta, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO,
+} from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
 import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
-import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
+import { markBought, releaseClaim, reserveItem, tieneReservaActiva } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, type NombreValidado } from '@/lib/guest'
+import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
+import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
@@ -36,17 +39,27 @@ const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
 /** Solo rutas de la app ("/l/…"), nunca a otro sitio. */
 const rutaPropia = (v?: string) => (v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : '/')
 
-async function listaExiste(token: string) {
+async function listaDeToken(token: string): Promise<string | null> {
   const [row] = await db.select({ id: lists.id }).from(lists).where(eq(lists.shareToken, token))
-  return !!row
+  return row?.id ?? null
 }
 
-async function itemPerteneceAToken(itemId: string, token: string) {
-  const [row] = await db.select({ id: items.id }).from(items)
+/** La lista del deseo, si el deseo es de la lista de ese token. */
+async function listaDelItem(itemId: string, token: string): Promise<string | null> {
+  const [row] = await db.select({ id: lists.id }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, token)))
-  return !!row
+  return row?.id ?? null
 }
+
+/** Adónde vuelve un formulario de una lista: la página de donde vino (con sus filtros), si es de esa misma lista. */
+function volverALista(fd: FormData, token: string) {
+  const v = rutaPropia(str(fd, 'volver'))
+  const base = `/l/${token}`
+  return v === base || v.startsWith(`${base}/`) || v.startsWith(`${base}?`) ? v : base
+}
+
+const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${ruta.includes('?') ? '&' : '?'}${clave}=${valor}`
 
 /** Los campos del formulario de un deseo (agregar o editar). Lo vacío queda undefined. Null si falta el título. */
 function deseoDelForm(formData: FormData): NewItemData | null {
@@ -201,42 +214,63 @@ export async function unfollowAction(formData: FormData) {
 /**
  * El que mira. Si no se sabe quién es y el formulario trae un nombre, lo anota como invitado
  * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
+ * Anotarse con su nombre en una lista es decir que no es suya: ve lo que reservaron los demás ahí (y solo ahí).
  */
-async function viewerIdentificandoGuest(formData: FormData): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
+async function viewerIdentificandoGuest(formData: FormData, listId: string): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
   const viewer = await getViewer()
   if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer }
   const v = validarNombre(formData.get('nombre'))
   if (!v.ok) return v
   const guest = await createGuest(db, v.nombre)
-  ;(await cookies()).set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
-  return { ok: true, viewer: { guestId: guest.id } }
+  await abrirListaAInvitado(db, guest.id, listId)
+  const jar = await cookies()
+  jar.set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  // con las cuentas que tuvieron sesión acá: en sus listas, este invitado nuevo tampoco ve nada
+  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value) }
 }
 
 export async function reserveAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const token = str(formData, 'token') ?? ''
   const itemId = str(formData, 'itemId') ?? ''
-  if (!(await itemPerteneceAToken(itemId, token))) return null
-  const quien = await viewerIdentificandoGuest(formData)
+  const listId = await listaDelItem(itemId, token)
+  if (!listId) return null
+  const quien = await viewerIdentificandoGuest(formData, listId)
   if (!quien.ok) return { error: quien.error }
   const r = await reserveItem(db, itemId, quien.viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
-  if (r.ok) return null
+  const volver = volverALista(formData, token)
+  // Un doble toque manda el segundo envío con la reserva del primero ya hecha: no hay que decirle que lo agarró otro.
+  if (r.ok || (r.reason === 'sin_stock' && await tieneReservaActiva(db, itemId, quien.viewer))) {
+    // si arriba quedó el cartel de una reserva anterior que no salió (?reserva=), se va
+    if (str(formData, 'conCartel')) redirect(volver)
+    return null
+  }
   // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
   // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
-  // Del detalle se vuelve al detalle, salvo que el deseo ya no esté.
-  const alDetalle = str(formData, 'desde') === 'detalle' && (r.reason === 'sin_stock' || r.reason === 'sin_identidad')
-  redirect(`${alDetalle ? `/l/${token}/item/${itemId}` : `/l/${token}`}?reserva=${r.reason}`)
+  // Se vuelve a la misma página, con sus filtros; del detalle, a la lista si el deseo ya no está.
+  const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad'
+  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', r.reason))
 }
 
 /** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */
 export async function identificarseAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const token = str(formData, 'token') ?? ''
-  if (!(await listaExiste(token))) return null
-  const quien = await viewerIdentificandoGuest(formData)
+  const listId = await listaDeToken(token)
+  if (!listId) return null
+  const quien = await viewerIdentificandoGuest(formData, listId)
   if (!quien.ok) return { error: quien.error }
   revalidatePath(`/l/${token}`, 'layout')
   return null
+}
+
+/** "No es mía: ver lo reservado": un invitado que se anotó en otra lista dice que esta tampoco es suya. */
+export async function verLoReservadoAction(formData: FormData) {
+  const token = str(formData, 'token') ?? ''
+  const [listId, viewer] = await Promise.all([listaDeToken(token), getViewer()])
+  if (!listId || !viewer.guestId) return
+  await abrirListaAInvitado(db, viewer.guestId, listId)
+  revalidatePath(`/l/${token}`, 'layout')
 }
 
 /** "Entrar con Google" desde una lista o un deseo: vuelve a la misma página. */
@@ -248,12 +282,14 @@ export async function entrarConGoogleAction(formData: FormData) {
  * "Cerrar sesión" (Perfil) o "¿No sos X?" (en una lista): este navegador se olvida del que está ahora.
  * Con sesión de Google, la cierra y nada más: la cookie de un invitado que no se unió a la cuenta es de otra persona
  * (o de la misma, que todavía no dijo que era ella) y borrarla dejaría sus reservas sin nadie que las maneje.
- * Sin sesión, borra la cookie de invitado.
+ * Queda anotado que esta cuenta usó el navegador: en sus listas, ese invitado ya no ve la capa oculta.
+ * Sin sesión, borra la cookie de invitado (la pantalla pide confirmarlo antes).
  */
 export async function salirAction(formData: FormData) {
   const volver = rutaPropia(str(formData, 'volver'))
   const session = await auth()
   if (session?.userId) {
+    anotarCuenta(await cookies(), session.userId)
     await signOut({ redirectTo: volver })
     return
   }
@@ -269,6 +305,7 @@ export async function unirInvitadoAction() {
   const session = await auth()
   if (!session?.userId) return
   const jar = await cookies()
+  anotarCuenta(jar, session.userId)
   const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
   // si falla, la cookie queda y la pregunta sigue ahí para volver a intentar
   if (guestId) await unirInvitadoACuenta(db, guestId, session.userId)
@@ -282,6 +319,8 @@ export async function noSoyElInvitadoAction() {
   const session = await auth()
   if (!session?.userId) return
   const jar = await cookies()
+  // la cookie del invitado sigue, pero en las listas de esta cuenta ya no ve nada (puede ser ella, después de salir)
+  anotarCuenta(jar, session.userId)
   const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
   if (guestId) jar.set(NO_SOY_COOKIE, marcaNoSoy(guestId, session.userId), OPCIONES_COOKIE_INVITADO)
   revalidatePath('/', 'layout')
@@ -307,7 +346,7 @@ export async function commentAction(formData: FormData) {
   const viewer = await getViewer()
   const token = str(formData, 'token')!
   const itemId = str(formData, 'itemId')!
-  if (!(await itemPerteneceAToken(itemId, token))) return
+  if (!(await listaDelItem(itemId, token))) return
   await addComment(db, itemId, viewer, str(formData, 'texto') ?? '')
   revalidatePath(`/l/${token}/item/${itemId}`)
 }
@@ -339,7 +378,7 @@ export async function startGroupGiftAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const token = str(formData, 'token') ?? ''
   const itemId = str(formData, 'itemId') ?? ''
-  if (!(await itemPerteneceAToken(itemId, token))) return
+  if (!(await listaDelItem(itemId, token))) return
   await iniciarRegaloGrupal(db, itemId, userId)
   revalidarRegalo(formData)
 }
@@ -413,8 +452,9 @@ export async function probarAvisoAction(): Promise<number> {
 export async function codazoAction(formData: FormData) {
   const token = str(formData, 'token') ?? ''
   // antes de anotar a nadie: un token inventado no crea invitados
-  if (!(await listaExiste(token))) redirect('/')
-  const quien = await viewerIdentificandoGuest(formData)
+  const listId = await listaDeToken(token)
+  if (!listId) redirect('/')
+  const quien = await viewerIdentificandoGuest(formData, listId)
   if (!quien.ok) redirect(`/l/${token}?codazo=${quien.motivo === 'vacio' ? 'sin_identidad' : 'nombre_largo'}#codazo`)
   const r = await mandarCodazo(db, token, quien.viewer, (await nombreDeViewer(db, quien.viewer)) ?? 'Alguien')
   redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)

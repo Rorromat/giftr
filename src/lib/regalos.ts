@@ -2,10 +2,11 @@ import { and, asc, desc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-or
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { identificado, type Viewer } from '@/lib/types'
+import type { Viewer } from '@/lib/types'
 import { reserveItem, type ReserveResult } from '@/lib/claims'
 import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
+import { accesoALista } from '@/lib/acceso'
 
 export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
@@ -170,11 +171,10 @@ export async function saldarCon(db: Db, userId: string, otroId: string): Promise
   return filas.length
 }
 
-/** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño nunca se le llama (y devuelve []), ni a quien no se identificó. */
+/** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño y a quien no ve la capa oculta (ver accesoALista) les devuelve []. */
 export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Promise<RegaloView[]> {
-  if (!identificado(viewer)) return []
   const [item] = await db.select({ listId: items.listId }).from(items).where(eq(items.id, itemId))
-  if (!item || (viewer.userId && await esDuenoDeLista(db, item.listId, viewer.userId))) return []
+  if (!item || (await accesoALista(db, item.listId, viewer)) !== 'regalador') return []
   const regalos = await db.select({ gift: groupGifts, nombre: users.nombre })
     .from(groupGifts).innerJoin(users, eq(groupGifts.organizerUserId, users.id))
     .where(and(eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado'])))
@@ -406,9 +406,9 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
   ].sort((a, b) => b.entrada.fecha.getTime() - a.entrada.fecha.getTime())
 }
 
-/** Historial de regalos comprados de una lista, para quien regala con nombre. Null para sus dueños y para quien no se identificó. */
+/** Historial de regalos comprados de una lista, para quien regala con nombre. Null para sus dueños y para quien no ve la capa oculta. */
 export async function historialDeLista(db: Db, listId: string, viewer: Viewer): Promise<Historial | null> {
-  if (!identificado(viewer) || (viewer.userId && await esDuenoDeLista(db, listId, viewer.userId))) return null
+  if ((await accesoALista(db, listId, viewer)) !== 'regalador') return null
   const compras = await comprasDeListas(db, [listId])
   const yo = viewer.userId ? `u:${viewer.userId}` : `g:${viewer.guestId}`
   const conteo = new Map<string, Historial['ranking'][number]>()

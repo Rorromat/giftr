@@ -19,12 +19,12 @@ const MOTIVOS: Record<string, string> = {
 }
 
 /**
- * Por qué no salió la reserva. Lo que habla de otros (lo reservó alguien, se dio de baja) solo para el que ya dijo
- * quién es: el link con ?reserva= lo puede abrir cualquiera, también el dueño sin su sesión.
+ * Por qué no salió la reserva. Lo que habla de otros (lo reservó alguien, se dio de baja) solo para el que ve la
+ * coordinación: el link con ?reserva= lo puede abrir cualquiera, también el dueño sin su sesión.
  */
-export function CartelReserva({ motivo, identified }: { motivo?: string; identified: boolean }) {
+export function CartelReserva({ motivo, veTodo, conNombre }: { motivo?: string; veTodo: boolean; conNombre: boolean }) {
   if (!motivo || !Object.hasOwn(MOTIVOS, motivo)) return null
-  if (motivo === 'sin_identidad' ? identified : !identified) return null
+  if (motivo === 'sin_identidad' ? conNombre : !veTodo) return null
   return (
     <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">
       {MOTIVOS[motivo]}
@@ -32,13 +32,15 @@ export function CartelReserva({ motivo, identified }: { motivo?: string; identif
   )
 }
 
-export function GuestGate({ token, itemId, identified, variant = 'secondary', desde = 'lista' }: {
+export function GuestGate({ token, itemId, identified, variant = 'secondary', volver, conCartel = false }: {
   token: string
   itemId: string
   identified: boolean
   variant?: keyof typeof BUTTON
-  /** Dónde está el botón: si la reserva no sale, se vuelve ahí con el motivo. */
-  desde?: 'lista' | 'detalle'
+  /** La página donde está el botón, con sus filtros: si la reserva no sale, se vuelve ahí con el motivo. */
+  volver: string
+  /** Si la página muestra el cartel de una reserva que no salió: cuando esta sale, se vuelve sin él. */
+  conCartel?: boolean
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [estado, reservar] = useActionState(reserveAction, null)
@@ -49,7 +51,8 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', de
       <form action={reservar} className="w-full">
         <input type="hidden" name="token" value={token} />
         <input type="hidden" name="itemId" value={itemId} />
-        <input type="hidden" name="desde" value={desde} />
+        <input type="hidden" name="volver" value={volver} />
+        {conCartel && <input type="hidden" name="conCartel" value="1" />}
         <button className={BUTTON[variant]}>Reservar</button>
         {error}
       </form>
@@ -69,7 +72,8 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', de
           </p>
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="itemId" value={itemId} />
-          <input type="hidden" name="desde" value={desde} />
+          <input type="hidden" name="volver" value={volver} />
+          {conCartel && <input type="hidden" name="conCartel" value="1" />}
           <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" className="gr-input" />
           {error}
           <button className="gr-btn-primary mt-1 w-full">Reservar</button>

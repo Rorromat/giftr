@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { claims, guestIdentities, items } from '@/db/schema'
-import { firmarInvitado, GUEST_COOKIE } from '@/lib/cookie-invitado'
+import { CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerCuentas, sumarCuenta } from '@/lib/cookie-invitado'
 import { createGuest } from '@/lib/guest'
 import { reserveItem } from '@/lib/claims'
 
@@ -12,13 +12,18 @@ const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   jar: new Map<string, string>(),
   jwt: undefined as unknown as Jwt,
+  romperCookies: false,
 }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
 vi.mock('next/headers', () => ({
-  cookies: async () => ({
-    get: (k: string) => (h.jar.has(k) ? { name: k, value: h.jar.get(k)! } : undefined),
-    delete: (k: string) => { h.jar.delete(k) },
-  }),
+  cookies: async () => {
+    if (h.romperCookies) throw new Error('cookies() fuera de un route handler')
+    return {
+      get: (k: string) => (h.jar.has(k) ? { name: k, value: h.jar.get(k)! } : undefined),
+      set: (k: string, v: string) => { h.jar.set(k, v) },
+      delete: (k: string) => { h.jar.delete(k) },
+    }
+  },
 }))
 vi.mock('next-auth/providers/google', () => ({ default: (opciones: object) => ({ id: 'google', opciones }) }))
 vi.mock('next-auth', () => ({
@@ -56,9 +61,30 @@ test('al entrar con Google no se une solo el invitado del navegador: queda como 
   expect(h.jar.get(GUEST_COOKIE)).toBe(firmarInvitado(ana.id))
 })
 
+test('al entrar con Google queda anotado que esa cuenta usó el navegador (sin olvidar las de antes)', async () => {
+  const { ana } = await preparar()
+  const antes = '8a1f3c2e-0000-4000-8000-000000000000'
+  h.jar.set(CUENTAS_COOKIE, sumarCuenta(undefined, antes))
+  h.jar.set(GUEST_COOKIE, firmarInvitado(ana.id))
+  const token = await entrar()
+  expect(leerCuentas(h.jar.get(CUENTAS_COOKIE))).toEqual([antes, token.userId])
+  // el invitado sigue ahí, pero en las listas de esa cuenta ya no va a ver nada (ver accesoALista)
+  expect(h.jar.get(GUEST_COOKIE)).toBe(firmarInvitado(ana.id))
+})
+
+test('si no se pueden anotar las cookies, se entra igual', async () => {
+  await preparar()
+  h.romperCookies = true
+  try {
+    expect((await entrar()).userId).toEqual(expect.any(String))
+  } finally {
+    h.romperCookies = false
+  }
+})
+
 test('una sesión que ya existía (sin account) no toca cookies ni invitados', async () => {
   const { ana } = await preparar()
   h.jar.set(GUEST_COOKIE, firmarInvitado(ana.id))
   expect(await h.jwt({ token: { userId: 'u-1' } })).toEqual({ userId: 'u-1' })
-  expect(h.jar.has(GUEST_COOKIE)).toBe(true)
+  expect([...h.jar.keys()]).toEqual([GUEST_COOKIE])
 })

@@ -15,7 +15,7 @@ import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
-import { NoSoyYo, QuienSos } from '@/components/Identidad'
+import { ConfirmarLista, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
@@ -60,11 +60,13 @@ export default async function ListaAjena({
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
+  // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
+  const veTodo = vista.role === 'giver'
   const identified = identificado(viewer)
   const [evento, historial, gustos, quien] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
-    identified ? historialDeLista(db, vista.listId, viewer) : null,
+    veTodo ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
@@ -79,13 +81,26 @@ export default async function ListaAjena({
   const categorias = [...new Set(tarjetas.map((i) => i.categoria).filter(Boolean))] as string[]
   let mostrados = tarjetas
   if (cat) mostrados = mostrados.filter((i) => i.categoria === cat)
-  if (disp === '1' && identified) mostrados = mostrados.filter((i) => i.disponible)
+  if (disp === '1' && veTodo) mostrados = mostrados.filter((i) => i.disponible)
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
 
   // Foto hero: el primer deseo de la lista tal como viene ordenada (solo si está disponible).
   const hero = mostrados[0]?.disponible ? mostrados[0] : undefined
   const resto = mostrados.filter((i) => i !== hero)
+
+  // Si una reserva no sale, se vuelve acá con los mismos filtros (y sin el cartel cuando la próxima sale bien).
+  const filtros = new URLSearchParams({ ...(cat && { cat }), ...(disp === '1' && { disp }) }).toString()
+  const aqui = `/l/${token}${filtros ? `?${filtros}` : ''}`
+  // Sin nombre, "Reservar" lo pide. Un invitado que todavía no dijo que esta lista no es suya, primero lo dice (así ve
+  // qué está libre de verdad); en un navegador donde entró con su cuenta alguien de la lista, no (ver accesoALista).
+  const reservar = (itemId: string, variant?: 'primary') => vista.role === 'anonimo' && vista.motivo !== 'sin_identidad'
+    ? null
+    : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
+
+  const heroAccion = hero && (hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
+    ? <YaLoReservaste grupal={hero.claims.some((c) => c.grupal?.soyParte)} />
+    : reservar(hero.id, 'primary'))
 
   return (
     <main className="flex flex-col gap-3 pb-32 pt-[52px]">
@@ -112,14 +127,16 @@ export default async function ListaAjena({
         </p>
       )}
 
-      {identified ? (
+      {veTodo ? (
         <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
           <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
           {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
         </p>
-      ) : <QuienSos token={token} volver={`/l/${token}`} />}
+      ) : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+        : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+          : <QuienSos token={token} volver={aqui} />}
 
-      <CartelReserva motivo={reserva} identified={identified} />
+      <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 
       {gustos.map((g) => (
         <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
@@ -130,7 +147,7 @@ export default async function ListaAjena({
 
       <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1">
         <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
-        {identified && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
+        {veTodo && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
         {categorias.map((c) => (
           <Link key={c} href={`/l/${token}?cat=${encodeURIComponent(c)}`} aria-current={cat === c ? 'page' : undefined}
                 className="gr-chip">
@@ -163,11 +180,7 @@ export default async function ListaAjena({
               {hero.cantidad > 1 && hero.quedan !== null && <p className="text-xs font-semibold text-gr-muted">quedan {hero.quedan} de {hero.cantidad}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex-[1.3]">
-                {hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
-                  ? <YaLoReservaste grupal={hero.claims.some((c) => c.grupal?.soyParte)} />
-                  : <GuestGate token={token} itemId={hero.id} identified={identified} variant="primary" />}
-              </div>
+              {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
               <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn min-h-[50px] flex-1 font-sans text-sm font-bold">Ver más</Link>
             </div>
           </div>
@@ -200,7 +213,7 @@ export default async function ListaAjena({
                   <div className="mt-1 flex flex-col items-start gap-0.5">
                     {item.disponible && (yaEsMio
                       ? <YaLoReservaste grupal={item.claims.some((c) => c.grupal?.soyParte)} />
-                      : <GuestGate token={token} itemId={item.id} identified={identified} />)}
+                      : reservar(item.id))}
                     <Link href={`/l/${token}/item/${item.id}`}
                           className="inline-flex min-h-11 items-center text-[13px] font-bold underline decoration-2 underline-offset-4">
                       Ver más

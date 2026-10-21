@@ -3,7 +3,7 @@ import { claims, codazos, comments, guestIdentities, items, listFollows, lists, 
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
 import { esDuenoSql } from '@/lib/groups'
-import { dijoQueNoEs, leerInvitado } from '@/lib/cookie-invitado'
+import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
 
@@ -27,12 +27,19 @@ export async function createGuest(db: Db, nombre: string) {
 }
 
 /**
- * Quién es un visitante sin sesión según su cookie: solo si está bien firmada y el invitado existe
- * (una base restaurada) y no se unió a una cuenta. Si no, es alguien sin identificar.
+ * Quién es un visitante sin sesión según sus cookies: el invitado, solo si su cookie está bien firmada y el invitado
+ * existe (una base restaurada) y no se unió a una cuenta; si no, es alguien sin identificar. Con eso van las cuentas que
+ * tuvieron sesión en este navegador: en sus listas no ve la capa oculta (ver accesoALista).
  */
-export async function viewerDeCookie(db: Db, valor: string | undefined): Promise<Viewer> {
+export async function viewerDeCookie(db: Db, valor: string | undefined, valorCuentas?: string): Promise<Viewer> {
   const g = await invitadoDeCookie(db, valor)
-  return g ? { guestId: g.id } : {}
+  return viewerSinSesion(g?.id, valorCuentas)
+}
+
+/** El que mira sin sesión, con el invitado ya verificado (si hay) y las cuentas de la cookie. */
+export function viewerSinSesion(guestId: string | undefined, valorCuentas: string | undefined): Viewer {
+  const cuentas = leerCuentas(valorCuentas)
+  return { ...(guestId && { guestId }), ...(cuentas.length && { cuentas }) }
 }
 
 async function invitadoDeCookie(db: Db, valor: string | undefined) {
@@ -53,6 +60,11 @@ export async function invitadoParaUnir(db: Db, userId: string, cookieInvitado: s
   return g && !dijoQueNoEs(cookieNoSoy, g.id, userId) ? { nombre: g.nombre } : null
 }
 
+/** El nombre del invitado anotado en este navegador que todavía no se unió a ninguna cuenta, aunque ya hayan dicho que no. */
+export async function nombreDelInvitado(db: Db, cookieInvitado: string | undefined): Promise<string | null> {
+  return (await invitadoDeCookie(db, cookieInvitado))?.nombre ?? null
+}
+
 /** Cómo se llama el que mira (para el codazo y para "¿No sos X?"). */
 export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | null> {
   const [fila] = viewer.userId
@@ -65,8 +77,10 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
  * Entró con Google en un navegador donde era invitado y confirmó que es esa persona ("Sí, soy yo"):
  * sus reservas, comentarios, avisos y codazos pasan a la cuenta, todo junto o nada, y las listas donde reservaba
  * pasan a ser de su gente (como si las hubiera abierto con sesión).
- * Lo que hizo sobre listas de las que la cuenta es dueña o co-dueña queda a nombre del invitado, sin tocar:
- * nadie puede terminar con reservas de sus propios deseos ni enterarse por un aviso.
+ * Lo que hizo sobre listas de las que la cuenta es dueña o co-dueña queda a nombre del invitado: nadie puede terminar
+ * con reservas de sus propios deseos ni enterarse por un aviso. Lo que reservó ahí sin comprar se libera: unido y sin
+ * cookie, nadie más lo podría liberar ni marcar comprado, y les trabaría el deseo a los que regalan de verdad
+ * (al dueño no le cambia nada de lo que ve).
  * Una reserva por persona y por deseo: si la cuenta ya tenía una activa de ese deseo, la reservada del invitado
  * se libera y la comprada queda a nombre del invitado (fue una compra de verdad y tiene que seguir contando).
  * Devuelve false si el invitado no existe o ya se había unido a una cuenta.
@@ -82,6 +96,9 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     const propias = t.select({ id: lists.id }).from(lists).where(esDuenoSql(t, userId))
     const deseosPropios = t.select({ id: items.id }).from(items).where(inArray(items.listId, propias))
     const delInvitado = and(eq(claims.claimerGuestId, guestId), notInArray(claims.itemId, deseosPropios))
+
+    await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() })
+      .where(and(eq(claims.claimerGuestId, guestId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseosPropios)))
 
     const dondeReservaba = await t.selectDistinct({ listId: items.listId }).from(claims)
       .innerJoin(items, eq(claims.itemId, items.id)).where(delInvitado)

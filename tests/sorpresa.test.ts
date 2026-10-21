@@ -1,11 +1,16 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
-import { items, claims, comments } from '@/db/schema'
+import { items, claims, comments, lists } from '@/db/schema'
 import { getListForViewer, getOwnList, getItemForViewer } from '@/lib/lists'
 import { historialDeLista, regalosDeItem } from '@/lib/regalos'
 import { markBought, reserveItem } from '@/lib/claims'
 import { createGuest } from '@/lib/guest'
+import { addComment } from '@/lib/comments'
+import { abrirListaAInvitado } from '@/lib/acceso'
+import { crearGrupo } from '@/lib/groups'
+import { createItem } from '@/lib/items'
+import type { Viewer } from '@/lib/types'
 
 const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo'].sort()
 
@@ -64,6 +69,49 @@ test('EL TEST DE ORO: el dueño no puede ver estados de sus items por ningún en
   expect(await regalosDeItem(db, item.id, {})).toEqual([])
 })
 
+// La dueña sin su sesión, pero con una cookie de invitado en ese navegador:
+// - la tablet de la familia: Mamá reservó como invitada; Euge entró con Google, dijo "No soy yo" y cerró sesión
+//   (o no contestó, o se le venció la sesión). La cuenta de Euge quedó anotada en el navegador (cuentas).
+// - Euge se anotó con su nombre en la lista de Rodri desde un navegador sin su sesión: en la suya no dijo nada.
+test('EL TEST DE ORO, con una cookie de invitado: tampoco ve nada sin decir en esa lista que no es suya', async () => {
+  const { db, owner, item } = await setup()
+  const mama = await createGuest(db, 'Mamá')
+  const r = await reserveItem(db, item.id, { guestId: mama.id })
+  expect(r).toEqual({ ok: false, reason: 'sin_stock' }) // ya lo tenía Rodri; igual quedó dicho que la lista no es de Mamá
+  const comoEuge = await createGuest(db, 'Euge')
+  const grupoId = await crearGrupo(db, owner.id, { nombre: 'Casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const cafetera = (await createItem(db, owner.id, { tipo: 'exacto', titulo: 'Cafetera' }, grupoId))!
+  await db.insert(claims).values({ itemId: cafetera.id, claimerGuestId: mama.id, expiresAt: new Date(Date.now() + 86400_000) })
+  await abrirListaAInvitado(db, mama.id, grupoId)
+
+  const casos: { viewer: Viewer; motivo: string }[] = [
+    { viewer: { guestId: mama.id, cuentas: [owner.id] }, motivo: 'otra_cuenta' },
+    // la cookie de las cuentas sola (sin invitado): ni se le pide el nombre
+    { viewer: { cuentas: [owner.id] }, motivo: 'otra_cuenta' },
+    { viewer: { guestId: comoEuge.id }, motivo: 'confirmar' },
+  ]
+  for (const { viewer, motivo } of casos) {
+    for (const [token, deseo] of [['tok-euge', item], [grupo.shareToken, cafetera]] as const) {
+      const vista = await getListForViewer(db, token, viewer)
+      const detalle = await getItemForViewer(db, token, deseo.id, viewer)
+      if (vista?.role !== 'anonimo' || detalle?.role !== 'anonimo') throw new Error(`esperaba anonimo (${motivo})`)
+      expect([vista.motivo, detalle.motivo]).toEqual([motivo, motivo])
+      for (const json of [JSON.stringify(vista), JSON.stringify(detalle)].map((j) => j.toLowerCase())) {
+        for (const palabra of ['claim', 'reservado', 'comprado', 'disponible', 'quedan', 'comment', 'regalos', 'Rodri', 'Mamá', 'color']) {
+          expect(json).not.toContain(palabra.toLowerCase())
+        }
+      }
+      expect(await historialDeLista(db, vista.listId, viewer)).toBeNull()
+      expect(await regalosDeItem(db, deseo.id, viewer)).toEqual([])
+    }
+    expect(await addComment(db, item.id, viewer, '¿y esto?')).toBe(false)
+  }
+  // donde entró con su cuenta, ni reservando se entera
+  expect(await reserveItem(db, item.id, { guestId: mama.id, cuentas: [owner.id] })).toEqual({ ok: false, reason: 'propio' })
+  expect(await db.select().from(comments).where(eq(comments.texto, '¿y esto?'))).toEqual([])
+})
+
 test('el regalador ve claims, comentarios y disponibilidad', async () => {
   const { db, giver, item } = await setup()
   const vista = await getListForViewer(db, 'tok-euge', { userId: giver.id })
@@ -88,7 +136,10 @@ test('sin identificarse se ven los deseos activos sin estados; con nombre, la vi
   expect(vista.items.map((i) => i.titulo)).toEqual(['Termo Stanley'])
   expect(vista.ownerNombre).toBe('Euge')
 
+  // un invitado ve la coordinación de una lista cuando dice ahí que no es suya (se anota, reserva o "Ver lo reservado")
   const abuela = await createGuest(db, 'Abuela')
+  expect(await getListForViewer(db, 'tok-euge', { guestId: abuela.id })).toMatchObject({ role: 'anonimo', motivo: 'confirmar' })
+  await abrirListaAInvitado(db, abuela.id, list.id)
   expect((await getListForViewer(db, 'tok-euge', { guestId: abuela.id }))?.role).toBe('giver')
 })
 
@@ -105,6 +156,7 @@ test('el id de un invitado no llega a lo que se manda a la página', async () =>
   await db.insert(comments).values({ itemId: mate.id, authorGuestId: abuela.id, texto: 'lo compré en Palermo' })
 
   const otra = await createGuest(db, 'Tía')
+  await abrirListaAInvitado(db, otra.id, list.id)
   for (const viewer of [{ guestId: otra.id }, { userId: giver.id }]) {
     const historial = await historialDeLista(db, list.id, viewer)
     expect(historial!.ranking).toHaveLength(2)

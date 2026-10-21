@@ -1,11 +1,26 @@
 import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
+import { cookies } from 'next/headers'
 import { db } from '@/db'
 import { upsertUserFromGoogle } from '@/lib/users'
+import { anotarCuenta } from '@/lib/cookie-invitado'
 
 declare module '@auth/core/types' {
   interface Session {
     userId?: string
+  }
+}
+
+/**
+ * Anota que esta cuenta tuvo sesión en este navegador: si después queda la cookie de un invitado (cerró sesión o se le
+ * venció), ese invitado no ve la capa oculta de sus listas (ver accesoALista). Corre dentro del route handler de
+ * /api/auth/callback, donde se pueden escribir cookies. Nunca impide entrar.
+ */
+async function anotarCuentaEnEsteNavegador(userId: string) {
+  try {
+    anotarCuenta(await cookies(), userId)
+  } catch (e) {
+    console.error('No se pudo anotar la cuenta en el navegador:', e)
   }
 }
 
@@ -25,6 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           avatarUrl: (profile as { picture?: string }).picture ?? null,
         })
         token.userId = user.id
+        await anotarCuentaEnEsteNavegador(user.id)
         // Si en este navegador había un invitado, no se une acá: en un dispositivo compartido puede ser otra persona.
         // Se le pregunta después, ya adentro ("¿Sos vos?", en PreguntaInvitado).
       }

@@ -144,7 +144,7 @@ Datos que hacen acertar incluso fuera de la lista:
 
 Esta sección es la que más vale llevar a Claude Code tal cual — son las reglas de negocio.
 
-1. **Dueño ciego, siempre en servidor.** La API nunca devuelve estados de reserva de items cuyo dueño (o co-dueño) sea el solicitante. No es un filtro de frontend. Si el que pide no se identificó (sin sesión ni nombre), puede ser el dueño sin su sesión: ve los deseos sin estados hasta que diga quién es.
+1. **Dueño ciego, siempre en servidor.** La API nunca devuelve estados de reserva de items cuyo dueño (o co-dueño) sea el solicitante. No es un filtro de frontend. Si el que pide no se identificó (sin sesión ni nombre), puede ser el dueño sin su sesión: ve los deseos sin estados hasta que diga quién es. Un invitado ve los estados de una lista solo después de decir ahí que no es suya (su nombre vale para todo el navegador), y nunca en las listas de una cuenta que tuvo sesión en ese navegador (la tablet de la familia después de cerrar sesión).
 2. **"Ya lo tengo / ya no lo quiero" con reserva activa.** Si el dueño archiva un item que alguien ya reservó o compró, el regalador recibe una notificación discreta e inmediata: "Un item que reservaste fue dado de baja por su dueño — te conviene elegir otro". Al dueño no se le dice nada (decirle "ojo que alguien ya lo compró" rompería la regla). Es el caso borde más doloroso: la app debe minimizarlo avisando al regalador lo antes posible.
 3. **Edición de item reservado.** Si el dueño edita un item reservado (cambia talle, color, link), los regaladores con reserva reciben la notificación del cambio.
 4. **Cantidad > 1.** El item muestra a los regaladores "quedan 4 de 6". Al llegar a 0 pasa a COMPRADO. El dueño solo ve su item, sin contadores.

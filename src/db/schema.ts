@@ -97,6 +97,14 @@ export const guestIdentities = pgTable('guest_identities', {
   promotedToUserId: uuid('promoted_to_user_id').references(() => users.id),
 })
 
+// Listas donde un invitado dijo que no son suyas (se anotó ahí, reservó o tocó "Ver lo reservado"): solo en esas ve
+// la capa oculta. Su nombre vale para todo el navegador, y en otra lista puede ser el dueño sin su sesión.
+export const listasDeInvitado = pgTable('listas_de_invitado', {
+  guestId: uuid('guest_id').notNull().references(() => guestIdentities.id),
+  listId: uuid('list_id').notNull().references(() => lists.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.guestId, t.listId] })])
+
 export const claims = pgTable('claims', {
   id: uuid('id').defaultRandom().primaryKey(),
   itemId: uuid('item_id').notNull().references(() => items.id),

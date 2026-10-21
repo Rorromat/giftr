@@ -53,3 +53,38 @@ export const marcaNoSoy = (guestId: string, userId: string) => hmac(`giftr_no_so
 export function dijoQueNoEs(valor: string | undefined, guestId: string, userId: string): boolean {
   return !!valor && igualesSinFiltrarTiempo(valor, marcaNoSoy(guestId, userId))
 }
+
+// Las cuentas de Google que tuvieron sesión en este navegador. Un invitado no ve la capa oculta de las listas de esas
+// cuentas: después de "Cerrar sesión" en la tablet de la familia (o si se le venció la sesión), el dueño queda con la
+// cookie de otro invitado, o con la suya de cuando se anotó con su nombre, y abrir su link le contaría todo.
+// Se anota al entrar con Google, al contestar "¿Sos vos?" y al cerrar sesión.
+export const CUENTAS_COOKIE = 'giftr_cuentas'
+
+// las más recientes; con una familia entera usando la misma tablet sobra
+const CUENTAS_MAXIMO = 20
+
+const firmaCuentas = (ids: string) => hmac(`giftr_cuentas:${ids}`)
+
+/** Las cuentas anotadas, si la cookie está bien firmada (`<id>~<id>….<firma>`). Si no: ninguna. */
+export function leerCuentas(valor: string | undefined): string[] {
+  const punto = valor?.lastIndexOf('.') ?? -1
+  if (!valor || punto < 0) return []
+  const ids = valor.slice(0, punto)
+  if (!igualesSinFiltrarTiempo(valor.slice(punto + 1), firmaCuentas(ids))) return []
+  return ids.split('~').filter(esUuid)
+}
+
+export function sumarCuenta(valor: string | undefined, userId: string): string {
+  const ids = [...leerCuentas(valor).filter((id) => id !== userId), userId].slice(-CUENTAS_MAXIMO).join('~')
+  return `${ids}.${firmaCuentas(ids)}`
+}
+
+type Frasco = {
+  get(nombre: string): { value: string } | undefined
+  set(nombre: string, valor: string, opciones: typeof OPCIONES_COOKIE_INVITADO): unknown
+}
+
+/** Anota en las cookies de este navegador que esta cuenta tuvo sesión acá (en una server action o un route handler). */
+export function anotarCuenta(jar: Frasco, userId: string) {
+  jar.set(CUENTAS_COOKIE, sumarCuenta(jar.get(CUENTAS_COOKIE)?.value, userId), OPCIONES_COOKIE_INVITADO)
+}

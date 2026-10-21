@@ -14,6 +14,8 @@ import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
+import { UnirInvitado } from '@/components/Identidad'
+import { invitadoDeEsteNavegador } from '@/lib/viewer'
 import { Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
@@ -24,7 +26,7 @@ export default async function Perfil() {
   const [lista, cumple, cuentas, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId), misGustos(db, session.userId),
   ])
-  const [foto, vapid] = await Promise.all([miFoto(db, session.userId), clavesVapid(db)])
+  const [foto, vapid, invitado] = await Promise.all([miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador()])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
@@ -125,6 +127,8 @@ export default async function Perfil() {
           <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
         </div>
       </form>
+
+      {invitado && <UnirInvitado nombre={invitado} />}
 
       {/* Para dejar este dispositivo (el de la familia, la tablet) o entrar con otra cuenta */}
       <form action={salirAction} className="self-center">
