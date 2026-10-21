@@ -135,6 +135,7 @@ export const notifications = pgTable('notifications', {
   userId: uuid('user_id').references(() => users.id),
   guestId: uuid('guest_id').references(() => guestIdentities.id),
   // regalo_encargo: ahora organiza un regalo grupal. regalo_cancelado: el regalo grupal en el que estaba se canceló.
+  // regalo_sacado: el encargado lo sacó del regalo grupal.
   // item_baja_comprado: ya lo había comprado y el dueño dijo "Ya no lo quiero". regalo_baja: estaba en un regalo grupal
   // abierto de un deseo que el dueño ya no quiere (el regalo se canceló); regalo_lo_tiene: el dueño dijo "Ya lo tengo" y el
   // regalo sigue abierto para dividirlo o cancelarlo desde Cuentas. Cuando el dueño lo vuelve a poner: item_vuelve, se le
@@ -142,7 +143,7 @@ export const notifications = pgTable('notifications', {
   tipo: text('tipo', {
     enum: [
       'item_baja', 'item_editado', 'regalo_encargo', 'regalo_cancelado', 'item_baja_comprado', 'regalo_baja', 'regalo_lo_tiene',
-      'item_vuelve', 'compra_vuelve', 'regalo_vuelve',
+      'item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'regalo_sacado',
     ],
   }).notNull(),
   itemId: uuid('item_id').notNull().references(() => items.id),

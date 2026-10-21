@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { signIn } from '@/auth'
 import {
-  cancelGroupGiftAction, joinGroupGiftAction, leaveGroupGiftAction, markPaidAction, startGroupGiftAction,
+  cancelGroupGiftAction, joinGroupGiftAction, leaveGroupGiftAction, markPaidAction, removeGroupGiftMemberAction, startGroupGiftAction,
 } from '@/app/actions'
 import { juntarNombres } from '@/lib/groups'
 import { pesos } from '@/lib/pesos'
@@ -51,14 +51,33 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
   )
 }
 
-// también en Cuentas, para el encargado que lo compra desde ahí
-export const ERRORES_COMPRA: Record<string, string> = {
-  no_suma: 'Las partes no suman el total. Revisalas y probá de nuevo.',
-  monto_invalido: 'Revisá el monto: tiene que ser un número de pesos.',
-  no_permitido: 'No se pudo: puede que alguien se haya sumado o bajado recién. Probá de nuevo.',
+const linkSubrayado = 'flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden'
+
+/** Para el encargado mientras está abierto: sacar a alguien que se sumó por error (se le avisa). */
+function SacarDelRegalo({ regalo, token, itemId }: Ctx & { regalo: RegaloView }) {
+  return (
+    <details className="group flex flex-col">
+      <summary className={linkSubrayado}>¿Se sumó alguien que no va?</summary>
+      <div className="mt-1 flex flex-col gap-1 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+        <p className="text-[13px] font-medium leading-snug">Si lo sacás, no entra en la división y le avisamos que ya no está.</p>
+        <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+          {regalo.miembros.filter((m) => !m.esEncargado).map((m) => (
+            <li key={m.userId} className="flex min-h-12 items-center justify-between gap-2 py-1">
+              <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
+              <form action={removeGroupGiftMemberAction}>
+                <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
+                <input type="hidden" name="miembroId" value={m.userId} />
+                <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">Sacar</BotonEnviar>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  )
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, nota, logueado, error }: Ctx & {
+export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, nota, logueado, ocupado }: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
@@ -66,11 +85,14 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   /** Lo que anotó el encargado al comprarlo. */
   nota?: string | null
   logueado: boolean
-  error?: string
+  /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
+  ocupado?: string | null
 }) {
   const n = regalo.miembros.length
   const nombres = regalo.miembros.map((m) => (m.esYo ? 'vos' : m.nombre))
   const encargado = regalo.soyEncargado ? 'Lo organizás vos' : `Lo organiza ${regalo.encargado.nombre}`
+  // cambia con cada corrección: el formulario vuelve a arrancar cerrado y con lo nuevo
+  const compra = `${regalo.montoTotal}:${regalo.miembros.map((m) => m.monto).join(',')}`
 
   if (regalo.estado === 'comprado' && !regalo.soyParte) {
     return (
@@ -104,10 +126,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
             {n === 1 ? `Por ahora ${nombres[0] === 'vos' ? 'estás solo vos' : `está ${nombres[0]}`}.` : `Están ${juntarNombres(nombres)}.`}
             {precio && (regalo.soyParte
               ? ` Si quedan así, sale ~${pesos(Math.ceil(precio / n))} cada uno.`
-              : ` Si te sumás, son ${n + 1}: ~${pesos(Math.ceil(precio / (n + 1)))} cada uno.`)}
+              : !ocupado && ` Si te sumás, son ${n + 1}: ~${pesos(Math.ceil(precio / (n + 1)))} cada uno.`)}
           </p>
 
-          {!regalo.soyParte && (logueado ? (
+          {!regalo.soyParte && (ocupado ? <p className="text-xs font-semibold leading-snug text-gr-muted">{ocupado}</p> : logueado ? (
             <form action={joinGroupGiftAction}>
               <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
               <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Me sumo</BotonEnviar>
@@ -132,16 +154,16 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                  href={`https://wa.me/?text=${encodeURIComponent(`Armé un regalo grupal para ${ownerNombre}: "${titulo}". ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${itemId}`)}`}>
                 <Icon name="chat" size={18} strokeWidth={2.4} />Invitar por WhatsApp
               </a>
-              <details className="group flex flex-col" open={!!error}>
+              <details className="group flex flex-col">
                 <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                   Ya lo compré: dividir
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
-                  {error && Object.hasOwn(ERRORES_COMPRA, error) && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{ERRORES_COMPRA[error]}</p>}
                   <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={precio}
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
               </details>
+              {n > 1 && <SacarDelRegalo regalo={regalo} token={token} itemId={itemId} />}
               {/* cancelarlo suelta el deseo (también si antes era una reserva suya): que no lo descubra después */}
               <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction}
                          ocultos={{ token, itemId, giftId: regalo.id }}>
@@ -183,6 +205,21 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               )
             })}
           </ul>
+          {/* un cero de más, o el precio de la lista que no era: mientras nadie le pagó, se arregla */}
+          {regalo.corregible && (
+            <details key={compra} className="group flex flex-col">
+              <summary className={linkSubrayado}>Corregir la compra</summary>
+              <div className="mt-1 flex flex-col gap-2">
+                <p className="text-xs font-semibold text-gr-muted">Mientras nadie te pague, podés cambiar el total o cómo se dividió.</p>
+                <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={null}
+                                  miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))}
+                                  corregir={{
+                                    total: regalo.montoTotal ?? 0, nota: nota ?? null,
+                                    partes: Object.fromEntries(regalo.miembros.map((m) => [m.userId, m.monto ?? 0])),
+                                  }} />
+              </div>
+            </details>
+          )}
           <Link href="/cuentas" className="flex min-h-11 items-center gap-1 self-start text-sm font-bold underline decoration-2 underline-offset-4">
             Ver todas mis cuentas <Icon name="chevron" size={16} strokeWidth={2.6} />
           </Link>

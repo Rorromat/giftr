@@ -27,7 +27,11 @@ import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
-import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
+import {
+  cancelarRegalo, comprarRegalo, corregirCompra, iniciarRegaloGrupal, marcarPagado, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo,
+  type CompraResult, type DatosCompra,
+} from '@/lib/regalos'
+import { parsePesos, partePesos, pesos } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
@@ -474,27 +478,62 @@ export async function cancelGroupGiftAction(formData: FormData) {
   revalidarRegalo(formData)
 }
 
-/** "0" es una parte válida (alguien que no pone); cualquier otra cosa se lee como pesos. */
-const parte = (v: string) => (/^\D*0+\D*$/.test(v) ? 0 : parsePesos(v) ?? Number.NaN)
+/** "Sacar" a alguien del regalo: solo el encargado (el de la sesión, nunca uno que venga en el formulario). */
+export async function removeGroupGiftMemberAction(formData: FormData) {
+  await sacarDeRegalo(db, str(formData, 'giftId') ?? '', str(formData, 'miembroId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
 
-export async function buyGroupGiftAction(formData: FormData) {
-  const userId = await usuarioRegalador()
-  const [token, itemId, giftId] = [str(formData, 'token'), str(formData, 'itemId'), str(formData, 'giftId') ?? '']
-  // desde Cuentas (sin el link de la lista) vuelve ahí, con el error en el regalo que lo tuvo
-  const enDeseo = token && itemId ? `/l/${token}/item/${itemId}` : null
+/** Lo que manda CompraGrupalForm: el total, con quiénes vio la división el encargado y, "A mano", la parte de cada uno. */
+function compraDesdeForm(formData: FormData): DatosCompra {
   let partes: Record<string, number> | undefined
   if (str(formData, 'modo') === 'manual') {
     partes = {}
+    // vacía o en 0 es que no pone, igual que en la pantalla (ver partePesos)
     for (const [k, v] of formData.entries()) {
-      if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = parte(v)
+      if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = partePesos(v) ?? Number.NaN
     }
   }
-  const r = await comprarRegalo(db, giftId, userId, {
-    total: parsePesos(str(formData, 'total')) ?? 0, partes, nota: str(formData, 'nota'),
-  })
+  return {
+    total: parsePesos(str(formData, 'total')) ?? 0,
+    miembros: formData.getAll('miembro').filter((v): v is string => typeof v === 'string'),
+    partes, nota: str(formData, 'nota'),
+  }
+}
+
+const ERRORES_COMPRA = {
+  monto_invalido: 'Revisá los montos: tienen que ser pesos. Si alguien no pone, dejá su parte vacía o en 0.',
+  cambiaron: 'Se sumó o se bajó alguien, revisá la división.',
+  ya_pagaron: 'Alguien ya figura como que te pagó: para corregir, primero deshacé ese pago.',
+  no_permitido: 'No se pudo: puede que ya se haya comprado o cancelado. Recargá la página.',
+}
+
+/** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
+function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
+  if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
+  const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
+  return suma < p.total
+    ? `Las partes suman ${pesos(suma)}: faltan ${pesos(p.total - suma)} para llegar a ${pesos(p.total)}.`
+    : `Las partes suman ${pesos(suma)}: te pasaste ${pesos(suma - p.total)} de ${pesos(p.total)}.`
+}
+
+/**
+ * "Lo compré" (en el deseo o desde Cuentas). Si no sale, el mensaje va en el formulario, que se queda con lo cargado; la
+ * página se vuelve a armar igual (si se sumó alguien, ya aparece en la división).
+ */
+export async function buyGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const p = compraDesdeForm(formData)
+  const r = await comprarRegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
   revalidarRegalo(formData)
-  if (r.ok) redirect(enDeseo ?? '/cuentas')
-  redirect(enDeseo ? `${enDeseo}?error=${r.reason}` : `/cuentas?error=${r.reason}&regalo=${encodeURIComponent(giftId)}`)
+  return r.ok ? null : { error: errorDeCompra(r, p) }
+}
+
+/** "Corregir la compra": lo mismo, sobre un regalo ya comprado que nadie le pagó todavía al encargado. */
+export async function fixGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const p = compraDesdeForm(formData)
+  const r = await corregirCompra(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
+  revalidarRegalo(formData)
+  return r.ok ? null : { error: errorDeCompra(r, p) }
 }
 
 export async function markPaidAction(formData: FormData) {

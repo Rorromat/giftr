@@ -111,7 +111,7 @@ test('sacar a quien se sumó por error vuelve al grupo con el aviso; si no se pu
   expect((await grupo(db, id)).inviteToken).not.toBe(invitacion)
 })
 
-test('el encargado que ya no tiene el link compra el regalo desde Cuentas y vuelve ahí (también con un error)', async () => {
+test('el encargado que ya no tiene el link compra el regalo desde Cuentas (y si no cierra, el error queda en el formulario)', async () => {
   const { db, caro } = await preparar()
   const [rodri, sofi] = [
     await upsertUserFromGoogle(db, { googleId: 'g-rodri', email: 'rodri@test.com', nombre: 'Rodri' }),
@@ -125,8 +125,9 @@ test('el encargado que ya no tiene el link compra el regalo desde Cuentas y vuel
   await cambiarLinkParaRegalar(db, lista.id, caro.id)
 
   h.session = { userId: rodri.id }
-  const mal = form({ giftId: g.giftId, total: '90.000', modo: 'manual', [`parte:${rodri.id}`]: '50.000', [`parte:${sofi.id}`]: '30.000' })
-  expect(await redirigeA(buyGroupGiftAction(mal))).toBe(`/cuentas?error=no_suma&regalo=${g.giftId}`)
-  expect(await redirigeA(buyGroupGiftAction(form({ giftId: g.giftId, total: '90.000', modo: 'iguales' })))).toBe('/cuentas')
+  const conGente = (fd: FormData) => { fd.append('miembro', rodri.id); fd.append('miembro', sofi.id); return fd }
+  const mal = conGente(form({ giftId: g.giftId, total: '90.000', modo: 'manual', [`parte:${rodri.id}`]: '50.000', [`parte:${sofi.id}`]: '30.000' }))
+  expect(await buyGroupGiftAction(null, mal)).toEqual({ error: 'Las partes suman $80.000: faltan $10.000 para llegar a $90.000.' })
+  expect(await buyGroupGiftAction(null, conGente(form({ giftId: g.giftId, total: '90.000', modo: 'iguales' })))).toBeNull()
   expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
 })

@@ -114,6 +114,8 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
           <p className="text-[13px] font-medium">
             {cuentas.debes || cuentas.teDeben
               ? [cuentas.debes && `Debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `Te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+              // los totales son netos: a mano con alguien, pero con partes sin marcar
+              : cuentas.personas.length ? 'Están a mano: falta marcarlo como saldado'
               : cuentas.enCurso.length ? `${cuentas.enCurso.length} ${cuentas.enCurso.length === 1 ? 'regalo grupal' : 'regalos grupales'} en curso` : 'Regalos entre varios, a lo Splitwise'}
           </p>
         </div>

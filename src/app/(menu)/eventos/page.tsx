@@ -109,11 +109,14 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
         <p className="text-[15px] font-medium">Los cumples y fechas de tu gente, con tiempo.</p>
       </div>
 
-      {(cuentas.debes > 0 || cuentas.teDeben > 0) && (
+      {/* los totales son netos: con alguien pueden estar a mano y tener partes sin marcar */}
+      {cuentas.personas.length > 0 && (
         <Link href="/cuentas" className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink px-3.5 py-2 text-sm font-semibold text-gr-bg">
           <span>
             Cuentas pendientes:{' '}
-            {[cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')}
+            {cuentas.debes || cuentas.teDeben
+              ? [cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+              : 'están a mano, falta marcarlo'}
           </span>
           <Icon name="chevron" size={18} strokeWidth={2.6} className="text-gr-accent" />
         </Link>

@@ -2,11 +2,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { misCuentas, pesos, type CuentaPersona, type LineaCuenta, type RegaloEnCurso } from '@/lib/regalos'
+import {
+  comprasParaCorregir, misCuentas, pesos, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
+} from '@/lib/regalos'
 import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { ERRORES_COMPRA } from '@/components/RegaloGrupal'
 import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
 /** Un link si lo hay; si no (cambiaron el link para regalar y no lo tiene), lo mismo sin link. */
@@ -84,7 +85,7 @@ function MeBajo({ giftId }: { giftId: string }) {
  * o cambiaron el link y no lo tiene. Lo que haría en el deseo lo hace desde acá, sin pasar por la lista: el encargado lo
  * compra o lo cancela; los demás se pueden bajar.
  */
-function DesdeAca({ r, error }: { r: RegaloEnCurso; error?: string }) {
+function DesdeAca({ r }: { r: RegaloEnCurso }) {
   if (r.dividirCon) {
     return (
       <div className="mt-1.5 flex flex-col gap-2 px-1 text-xs font-semibold">
@@ -93,12 +94,11 @@ function DesdeAca({ r, error }: { r: RegaloEnCurso; error?: string }) {
             ? 'Ya no tenés el link de esta lista: el regalo lo terminás desde acá.'
             : 'Lo sacaron de la lista: si ya lo compraste, dividí lo que salió; si no, cancelalo.'}
         </span>
-        <details className="group flex flex-col" open={!!error}>
+        <details className="group flex flex-col">
           <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             Ya lo compré: dividir
           </summary>
-          <div className="mt-3 flex flex-col gap-2">
-            {error && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{ERRORES_COMPRA[error]}</p>}
+          <div className="mt-3">
             <CompraGrupalForm giftId={r.giftId} miembros={r.dividirCon} sugerido={null} />
           </div>
         </details>
@@ -117,13 +117,35 @@ function DesdeAca({ r, error }: { r: RegaloEnCurso; error?: string }) {
   )
 }
 
-export default async function Cuentas({ searchParams }: { searchParams: Promise<{ error?: string; regalo?: string }> }) {
+/**
+ * Lo que compró en un regalo y no puede corregir en el deseo (lo sacaron de la lista, o cambiaron el link): desde acá,
+ * mientras nadie le pagó. Cambia con cada corrección: el formulario vuelve a arrancar cerrado y con lo nuevo.
+ */
+function Corregir({ c }: { c: CompraParaCorregir }) {
+  return (
+    <li className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+      <p className="text-sm leading-snug">
+        <span className="font-bold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
+        <span className="block text-xs font-medium text-gr-muted">Lo compraste por {pesos(c.total)} · nadie te pagó todavía</span>
+      </p>
+      <details key={`${c.total}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
+        <summary className={`${linkSubrayado} flex cursor-pointer list-none items-center text-sm [&::-webkit-details-marker]:hidden`}>
+          Corregir la compra
+        </summary>
+        <div className="mt-2">
+          <CompraGrupalForm giftId={c.giftId} miembros={c.miembros} sugerido={null}
+                            corregir={{ total: c.total, nota: c.nota, partes: Object.fromEntries(c.miembros.map((m) => [m.userId, m.monto])) }} />
+        </div>
+      </details>
+    </li>
+  )
+}
+
+export default async function Cuentas() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, { error, regalo }] = await Promise.all([misCuentas(db, session.userId), searchParams])
-  // el error de "Ya lo compré" hecho desde acá, en el regalo que lo tuvo
-  const errorDe = (giftId: string) => (regalo === giftId && error && Object.hasOwn(ERRORES_COMPRA, error) ? error : undefined)
-  const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length
+  const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
+  const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
   return (
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
@@ -177,10 +199,18 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
                   </span>
                   {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
                 </QuizasLink>
-                {(!r.sigueEnLaLista || !r.href) && <DesdeAca r={r} error={errorDe(r.giftId)} />}
+                {(!r.sigueEnLaLista || !r.href) && <DesdeAca r={r} />}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {aCorregir.length > 0 && (
+        <section className="flex flex-col gap-2.5">
+          <h2 className="font-display text-[22px] leading-none font-extrabold tracking-[-0.03em]">Lo que compraste</h2>
+          <p className="text-[13px] font-medium leading-snug">Mientras nadie te pague, podés cambiar el total o cómo se dividió.</p>
+          <ul className="flex flex-col gap-2.5">{aCorregir.map((x) => <Corregir key={x.giftId} c={x} />)}</ul>
         </section>
       )}
 

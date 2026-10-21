@@ -38,6 +38,8 @@ export type RegaloView = {
   soyParte: boolean
   soyEncargado: boolean
   montoTotal: number | null
+  /** El encargado todavía puede corregir la compra (ver corregirCompra). */
+  corregible: boolean
 }
 
 export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult, { ok: true }> | { ok: false; reason: 'ya_comprado' }
@@ -75,6 +77,10 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
   })
 }
 
+/**
+ * "Me sumo", mientras está abierto. Una persona, una reserva por deseo (como reserveItem e iniciarRegaloGrupal): el que ya
+ * lo reservó o compró suelto, o está en otro regalo de este deseo, no se suma (la pantalla no se lo ofrece: le dice por qué).
+ */
 export async function sumarseARegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
   if (!esUuid(giftId)) return false
   return db.transaction(async (tx) => {
@@ -83,12 +89,15 @@ export async function sumarseARegalo(db: Db, giftId: string, userId: string): Pr
     if (!regalo) return false
     // Lock del deseo y después del regalo, en el mismo orden que unirseAGrupo: si a la vez se une al grupo, uno espera al
     // otro. El del regalo solo no alcanza: unirseAGrupo encuentra los regalos por sus miembros y no vería esta fila sin
-    // confirmar, así que no esperaría.
-    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno }).from(items).where(eq(items.id, regalo.itemId)).for('update')
+    // confirmar, así que no esperaría. El del regalo hace esperar a una compra que llega a la vez (o a la compra).
+    const [item] = await t.select({ id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible, estado: items.estadoDueno })
+      .from(items).where(eq(items.id, regalo.itemId)).for('update')
     const [g] = await t.select({ estado: groupGifts.estado }).from(groupGifts).where(eq(groupGifts.id, giftId)).for('update')
     // con "Ya lo tengo" el regalo sigue abierto para terminarlo, pero desde una pantalla vieja nadie se suma a algo que salió
     if (item?.estado !== 'activo' || g?.estado !== 'abierto') return false
     if (await esOFueDuenoDeLista(t, item.listId, userId)) return false
+    const ya = await loQueYaTiene(t, item, { userId })
+    if (ya && ya.giftId !== giftId) return false
     await t.insert(groupGiftMembers).values({ giftId, userId }).onConflictDoNothing()
     return true
   })
@@ -112,6 +121,28 @@ export async function salirDeRegalo(db: Db, giftId: string, userId: string): Pro
 }
 
 /**
+ * El encargado saca a alguien mientras está abierto (se sumó por error, o no lo conoce): sumarse es un toque y sin
+ * aprobación, así que esto lo corrige. Al que sacan se le avisa. Ya comprado, no: tiene su parte (se corrige la compra).
+ */
+export async function sacarDeRegalo(db: Db, giftId: string, miembroId: string, encargadoId: string): Promise<boolean> {
+  if (!esUuid(giftId) || !esUuid(miembroId) || miembroId === encargadoId) return false
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // lock del regalo, como salirDeRegalo: una compra a la vez divide sin él, o espera y ya no está abierto
+    const [g] = await t.select({ itemId: groupGifts.itemId }).from(groupGifts)
+      .where(and(eq(groupGifts.id, giftId), eq(groupGifts.organizerUserId, encargadoId), eq(groupGifts.estado, 'abierto')))
+      .for('update')
+    if (!g) return false
+    const sacados = await t.delete(groupGiftMembers)
+      .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, miembroId)))
+      .returning({ userId: groupGiftMembers.userId })
+    if (!sacados.length) return false
+    await dejarAviso(t, g.itemId, 'regalo_sacado', [{ userId: miembroId, guestId: null }])
+    return true
+  })
+}
+
+/**
  * Solo el encargado y mientras está abierto: libera el deseo para que lo reserve otro (también si antes era su reserva).
  * A los que se habían sumado se les avisa: si no, el regalo les desaparece de "En curso" sin explicación.
  */
@@ -131,43 +162,110 @@ export async function cancelarRegalo(db: Db, giftId: string, userId: string): Pr
   })
 }
 
-export type CompraResult = { ok: true } | { ok: false; reason: 'no_permitido' | 'monto_invalido' | 'no_suma' }
+/** cambiaron: se sumó o se bajó alguien desde que el encargado vio la división. ya_pagaron: ver corregirCompra. */
+export type CompraResult = { ok: true } | { ok: false; reason: 'no_permitido' | 'monto_invalido' | 'no_suma' | 'cambiaron' | 'ya_pagaron' }
 
 /**
- * El encargado lo compró: fija el total y la parte de cada uno (por defecto, partes iguales).
- * Las partes tienen que sumar el total. La parte del encargado ya está paga: la puso él.
+ * Lo que cargó el encargado. miembros: con quiénes vio la división (los ids de la pantalla). partes: "A mano"; si no,
+ * partes iguales.
  */
-export async function comprarRegalo(
-  db: Db, giftId: string, userId: string,
-  p: { total: number; partes?: Record<string, number>; nota?: string },
-): Promise<CompraResult> {
-  if (!Number.isSafeInteger(p.total) || p.total <= 0 || p.total > MONTO_MAXIMO) return { ok: false, reason: 'monto_invalido' }
+export type DatosCompra = { total: number; miembros?: string[]; partes?: Record<string, number>; nota?: string }
+
+const montoValido = (n: number) => Number.isSafeInteger(n) && n > 0 && n <= MONTO_MAXIMO
+
+/** Alguien que no es el encargado ya figura como pago. Las partes en 0 no cuentan: quedan pagas solas al comprar. */
+const alguienPago = (filas: { userId: string; monto: number | null; pagado: boolean }[], encargado: string) =>
+  filas.some((f) => f.userId !== encargado && f.pagado && (f.monto ?? 0) > 0)
+
+/**
+ * Cuánto pone cada uno (ids: el encargado primero y después por orden de llegada, como en la pantalla). Si la gente no es
+ * la que vio el encargado, que revise la división: en partes iguales se cobraría una parte que nadie confirmó.
+ */
+function repartir(ids: string[], p: DatosCompra): { ok: true; montos: number[] } | Exclude<CompraResult, { ok: true }> {
+  if (p.miembros && (p.miembros.length !== ids.length || !ids.every((id) => p.miembros!.includes(id)))) return { ok: false, reason: 'cambiaron' }
+  if (!p.partes) return { ok: true, montos: dividir(p.total, ids.length) }
+  const partes = p.partes
+  if (Object.keys(partes).length !== ids.length || !ids.every((id) => Object.hasOwn(partes, id))) return { ok: false, reason: 'no_permitido' }
+  const montos = ids.map((id) => partes[id])
+  if (montos.some((m) => !Number.isSafeInteger(m) || m < 0)) return { ok: false, reason: 'monto_invalido' }
+  if (montos.reduce((a, b) => a + b, 0) !== p.total) return { ok: false, reason: 'no_suma' }
+  return { ok: true, montos }
+}
+
+/** La parte de cada uno. La del encargado ya está paga (la puso él) y una en 0 no se debe. */
+async function fijarPartes(t: Db, giftId: string, encargado: string, ids: string[], montos: number[]) {
+  const ahora = new Date()
+  for (const [i, id] of ids.entries()) {
+    const saldado = id === encargado || montos[i] === 0
+    await t.update(groupGiftMembers).set({ monto: montos[i], pagado: saldado, pagadoAt: saldado ? ahora : null })
+      .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, id)))
+  }
+}
+
+const encargadoPrimero = (filas: { userId: string }[], encargado: string) =>
+  [encargado, ...filas.map((f) => f.userId).filter((id) => id !== encargado)]
+
+/**
+ * El encargado lo compró: fija el total y la parte de cada uno (por defecto, partes iguales), entre los que vio en la
+ * pantalla. Las partes tienen que sumar el total.
+ */
+export async function comprarRegalo(db: Db, giftId: string, userId: string, p: DatosCompra): Promise<CompraResult> {
+  if (!montoValido(p.total)) return { ok: false, reason: 'monto_invalido' }
+  if (!esUuid(giftId)) return { ok: false, reason: 'no_permitido' }
   return db.transaction(async (tx): Promise<CompraResult> => {
-    const [g] = await tx.select().from(groupGifts)
+    const t = tx as unknown as Db
+    const [regalo] = await t.select({ itemId: groupGifts.itemId }).from(groupGifts).where(eq(groupGifts.id, giftId))
+    if (!regalo) return { ok: false, reason: 'no_permitido' }
+    // Lock del deseo y después del regalo, como sumarseARegalo. El del regalo: sumarse, bajarse o que lo saquen esperan a
+    // la compra (y ya no está abierto), o la compra a ellos y divide entre los que quedaron. El del deseo: si a la vez lo
+    // sacan de la lista, archivar ve el regalo comprado y no lo cancela.
+    await t.select({ id: items.id }).from(items).where(eq(items.id, regalo.itemId)).for('update')
+    const [g] = await t.select().from(groupGifts)
       .where(and(eq(groupGifts.id, giftId), eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'abierto')))
       .for('update')
     if (!g) return { ok: false, reason: 'no_permitido' }
-    const filas = await tx.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
+    const filas = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
       .where(eq(groupGiftMembers.giftId, giftId)).orderBy(asc(groupGiftMembers.createdAt))
-    const ids = [userId, ...filas.map((f) => f.userId).filter((id) => id !== userId)]
-
-    let montos = dividir(p.total, ids.length)
-    if (p.partes) {
-      const claves = Object.keys(p.partes)
-      if (claves.length !== ids.length || !ids.every((id) => id in p.partes!)) return { ok: false, reason: 'no_permitido' }
-      montos = ids.map((id) => p.partes![id])
-      if (montos.some((m) => !Number.isSafeInteger(m) || m < 0)) return { ok: false, reason: 'monto_invalido' }
-      if (montos.reduce((a, b) => a + b, 0) !== p.total) return { ok: false, reason: 'no_suma' }
-    }
+    const ids = encargadoPrimero(filas, userId)
+    const r = repartir(ids, p)
+    if (!r.ok) return r
 
     const ahora = new Date()
-    for (const [i, id] of ids.entries()) {
-      const saldado = id === userId || montos[i] === 0
-      await tx.update(groupGiftMembers).set({ monto: montos[i], pagado: saldado, pagadoAt: saldado ? ahora : null })
-        .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, id)))
-    }
-    await tx.update(groupGifts).set({ estado: 'comprado', montoTotal: p.total, compradoAt: ahora }).where(eq(groupGifts.id, giftId))
-    await tx.update(claims).set({ estado: 'comprado', notaQueCompre: p.nota ?? null, updatedAt: ahora }).where(eq(claims.id, g.claimId))
+    await fijarPartes(t, giftId, userId, ids, r.montos)
+    await t.update(groupGifts).set({ estado: 'comprado', montoTotal: p.total, compradoAt: ahora }).where(eq(groupGifts.id, giftId))
+    await t.update(claims).set({ estado: 'comprado', notaQueCompre: p.nota ?? null, updatedAt: ahora }).where(eq(claims.id, g.claimId))
+    return { ok: true }
+  })
+}
+
+/**
+ * "Corregir la compra": el encargado cambia el total o las partes de un regalo ya comprado (un cero de más, el precio de
+ * la lista que no era el que pagó), mientras nadie más que él figura como pago. Si alguien ya pagó, cambiarle la parte
+ * pisaría eso: primero se deshace el pago. La fecha de la compra queda (la usan Cuentas, el historial y el deseo).
+ */
+export async function corregirCompra(db: Db, giftId: string, userId: string, p: DatosCompra): Promise<CompraResult> {
+  if (!montoValido(p.total)) return { ok: false, reason: 'monto_invalido' }
+  if (!esUuid(giftId)) return { ok: false, reason: 'no_permitido' }
+  return db.transaction(async (tx): Promise<CompraResult> => {
+    const t = tx as unknown as Db
+    const [g] = await t.select({ claimId: groupGifts.claimId, listId: items.listId }).from(groupGifts)
+      .innerJoin(items, eq(groupGifts.itemId, items.id))
+      .where(and(eq(groupGifts.id, giftId), eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'comprado')))
+      .for('update', { of: groupGifts })
+    // si después se sumó al grupo de esa lista ya no ve el regalo (ver enCuentasDe): tampoco lo toca
+    if (!g || (await esOFueDuenoDeLista(t, g.listId, userId))) return { ok: false, reason: 'no_permitido' }
+    // con lock: un "Ya le pagué" a la vez, o se ve acá, o espera y queda pago sobre la parte nueva
+    const filas = await t.select({ userId: groupGiftMembers.userId, monto: groupGiftMembers.monto, pagado: groupGiftMembers.pagado })
+      .from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId)).orderBy(asc(groupGiftMembers.createdAt))
+      .for('update')
+    if (alguienPago(filas, userId)) return { ok: false, reason: 'ya_pagaron' }
+    const ids = encargadoPrimero(filas, userId)
+    const r = repartir(ids, p)
+    if (!r.ok) return r
+
+    await fijarPartes(t, giftId, userId, ids, r.montos)
+    await t.update(groupGifts).set({ montoTotal: p.total }).where(eq(groupGifts.id, giftId))
+    await t.update(claims).set({ notaQueCompre: p.nota ?? null }).where(eq(claims.id, g.claimId))
     return { ok: true }
   })
 }
@@ -235,13 +333,15 @@ export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Pro
     const suyos = miembros.filter((x) => x.m.giftId === gift.id)
       .sort((a, b) => Number(b.m.userId === gift.organizerUserId) - Number(a.m.userId === gift.organizerUserId))
     const soyParte = !!viewer.userId && suyos.some((x) => x.m.userId === viewer.userId)
+    const soyEncargado = viewer.userId === gift.organizerUserId
     return {
       id: gift.id,
       estado: gift.estado as 'abierto' | 'comprado',
       encargado: { id: gift.organizerUserId, nombre },
       soyParte,
-      soyEncargado: viewer.userId === gift.organizerUserId,
+      soyEncargado,
       montoTotal: soyParte ? gift.montoTotal : null,
+      corregible: soyEncargado && gift.estado === 'comprado' && !alguienPago(suyos.map((x) => x.m), gift.organizerUserId),
       miembros: suyos.map((x) => ({
         userId: x.m.userId, nombre: x.nombre,
         esEncargado: x.m.userId === gift.organizerUserId,
@@ -347,7 +447,6 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
 
   const porPersona = new Map<string, CuentaPersona>()
   const saldadas: Cuentas['saldadas'] = []
-  let debes = 0, teDeben = 0
   for (const r of partes) {
     const monto = r.monto ?? 0
     if (monto <= 0) continue
@@ -361,8 +460,6 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       saldadas.push({ ...linea, con: otro.nombre, fecha: r.pagadoAt ?? linea.fecha })
       continue
     }
-    if (debo) debes += monto
-    else teDeben += monto
     const persona = porPersona.get(otro.id) ?? { ...otro, neto: 0, lineas: [] }
     persona.neto += debo ? -monto : monto
     persona.lineas.push(linea)
@@ -386,10 +483,14 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       .orderBy(asc(groupGiftMembers.createdAt))
     : []
 
+  // Los totales salen del neto con cada uno, como las tarjetas ("ya está descontado lo que se deben entre los dos"): si
+  // Sofi te debe 30.000 y vos le debés 10.000, arriba no dice "Debés $10.000".
+  const personas = [...porPersona.values()]
   return {
-    debes, teDeben,
+    debes: personas.reduce((s, p) => s + Math.max(0, -p.neto), 0),
+    teDeben: personas.reduce((s, p) => s + Math.max(0, p.neto), 0),
     // primero a quien más le debés, después quien más te debe
-    personas: [...porPersona.values()].sort((a, b) => a.neto - b.neto),
+    personas: personas.sort((a, b) => a.neto - b.neto),
     enCurso: abiertos.map((a) => {
       const miembros = nombres.filter((n) => n.giftId === a.giftId)
       // Sin el link tampoco para el encargado: con el nuevo volvería a abrir (y seguir) la lista que le quisieron cerrar.
@@ -407,6 +508,43 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     }),
     saldadas: saldadas.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 10),
   }
+}
+
+export type CompraParaCorregir = {
+  giftId: string; itemTitulo: string; para: string; total: number; nota: string | null
+  /** El encargado primero y después por orden de llegada, como en comprarRegalo. */
+  miembros: { userId: string; nombre: string; esYo: boolean; monto: number }[]
+}
+
+/**
+ * Lo que compró en un regalo grupal y todavía puede corregir (nadie le pagó), cuando no lo puede hacer en el deseo: lo
+ * sacaron de la lista (se lo dieron en el cumple y dijo "Ya lo tengo") o cambiaron el link y no lo tiene. Como dividirCon.
+ */
+export async function comprasParaCorregir(db: Db, userId: string): Promise<CompraParaCorregir[]> {
+  const compras = await db.select({
+    giftId: groupGifts.id, total: groupGifts.montoTotal, nota: claims.notaQueCompre, ...columnasDestino(db, userId),
+  }).from(groupGifts)
+    .innerJoin(claims, eq(groupGifts.claimId, claims.id))
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
+    .innerJoin(lists, eq(items.listId, lists.id))
+    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .where(and(eq(groupGifts.organizerUserId, userId), enCuentasDe(db, userId)))
+    .orderBy(desc(groupGifts.compradoAt))
+  const lejos = compras.filter((c) => !c.activo || !c.tieneElLink)
+  if (!lejos.length) return []
+  const filas = await db.select({ m: groupGiftMembers, nombre: users.nombre }).from(groupGiftMembers)
+    .innerJoin(users, eq(groupGiftMembers.userId, users.id))
+    .where(inArray(groupGiftMembers.giftId, lejos.map((c) => c.giftId)))
+    .orderBy(asc(groupGiftMembers.createdAt))
+  return lejos.flatMap((c) => {
+    const suyos = filas.filter((f) => f.m.giftId === c.giftId)
+    if (alguienPago(suyos.map((f) => f.m), userId)) return []
+    return [{
+      giftId: c.giftId, itemTitulo: c.itemTitulo, para: destino(c).para, total: c.total ?? 0, nota: c.nota,
+      miembros: [...suyos.filter((f) => f.m.userId === userId), ...suyos.filter((f) => f.m.userId !== userId)]
+        .map((f) => ({ userId: f.m.userId, nombre: f.nombre, esYo: f.m.userId === userId, monto: f.m.monto ?? 0 })),
+    }]
+  })
 }
 
 // ---------- Historial: quién se ocupó de los regalos de una lista ----------

@@ -12,9 +12,10 @@ import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList 
 import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
 import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
 import {
-  cancelarRegalo, comprarRegalo, dividir, historialDeLista, iniciarRegaloGrupal, marcarPagado, misCuentas,
-  parsePesos, pesos, regalosDeItem, salirDeRegalo, saldarCon, sumarseARegalo, ultimosRegalos,
+  cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dividir, historialDeLista, iniciarRegaloGrupal, marcarPagado,
+  misCuentas, parsePesos, pesos, regalosDeItem, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo, ultimosRegalos,
 } from '@/lib/regalos'
+import { partePesos } from '@/lib/pesos'
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
@@ -46,7 +47,8 @@ test('pesos: se leen del precio y se escriben con puntos', () => {
   expect(parsePesos('$90.000')).toBe(90000)
   expect(parsePesos('$20.000 - $30.000')).toBe(20000)
   expect(parsePesos('45k')).toBe(45000)
-  expect(parsePesos('$ 1.250,50')).toBe(1250)
+  // los centavos se redondean (antes se cortaban: daba 1250)
+  expect(parsePesos('$ 1.250,50')).toBe(1251)
   expect(parsePesos('a consultar')).toBeNull()
   expect(parsePesos(null)).toBeNull()
   expect(pesos(90000)).toBe('$90.000')
@@ -150,9 +152,12 @@ test('cuentas a lo Splitwise: quién le debe a quién, de qué regalo, y saldar'
   expect((await misCuentas(db, rodri.id)).enCurso[0]).toMatchObject({ itemTitulo: 'Perfume', encargado: 'Sofi', personas: ['Sofi', 'Rodri'] })
   await comprarRegalo(db, otro.giftId, sofi.id, { total: 20000 })
   await marcarPagado(db, giftId, sofi.id, sofi.id, false) // se equivocó: todavía no le pagó
+  // Los totales salen de los netos, como las tarjetas: Sofi le debe 30.000 y él a ella 10.000, así que no "debe" nada (antes
+  // decía "Debés $10.000 · Te deben $60.000" arriba de "Sofi te debe $20.000")
   const neto = await misCuentas(db, rodri.id)
-  expect(neto).toMatchObject({ debes: 10000, teDeben: 60000 })
+  expect(neto).toMatchObject({ debes: 0, teDeben: 50000 })
   expect(neto.personas.find((p) => p.nombre === 'Sofi')).toMatchObject({ neto: 20000 })
+  expect(await misCuentas(db, sofi.id)).toMatchObject({ debes: 20000, teDeben: 0 })
 
   // "Saldar todo" con Sofi deja las dos direcciones pagas; lo de Ana sigue
   expect(await saldarCon(db, rodri.id, sofi.id)).toBe(2)
@@ -439,6 +444,10 @@ test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni hist
   const yo = { userId: mama.id }
   expect(await historialDeLista(db, lista.id, yo)).toBeNull()
   expect(await regalosDeItem(db, bici.id, yo)).toEqual([])
+  // ni corrige ni saca a nadie
+  expect(await corregirCompra(db, giftId, mama.id, { total: 10 })).toEqual({ ok: false, reason: 'no_permitido' })
+  expect(await sacarDeRegalo(db, giftId, sofi.id, mama.id)).toBe(false)
+  expect(await comprasParaCorregir(db, mama.id)).toEqual([])
   expect((await ultimosRegalos(db, mama.id, [lista.id])).size).toBe(0)
   const cuentas = await misCuentas(db, mama.id)
   expect(cuentas).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
@@ -561,11 +570,12 @@ test('si organizabas un regalo y solo quedan los que tienen su propia reserva de
   const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
   const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
   const copas = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Copas', cantidad: 2 }, grupoId))!
-  // Martín arma el regalo de un juego de copas; Sofi reservó el otro suelto y además se sumó
+  // Martín arma el regalo de un juego de copas; Sofi reservó el otro suelto y además se sumó (de antes: ahora con su
+  // reserva suelta no se suma, ver sumarseARegalo)
   const g = await iniciarRegaloGrupal(db, copas.id, martin.id)
   if (!g.ok) throw new Error(g.reason)
   expect(await reserveItem(db, copas.id, { userId: sofi.id })).toMatchObject({ ok: true })
-  expect(await sumarseARegalo(db, g.giftId, sofi.id)).toBe(true)
+  await db.insert(groupGiftMembers).values({ giftId: g.giftId, userId: sofi.id })
 
   await unirseAGrupo(db, grupo.inviteToken!, martin.id)
   // a Sofi no se lo pasa (tendría dos reservas del mismo deseo): se cancela, y no le desaparece sin explicación
@@ -601,7 +611,10 @@ test('si la dueña cambia el link para regalar, Cuentas no se lo pasa a quien so
   ])
   expect(JSON.stringify(await misCuentas(db, sofi.id))).not.toContain(nuevo!)
   expect(await comprarRegalo(db, p.giftId, sofi.id, { total: 50000 })).toEqual({ ok: true })
-  expect((await misCuentas(db, rodri.id)).debes).toBe(25000)
+  // le debe 25.000 del perfume, descontados de los 30.000 que Sofi le debe de la bici
+  const conSofi = (await misCuentas(db, rodri.id)).personas.find((x) => x.nombre === 'Sofi')!
+  expect(conSofi.neto).toBe(5000)
+  expect(conSofi.lineas).toContainEqual(expect.objectContaining({ itemTitulo: 'Perfume', tipo: 'debes', monto: 25000 }))
   // cuando abre el link nuevo (y la sigue), vuelve a tenerlo
   await seguirLista(db, ana.id, lista.id)
   expect((await misCuentas(db, ana.id)).personas[0].lineas[0].href).toBe(`/l/${nuevo}/item/${bici.id}`)
@@ -636,4 +649,155 @@ test('"Saldar todo" salda solo lo que Cuentas muestra, no la deuda de un grupo a
   // Rodri sí la ve, y la salda desde su lado
   expect(await saldarCon(db, rodri.id, martin.id)).toBe(1)
   expect((await misCuentas(db, rodri.id)).personas).toEqual([])
+})
+
+// Los formatos que se usan acá. Lo que no son pesos da null: sin estimación ("~$X cada uno") y con el total vacío, mejor
+// que un número engañoso.
+test.each([
+  ['$45.000', 45000], ['45.000,50', 45001], ['45k', 45000], ['1,5k', 1500], ['1.5k', 1500], ['$ 45 000', 45000],
+  ['$45,000', 45000], ['45 mil', 45000], ['2 x $10.000', 10000], ['$90.000 aprox.', 90000],
+  // el ejemplo del rango que sugiere el formulario: la "k" vale para los dos números
+  ['$10–30k', 10000], ['$10 a 30 mil', 10000], ['$500 - 2k', 500],
+  ['US$ 300', null], ['USD 300', null], ['U$S 300', null], ['u$d 300', null], ['€ 50', null], ['50 euros', null],
+  ['-$5.000', null], ['$ -5000', null], ['', null], ['   ', null],
+] as const)('pesos: "%s" → %s', (texto, esperado) => {
+  expect(parsePesos(texto)).toBe(esperado)
+})
+
+test('una parte "A mano" vacía vale 0, igual que en la pantalla', () => {
+  expect(['', ' ', '0', '$ 0'].map(partePesos)).toEqual([0, 0, 0, 0])
+  expect(partePesos('45.000')).toBe(45000)
+  expect(partePesos('abc')).toBeNull()
+  expect(partePesos('-5')).toBeNull()
+})
+
+test('una persona, una reserva por deseo: con una reserva o compra suelta, o en otro regalo del deseo, no se suma a este', async () => {
+  const { db, rodri, sofi, ana, martin, bici, giftId } = await conRegalo()
+  await db.update(items).set({ cantidad: 5 }).where(eq(items.id, bici.id))
+  const [caro, leo, juli] = [await usuario(db, 'Caro'), await usuario(db, 'Leo'), await usuario(db, 'Juli')]
+  // Caro la reservó suelta: se suma recién cuando la libera
+  const suelta = await reserveItem(db, bici.id, { userId: caro.id })
+  if (!suelta.ok) throw new Error(suelta.reason)
+  expect(await sumarseARegalo(db, giftId, caro.id)).toBe(false)
+  expect(await releaseClaim(db, suelta.claimId, { userId: caro.id })).toBe(true)
+  expect(await sumarseARegalo(db, giftId, caro.id)).toBe(true)
+  // Leo la compró suelta: tampoco
+  const compra = await reserveItem(db, bici.id, { userId: leo.id })
+  if (!compra.ok) throw new Error(compra.reason)
+  await markBought(db, compra.claimId, { userId: leo.id })
+  expect(await sumarseARegalo(db, giftId, leo.id)).toBe(false)
+  // Martín arma otro regalo de la bici y Juli se suma: ninguno entra también en el de Rodri, ni uno de Rodri en ese
+  const otro = await iniciarRegaloGrupal(db, bici.id, martin.id)
+  if (!otro.ok) throw new Error(otro.reason)
+  expect(await sumarseARegalo(db, otro.giftId, juli.id)).toBe(true)
+  expect(await sumarseARegalo(db, giftId, martin.id)).toBe(false)
+  expect(await sumarseARegalo(db, giftId, juli.id)).toBe(false)
+  expect(await sumarseARegalo(db, otro.giftId, sofi.id)).toBe(false)
+  // volver a tocar "Me sumo" en el propio, sí
+  expect(await sumarseARegalo(db, giftId, ana.id)).toBe(true)
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].miembros.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi', 'Ana', 'Caro'])
+})
+
+test('el encargado divide entre los que vio: si mientras tanto se sumó o se bajó alguien, tiene que revisar la división', async () => {
+  const { db, rodri, sofi, ana, martin, bici, giftId } = await conRegalo()
+  const vio = [rodri.id, sofi.id, ana.id]
+  // Martín se suma desde WhatsApp antes de que Rodri toque "Lo compré · dividir $90.000": no le cobra una parte que nadie vio
+  expect(await sumarseARegalo(db, giftId, martin.id)).toBe(true)
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: vio })).toEqual({ ok: false, reason: 'cambiaron' })
+  // y si Ana se baja, a los demás no les sube la parte sin que lo vea
+  expect(await salirDeRegalo(db, giftId, ana.id)).toBe(true)
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: [...vio, martin.id] })).toEqual({ ok: false, reason: 'cambiaron' })
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].estado).toBe('abierto')
+  // con los de ahora (en cualquier orden), sí
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: [martin.id, sofi.id, rodri.id] })).toEqual({ ok: true })
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].miembros.map((m) => m.monto)).toEqual([30000, 30000, 30000])
+})
+
+test('el encargado saca a alguien que se sumó por error: no entra en la división y se entera', async () => {
+  const { db, mama, lista, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  // solo el encargado, y a otro
+  expect(await sacarDeRegalo(db, giftId, ana.id, sofi.id)).toBe(false)
+  expect(await sacarDeRegalo(db, giftId, rodri.id, rodri.id)).toBe(false)
+  expect(await sacarDeRegalo(db, 'no-es-un-id', ana.id, rodri.id)).toBe(false)
+  expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(true)
+  expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(false)
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].miembros.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi'])
+  expect(await getUnreadNotifications(db, { userId: ana.id })).toEqual([
+    expect.objectContaining({ tipo: 'regalo_sacado', itemTitulo: 'Bici', href: `/l/${lista.shareToken}/item/${bici.id}` }),
+  ])
+  expect((await misCuentas(db, ana.id)).enCurso).toEqual([])
+  expect(await getUnreadNotifications(db, { userId: mama.id })).toEqual([])
+  // ya comprado, no: tiene su parte (eso se arregla corrigiendo la compra)
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  expect(await sacarDeRegalo(db, giftId, sofi.id, rodri.id)).toBe(false)
+  expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
+})
+
+test('corregir la compra: el encargado cambia el total o las partes mientras nadie le pagó', async () => {
+  const { db, rodri, sofi, ana, bici, perfume, giftId } = await conRegalo()
+  // un cero de más
+  await comprarRegalo(db, giftId, rodri.id, { total: 900000, nota: 'la roja' })
+  const [antes] = await db.select().from(groupGifts).where(eq(groupGifts.id, giftId))
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].corregible).toBe(true)
+  expect((await regalosDeItem(db, bici.id, { userId: sofi.id }))[0].corregible).toBe(false)
+  expect(await corregirCompra(db, giftId, sofi.id, { total: 90000 })).toEqual({ ok: false, reason: 'no_permitido' })
+  const todos = [rodri.id, sofi.id, ana.id]
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, nota: 'la roja' })).toEqual({ ok: true })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+  // a mano: al final Ana no puso
+  const partes = { [rodri.id]: 50000, [sofi.id]: 40000, [ana.id]: 0 }
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: { ...partes, [ana.id]: 5 } }))
+    .toEqual({ ok: false, reason: 'no_suma' })
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes, nota: 'la roja' })).toEqual({ ok: true })
+  const [regalo] = await regalosDeItem(db, bici.id, { userId: rodri.id })
+  expect(regalo.miembros.map((m) => [m.nombre, m.monto, m.pagado])).toEqual([['Rodri', 50000, true], ['Sofi', 40000, false], ['Ana', 0, true]])
+  expect(await misCuentas(db, ana.id)).toMatchObject({ debes: 0, personas: [] })
+  // la compra sigue siendo de cuando fue
+  const [despues] = await db.select().from(groupGifts).where(eq(groupGifts.id, giftId))
+  expect(despues).toMatchObject({ estado: 'comprado', montoTotal: 90000, compradoAt: antes.compradoAt })
+  expect((await db.select().from(claims).where(eq(claims.id, antes.claimId)))[0]).toMatchObject({ estado: 'comprado', notaQueCompre: 'la roja' })
+  // Sofi le pagó: ya no se corrige (pisaría su pago) hasta que se deshace
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id)).toBe(true)
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].corregible).toBe(false)
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 80000, miembros: todos })).toEqual({ ok: false, reason: 'ya_pagaron' })
+  expect(await marcarPagado(db, giftId, sofi.id, rodri.id, false)).toBe(true)
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 80000, miembros: todos })).toEqual({ ok: true })
+  // uno abierto no se corrige: se compra
+  const abierto = await iniciarRegaloGrupal(db, perfume.id, sofi.id)
+  if (!abierto.ok) throw new Error(abierto.reason)
+  expect(await corregirCompra(db, abierto.giftId, sofi.id, { total: 10000 })).toEqual({ ok: false, reason: 'no_permitido' })
+})
+
+test('si el deseo salió de la lista (se lo dieron), el encargado corrige la compra desde Cuentas', async () => {
+  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  await comprarRegalo(db, giftId, rodri.id, { total: 900000, nota: 'la roja' })
+  // con el deseo en la lista se corrige ahí
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  const [c] = await comprasParaCorregir(db, rodri.id)
+  expect(c).toMatchObject({ giftId, itemTitulo: 'Bici', para: 'Mamá', total: 900000, nota: 'la roja' })
+  expect(c.miembros.map((m) => [m.nombre, m.esYo, m.monto])).toEqual([['Rodri', true, 300000], ['Sofi', false, 300000], ['Ana', false, 300000]])
+  expect(await comprasParaCorregir(db, sofi.id)).toEqual([])
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: c.miembros.map((m) => m.userId) })).toEqual({ ok: true })
+  expect((await misCuentas(db, ana.id)).debes).toBe(30000)
+  // cuando alguien le paga, ya no
+  await marcarPagado(db, giftId, ana.id, ana.id)
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
+})
+
+test('cuentas: con alguien a mano los totales dan 0, pero las partes siguen ahí para marcarlas saldadas', async () => {
+  const { db, rodri, sofi, bici, perfume } = await setup()
+  const comprado = async (itemId: string, encargado: string, otro: string) => {
+    const g = await iniciarRegaloGrupal(db, itemId, encargado)
+    if (!g.ok) throw new Error(g.reason)
+    await sumarseARegalo(db, g.giftId, otro)
+    await comprarRegalo(db, g.giftId, encargado, { total: 30000 })
+  }
+  await comprado(bici.id, rodri.id, sofi.id)
+  await comprado(perfume.id, sofi.id, rodri.id)
+  const c = await misCuentas(db, rodri.id)
+  expect(c).toMatchObject({ debes: 0, teDeben: 0 })
+  expect(c.personas).toEqual([expect.objectContaining({ nombre: 'Sofi', neto: 0 })])
+  expect(await saldarCon(db, rodri.id, sofi.id)).toBe(2)
+  expect((await misCuentas(db, sofi.id)).personas).toEqual([])
 })

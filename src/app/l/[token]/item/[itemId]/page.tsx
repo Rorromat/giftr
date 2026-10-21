@@ -46,9 +46,9 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
-  searchParams: Promise<{ error?: string; reserva?: string }>
+  searchParams: Promise<{ reserva?: string }>
 }) {
-  const [{ token, itemId }, { error, reserva }] = await Promise.all([params, searchParams])
+  const [{ token, itemId }, { reserva }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
@@ -77,6 +77,10 @@ export default async function DetalleItem({ params, searchParams }: {
   const miCompra = mia?.estado === 'comprado' && mia.deshacer ? mia : undefined
   const vencida = giver?.miVencida ?? null
   const enUnRegalo = regalos.some((r) => r.soyParte)
+  // Una persona, una reserva por deseo (ver sumarseARegalo): en vez de "Me sumo", por qué no
+  const ocupado = mia ? (mia.estado === 'comprado' ? 'Ya lo compraste vos: no hace falta que te sumes.'
+    : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
+    : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
   const cuantos = cantidad(item, giver?.item ?? null)
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
@@ -174,8 +178,8 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {regalos.map((r) => (
           <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
-                        precio={parsePesos(precio)} logueado={logueado}
-                        nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} error={r.soyEncargado ? error : undefined} />
+                        precio={parsePesos(precio)} logueado={logueado} ocupado={ocupado}
+                        nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} />
         ))}
 
         {/* como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá */}
