@@ -106,6 +106,13 @@
       "when": 1792610629875,
       "tag": "0014_corte_del_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792613103881,
+      "tag": "0015_fotos_deseo_por_usuario",
+      "breakpoints": true
     }
   ]
 }

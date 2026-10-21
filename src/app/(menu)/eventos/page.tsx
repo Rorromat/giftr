@@ -5,14 +5,15 @@ import { db } from '@/db'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, hoyLocal, miCumple, misEventos, type Evento } from '@/lib/events'
 import { AvatarStack, Icon, ItemPhoto, Seccion, Starburst } from '@/components/ui'
+import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={150} />
   return (
     <div className="grid h-[150px] border-b-[3px] border-gr-ink" style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
       {e.fotos.map((src, i) => (
-        // eslint-disable-next-line @next/next/no-img-element -- fotos de tiendas externas
-        <img key={i} src={src} alt="" className={`size-full object-cover ${i ? 'border-l-[3px] border-gr-ink' : ''}`} />
+        <FotoConRespaldo key={i} src={src} className={`size-full object-cover ${i ? 'border-l-[3px] border-gr-ink' : ''}`}
+                         respaldo={<span className={`size-full bg-gr-bg ${i ? 'border-l-[3px] border-gr-ink' : ''}`} />} />
       ))}
     </div>
   )

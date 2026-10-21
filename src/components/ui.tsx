@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 
-// Piezas base del sistema "Sticker". Server components puros (sin estado).
+// Piezas base del sistema "Sticker". Server components puros (sin estado); la foto que no carga cae al placeholder
+// desde un componente cliente (FotoConRespaldo).
 
 export const PRIORIDADES = {
   mucho: { label: 'Lo quiero mucho', corazones: 3 },
@@ -96,7 +98,7 @@ export function PriceSticker({ children, rotate = -5, className = '' }: {
   )
 }
 
-/** Foto del deseo a sangre; sin foto, placeholder crema con la estrella y la inicial. */
+/** Foto del deseo a sangre; sin foto (o si no carga), placeholder crema con la estrella y la inicial. */
 export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' }: {
   src: string | null
   titulo: string
@@ -104,18 +106,17 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   dimmed?: boolean
   className?: string
 }) {
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- PoC: remote host images, no next/image config
-      <img src={src} alt={titulo} className={`gr-sticker__img ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }} />
-    )
-  }
   const inicial = titulo.trim().charAt(0).toUpperCase()
-  return (
+  const placeholder = (
     <div className={`flex items-center justify-center border-b-[3px] border-gr-ink bg-gr-bg ${dimmed ? 'opacity-45' : ''} ${className}`}
          style={{ height }}>
       <Starburst size={Math.min(96, Math.round(height * 0.55))} fontSize={46} className="rotate-12">{inicial}</Starburst>
     </div>
+  )
+  if (!src) return placeholder
+  return (
+    <FotoConRespaldo src={src} alt={titulo} respaldo={placeholder}
+                     className={`gr-sticker__img ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }} />
   )
 }
 

@@ -1,0 +1,1 @@
+CREATE INDEX "fotos_deseo_user_id_created_at_idx" ON "fotos_deseo" USING btree ("user_id","created_at");

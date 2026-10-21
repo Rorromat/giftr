@@ -9,6 +9,7 @@ import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
 import { miFoto } from '@/lib/perfil'
 import { FotoPerfil } from '@/components/FotoPerfil'
+import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
 import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
@@ -52,9 +53,9 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         <div className="relative h-[60px] w-[86px] flex-none">
           {fotos.length > 0
             ? fotos.map((f, i) => (
-                // eslint-disable-next-line @next/next/no-img-element -- PoC: remote host images, no next/image config
-                <img key={f.id} src={f.src} alt="" className="absolute size-[46px] rounded-xl border-[2.5px] border-gr-ink object-cover"
-                     style={{ left: i * 20, top: [6, 0, 10][i], transform: `rotate(${GIROS_FOTOS[i]}deg)` }} />
+                // la que no carga no se muestra (en vez del ícono de imagen rota)
+                <FotoConRespaldo key={f.id} src={f.src} respaldo={null} className="absolute size-[46px] rounded-xl border-[2.5px] border-gr-ink object-cover"
+                                 style={{ left: i * 20, top: [6, 0, 10][i], transform: `rotate(${GIROS_FOTOS[i]}deg)` }} />
               ))
             : <Starburst size={60} className="mx-auto rotate-12">{activos.length}</Starburst>}
         </div>

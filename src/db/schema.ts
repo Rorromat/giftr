@@ -32,12 +32,13 @@ export const fotosPerfil = pgTable('fotos_perfil', {
 
 // Foto de un deseo subida desde el teléfono (galería, cámara o pegada): JPEG de hasta 1200px, sin metadatos.
 // El deseo la usa como /foto/deseo/:id; se sube antes de guardar el deseo, por eso no apunta a items.
+// Índice por usuario y fecha: el cupo de subidas por día y la limpieza de las que nadie usa (ver guardarFotoDeseo).
 export const fotosDeseo = pgTable('fotos_deseo', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id),
   datos: bytea('datos').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index('fotos_deseo_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
 // Dos tipos de lista:
 // - personal: una por usuario, su dueño es owner_id (único).

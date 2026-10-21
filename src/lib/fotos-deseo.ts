@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, count, eq, gt, lt, notExists, sql } from 'drizzle-orm'
 import sharp from 'sharp'
-import { fotosDeseo } from '@/db/schema'
+import { fotosDeseo, items, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esUuid } from '@/lib/groups'
 
@@ -24,10 +24,36 @@ export async function procesarFotoDeseo(datos: Buffer): Promise<Buffer> {
     .toBuffer()
 }
 
-/** Guarda la foto y devuelve la URL para el deseo. */
-export async function guardarFotoDeseo(db: Db, userId: string, jpeg: Buffer): Promise<string> {
-  const [f] = await db.insert(fotosDeseo).values({ userId, datos: jpeg }).returning({ id: fotosDeseo.id })
-  return `/foto/deseo/${f.id}`
+/** Cuántas fotos de deseos puede subir alguien en un día (cambiar la foto varias veces entra de sobra). */
+export const FOTOS_POR_DIA = 40
+
+const haceUnDia = sql`now() - interval '24 hours'`
+
+/** Si todavía puede subir fotos hoy (en las últimas 24 horas). */
+export async function quedanFotos(db: Db, userId: string): Promise<boolean> {
+  const [{ n }] = await db.select({ n: count() }).from(fotosDeseo)
+    .where(and(eq(fotosDeseo.userId, userId), gt(fotosDeseo.createdAt, haceUnDia)))
+  return n < FOTOS_POR_DIA
+}
+
+/**
+ * Guarda la foto y devuelve la URL para el deseo; null si ya subió FOTOS_POR_DIA hoy. De paso borra sus fotos de más de
+ * un día que ningún deseo usa (las que cambió, quitó o subió y no guardó): el día de margen es para un formulario que
+ * sigue abierto. Se mira cualquier deseo, de cualquier lista y archivado o no: el link de una foto subida se puede usar
+ * en otro deseo, también de otra persona.
+ */
+export async function guardarFotoDeseo(db: Db, userId: string, jpeg: Buffer): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // lock del usuario: dos subidas a la vez no pasan juntas el cupo
+    await t.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update')
+    if (!(await quedanFotos(t, userId))) return null
+    const usada = t.select({ id: items.id }).from(items)
+      .where(sql`${items.fotoUrl} like ('%/foto/deseo/' || ${fotosDeseo.id}::text)`)
+    await t.delete(fotosDeseo).where(and(eq(fotosDeseo.userId, userId), lt(fotosDeseo.createdAt, haceUnDia), notExists(usada)))
+    const [f] = await t.insert(fotosDeseo).values({ userId, datos: jpeg }).returning({ id: fotosDeseo.id })
+    return `/foto/deseo/${f.id}`
+  })
 }
 
 export async function leerFotoDeseo(db: Db, id: string): Promise<Buffer | null> {
