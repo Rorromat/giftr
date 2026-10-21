@@ -39,13 +39,18 @@ export function ocupaSql(desde: Date | null) {
 
 type Deseo = { id: string; listId: string; tipo: 'exacto' | 'idea'; repetible: boolean }
 
+/** El desde de ocupaSql para un deseo: en una idea que se puede repetir, el último evento; si no, null (todo ocupa). */
+export async function desdeQueOcupa(db: Db, deseo: Omit<Deseo, 'id'>): Promise<Date | null> {
+  return esRepetible(deseo) ? desdeElUltimoEvento(db, deseo.listId) : null
+}
+
 /**
  * Lo que el que mira ya tiene de un deseo (una persona, una reserva por deseo): su reserva o compra suelta, o la del
  * regalo grupal en el que está, como encargado o sumado. Si por datos de antes hay más de una: primero la de un regalo
  * (uno abierto antes que uno comprado), después lo reservado y lo más viejo.
  */
 export async function loQueYaTiene(db: Db, deseo: Deseo, viewer: Viewer) {
-  const desde = esRepetible(deseo) ? await desdeElUltimoEvento(db, deseo.listId) : null
+  const desde = await desdeQueOcupa(db, deseo)
   const enUnRegalo = viewer.userId
     ? inArray(groupGifts.id, db.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers).where(eq(groupGiftMembers.userId, viewer.userId)))
     : undefined

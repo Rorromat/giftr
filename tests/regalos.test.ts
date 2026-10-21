@@ -1,7 +1,8 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { claims, groupGifts, items, lists } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
@@ -176,10 +177,10 @@ test('bajarse y cancelar: el encargado no se baja, cancela y libera el deseo', a
 })
 
 // Antes sacar el deseo dejaba el regalo abierto trabado (en Cuentas, hasta que el encargado lo cancelara, y los demás sin
-// poder bajarse). Ahora se cancela en el momento y se les avisa a todos.
-test('si la dueña lo saca de la lista, el regalo abierto se cancela y se les avisa a todos los que estaban', async () => {
+// poder bajarse). Con "Ya no lo quiero" se cancela en el momento y se les avisa a todos (con "Ya lo tengo", abajo, no).
+test('si la dueña ya no lo quiere, el regalo abierto se cancela y se les avisa a todos los que estaban', async () => {
   const { db, mama, rodri, sofi, ana, martin, lista, bici, giftId } = await conRegalo()
-  expect(await archiveItem(db, bici.id, mama.id, 'lo_tengo')).toBe(true)
+  expect(await archiveItem(db, bici.id, mama.id, 'no_lo_quiero')).toBe(true)
   for (const u of [rodri, sofi, ana]) {
     expect((await misCuentas(db, u.id)).enCurso).toEqual([])
     expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([expect.objectContaining({ tipo: 'regalo_baja', itemTitulo: 'Bici' })])
@@ -201,6 +202,34 @@ test('si la dueña lo saca de la lista, el regalo abierto se cancela y se les av
   }
 })
 
+// Mamá toca "Ya lo tengo" porque se la dieron en el cumple, pero Rodri todavía no había dividido lo que salió: el regalo
+// no se cancela (se perderían los $90.000), lo termina desde Cuentas.
+test('si la dueña ya lo tiene, el regalo abierto sigue: el encargado lo divide o lo cancela desde Cuentas', async () => {
+  const { db, mama, rodri, sofi, ana, martin, lista, bici, giftId } = await conRegalo()
+  expect(await archiveItem(db, bici.id, mama.id, 'lo_tengo')).toBe(true)
+  for (const u of [rodri, sofi, ana]) {
+    expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([
+      expect.objectContaining({ tipo: 'regalo_lo_tiene', itemTitulo: 'Bici', href: '/cuentas' }),
+    ])
+  }
+  const [deRodri] = (await misCuentas(db, rodri.id)).enCurso
+  expect(deRodri).toMatchObject({ giftId, sigueEnLaLista: false, soyEncargado: true, href: `/l/${lista.shareToken}` })
+  expect(deRodri.dividirCon!.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi', 'Ana'])
+  expect((await misCuentas(db, sofi.id)).enCurso[0]).toMatchObject({ sigueEnLaLista: false, soyEncargado: false, dividirCon: null })
+  // desde una pantalla vieja nadie se suma a algo que salió de la lista
+  expect(await sumarseARegalo(db, giftId, martin.id)).toBe(false)
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 90000 })).toEqual({ ok: true })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+  expect((await misCuentas(db, rodri.id)).teDeben).toBe(60000)
+  // a la dueña no le llega nada; si lo vuelve a poner, ya está comprado y el aviso de Cuentas no queda
+  expect(await getUnreadNotifications(db, { userId: mama.id })).toEqual([])
+  expect(await restoreItem(db, bici.id, mama.id)).toBe(true)
+  expect(await getUnreadNotifications(db, { userId: sofi.id })).toEqual([])
+  const vista = await getListForViewer(db, lista.shareToken, { userId: martin.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items.find((i) => i.id === bici.id)).toMatchObject({ disponible: false })
+})
+
 test('si la dueña vuelve a poner un deseo que "ya no quería", a los del regalo grupal comprado se les avisa que volvió', async () => {
   const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
   await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
@@ -214,9 +243,10 @@ test('si la dueña vuelve a poner un deseo que "ya no quería", a los del regalo
 
 test('un regalo abierto de un deseo que salió de la lista antes de esto: el encargado lo cancela y los demás se bajan desde Cuentas', async () => {
   const { db, rodri, sofi, bici, giftId } = await conRegalo()
-  await db.update(items).set({ estadoDueno: 'lo_tengo' }).where(eq(items.id, bici.id))
+  await db.update(items).set({ estadoDueno: 'no_lo_quiero' }).where(eq(items.id, bici.id))
   const enCurso = (await misCuentas(db, rodri.id)).enCurso
-  expect(enCurso).toEqual([expect.objectContaining({ giftId, sigueEnLaLista: false, soyEncargado: true })])
+  // también lo podría dividir, si lo había comprado
+  expect(enCurso).toEqual([expect.objectContaining({ giftId, sigueEnLaLista: false, soyEncargado: true, dividirCon: expect.any(Array) })])
   expect(enCurso[0].href).not.toContain(bici.id) // el detalle ya no existe para quien regala
   expect((await misCuentas(db, sofi.id)).enCurso[0]).toMatchObject({ sigueEnLaLista: false, soyEncargado: false })
   expect(await salirDeRegalo(db, giftId, sofi.id)).toBe(true)
@@ -298,6 +328,72 @@ test('si ya lo compró suelto, no arma un regalo grupal encima', async () => {
   await markBought(db, r.claimId, { userId: sofi.id })
   expect(await iniciarRegaloGrupal(db, perfume.id, sofi.id)).toEqual({ ok: false, reason: 'ya_comprado' })
   expect(await db.select().from(groupGifts)).toEqual([])
+})
+
+const DIA = 86400_000
+
+test('en una idea que se puede repetir, un regalo grupal comprado para un evento anterior no sale en el deseo (como en la lista)', async () => {
+  const { db, mama, rodri, ana, lista } = await setup()
+  const medias = (await createItem(db, mama.id, { tipo: 'idea', titulo: 'Medias', repetible: true }))!
+  const r = await iniciarRegaloGrupal(db, medias.id, rodri.id)
+  if (!r.ok) throw new Error(r.reason)
+  await sumarseARegalo(db, r.giftId, ana.id)
+  await comprarRegalo(db, r.giftId, rodri.id, { total: 20000 })
+  // fue para el cumple pasado (la lista no tiene fecha: cuenta el último año)
+  const hace13Meses = new Date(Date.now() - 395 * DIA)
+  const [gift] = await db.update(groupGifts).set({ compradoAt: hace13Meses }).where(eq(groupGifts.id, r.giftId)).returning()
+  await db.update(claims).set({ updatedAt: hace13Meses }).where(eq(claims.id, gift.claimId))
+
+  const vista = await getListForViewer(db, lista.shareToken, { userId: ana.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items.find((i) => i.id === medias.id)).toMatchObject({ disponible: true, claims: [] })
+  const detalle = await getItemForViewer(db, lista.shareToken, medias.id, { userId: ana.id })
+  if (detalle?.role !== 'giver') throw new Error('esperaba giver')
+  expect(detalle.regalos).toEqual([])
+  expect(detalle.item).toMatchObject({ disponible: true, claims: [] })
+  // ya lo regalaron: lo que cambie ahora no les importa
+  await updateItem(db, medias.id, mama.id, { notas: 'de lana' })
+  for (const u of [rodri, ana]) expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([])
+  // y lo puede reservar o armar uno nuevo, como dice la lista; el de antes sigue en Cuentas y en el historial
+  expect(await reserveItem(db, medias.id, { userId: ana.id })).toMatchObject({ ok: true })
+  expect((await misCuentas(db, ana.id)).debes).toBe(10000)
+  // uno de este evento, sí
+  await db.update(claims).set({ updatedAt: new Date() }).where(eq(claims.id, gift.claimId))
+  expect((await regalosDeItem(db, medias.id, { userId: ana.id })).map((g) => g.id)).toEqual([r.giftId])
+})
+
+// Lo que quedó en la base de cuando un doble toque en "Armar regalo grupal" armaba dos: la migración 0012 lo limpia.
+// createTestDb ya la corrió sobre una base vacía; acá se arma el estado viejo a mano y se la vuelve a correr.
+test('la migración cancela los regalos grupales repetidos del mismo encargado que no tienen a nadie más', async () => {
+  const { db, rodri, sofi, ana, martin, bici, perfume, mama } = await setup()
+  const vela = (await createItem(db, mama.id, { tipo: 'exacto', titulo: 'Vela' }))!
+  const repetido = async (itemId: string, organizador: string, hace: number) => {
+    const [c] = await db.insert(claims).values({ itemId, claimerUserId: organizador, expiresAt: null, createdAt: new Date(Date.now() - hace * DIA) }).returning()
+    const [g] = await db.insert(groupGifts).values({ itemId, claimId: c.id, organizerUserId: organizador, createdAt: new Date(Date.now() - hace * DIA) }).returning()
+    await db.insert(groupGiftMembers).values({ giftId: g.id, userId: organizador })
+    return g
+  }
+  // la bici: dos vacíos de Rodri; el perfume: uno vacío (el más viejo) y otro donde se sumó Sofi; la vela: Ana y Martín en
+  // uno cada uno
+  const [bici1, bici2] = [await repetido(bici.id, rodri.id, 3), await repetido(bici.id, rodri.id, 2)]
+  const [perfume1, perfume2] = [await repetido(perfume.id, rodri.id, 3), await repetido(perfume.id, rodri.id, 2)]
+  await db.insert(groupGiftMembers).values({ giftId: perfume2.id, userId: sofi.id })
+  const [vela1, vela2] = [await repetido(vela.id, rodri.id, 3), await repetido(vela.id, rodri.id, 2)]
+  await db.insert(groupGiftMembers).values([{ giftId: vela1.id, userId: ana.id }, { giftId: vela2.id, userId: martin.id }])
+
+  const archivo = readFileSync('drizzle/0012_limpiar_regalos_repetidos.sql', 'utf8')
+  for (let vez = 0; vez < 2; vez++) {
+    for (const sentencia of archivo.split('--> statement-breakpoint')) await db.execute(sql.raw(sentencia))
+  }
+  const estado = async (g: typeof bici1) => {
+    const [fila] = await db.select({ regalo: groupGifts.estado, reserva: claims.estado }).from(groupGifts)
+      .innerJoin(claims, eq(groupGifts.claimId, claims.id)).where(eq(groupGifts.id, g.id))
+    return `${fila.regalo}/${fila.reserva}`
+  }
+  expect(await Promise.all([bici1, bici2, perfume1, perfume2, vela1, vela2].map(estado))).toEqual([
+    'abierto/reservado', 'cancelado/liberado', 'cancelado/liberado', 'abierto/reservado', 'abierto/reservado', 'abierto/reservado',
+  ])
+  expect((await regalosDeItem(db, bici.id, { userId: ana.id })).map((g) => g.id)).toEqual([bici1.id])
 })
 
 test('historial: quién se ocupó de cada regalo y cuántos compró cada uno', async () => {

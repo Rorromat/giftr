@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { loQueYaTiene, reserveItem, type ReserveResult } from '@/lib/claims'
+import { desdeQueOcupa, loQueYaTiene, reserveItem, type ReserveResult } from '@/lib/claims'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
@@ -84,9 +84,10 @@ export async function sumarseARegalo(db: Db, giftId: string, userId: string): Pr
     // Lock del deseo y después del regalo, en el mismo orden que unirseAGrupo: si a la vez se une al grupo, uno espera al
     // otro. El del regalo solo no alcanza: unirseAGrupo encuentra los regalos por sus miembros y no vería esta fila sin
     // confirmar, así que no esperaría.
-    const [item] = await t.select({ listId: items.listId }).from(items).where(eq(items.id, regalo.itemId)).for('update')
+    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno }).from(items).where(eq(items.id, regalo.itemId)).for('update')
     const [g] = await t.select({ estado: groupGifts.estado }).from(groupGifts).where(eq(groupGifts.id, giftId)).for('update')
-    if (!item || g?.estado !== 'abierto') return false
+    // con "Ya lo tengo" el regalo sigue abierto para terminarlo, pero desde una pantalla vieja nadie se suma a algo que salió
+    if (item?.estado !== 'activo' || g?.estado !== 'abierto') return false
     if (await esOFueDuenoDeLista(t, item.listId, userId)) return false
     await t.insert(groupGiftMembers).values({ giftId, userId }).onConflictDoNothing()
     return true
@@ -211,11 +212,18 @@ export async function saldarCon(db: Db, userId: string, otroId: string): Promise
 
 /** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño y a quien no ve la capa oculta (ver accesoALista) les devuelve []. */
 export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Promise<RegaloView[]> {
-  const [item] = await db.select({ listId: items.listId }).from(items).where(eq(items.id, itemId))
+  const [item] = await db.select({ listId: items.listId, tipo: items.tipo, repetible: items.repetible }).from(items).where(eq(items.id, itemId))
   if (!item || (await accesoALista(db, item.listId, viewer)) !== 'regalador') return []
+  // En una idea que se puede repetir, uno comprado para un evento anterior ya se regaló: no se muestra, como en la lista
+  // y al reservar (ver ocupaSql). Lo comprado se anota en su reserva.
+  const desde = await desdeQueOcupa(db, item)
   const regalos = await db.select({ gift: groupGifts, nombre: users.nombre })
     .from(groupGifts).innerJoin(users, eq(groupGifts.organizerUserId, users.id))
-    .where(and(eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado'])))
+    .innerJoin(claims, eq(groupGifts.claimId, claims.id))
+    .where(and(
+      eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado']),
+      desde ? or(eq(groupGifts.estado, 'abierto'), gte(claims.updatedAt, desde)) : undefined,
+    ))
     .orderBy(asc(groupGifts.createdAt))
   if (!regalos.length) return []
   const miembros = await db.select({ m: groupGiftMembers, nombre: users.nombre })
@@ -268,11 +276,12 @@ export type CuentaPersona = Persona & {
 
 export type RegaloEnCurso = {
   giftId: string; itemTitulo: string; para: string; href: string | null; encargado: string; soyEncargado: boolean; personas: string[]
-  /** false si el dueño lo sacó de su lista: el encargado lo cancela desde Cuentas. */
+  /** false si el dueño lo sacó de su lista ("Ya lo tengo"): el encargado lo compra o lo cancela desde Cuentas. */
   sigueEnLaLista: boolean
   /**
-   * Solo para el encargado que no tiene el link de la lista (lo cambiaron): con quiénes dividir la compra, que hace desde
-   * Cuentas. El encargado primero y después por orden de llegada, como en comprarRegalo.
+   * Solo para el encargado que no lo puede terminar en el deseo (salió de la lista, o cambiaron el link y no lo tiene):
+   * con quiénes dividir la compra, que hace desde Cuentas. El encargado primero y después por orden de llegada, como en
+   * comprarRegalo.
    */
   dividirCon: { userId: string; nombre: string; esYo: boolean }[] | null
 }
@@ -384,13 +393,13 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     enCurso: abiertos.map((a) => {
       const miembros = nombres.filter((n) => n.giftId === a.giftId)
       // Sin el link tampoco para el encargado: con el nuevo volvería a abrir (y seguir) la lista que le quisieron cerrar.
-      // Lo compra o lo cancela desde Cuentas, así el regalo no queda trabado.
-      const sinLink = a.encargadoId === userId && a.activo && !a.tieneElLink
+      // Y si salió de la lista, el deseo ya no se abre. Lo compra o lo cancela desde Cuentas, así el regalo no queda trabado.
+      const desdeCuentas = a.encargadoId === userId && (!a.activo || !a.tieneElLink)
       return {
         giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a),
         encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
         personas: miembros.map((n) => n.nombre),
-        dividirCon: sinLink
+        dividirCon: desdeCuentas
           ? [...miembros.filter((m) => m.userId === userId), ...miembros.filter((m) => m.userId !== userId)]
             .map((m) => ({ userId: m.userId, nombre: m.nombre, esYo: m.userId === userId }))
           : null,

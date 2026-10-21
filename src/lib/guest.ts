@@ -1,8 +1,9 @@
-import { and, eq, gt, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
 import { esOFueDuenoSql } from '@/lib/groups'
+import { desdeQueOcupa, loQueYaTiene } from '@/lib/claims'
 import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
@@ -81,8 +82,8 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
  * con reservas de sus propios deseos ni enterarse por un aviso. Lo que reservó ahí sin comprar se libera: unido y sin
  * cookie, nadie más lo podría liberar ni marcar comprado, y les trabaría el deseo a los que regalan de verdad
  * (al dueño no le cambia nada de lo que ve).
- * Una reserva por persona y por deseo: si la cuenta ya tenía una activa de ese deseo, la reservada del invitado
- * se libera y la comprada queda a nombre del invitado (fue una compra de verdad y tiene que seguir contando).
+ * Una reserva por persona y por deseo, como al reservar: si la cuenta ya tiene algo de ese deseo, la reservada del
+ * invitado se libera y la comprada queda a nombre del invitado (fue una compra de verdad y tiene que seguir contando).
  * Devuelve false si el invitado no existe o ya se había unido a una cuenta.
  */
 export async function unirInvitadoACuenta(db: Db, guestId: string, userId: string): Promise<boolean> {
@@ -108,12 +109,28 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
       await t.insert(listFollows).values(dondeReservaba.map((l) => ({ userId, listId: l.listId }))).onConflictDoNothing()
     }
 
-    const yaTieneLaCuenta = t.select({ id: claims.itemId }).from(claims)
-      .where(and(eq(claims.claimerUserId, userId), inArray(claims.estado, ['reservado', 'comprado'])))
-    await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() })
-      .where(and(delInvitado, eq(claims.estado, 'reservado'), inArray(claims.itemId, yaTieneLaCuenta)))
+    // Lo que la cuenta ya tiene, con la misma regla que reservar (loQueYaTiene): también estar sumada a un regalo grupal, y
+    // en una idea que se puede repetir solo lo de este evento (las medias del cumple pasado no le sacan las de este).
+    // Una por una, lo comprado primero: si por un doble toque de antes el invitado tenía dos del mismo deseo, la primera
+    // pasa y para la otra la cuenta ya lo tiene.
+    const activas = await t.select({
+      id: claims.id, estado: claims.estado, updatedAt: claims.updatedAt,
+      deseo: { id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible },
+    }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
+      .where(and(delInvitado, inArray(claims.estado, ['reservado', 'comprado'])))
+      .orderBy(asc(claims.estado), asc(claims.createdAt))
+    const pasar = (id: string) => t.update(claims).set({ claimerUserId: userId, claimerGuestId: null }).where(eq(claims.id, id))
+    for (const c of activas) {
+      if (!(await loQueYaTiene(t, c.deseo, { userId }))) await pasar(c.id)
+      else if (c.estado === 'reservado') await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, c.id))
+      else {
+        // una compra de un evento anterior ya no ocupa: es historial, y pasa
+        const desde = await desdeQueOcupa(t, c.deseo)
+        if (desde && c.updatedAt < desde) await pasar(c.id)
+      }
+    }
     await t.update(claims).set({ claimerUserId: userId, claimerGuestId: null })
-      .where(and(delInvitado, or(ne(claims.estado, 'comprado'), notInArray(claims.itemId, yaTieneLaCuenta))))
+      .where(and(delInvitado, notInArray(claims.estado, ['reservado', 'comprado'])))
 
     await t.update(comments).set({ authorUserId: userId, authorGuestId: null })
       .where(and(eq(comments.authorGuestId, guestId), notInArray(comments.itemId, deseosPropios)))

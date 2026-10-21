@@ -5,6 +5,7 @@ import { claims, groupGiftMembers, groupGifts, items, listMembers, lists, notifi
 import type { Db } from '@/db/types'
 import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
+import { recienHecho } from '@/lib/repetido'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
@@ -93,6 +94,11 @@ export async function crearGrupo(
   p: { nombre: string; descripcion?: string; eventoFecha?: string | null; eventoAnual?: boolean },
 ): Promise<string> {
   return db.transaction(async (tx) => {
+    // Un doble toque en "Crear grupo" no arma dos: el mismo grupo recién creado es ese (lock del usuario, por dos a la vez).
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update')
+    const [repetido] = await tx.select({ id: lists.id }).from(lists).innerJoin(listMembers, eq(listMembers.listId, lists.id))
+      .where(and(eq(listMembers.userId, userId), eq(lists.tipo, 'grupo'), eq(lists.nombre, p.nombre), recienHecho(lists.createdAt)))
+    if (repetido) return repetido.id
     const [list] = await tx.insert(lists).values({
       tipo: 'grupo', nombre: p.nombre, descripcion: p.descripcion ?? null,
       shareToken: newShareToken(), inviteToken: newInviteToken(),

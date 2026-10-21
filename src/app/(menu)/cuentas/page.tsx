@@ -80,14 +80,19 @@ function MeBajo({ giftId }: { giftId: string }) {
 }
 
 /**
- * Un regalo abierto de una lista cuyo link no tiene (lo cambiaron): lo que haría en el deseo lo hace desde acá, sin pasar
- * por la lista. El encargado lo compra o lo cancela; los demás se pueden bajar.
+ * Un regalo abierto que no se puede terminar en el deseo: lo sacaron de la lista ("Ya lo tengo": quizás ya se lo dieron)
+ * o cambiaron el link y no lo tiene. Lo que haría en el deseo lo hace desde acá, sin pasar por la lista: el encargado lo
+ * compra o lo cancela; los demás se pueden bajar.
  */
-function SinLink({ r, error }: { r: RegaloEnCurso; error?: string }) {
+function DesdeAca({ r, error }: { r: RegaloEnCurso; error?: string }) {
   if (r.dividirCon) {
     return (
       <div className="mt-1.5 flex flex-col gap-2 px-1 text-xs font-semibold">
-        <span>Ya no tenés el link de esta lista: el regalo lo terminás desde acá.</span>
+        <span>
+          {r.sigueEnLaLista
+            ? 'Ya no tenés el link de esta lista: el regalo lo terminás desde acá.'
+            : 'Lo sacaron de la lista: si ya lo compraste, dividí lo que salió; si no, cancelalo.'}
+        </span>
         <details className="group flex flex-col" open={!!error}>
           <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             Ya lo compré: dividir
@@ -104,7 +109,9 @@ function SinLink({ r, error }: { r: RegaloEnCurso; error?: string }) {
   if (r.soyEncargado) return null
   return (
     <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
-      <span className="flex-1">Ya no tenés el link de esta lista. Si no vas a poner, bajate desde acá.</span>
+      <span className="flex-1">
+        {r.sigueEnLaLista ? 'Ya no tenés el link de esta lista' : 'Lo sacaron de la lista'}. Si no vas a poner, bajate desde acá.
+      </span>
       <MeBajo giftId={r.giftId} />
     </div>
   )
@@ -170,13 +177,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
                   </span>
                   {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
                 </QuizasLink>
-                {/* de antes: ahora sacar un deseo de la lista cancela sus regalos abiertos (y les avisa) */}
-                {!r.sigueEnLaLista ? (
-                  <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
-                    <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>
-                    {r.soyEncargado ? <CancelarRegalo giftId={r.giftId} /> : <MeBajo giftId={r.giftId} />}
-                  </div>
-                ) : !r.href && <SinLink r={r} error={errorDe(r.giftId)} />}
+                {(!r.sigueEnLaLista || !r.href) && <DesdeAca r={r} error={errorDe(r.giftId)} />}
               </li>
             ))}
           </ul>

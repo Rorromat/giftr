@@ -1,11 +1,12 @@
-import { and, eq, gte, inArray } from 'drizzle-orm'
+import { and, eq, gte, inArray, or } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esRepetible, pickItemFields, type OwnerItemView } from '@/lib/serialize'
 import { esDuenoSql, esUuid } from '@/lib/groups'
-import { noEsDeRegaloGrupal } from '@/lib/claims'
+import { expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
 import { dejarAviso, type TipoAviso } from '@/lib/notifications'
 import { desdeElUltimoEvento } from '@/lib/events'
+import { recienHecho } from '@/lib/repetido'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -25,11 +26,19 @@ export type NewItemData = {
 export async function createItem(db: Db, userId: string, data: NewItemData, listId?: string): Promise<OwnerItemView | null> {
   // un id que no es UUID no es de nadie (y la base lo rechazaría con un error)
   if (!esUuid(userId) || (listId !== undefined && !esUuid(listId))) return null
-  const [list] = await db.select().from(lists)
-    .where(listId ? and(eq(lists.id, listId), esDuenoSql(db, userId)) : eq(lists.ownerId, userId))
-  if (!list) return null
-  const [item] = await db.insert(items).values({ ...soloIdeasSeRepiten(data), listId: list.id }).returning()
-  return pickItemFields(item)
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const [list] = await t.select().from(lists)
+      .where(listId ? and(eq(lists.id, listId), esDuenoSql(t, userId)) : eq(lists.ownerId, userId))
+      .for('update')
+    if (!list) return null
+    // Un doble toque en "Agregar" no lo duplica (dos deseos iguales son dos lugares para reservar el mismo regalo).
+    const [repetido] = await t.select().from(items)
+      .where(and(eq(items.listId, list.id), eq(items.titulo, data.titulo), eq(items.tipo, data.tipo), recienHecho(items.createdAt)))
+    if (repetido) return pickItemFields(repetido)
+    const [item] = await t.insert(items).values({ ...soloIdeasSeRepiten(data), listId: list.id }).returning()
+    return pickItemFields(item)
+  })
 }
 
 async function itemDelDueno(db: Db, itemId: string, userId: string) {
@@ -45,13 +54,21 @@ function soloIdeasSeRepiten<T extends { tipo?: 'exacto' | 'idea'; repetible?: bo
   return (data.tipo ?? tipoAntes) === 'exacto' ? { ...data, repetible: false } : data
 }
 
-/** Los que regalan este deseo: lo reservaron o compraron, o están en un regalo grupal vigente (no solo el encargado). */
-async function genteDelDeseo(db: Db, itemId: string) {
+/**
+ * Los que regalan este deseo para el evento que viene: lo reservaron o lo compraron, o están en un regalo grupal abierto o
+ * comprado (no solo el encargado). Lo comprado para un evento anterior ya se regaló: no le importa lo que cambie ahora, como
+ * en restoreItem y desmarcarComprado (ver desdeElUltimoEvento). Lo comprado se anota en la reserva, también la de un regalo.
+ */
+async function genteDelDeseo(db: Db, itemId: string, listId: string) {
+  const desde = await desdeElUltimoEvento(db, listId)
   const reservas = await db.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId }).from(claims)
-    .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado'])))
+    .where(and(eq(claims.itemId, itemId), ocupaSql(desde)))
   const miembros = await db.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
     .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
-    .where(and(eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado'])))
+    .innerJoin(claims, eq(groupGifts.claimId, claims.id))
+    .where(and(eq(groupGifts.itemId, itemId), or(
+      eq(groupGifts.estado, 'abierto'), and(eq(groupGifts.estado, 'comprado'), gte(claims.updatedAt, desde)),
+    )))
   return [...reservas, ...miembros.map((m) => ({ userId: m.userId, guestId: null }))]
 }
 
@@ -78,7 +95,7 @@ export async function updateItem(db: Db, itemId: string, userId: string, data: C
   // La marca de repetible, solo si cambia de verdad: un "Quiero ESTO" de antes que la tenía no se repetía igual.
   const despues = { ...antes, ...cambios }
   const avisar = AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
-  if (avisar) await dejarAviso(db, itemId, 'item_editado', await genteDelDeseo(db, itemId))
+  if (avisar) await dejarAviso(db, itemId, 'item_editado', await genteDelDeseo(db, itemId, antes.listId))
   return true
 }
 
@@ -100,9 +117,12 @@ export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
  * vuelve a avisar ni cambia el motivo. Devuelve si lo archivó ahora. En la misma transacción, lo de los que regalan, así
  * nada les queda trabado sobre un deseo que ya no pueden abrir:
  * - Las reservas sin comprar se liberan y a cada uno se le avisa que elija otro.
- * - Los regalos grupales abiertos se cancelan (se libera su reserva) y se les avisa a todos los que estaban.
+ * - Los regalos grupales abiertos: con "Ya lo tengo" siguen abiertos (quizás se lo dieron y el encargado todavía no
+ *   dividió lo que salió) y se les avisa a todos que lo terminen en Cuentas, dividiendo o cancelando. Con "Ya no lo
+ *   quiero" se cancelan (se libera su reserva) y se les avisa a todos los que estaban.
  * - Lo comprado queda como está. Con "Ya lo tengo" no se avisa (seguramente ya se lo dieron); con "Ya no lo quiero",
- *   sí, para que lo cambie si puede.
+ *   sí, para que lo cambie si puede (solo lo de este evento: lo de antes ya se regaló).
+ * - Los avisos sin leer que decían que se podía hacer algo con el deseo (volvió, fue editado, reservalo) ya no valen.
  * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
  */
 export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero'): Promise<boolean> {
@@ -112,34 +132,46 @@ export async function archiveItem(db: Db, itemId: string, userId: string, estado
     // el update bloquea el deseo, como reserveItem: una reserva que llega a la vez espera y lo encuentra archivado
     const [archivado] = await t.update(items).set({ estadoDueno: estado })
       .where(and(eq(items.id, itemId), eq(items.estadoDueno, 'activo')))
-      .returning({ id: items.id })
+      .returning({ id: items.id, listId: items.listId })
     if (!archivado) return false
     const ahora = new Date()
+
+    await t.update(notifications).set({ leida: true }).where(and(
+      eq(notifications.itemId, itemId), eq(notifications.leida, false), inArray(notifications.tipo, YA_NO_VALEN_AL_SACARLO),
+    ))
 
     const liberadas = await t.update(claims).set({ estado: 'liberado', updatedAt: ahora })
       .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'reservado'), noEsDeRegaloGrupal()))
       .returning({ userId: claims.claimerUserId, guestId: claims.claimerGuestId })
     await dejarAviso(t, itemId, 'item_baja', liberadas)
 
-    const cancelados = await t.update(groupGifts).set({ estado: 'cancelado' })
+    const abiertos = await t.select({ id: groupGifts.id, claimId: groupGifts.claimId }).from(groupGifts)
       .where(and(eq(groupGifts.itemId, itemId), eq(groupGifts.estado, 'abierto')))
-      .returning({ id: groupGifts.id, claimId: groupGifts.claimId })
-    if (cancelados.length) {
-      await t.update(claims).set({ estado: 'liberado', updatedAt: ahora }).where(inArray(claims.id, cancelados.map((g) => g.claimId)))
+    if (abiertos.length) {
+      if (estado === 'no_lo_quiero') {
+        await t.update(groupGifts).set({ estado: 'cancelado' }).where(inArray(groupGifts.id, abiertos.map((g) => g.id)))
+        await t.update(claims).set({ estado: 'liberado', updatedAt: ahora }).where(inArray(claims.id, abiertos.map((g) => g.claimId)))
+      }
       const estaban = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
-        .where(inArray(groupGiftMembers.giftId, cancelados.map((g) => g.id)))
-      await dejarAviso(t, itemId, 'regalo_baja', estaban.map((m) => ({ userId: m.userId, guestId: null })))
+        .where(inArray(groupGiftMembers.giftId, abiertos.map((g) => g.id)))
+      await dejarAviso(t, itemId, estado === 'no_lo_quiero' ? 'regalo_baja' : 'regalo_lo_tiene',
+        estaban.map((m) => ({ userId: m.userId, guestId: null })))
     }
 
-    if (estado === 'no_lo_quiero') await dejarAviso(t, itemId, 'item_baja_comprado', await genteDelDeseo(t, itemId))
+    if (estado === 'no_lo_quiero') await dejarAviso(t, itemId, 'item_baja_comprado', await genteDelDeseo(t, itemId, archivado.listId))
     return true
   })
 }
 
+/** Avisos que dicen que con el deseo se puede hacer algo (reservarlo, revisarlo, deshacer la compra): sacándolo, no. */
+const YA_NO_VALEN_AL_SACARLO: TipoAviso[] = ['item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'item_editado', 'regalo_cancelado']
+
 /**
- * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre). Lo
- * que se les dijo a los que regalan al sacarlo ya no vale (y el cartel ahora lleva al deseo diciendo que salió):
- * - Al que se le liberó la reserva o se le canceló el regalo grupal y todavía no lo vio, el aviso pasa a decir eso.
+ * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre, un
+ * regalo grupal que quedó abierto sigue abierto). Lo que se les dijo a los que regalan al sacarlo ya no vale (y el cartel
+ * ahora lleva al deseo diciendo que salió):
+ * - Al que se le liberó la reserva o se le canceló el regalo grupal y todavía no lo vio, el aviso pasa a decir eso. Si
+ *   todavía tiene algo del deseo (una reserva que el archivar de antes no liberaba), no: el aviso de la baja se va.
  * - Al que lo compró para este evento y se le dijo que lo cambiara ("Ya no lo quiero"), que volvió y sigue a su nombre:
  *   si ya lo cambió, que lo diga, así otro lo puede regalar. Con "Ya lo tengo" no se le había dicho nada.
  * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
@@ -149,17 +181,23 @@ export async function restoreItem(db: Db, itemId: string, userId: string): Promi
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez
-    const [antes] = await t.select({ estado: items.estadoDueno, listId: items.listId }).from(items).where(eq(items.id, itemId)).for('update')
-    if (!antes || antes.estado === 'activo') return false
+    const [antes] = await t.select().from(items).where(eq(items.id, itemId)).for('update')
+    if (!antes || antes.estadoDueno === 'activo') return false
     await t.update(items).set({ estadoDueno: 'activo' }).where(eq(items.id, itemId))
 
+    // Los de la baja se borran y se dejan los nuevos con dejarAviso: si ya tenía uno igual sin leer (volvió una vez y lo
+    // volvieron a sacar), sube ese en vez de sumar otro.
     const sinLeer = (tipo: TipoAviso) => and(eq(notifications.itemId, itemId), eq(notifications.tipo, tipo), eq(notifications.leida, false))
-    const ahora = new Date()
-    await t.update(notifications).set({ tipo: 'item_vuelve', createdAt: ahora }).where(sinLeer('item_baja'))
-    await t.update(notifications).set({ tipo: 'regalo_cancelado', createdAt: ahora }).where(sinLeer('regalo_baja'))
-    await t.update(notifications).set({ leida: true }).where(sinLeer('item_baja_comprado'))
+    const para = { userId: notifications.userId, guestId: notifications.guestId }
+    const bajas = await t.delete(notifications).where(sinLeer('item_baja')).returning(para)
+    await expireStaleClaims(t, itemId)
+    const sinNada: typeof bajas = []
+    for (const d of bajas) if (!(await loQueYaTiene(t, antes, d.userId ? { userId: d.userId } : { guestId: d.guestId! }))) sinNada.push(d)
+    await dejarAviso(t, itemId, 'item_vuelve', sinNada)
+    await dejarAviso(t, itemId, 'regalo_cancelado', await t.delete(notifications).where(sinLeer('regalo_baja')).returning(para))
+    await t.update(notifications).set({ leida: true }).where(or(sinLeer('item_baja_comprado'), sinLeer('regalo_lo_tiene')))
 
-    if (antes.estado === 'no_lo_quiero') {
+    if (antes.estadoDueno === 'no_lo_quiero') {
       const compras = await t.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId, giftId: groupGifts.id }).from(claims)
         .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
         .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'comprado'), gte(claims.updatedAt, await desdeElUltimoEvento(t, antes.listId))))

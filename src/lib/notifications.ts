@@ -11,6 +11,7 @@ const TEXTOS = {
   regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
   item_baja_comprado: (t: string) => `"${t}" salió de la lista porque ya no lo quiere — si todavía podés, cambialo por otra cosa.`,
   regalo_baja: (t: string) => `"${t}" fue dado de baja por su dueño y se canceló el regalo grupal — si ya lo habían comprado, arréglenlo entre ustedes; si no, elijan otro regalo.`,
+  regalo_lo_tiene: (t: string) => `"${t}" salió de la lista porque ya lo tiene — el regalo grupal sigue en Cuentas: si ya lo compraron, el que lo organiza divide lo que salió; si no, lo cancela.`,
   item_vuelve: (t: string) => `"${t}" volvió a la lista, pero tu reserva ya se había liberado — si todavía lo querés regalar, reservalo de nuevo.`,
   compra_vuelve: (t: string) => `"${t}" volvió a la lista y sigue como comprado por vos — si ya lo cambiaste, tocá "Me equivoqué, todavía no lo compré" así lo puede regalar otro.`,
   regalo_vuelve: (t: string) => `"${t}" volvió a la lista y el regalo grupal sigue como comprado — si ya lo cambiaron, cuéntenlo en el hilo del deseo.`,
@@ -81,8 +82,9 @@ export async function getUnreadNotifications(db: Db, viewer: Viewer) {
     .orderBy(desc(notifications.createdAt))
   return filas.map(({ itemId, token, activo, conLink, ...n }) => ({
     ...n,
-    // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro
-    href: !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
+    // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro. El regalo
+    // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista)
+    href: n.tipo === 'regalo_lo_tiene' ? '/cuentas' : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
   }))
 }
 

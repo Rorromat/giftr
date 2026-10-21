@@ -11,6 +11,7 @@ import { asegurarListaPropia, upsertUserFromGoogle } from '@/lib/users'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem, updateItem } from '@/lib/items'
+import { iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 
 test('un guest puede reservar', async () => {
   const db = await createTestDb()
@@ -276,6 +277,57 @@ test('al unirse, queda una sola reserva activa por persona y por deseo', async (
     [giver.id, null, 'reservado'], [null, enLaCompu.id, 'comprado'],
   ].sort())
   expect(await activas(termo.id)).toEqual([expect.objectContaining({ claimerUserId: giver.id, claimerGuestId: null })])
+})
+
+const DIA = 86400_000
+
+test('al unirse, lo que la cuenta ya tiene se mira como al reservar: en una idea que se repite, solo lo de este evento', async () => {
+  const db = await createTestDb()
+  const { list, giver } = await seedOwnerAndGiver(db)
+  const [medias] = await db.insert(items).values({ listId: list.id, tipo: 'idea', titulo: 'Medias', repetible: true }).returning()
+  const [velas] = await db.insert(items).values({ listId: list.id, tipo: 'idea', titulo: 'Velas', repetible: true }).returning()
+  // Rodri, con su cuenta, regaló medias y velas el cumple pasado (la lista no tiene fecha: cuenta el último año)
+  const hace13Meses = new Date(Date.now() - 395 * DIA)
+  for (const it of [medias, velas]) {
+    await db.insert(claims).values({ itemId: it.id, claimerUserId: giver.id, estado: 'comprado', createdAt: hace13Meses, updatedAt: hace13Meses })
+  }
+  // este año, como invitado en la compu, reservó las medias y ya compró las velas
+  const enLaCompu = await createGuest(db, 'Rodri')
+  const deMedias = await reserveItem(db, medias.id, { guestId: enLaCompu.id })
+  const deVelas = await reserveItem(db, velas.id, { guestId: enLaCompu.id })
+  if (!deMedias.ok || !deVelas.ok) throw new Error('esperaba poder reservar')
+  await markBought(db, deVelas.claimId, { guestId: enLaCompu.id })
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  // las dos de este año pasan a la cuenta: ni se libera la reserva ni la compra queda a nombre del invitado
+  const [m, v] = await Promise.all([deMedias.claimId, deVelas.claimId].map(async (id) => (await db.select().from(claims).where(eq(claims.id, id)))[0]))
+  expect(m).toMatchObject({ estado: 'reservado', claimerUserId: giver.id, claimerGuestId: null })
+  expect(v).toMatchObject({ estado: 'comprado', claimerUserId: giver.id, claimerGuestId: null })
+  const vista = await getListForViewer(db, 'tok-euge', { userId: giver.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items.find((i) => i.id === medias.id)!.claims).toEqual([expect.objectContaining({ esMia: true, estado: 'reservado' })])
+  expect(vista.items.find((i) => i.id === velas.id)!.claims).toEqual([expect.objectContaining({ esMia: true, deshacer: true })])
+  expect(await reserveItem(db, medias.id, { userId: giver.id })).toEqual(deMedias)
+})
+
+test('al unirse, si la cuenta está sumada a un regalo grupal del deseo, la reserva suelta del invitado se libera', async () => {
+  const db = await createTestDb()
+  const { list, giver } = await seedOwnerAndGiver(db)
+  const ana = await upsertUserFromGoogle(db, { googleId: 'g-ana', email: 'ana@test.com', nombre: 'Ana' })
+  const [copas] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Copas', cantidad: 3 }).returning()
+  const regalo = await iniciarRegaloGrupal(db, copas.id, ana.id)
+  if (!regalo.ok) throw new Error(regalo.reason)
+  expect(await sumarseARegalo(db, regalo.giftId, giver.id)).toBe(true)
+  const enLaCompu = await createGuest(db, 'Rodri')
+  const suelta = await reserveItem(db, copas.id, { guestId: enLaCompu.id })
+  if (!suelta.ok) throw new Error(suelta.reason)
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  // una persona, un lugar: el del regalo (como si hubiera tocado Reservar estando en él)
+  expect((await db.select().from(claims).where(eq(claims.id, suelta.claimId)))[0].estado).toBe('liberado')
+  const vista = await getListForViewer(db, 'tok-euge', { userId: giver.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items[0]).toMatchObject({ quedan: 2, claims: [expect.objectContaining({ grupal: expect.objectContaining({ soyParte: true }) })] })
 })
 
 test('los carteles de reservas y avisos nunca muestran un deseo de una lista propia', async () => {

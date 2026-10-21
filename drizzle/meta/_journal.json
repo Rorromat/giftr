@@ -85,6 +85,13 @@
       "when": 1792585560390,
       "tag": "0011_destrabar_co_duenos",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792596394371,
+      "tag": "0012_limpiar_regalos_repetidos",
+      "breakpoints": true
     }
   ]
 }
