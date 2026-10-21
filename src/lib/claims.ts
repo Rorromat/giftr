@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -110,8 +110,11 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: 
   })
 }
 
-/** La reserva de un regalo grupal se compra o se cancela desde el regalo, no como reserva suelta. */
-export const noEsDeRegaloGrupal = () => notInArray(claims.id, sql`(select ${groupGifts.claimId} from ${groupGifts})`)
+/**
+ * La reserva de un regalo grupal se compra o se cancela desde el regalo, no como reserva suelta. Con not exists, por el
+ * único de group_gifts.claim_id: un not in recorría todos los regalos de la base en cada consulta.
+ */
+export const noEsDeRegaloGrupal = () => sql`not exists (select 1 from ${groupGifts} where ${groupGifts.claimId} = ${claims.id})`
 
 function claimEsDe(viewer: Viewer) {
   return viewer.userId

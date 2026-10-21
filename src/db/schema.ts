@@ -72,11 +72,12 @@ export const lists = pgTable('lists', {
 })
 
 // Listas que un usuario abrió como regalador: su gente. Sus cumples y fechas aparecen en Eventos.
+// Índice por lista: al cambiar el link para regalar se borran los que la seguían (la clave empieza por el usuario).
 export const listFollows = pgTable('list_follows', {
   userId: uuid('user_id').notNull().references(() => users.id),
   listId: uuid('list_id').notNull().references(() => lists.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [primaryKey({ columns: [t.userId, t.listId] })])
+}, (t) => [primaryKey({ columns: [t.userId, t.listId] }), index('list_follows_list_id_idx').on(t.listId)])
 
 export const listMembers = pgTable('list_members', {
   listId: uuid('list_id').notNull().references(() => lists.id),
@@ -102,7 +103,11 @@ export const items = pgTable('items', {
   estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
   linkTienda: text('link_tienda'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl))])
+}, (t) => [
+  index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)),
+  // los deseos de una lista, en el orden en que se cargaron: cada vista de lista, la vista previa y Eventos
+  index('items_list_id_created_at_idx').on(t.listId, t.createdAt),
+])
 
 // Un invitado por link: solo su nombre. Su credencial es la cookie con el id firmado (src/lib/cookie-invitado.ts).
 export const guestIdentities = pgTable('guest_identities', {
@@ -131,7 +136,15 @@ export const claims = pgTable('claims', {
   notaQueCompre: text('nota_que_compre'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  // lo reservado de un deseo (cada vista, y el conteo de reserveItem con el deseo bloqueado)
+  index('claims_item_id_estado_idx').on(t.itemId, t.estado),
+  // lo de cada persona: los carteles de "¿Lo conseguiste?" en cada pantalla y la unión del invitado a su cuenta
+  index('claims_claimer_user_id_idx').on(t.claimerUserId),
+  index('claims_claimer_guest_id_idx').on(t.claimerGuestId),
+  // expireStaleClaims sin deseo corre en cada pantalla: solo mira las reservadas que tienen vencimiento
+  index('claims_vencen_idx').on(t.expiresAt).where(sql`${t.estado} = 'reservado'`),
+])
 
 export const comments = pgTable('comments', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -140,7 +153,7 @@ export const comments = pgTable('comments', {
   authorGuestId: uuid('author_guest_id').references(() => guestIdentities.id),
   texto: text('texto').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index('comments_item_id_created_at_idx').on(t.itemId, t.createdAt)])
 
 export const notifications = pgTable('notifications', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -161,7 +174,12 @@ export const notifications = pgTable('notifications', {
   itemId: uuid('item_id').notNull().references(() => items.id),
   leida: boolean('leida').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  // los avisos de cada uno (Banners, en cada pantalla) y los de un deseo (al editarlo o volver a ponerlo)
+  index('notifications_user_id_idx').on(t.userId),
+  index('notifications_guest_id_idx').on(t.guestId),
+  index('notifications_item_id_idx').on(t.itemId),
+])
 
 // Regalo grupal: un encargado (organizer) lo compra y paga; los demás se suman y le deben su parte.
 // Reserva el deseo con un claim propio (sin vencimiento) para que nadie lo duplique.
@@ -176,7 +194,11 @@ export const groupGifts = pgTable('group_gifts', {
   // el encargado dijo "Sigue en pie" al recordatorio de cerrarlo: el próximo cuenta desde acá (ver regalosParaCerrar)
   recordatorioAt: timestamp('recordatorio_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  // los regalos de un deseo (su detalle) y los que organiza cada uno (Cuentas)
+  index('group_gifts_item_id_idx').on(t.itemId),
+  index('group_gifts_organizer_user_id_idx').on(t.organizerUserId),
+])
 
 export const groupGiftMembers = pgTable('group_gift_members', {
   giftId: uuid('gift_id').notNull().references(() => groupGifts.id),
@@ -221,4 +243,8 @@ export const codazos = pgTable('codazos', {
   deNombre: text('de_nombre').notNull(),
   visto: boolean('visto').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('codazos_para_user_id_idx').on(t.paraUserId)])
+}, (t) => [
+  index('codazos_para_user_id_idx').on(t.paraUserId),
+  // los topes del codazo: los de una lista en las últimas 24 horas
+  index('codazos_list_id_created_at_idx').on(t.listId, t.createdAt),
+])
