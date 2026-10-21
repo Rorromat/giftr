@@ -10,10 +10,10 @@ import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
-import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
+import { guardarCumple, hoyLocal, misEventos, seguirLista } from '@/lib/events'
 import {
   cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dividir, historialDeLista, iniciarRegaloGrupal, marcarPagado,
-  misCuentas, parsePesos, pesos, regalosDeItem, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo, ultimosRegalos,
+  misCuentas, parsePesos, pesos, regalosDeItem, regalosParaCerrar, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo, ultimosRegalos,
 } from '@/lib/regalos'
 import { partePesos } from '@/lib/pesos'
 
@@ -444,10 +444,11 @@ test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni hist
   const yo = { userId: mama.id }
   expect(await historialDeLista(db, lista.id, yo)).toBeNull()
   expect(await regalosDeItem(db, bici.id, yo)).toEqual([])
-  // ni corrige ni saca a nadie
+  // ni corrige, ni saca a nadie, ni le llegan carteles de regalos para cerrar
   expect(await corregirCompra(db, giftId, mama.id, { total: 10 })).toEqual({ ok: false, reason: 'no_permitido' })
   expect(await sacarDeRegalo(db, giftId, sofi.id, mama.id)).toBe(false)
   expect(await comprasParaCorregir(db, mama.id)).toEqual([])
+  expect(await regalosParaCerrar(db, mama.id)).toEqual([])
   expect((await ultimosRegalos(db, mama.id, [lista.id])).size).toBe(0)
   const cuentas = await misCuentas(db, mama.id)
   expect(cuentas).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
@@ -800,4 +801,30 @@ test('cuentas: con alguien a mano los totales dan 0, pero las partes siguen ahí
   expect(c.personas).toEqual([expect.objectContaining({ nombre: 'Sofi', neto: 0 })])
   expect(await saldarCon(db, rodri.id, sofi.id)).toBe(2)
   expect((await misCuentas(db, sofi.id)).personas).toEqual([])
+})
+
+test('un regalo grupal no vence solo, pero al que lo organiza se le recuerda cerrarlo cuando una reserva ya habría vencido', async () => {
+  const { db, mama, lista, rodri, sofi, martin, bici, perfume, giftId } = await conRegalo()
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  await db.update(groupGifts).set({ createdAt: new Date(Date.now() - 15 * DIA) }).where(eq(groupGifts.id, giftId))
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([{ giftId, itemTitulo: 'Bici', href: `/l/${lista.shareToken}/item/${bici.id}` }])
+  // a los que se sumaron no (no lo cierran ellos), y el deseo sigue ocupado: no se le cae a nadie
+  expect(await regalosParaCerrar(db, sofi.id)).toEqual([])
+  expect(await reserveItem(db, bici.id, { userId: martin.id })).toEqual({ ok: false, reason: 'sin_stock' })
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+
+  // con el cumple de Mamá en 2 días, uno armado hace 2 ya está (3 días antes del evento); recién armado, no (24 horas)
+  const enDos = new Date(hoyLocal().getTime() + 2 * DIA)
+  await guardarCumple(db, mama.id, enDos.getUTCDate(), enDos.getUTCMonth() + 1)
+  const p = await iniciarRegaloGrupal(db, perfume.id, sofi.id)
+  if (!p.ok) throw new Error(p.reason)
+  expect(await regalosParaCerrar(db, sofi.id)).toEqual([])
+  await db.update(groupGifts).set({ createdAt: new Date(Date.now() - 2 * DIA) }).where(eq(groupGifts.id, p.giftId))
+  expect((await regalosParaCerrar(db, sofi.id)).map((r) => r.itemTitulo)).toEqual(['Perfume'])
+  // si Mamá dijo "Ya lo tengo", se termina en Cuentas
+  await archiveItem(db, perfume.id, mama.id, 'lo_tengo')
+  expect(await regalosParaCerrar(db, sofi.id)).toEqual([expect.objectContaining({ itemTitulo: 'Perfume', href: '/cuentas' })])
+  expect(await cancelarRegalo(db, p.giftId, sofi.id)).toBe(true)
+  expect(await regalosParaCerrar(db, sofi.id)).toEqual([])
 })

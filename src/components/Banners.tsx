@@ -2,6 +2,7 @@ import { db } from '@/db'
 import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getMyClaimWarnings } from '@/lib/claims'
+import { regalosParaCerrar } from '@/lib/regalos'
 import { markNotifsReadAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
@@ -16,9 +17,10 @@ function QuizasLink({ href, className, children }: { href: string | null; classN
 
 export async function Banners() {
   const viewer = await getViewer()
-  const [todas, warnings, codazos, avisos, invitado] = await Promise.all([
+  const [todas, warnings, sinCerrar, codazos, avisos, invitado] = await Promise.all([
     getUnreadNotifications(db, viewer),
     getMyClaimWarnings(db, viewer),
+    viewer.userId ? regalosParaCerrar(db, viewer.userId) : [],
     viewer.userId ? codazosSinVer(db, viewer.userId) : [],
     viewer.userId ? tieneAvisos(db, viewer.userId) : false,
     viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
@@ -27,7 +29,7 @@ export async function Banners() {
     const texto = textoDeAviso(n.tipo, n.itemTitulo)
     return texto ? [{ id: n.id, texto, href: n.href }] : []
   })
-  if (!notifs.length && !warnings.length && !codazos.length && !invitado) return null
+  if (!notifs.length && !warnings.length && !sinCerrar.length && !codazos.length && !invitado) return null
   // Codazos: quiénes (sin repetir) y, si todos son para el mismo grupo, agregar directo ahí.
   const quienes = [...new Set(codazos.map((c) => c.deNombre.split(' ')[0]))]
   const grupos = [...new Set(codazos.map((c) => (c.tipo === 'grupo' ? c.listId : null)))]
@@ -71,6 +73,15 @@ export async function Banners() {
           {w.href && <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Marcalo o liberalo</span>}
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </QuizasLink>
+      ))}
+      {/* un regalo grupal no vence solo (tiene gente adentro): al que lo organiza se le recuerda que lo cierre */}
+      {sinCerrar.map((r) => (
+        <Link key={r.giftId} href={r.href}
+              className="relative block rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
+          {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
+          <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
+          <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
+        </Link>
       ))}
       {notifs.length > 0 && (
         <form action={markNotifsReadAction}>

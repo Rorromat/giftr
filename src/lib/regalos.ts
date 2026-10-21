@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { desdeQueOcupa, loQueYaTiene, reserveItem, type ReserveResult } from '@/lib/claims'
+import { desdeQueOcupa, loQueYaTiene, reserveItem, vencimientoDeReserva, type ReserveResult } from '@/lib/claims'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
@@ -545,6 +545,28 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
         .map((f) => ({ userId: f.m.userId, nombre: f.nombre, esYo: f.m.userId === userId, monto: f.m.monto ?? 0 })),
     }]
   })
+}
+
+/**
+ * Los regalos grupales que organiza y siguen abiertos cuando una reserva suelta ya habría vencido (14 días, o 3 antes del
+ * evento de la lista; ver vencimientoDeReserva): un cartel para que lo compre y lo divida, o lo cancele. No vencen solos:
+ * tienen gente adentro, y quizás ya lo compró y le falta cargarlo. Al deseo; a Cuentas si desde ahí no se puede.
+ */
+export async function regalosParaCerrar(db: Db, userId: string): Promise<{ giftId: string; itemTitulo: string; href: string }[]> {
+  const abiertos = await db.select({ giftId: groupGifts.id, createdAt: groupGifts.createdAt, listId: lists.id, ...columnasDestino(db, userId) })
+    .from(groupGifts)
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
+    .innerJoin(lists, eq(items.listId, lists.id))
+    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .where(and(eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
+    .orderBy(asc(groupGifts.createdAt))
+  const ahora = new Date()
+  const viejos: typeof abiertos = []
+  for (const a of abiertos) if (ahora >= (await vencimientoDeReserva(db, a.listId, a.createdAt))) viejos.push(a)
+  return viejos.map((a) => ({
+    giftId: a.giftId, itemTitulo: a.itemTitulo,
+    href: a.activo && a.tieneElLink ? `/l/${a.shareToken}/item/${a.itemId}` : '/cuentas',
+  }))
 }
 
 // ---------- Historial: quién se ocupó de los regalos de una lista ----------
