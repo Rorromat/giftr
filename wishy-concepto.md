@@ -150,7 +150,7 @@ Esta sección es la que más vale llevar a Claude Code tal cual — son las regl
 4. **Cantidad > 1.** El item muestra a los regaladores "quedan 4 de 6". Al llegar a 0 pasa a COMPRADO. El dueño solo ve su item, sin contadores.
 5. **Carrera por reservar.** La reserva es atómica: el primero que confirma se lo queda; el segundo ve "recién lo reservó otra persona" y el hilo para coordinar (quizás lo convierten en grupal).
 6. **Item idea con repetición permitida** admite múltiples reservas en paralelo, cada una con su nota de "qué compré".
-7. **Guest por link.** El guest se identifica con su nombre (su cookie va firmada: es su credencial). Su reserva vale igual que la de un usuario registrado. Si después entra con Google en ese mismo navegador, su cuenta hereda sus reservas, salvo las de listas propias.
+7. **Guest por link.** El guest se identifica con su nombre (su cookie va firmada: es su credencial). Su reserva vale igual que la de un usuario registrado. Si después entra con Google en ese mismo navegador y confirma que es esa persona ("¿Sos vos?": en un dispositivo compartido puede ser otra), su cuenta hereda sus reservas, salvo las de listas propias.
 8. **Un regalador con dos listas de la misma persona** (wishlist + lista de cumpleaños): los items compartidos entre ambas muestran el mismo estado — el estado vive en el item, no en la relación item-lista.
 9. **Auto-regalo prohibido**: nadie puede reservar items propios (obvio, pero hay que validarlo — cubre el caso del co-dueño curioso).
 10. **Privacidad del historial**: lo que reservaste/compraste solo lo ven los regaladores de ese círculo, no es público ni cross-grupo.
@@ -250,7 +250,7 @@ Para el plan de implementación en Claude Code. Entidades y relaciones clave:
 - **Circle** (grupo de personas) y **CircleMember**
 - **Event** (fecha, recurrencia, listas y círculo asociados)
 - **Comment** (hilo por item, visible solo para no-dueños)
-- **GuestIdentity** (nombre, ligado a sus claims; se une a un User si entra con Google en el mismo navegador)
+- **GuestIdentity** (nombre, ligado a sus claims; se une a un User si entra con Google en el mismo navegador y confirma que es él)
 
 **Regla de oro para la API:** el serializer de Item hacia un dueño/co-dueño excluye Claims, Comments y GroupGifts. Test de integración obligatorio: "el dueño no puede obtener estados de sus items por ningún endpoint".
 

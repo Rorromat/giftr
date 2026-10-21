@@ -2,10 +2,10 @@ import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getItemForViewer } from '@/lib/lists'
-import { getViewer } from '@/lib/viewer'
+import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
-import { GuestGate } from '@/components/GuestGate'
-import { NoSoyYo, QuienSos } from '@/components/Identidad'
+import { CartelReserva, GuestGate } from '@/components/GuestGate'
+import { NoSoyYo, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
@@ -26,9 +26,9 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; reserva?: string }>
 }) {
-  const [{ token, itemId }, { error }] = await Promise.all([params, searchParams])
+  const [{ token, itemId }, { error, reserva }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
@@ -43,7 +43,11 @@ export default async function DetalleItem({ params, searchParams }: {
   const regalos = giver?.regalos ?? []
   const comments = giver?.comments ?? []
   const disponible = giver?.item.disponible ?? true
-  const quien = identified ? await nombreDeViewer(db, viewer) : null
+  const [quien, invitado] = await Promise.all([
+    identified ? nombreDeViewer(db, viewer) : null,
+    // volviendo de entrar con Google ("Me sumo"): si en este navegador había un invitado, se le pregunta si es él
+    viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
+  ])
   // La reserva de un regalo grupal se maneja desde el regalo; acá solo las sueltas.
   const miClaim = claims.find((c) => c.esMia && c.estado === 'reservado' && !c.grupal)
   const enUnRegalo = regalos.some((r) => r.soyParte)
@@ -53,6 +57,8 @@ export default async function DetalleItem({ params, searchParams }: {
   return (
     <main className="flex flex-col gap-4 pb-12 pt-[52px]">
       <BackLink href={`/l/${token}`} label="Volver a la lista" />
+
+      {invitado && <PreguntaInvitado nombre={invitado} />}
 
       <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
         <div className="relative">
@@ -84,6 +90,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
       <section className="flex flex-col gap-2.5">
         {!identified && <QuienSos token={token} volver={`/l/${token}/item/${item.id}`} />}
+        <CartelReserva motivo={reserva} identified={identified} />
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
@@ -107,7 +114,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {disponible && !miClaim && !enUnRegalo && (
           <>
-            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" />
+            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" desde="detalle" />
             {identified && <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />}
           </>
         )}

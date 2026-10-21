@@ -1,9 +1,9 @@
-import { and, eq, inArray, isNull, notInArray } from 'drizzle-orm'
-import { claims, codazos, comments, guestIdentities, items, lists, notifications, users } from '@/db/schema'
+import { and, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
 import { esDuenoSql } from '@/lib/groups'
-import { leerInvitado } from '@/lib/cookie-invitado'
+import { dijoQueNoEs, leerInvitado } from '@/lib/cookie-invitado'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
 
@@ -31,11 +31,26 @@ export async function createGuest(db: Db, nombre: string) {
  * (una base restaurada) y no se unió a una cuenta. Si no, es alguien sin identificar.
  */
 export async function viewerDeCookie(db: Db, valor: string | undefined): Promise<Viewer> {
-  const guestId = leerInvitado(valor)
-  if (!guestId) return {}
-  const [g] = await db.select({ id: guestIdentities.id }).from(guestIdentities)
-    .where(and(eq(guestIdentities.id, guestId), isNull(guestIdentities.promotedToUserId)))
+  const g = await invitadoDeCookie(db, valor)
   return g ? { guestId: g.id } : {}
+}
+
+async function invitadoDeCookie(db: Db, valor: string | undefined) {
+  const guestId = leerInvitado(valor)
+  if (!guestId) return null
+  const [g] = await db.select({ id: guestIdentities.id, nombre: guestIdentities.nombre }).from(guestIdentities)
+    .where(and(eq(guestIdentities.id, guestId), isNull(guestIdentities.promotedToUserId)))
+  return g ?? null
+}
+
+/**
+ * Con sesión, el invitado que quedó anotado en este navegador y todavía no se unió a ninguna cuenta: a esa cuenta
+ * se le pregunta si es ella (null si no hay o si ya dijo que no). En un dispositivo compartido puede ser otra persona,
+ * así que nunca se une solo. No mira qué reservó: la pregunta es la misma para todos (al dueño no le cuenta nada).
+ */
+export async function invitadoParaUnir(db: Db, userId: string, cookieInvitado: string | undefined, cookieNoSoy: string | undefined) {
+  const g = await invitadoDeCookie(db, cookieInvitado)
+  return g && !dijoQueNoEs(cookieNoSoy, g.id, userId) ? { nombre: g.nombre } : null
 }
 
 /** Cómo se llama el que mira (para el codazo y para "¿No sos X?"). */
@@ -47,10 +62,13 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
 }
 
 /**
- * Entró con Google en un navegador donde era invitado (la cookie firmada prueba que es la misma persona):
- * sus reservas, comentarios, avisos y codazos pasan a la cuenta, todo junto o nada.
+ * Entró con Google en un navegador donde era invitado y confirmó que es esa persona ("Sí, soy yo"):
+ * sus reservas, comentarios, avisos y codazos pasan a la cuenta, todo junto o nada, y las listas donde reservaba
+ * pasan a ser de su gente (como si las hubiera abierto con sesión).
  * Lo que hizo sobre listas de las que la cuenta es dueña o co-dueña queda a nombre del invitado, sin tocar:
- * en un dispositivo compartido nadie puede terminar con reservas de sus propios deseos ni enterarse por un aviso.
+ * nadie puede terminar con reservas de sus propios deseos ni enterarse por un aviso.
+ * Una reserva por persona y por deseo: si la cuenta ya tenía una activa de ese deseo, la reservada del invitado
+ * se libera y la comprada queda a nombre del invitado (fue una compra de verdad y tiene que seguir contando).
  * Devuelve false si el invitado no existe o ya se había unido a una cuenta.
  */
 export async function unirInvitadoACuenta(db: Db, guestId: string, userId: string): Promise<boolean> {
@@ -63,8 +81,21 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     if (!g) return false
     const propias = t.select({ id: lists.id }).from(lists).where(esDuenoSql(t, userId))
     const deseosPropios = t.select({ id: items.id }).from(items).where(inArray(items.listId, propias))
+    const delInvitado = and(eq(claims.claimerGuestId, guestId), notInArray(claims.itemId, deseosPropios))
+
+    const dondeReservaba = await t.selectDistinct({ listId: items.listId }).from(claims)
+      .innerJoin(items, eq(claims.itemId, items.id)).where(delInvitado)
+    if (dondeReservaba.length) {
+      await t.insert(listFollows).values(dondeReservaba.map((l) => ({ userId, listId: l.listId }))).onConflictDoNothing()
+    }
+
+    const yaTieneLaCuenta = t.select({ id: claims.itemId }).from(claims)
+      .where(and(eq(claims.claimerUserId, userId), inArray(claims.estado, ['reservado', 'comprado'])))
+    await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() })
+      .where(and(delInvitado, eq(claims.estado, 'reservado'), inArray(claims.itemId, yaTieneLaCuenta)))
     await t.update(claims).set({ claimerUserId: userId, claimerGuestId: null })
-      .where(and(eq(claims.claimerGuestId, guestId), notInArray(claims.itemId, deseosPropios)))
+      .where(and(delInvitado, or(ne(claims.estado, 'comprado'), notInArray(claims.itemId, yaTieneLaCuenta))))
+
     await t.update(comments).set({ authorUserId: userId, authorGuestId: null })
       .where(and(eq(comments.authorGuestId, guestId), notInArray(comments.itemId, deseosPropios)))
     await t.update(notifications).set({ userId, guestId: null })

@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
-import { claims, codazos, comments, guestIdentities, items, lists, notifications, users } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
+import { and, eq, inArray } from 'drizzle-orm'
 import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest, unirInvitadoACuenta, validarNombre, viewerDeCookie } from '@/lib/guest'
@@ -73,7 +73,7 @@ test('la firma usa AUTH_SECRET y en producción sin esa variable falla claro', (
   }
 })
 
-test('al entrar con Google en el navegador del invitado, la cuenta hereda sus reservas, comentarios, avisos y codazos', async () => {
+test('al confirmar que es el invitado de ese navegador, la cuenta hereda sus reservas, comentarios, avisos y codazos', async () => {
   const db = await createTestDb()
   const { list, owner } = await seedOwnerAndGiver(db)
   const [termo] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Termo' }).returning()
@@ -131,36 +131,83 @@ test('lo que el invitado hizo en listas de la cuenta (propia o de un grupo) qued
   const [deRodri] = await db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' }).returning()
   const [mate] = await db.insert(items).values({ listId: deRodri.id, tipo: 'exacto', titulo: 'Mate' }).returning()
 
-  // Mamá, como invitada, desde la tablet de Euge: reserva y comenta en la lista de Euge, en el grupo y en la de Rodri
-  const mama = await createGuest(db, 'Mamá')
+  // Euge, sin su sesión (el navegador de WhatsApp), se anotó como invitada: reservó y comentó en la lista de Rodri,
+  // pero también en la suya y en la del grupo (las abrió y dijo su nombre en vez de entrar con Google)
+  const invitada = await createGuest(db, 'Euge')
   for (const it of [termo, cafetera, mate]) {
-    const r = await reserveItem(db, it.id, { guestId: mama.id })
+    const r = await reserveItem(db, it.id, { guestId: invitada.id })
     if (!r.ok) throw new Error(r.reason)
-    await addComment(db, it.id, { guestId: mama.id }, `yo me ocupo de ${it.titulo}`)
+    await addComment(db, it.id, { guestId: invitada.id }, `yo me ocupo de ${it.titulo}`)
   }
   await updateItem(db, termo.id, owner.id, { notas: 'el verde' })
   await updateItem(db, cafetera.id, owner.id, { notas: 'la italiana' })
 
-  // Después Euge entra con Google en esa tablet
-  expect(await unirInvitadoACuenta(db, mama.id, owner.id)).toBe(true)
+  // Después entra con Google en ese navegador y dice que es ella
+  expect(await unirInvitadoACuenta(db, invitada.id, owner.id)).toBe(true)
 
   const deClaim = Object.fromEntries((await db.select().from(claims)).map((c) => [c.itemId, c]))
-  expect(deClaim[termo.id]).toMatchObject({ claimerGuestId: mama.id, claimerUserId: null })
-  expect(deClaim[cafetera.id]).toMatchObject({ claimerGuestId: mama.id, claimerUserId: null })
+  expect(deClaim[termo.id]).toMatchObject({ claimerGuestId: invitada.id, claimerUserId: null })
+  expect(deClaim[cafetera.id]).toMatchObject({ claimerGuestId: invitada.id, claimerUserId: null })
   expect(deClaim[mate.id]).toMatchObject({ claimerGuestId: null, claimerUserId: owner.id })
   const deComentario = Object.fromEntries((await db.select().from(comments)).map((c) => [c.itemId, c]))
-  expect(deComentario[termo.id].authorGuestId).toBe(mama.id)
-  expect(deComentario[cafetera.id].authorGuestId).toBe(mama.id)
+  expect(deComentario[termo.id].authorGuestId).toBe(invitada.id)
+  expect(deComentario[cafetera.id].authorGuestId).toBe(invitada.id)
   expect(deComentario[mate.id].authorUserId).toBe(owner.id)
-  expect((await db.select().from(notifications)).every((n) => n.guestId === mama.id && n.userId === null)).toBe(true)
+  expect((await db.select().from(notifications)).every((n) => n.guestId === invitada.id && n.userId === null)).toBe(true)
 
-  // a Euge no le llega ningún cartel sobre sus deseos, y los demás siguen viendo a Mamá
+  // con su cuenta no le llega ningún cartel sobre sus deseos (ni la sigue: es suya)
   expect(await getMyClaimWarnings(db, { userId: owner.id })).toEqual([])
   expect(await getUnreadNotifications(db, { userId: owner.id })).toEqual([])
+  expect((await db.select().from(listFollows)).map((f) => f.listId)).toEqual([deRodri.id])
   const detalle = await getItemForViewer(db, 'tok-euge', termo.id, { userId: giver.id })
   if (detalle?.role !== 'giver') throw new Error('esperaba giver')
-  expect(detalle.item.claims[0].claimerNombre).toBe('Mamá')
-  expect(detalle.comments[0].autorNombre).toBe('Mamá')
+  expect(detalle.item.claims[0].claimerNombre).toBe('Euge')
+  expect(detalle.comments[0].autorNombre).toBe('Euge')
+})
+
+test('al unirse, la cuenta sigue las listas donde reservaba como invitado (aparecen en Tu gente y en Eventos)', async () => {
+  const db = await createTestDb()
+  const { list, owner, giver } = await seedOwnerAndGiver(db)
+  const [deMarta] = await db.insert(users).values({ googleId: 'g-marta', nombre: 'Marta', email: 'marta@test.com' }).returning()
+  const [listaMarta] = await db.insert(lists).values({ ownerId: deMarta.id, shareToken: 'tok-marta' }).returning()
+  const [termo] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Termo' }).returning()
+  const [mate] = await db.insert(items).values({ listId: listaMarta.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  const [taza] = await db.insert(items).values({ listId: listaMarta.id, tipo: 'exacto', titulo: 'Taza' }).returning()
+  const abuela = await createGuest(db, 'Abuela')
+  for (const it of [termo, mate, taza]) await reserveItem(db, it.id, { guestId: abuela.id })
+  // ya seguía la de Euge: no se duplica
+  await db.insert(listFollows).values({ userId: giver.id, listId: list.id })
+
+  expect(await unirInvitadoACuenta(db, abuela.id, giver.id)).toBe(true)
+  const seguidas = (await db.select().from(listFollows).where(eq(listFollows.userId, giver.id))).map((f) => f.listId)
+  expect(seguidas.sort()).toEqual([list.id, listaMarta.id].sort())
+  expect(await db.select().from(listFollows).where(eq(listFollows.userId, owner.id))).toEqual([])
+})
+
+test('al unirse, queda una sola reserva activa por persona y por deseo', async () => {
+  const db = await createTestDb()
+  const { list, giver } = await seedOwnerAndGiver(db)
+  const [velas] = await db.insert(items).values({ listId: list.id, tipo: 'idea', titulo: 'Velas', cantidad: 2 }).returning()
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate', cantidad: 2 }).returning()
+  const [termo] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Termo' }).returning()
+  const rodri = { userId: giver.id }
+  const enLaCompu = await createGuest(db, 'Rodri')
+  // Rodri reservó las Velas con su cuenta en el celular y como invitado en la compu; el Mate lo compró como invitado
+  // y además lo tiene reservado con la cuenta; el Termo, solo como invitado
+  for (const it of [velas, mate]) await reserveItem(db, it.id, rodri)
+  for (const it of [velas, mate, termo]) await reserveItem(db, it.id, { guestId: enLaCompu.id })
+  await db.update(claims).set({ estado: 'comprado' }).where(and(eq(claims.itemId, mate.id), eq(claims.claimerGuestId, enLaCompu.id)))
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  const activas = (itemId: string) => db.select().from(claims)
+    .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado'])))
+  // la reservada del invitado se libera: queda una de Rodri y otra vela para otro regalador
+  expect(await activas(velas.id)).toEqual([expect.objectContaining({ claimerUserId: giver.id, estado: 'reservado' })])
+  // la compra es de verdad: sigue contando, a nombre del invitado
+  expect((await activas(mate.id)).map((c) => [c.claimerUserId, c.claimerGuestId, c.estado]).sort()).toEqual([
+    [giver.id, null, 'reservado'], [null, enLaCompu.id, 'comprado'],
+  ].sort())
+  expect(await activas(termo.id)).toEqual([expect.objectContaining({ claimerUserId: giver.id, claimerGuestId: null })])
 })
 
 test('los carteles de reservas y avisos nunca muestran un deseo de una lista propia', async () => {

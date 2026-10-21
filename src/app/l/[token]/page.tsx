@@ -13,7 +13,7 @@ import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
 import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
-import { GuestGate } from '@/components/GuestGate'
+import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { NoSoyYo, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
@@ -50,10 +50,10 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string }>
 }) {
   const { token } = await params
-  const { cat, disp, codazo } = await searchParams
+  const { cat, disp, codazo, reserva } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) notFound()
@@ -118,6 +118,8 @@ export default async function ListaAjena({
           {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
         </p>
       ) : <QuienSos token={token} volver={`/l/${token}`} />}
+
+      <CartelReserva motivo={reserva} identified={identified} />
 
       {gustos.map((g) => (
         <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}

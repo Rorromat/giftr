@@ -7,8 +7,8 @@ export function newShareToken(): string {
   return randomBytes(8).toString('base64url')
 }
 
-// El invitado que usaba este navegador se une a la cuenta al entrar (por la cookie, en src/auth.ts), no por email:
-// el email que escribía un invitado nadie lo verificaba.
+// El invitado que usaba este navegador se une a la cuenta si, ya adentro, dice que es él (por la cookie, en
+// PreguntaInvitado), no por email: el email que escribía un invitado nadie lo verificaba.
 export async function upsertUserFromGoogle(
   db: Db,
   p: { googleId: string; email: string; nombre: string; avatarUrl?: string | null },

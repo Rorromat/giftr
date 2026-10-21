@@ -7,13 +7,13 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
-import { firmarInvitado, GUEST_COOKIE, OPCIONES_COOKIE_INVITADO } from '@/lib/cookie-invitado'
+import { firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
 import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
 import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest, nombreDeViewer, validarNombre, type NombreValidado } from '@/lib/guest'
+import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, type NombreValidado } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
@@ -218,10 +218,15 @@ export async function reserveAction(_: EstadoForm, formData: FormData): Promise<
   if (!(await itemPerteneceAToken(itemId, token))) return null
   const quien = await viewerIdentificandoGuest(formData)
   if (!quien.ok) return { error: quien.error }
-  await reserveItem(db, itemId, quien.viewer)
+  const r = await reserveItem(db, itemId, quien.viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
-  return null
+  if (r.ok) return null
+  // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
+  // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
+  // Del detalle se vuelve al detalle, salvo que el deseo ya no esté.
+  const alDetalle = str(formData, 'desde') === 'detalle' && (r.reason === 'sin_stock' || r.reason === 'sin_identidad')
+  redirect(`${alDetalle ? `/l/${token}/item/${itemId}` : `/l/${token}`}?reserva=${r.reason}`)
 }
 
 /** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */
@@ -234,22 +239,52 @@ export async function identificarseAction(_: EstadoForm, formData: FormData): Pr
   return null
 }
 
-/** "Entrar con Google" desde una lista o un deseo: vuelve a la misma página (ahí se une el invitado, si lo era). */
+/** "Entrar con Google" desde una lista o un deseo: vuelve a la misma página. */
 export async function entrarConGoogleAction(formData: FormData) {
   await signIn('google', { redirectTo: rutaPropia(str(formData, 'volver')) })
 }
 
 /**
- * "Cerrar sesión" (Perfil) o "¿No sos X?" (en una lista): este navegador se olvida de quién es.
- * Borra la cookie de invitado y, si hay sesión de Google, la cierra.
+ * "Cerrar sesión" (Perfil) o "¿No sos X?" (en una lista): este navegador se olvida del que está ahora.
+ * Con sesión de Google, la cierra y nada más: la cookie de un invitado que no se unió a la cuenta es de otra persona
+ * (o de la misma, que todavía no dijo que era ella) y borrarla dejaría sus reservas sin nadie que las maneje.
+ * Sin sesión, borra la cookie de invitado.
  */
 export async function salirAction(formData: FormData) {
   const volver = rutaPropia(str(formData, 'volver'))
-  ;(await cookies()).delete(GUEST_COOKIE)
   const session = await auth()
-  if (session?.userId) await signOut({ redirectTo: volver })
+  if (session?.userId) {
+    await signOut({ redirectTo: volver })
+    return
+  }
+  const jar = await cookies()
+  jar.delete(GUEST_COOKIE)
+  jar.delete(NO_SOY_COOKIE)
   revalidatePath(volver, 'layout')
   redirect(volver)
+}
+
+/** "Sí, soy yo": el invitado de este navegador se une a la cuenta (sus reservas, comentarios y avisos pasan a ella). */
+export async function unirInvitadoAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
+  // si falla, la cookie queda y la pregunta sigue ahí para volver a intentar
+  if (guestId) await unirInvitadoACuenta(db, guestId, session.userId)
+  jar.delete(GUEST_COOKIE)
+  jar.delete(NO_SOY_COOKIE)
+  revalidatePath('/', 'layout')
+}
+
+/** "No soy yo": el invitado queda como estaba (es de otra persona que usa este navegador) y no se pregunta más. */
+export async function noSoyElInvitadoAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
+  if (guestId) jar.set(NO_SOY_COOKIE, marcaNoSoy(guestId, session.userId), OPCIONES_COOKIE_INVITADO)
+  revalidatePath('/', 'layout')
 }
 
 export async function boughtAction(formData: FormData) {

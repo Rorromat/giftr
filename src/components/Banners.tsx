@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { getViewer } from '@/lib/viewer'
+import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { getUnreadNotifications } from '@/lib/notifications'
 import { getMyClaimWarnings } from '@/lib/claims'
 import { markNotifsReadAction, vistoCodazosAction } from '@/app/actions'
@@ -7,6 +7,7 @@ import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
 import { Starburst } from '@/components/ui'
+import { PreguntaInvitado } from '@/components/Identidad'
 
 const COPY = {
   item_baja: (t: string) => `"${t}" fue dado de baja por su dueño — te conviene elegir otro regalo.`,
@@ -15,13 +16,14 @@ const COPY = {
 
 export async function Banners() {
   const viewer = await getViewer()
-  const [notifs, warnings, codazos, avisos] = await Promise.all([
+  const [notifs, warnings, codazos, avisos, invitado] = await Promise.all([
     getUnreadNotifications(db, viewer),
     getMyClaimWarnings(db, viewer),
     viewer.userId ? codazosSinVer(db, viewer.userId) : [],
     viewer.userId ? tieneAvisos(db, viewer.userId) : false,
+    viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
   ])
-  if (!notifs.length && !warnings.length && !codazos.length) return null
+  if (!notifs.length && !warnings.length && !codazos.length && !invitado) return null
   // Codazos: quiénes (sin repetir) y, si todos son para el mismo grupo, agregar directo ahí.
   const quienes = [...new Set(codazos.map((c) => c.deNombre.split(' ')[0]))]
   const grupos = [...new Set(codazos.map((c) => (c.tipo === 'grupo' ? c.listId : null)))]
@@ -29,6 +31,7 @@ export async function Banners() {
 
   return (
     <div className="flex flex-col gap-2.5">
+      {invitado && <PreguntaInvitado nombre={invitado} />}
       {codazos.length > 0 && (
         <div className="relative flex flex-col gap-2.5 rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent py-3 pl-3.5 pr-12 shadow-sticker-sm">
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>

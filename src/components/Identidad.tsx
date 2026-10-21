@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
-import { entrarConGoogleAction, identificarseAction, salirAction } from '@/app/actions'
+import { entrarConGoogleAction, identificarseAction, noSoyElInvitadoAction, salirAction, unirInvitadoAction } from '@/app/actions'
 import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
 
 /**
@@ -44,5 +44,32 @@ export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver:
       <span className="[overflow-wrap:anywhere]">¿No sos {nombre}?</span>
       <button className="min-h-11 font-bold underline decoration-2 underline-offset-4">{conCuenta ? 'Salir' : 'Cambiar'}</button>
     </form>
+  )
+}
+
+/**
+ * Ya con sesión, en un navegador donde había un invitado anotado: "¿Sos vos?". Nunca se une solo, porque en un
+ * dispositivo compartido puede ser otra persona (la abuela que usó la tablet), y lo que reservó no es de esta cuenta.
+ */
+export function PreguntaInvitado({ nombre }: { nombre: string }) {
+  return (
+    <section aria-labelledby="pregunta-invitado" className="gr-sticker flex flex-col gap-2.5 p-3.5">
+      <div>
+        <h2 id="pregunta-invitado" className="font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">
+          En este navegador se anotó “{nombre}”. ¿Sos vos?
+        </h2>
+        <p className="text-[13px] font-medium leading-snug">
+          Si sos vos, lo que reservaste y comentaste pasa a tu cuenta. Si no, queda a su nombre, como estaba.
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <form action={unirInvitadoAction}>
+          <button className="gr-btn-primary gr-btn--sm rounded-[14px] px-4">Sí, soy yo</button>
+        </form>
+        <form action={noSoyElInvitadoAction}>
+          <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">No soy yo</button>
+        </form>
+      </div>
+    </section>
   )
 }

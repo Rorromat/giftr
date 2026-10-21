@@ -22,7 +22,14 @@ function secreto(): string {
   return SECRETO_DE_DESARROLLO
 }
 
-const firma = (guestId: string) => createHmac('sha256', secreto()).update(`giftr_guest:${guestId}`).digest('base64url')
+const hmac = (mensaje: string) => createHmac('sha256', secreto()).update(mensaje).digest('base64url')
+const firma = (guestId: string) => hmac(`giftr_guest:${guestId}`)
+
+const igualesSinFiltrarTiempo = (a: string, b: string) => {
+  const x = Buffer.from(a)
+  const y = Buffer.from(b)
+  return x.length === y.length && timingSafeEqual(x, y)
+}
 
 export function firmarInvitado(guestId: string): string {
   return `${guestId}.${firma(guestId)}`
@@ -34,7 +41,15 @@ export function leerInvitado(valor: string | undefined): string | null {
   if (!valor || punto < 0) return null
   const id = valor.slice(0, punto)
   if (!esUuid(id)) return null
-  const esperada = Buffer.from(firma(id))
-  const recibida = Buffer.from(valor.slice(punto + 1))
-  return recibida.length === esperada.length && timingSafeEqual(recibida, esperada) ? id : null
+  return igualesSinFiltrarTiempo(valor.slice(punto + 1), firma(id)) ? id : null
+}
+
+// "No soy yo": la cuenta que entró en este navegador dijo que no es el invitado que estaba anotado.
+// No se le vuelve a preguntar, y la cookie del invitado sigue ahí para cuando vuelva a usarlo esa persona.
+export const NO_SOY_COOKIE = 'giftr_no_soy'
+
+export const marcaNoSoy = (guestId: string, userId: string) => hmac(`giftr_no_soy:${guestId}:${userId}`)
+
+export function dijoQueNoEs(valor: string | undefined, guestId: string, userId: string): boolean {
+  return !!valor && igualesSinFiltrarTiempo(valor, marcaNoSoy(guestId, userId))
 }
