@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib/groups'
@@ -233,6 +233,9 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
     if (e.propio) return { ...e, fotos }
     // De qué se ocupa para el evento que viene: lo reservado (vence, o es un regalo grupal abierto) y lo comprado para
     // este (desde el día siguiente al anterior, ver desdeElUltimoEvento): lo que regaló el año pasado ya se regaló.
+    // Un regalo grupal abierto cuenta mientras siga abierto, aunque lo hayan armado para el anterior: hasta que lo
+    // cierren es lo pendiente de este, como en la lista ("Estás en el regalo grupal", el deseo sigue ocupado y
+    // reserveItem devuelve ese). Al encargado se le recuerda que lo cierre (ver regalosParaCerrar).
     const desde = desdeDe(e.cae, hoy, inicioDelDia(hoy))
     const suyos = ocupados.filter((c) => c.listId === e.listId && (c.claimerUserId === userId || enGrupales.has(c.id)) &&
       (c.estado === 'reservado' || c.updatedAt >= desde))
@@ -247,10 +250,16 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
 
 /**
  * Guarda la lista entre las que sigue el usuario: al abrir con sesión cualquier página de una lista ajena (la lista, un
- * deseo, el perfil de un dueño), también al volver de entrar con Google desde ahí.
+ * deseo, el perfil de un dueño), también al volver de entrar con Google desde ahí. Solo si el link con el que la abrió
+ * (shareToken) sigue siendo el de la lista: si lo cambiaron mientras cargaba la página, no la sigue con el nuevo (ver
+ * cambiarLinkParaRegalar). El FOR SHARE espera a un cambio en curso y, si no, lo hace esperar hasta después de anotarla,
+ * así su DELETE también se lleva esta.
  */
-export async function seguirLista(db: Db, userId: string, listId: string) {
-  await db.insert(listFollows).values({ userId, listId }).onConflictDoNothing()
+export async function seguirLista(db: Db, userId: string, listId: string, shareToken: string) {
+  const fila = { userId: sql<string>`${userId}::uuid`.as('user_id'), listId: lists.id, createdAt: sql<Date>`now()`.as('created_at') }
+  await db.insert(listFollows)
+    .select(db.select(fila).from(lists).where(and(eq(lists.id, listId), eq(lists.shareToken, shareToken))).for('share'))
+    .onConflictDoNothing()
 }
 
 /** La saca de las que sigue: deja de estar en Tu gente y en Eventos (vuelve si abre la lista de nuevo). */
@@ -309,14 +318,42 @@ export async function guardarCumple(db: Db, userId: string, dia: number | null, 
   return true
 }
 
-/** Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. Una que no existe, no. */
-export async function guardarFechaGrupo(db: Db, listId: string, userId: string, fecha: string | null, anual: boolean): Promise<boolean> {
+/** Una fecha anual ('YYYY-MM-DD') que ya cayó alguna vez: tal cual, o con el último año en que cayó (el 29/2, el último bisiesto). */
+function conUnaVezQueYaCayo(fecha: string, hoy: Date): string {
+  const f = fechaDeGrupo(fecha, true)
+  if (vezAnterior(f, hoy)) return fecha
+  let anio = hoy.getUTCFullYear()
+  while ((f.mes === 2 && f.dia === 29 && !esBisiesto(anio)) || new Date(Date.UTC(anio, f.mes - 1, f.dia)) >= hoy) anio--
+  return `${anio}${fecha.slice(4)}`
+}
+
+/** La fecha de un grupo para el formulario: si es anual, la próxima vez (el año guardado es el de la primera). */
+export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy: Date): string {
+  const proxima = anual ? proximaDeGrupo(eventoFecha, true, hoy) : null
+  return proxima ? proxima.toISOString().slice(0, 10) : eventoFecha ?? ''
+}
+
+/**
+ * Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. Una que no existe, no.
+ * Un grupo que ya tuvo su evento no vuelve a empezar: una anual que todavía no cayó nunca (le corrigen el día poniendo el
+ * del año que viene) se guarda con el último año en que ya cayó. Si no, vezAnterior no lo encontraría y lo comprado para
+ * el que pasó volvería a ser de este (ver desdeElUltimoEvento). Sin uno que ya pasó (el casamiento a futuro), tal cual.
+ */
+export async function guardarFechaGrupo(
+  db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, hoy = hoyLocal(),
+): Promise<boolean> {
   if (!esUuid(listId)) return false
   if (fecha !== null && !fechaDeGrupoValida(fecha)) return false
-  const updated = await db.update(lists).set({ eventoFecha: fecha, eventoAnual: anual })
-    .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId)))
-    .returning({ id: lists.id })
-  return updated.length === 1
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const [antes] = await t.select({ eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual }).from(lists)
+      .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(t, userId))).for('update')
+    if (!antes) return false
+    const yaFue = antes.eventoFecha && vezAnterior(fechaDeGrupo(antes.eventoFecha, antes.eventoAnual), hoy)
+    await t.update(lists).set({ eventoFecha: fecha && anual && yaFue ? conUnaVezQueYaCayo(fecha, hoy) : fecha, eventoAnual: anual })
+      .where(eq(lists.id, listId))
+    return true
+  })
 }
 
 export type MesCalendario = { nombre: string; dias: number; eventos: number[]; hoy: number | null; actual: boolean }

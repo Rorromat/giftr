@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import { createTestDb, seguir } from './helpers'
 import { claims, comments, items, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { cambiarLinkParaRegalar, getListForViewer, getItemForViewer, getOwnList } from '@/lib/lists'
@@ -12,7 +12,7 @@ import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { markBought, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { guardarFechaGrupo, misEventos, seguirLista } from '@/lib/events'
+import { guardarFechaGrupo, misEventos } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 import { comprarRegalo, historialDeLista, iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo, ultimosRegalos } from '@/lib/regalos'
 import { getUnreadNotifications } from '@/lib/notifications'
@@ -77,7 +77,7 @@ test('EL TEST DE ORO, grupos: el que sale del grupo sigue sin ver nada de lo que
   const libre = (await createItem(db, delfina.id, { tipo: 'idea', titulo: 'Plantas' }, grupo.id))!
   // Martín había abierto el link para regalar antes de sumarse
   await guardarFechaGrupo(db, grupo.id, delfina.id, '2020-12-25', true)
-  await seguirLista(db, martin.id, grupo.id)
+  await seguir(db, martin.id, grupo.id)
 
   expect(await salirDeGrupo(db, grupo.id, martin.id)).toBe(true)
   const yo = { userId: martin.id }
@@ -264,7 +264,7 @@ test('generar una invitación nueva: la anterior deja de servir, y solo la gener
 test('cambiar el link para regalar: el anterior deja de andar y la lista sale de Tu gente y Eventos de quien la seguía', async () => {
   const { db, delfina, martin, rodri, intruso, grupo, item } = await setup()
   await guardarFechaGrupo(db, grupo.id, delfina.id, '2020-12-25', true)
-  await seguirLista(db, rodri.id, grupo.id)
+  await seguir(db, rodri.id, grupo.id)
   expect(await miGente(db, rodri.id)).toHaveLength(1)
   expect(await misEventos(db, rodri.id)).toHaveLength(1)
 

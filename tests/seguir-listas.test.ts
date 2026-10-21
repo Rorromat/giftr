@@ -5,7 +5,8 @@ import { items, listFollows, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
-import { guardarCumple, misEventos } from '@/lib/events'
+import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { miGente } from '@/lib/gente'
 import { iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 
@@ -91,4 +92,16 @@ test('sin sesión no se sigue nada, y el dueño que abre su deseo va a su lista 
   h.session = { userId: mama.id }
   await expect(abrirDeseo(lista.shareToken, bici.id)).rejects.toMatchObject({ url: '/mi-lista' })
   expect(await siguen(db, lista.id)).toEqual([rodri.id])
+})
+
+test('si cambian el link para regalar mientras carga la página, no la sigue con el nuevo', async () => {
+  const { db, mama, sofi, lista } = await preparar()
+  // la página ya validó el link de antes y Mamá lo cambia antes de que se anote (lo que se olvida quién la seguía)
+  const nuevo = await cambiarLinkParaRegalar(db, lista.id, mama.id)
+  await seguirLista(db, sofi.id, lista.id, lista.shareToken)
+  expect(await siguen(db, lista.id)).toEqual([])
+  expect(await miGente(db, sofi.id)).toEqual([])
+  // con el de ahora, sí
+  await seguirLista(db, sofi.id, lista.id, nuevo!)
+  expect(await siguen(db, lista.id)).toEqual([sofi.id])
 })

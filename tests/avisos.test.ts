@@ -1,10 +1,9 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createTestDb, seedOwnerAndGiver } from './helpers'
+import { createTestDb, seedOwnerAndGiver, seguir } from './helpers'
 import { items, notifications } from '@/db/schema'
 import { reserveItem } from '@/lib/claims'
 import { abrirListaAInvitado } from '@/lib/acceso'
-import { seguirLista } from '@/lib/events'
 import { createGuest } from '@/lib/guest'
 import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
@@ -42,7 +41,7 @@ test('si cambiaron el link para regalar, el aviso no le pasa el nuevo a quien no
   expect((await getUnreadNotifications(db, { userId: giver.id }))[0].href).toBeNull()
   expect((await getUnreadNotifications(db, { guestId: abuela.id }))[0].href).toBeNull()
   // la abrió con el link nuevo (la sigue): ahí sí
-  await seguirLista(db, giver.id, list.id)
+  await seguir(db, giver.id, list.id)
   expect((await getUnreadNotifications(db, { userId: giver.id }))[0].href).toBe(`/l/${nuevo}/item/${termo.id}`)
   // un invitado que se anotó con el link nuevo, también
   const tia = await createGuest(db, 'Tía')

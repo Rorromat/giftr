@@ -86,7 +86,7 @@ export default async function ListaAjena({
     veTodo ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
-    viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
+    viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
   const cuenta = evento && evento.dias <= 60
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`

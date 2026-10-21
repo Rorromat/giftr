@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { ANIO_MAXIMO, ANIO_MINIMO, grupoParaDueno, juntarNombres } from '@/lib/groups'
 import { leaveGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction } from '@/app/actions'
-import { hoyLocal, rotuloFechaGrupo } from '@/lib/events'
+import { fechaParaEditar, hoyLocal, rotuloFechaGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
@@ -58,7 +58,7 @@ export default async function Grupo({ params, searchParams }: {
             <input type="hidden" name="grupoId" value={grupo.id} />
             {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
             <input name="fecha" type="date" required min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`}
-                   defaultValue={grupo.eventoFecha ?? ''} aria-label="Fecha del grupo" className="gr-input" />
+                   defaultValue={fechaParaEditar(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())} aria-label="Fecha del grupo" className="gr-input" />
             <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
               <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
             </label>

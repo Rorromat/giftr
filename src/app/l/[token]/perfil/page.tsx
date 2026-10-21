@@ -25,7 +25,7 @@ export default async function Perfil({ params, searchParams }: Props) {
   const primer = p.nombre.split(' ')[0]
   const propio = viewer.userId === p.id
   // como en la lista: abrir el perfil de alguien con sesión sigue su lista (la de un dueño, no: es suya)
-  if (viewer.userId && !propio && !p.otros.some((o) => o.id === viewer.userId)) await seguirLista(db, viewer.userId, p.listId)
+  if (viewer.userId && !propio && !p.otros.some((o) => o.id === viewer.userId)) await seguirLista(db, viewer.userId, p.listId, token)
   const noRegalar = p.secciones.find((s) => s.clave === 'noRegalar')
   const nota = p.secciones.find((s) => s.clave === 'nota')
   const hayGustos = p.secciones.some((s) => !['noRegalar', 'nota', 'talles'].includes(s.clave))

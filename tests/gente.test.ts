@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import { createTestDb, seguir } from './helpers'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
-import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, misEventos, seguirLista } from '@/lib/events'
+import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, misEventos } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 
 const HOY = new Date(Date.UTC(2026, 7, 8)) // sábado 8 de agosto de 2026
@@ -29,7 +29,7 @@ async function setup() {
   ])
   const mellizos = await crearGrupo(db, caro.id, { nombre: 'Cumple de los mellizos' })
   await guardarFechaGrupo(db, mellizos, caro.id, '2026-10-12', true)
-  for (const listId of [deEuge.id, deRodri.id, mellizos]) await seguirLista(db, sofi.id, listId)
+  for (const listId of [deEuge.id, deRodri.id, mellizos]) await seguir(db, sofi.id, listId)
   return { db, euge, rodri, sofi, caro, deEuge, deRodri, mellizos }
 }
 
@@ -80,6 +80,6 @@ test('dejar de seguir la saca de tu gente y de Eventos; si la volvés a abrir, v
   await dejarDeSeguir(db, sofi.id, 'no-es-un-id') // ignorado
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Cumple de los mellizos', 'rodri'])
   expect((await misEventos(db, sofi.id, HOY)).map((e) => e.titulo)).toEqual(['Cumple de los mellizos'])
-  await seguirLista(db, sofi.id, deEuge.id)
+  await seguir(db, sofi.id, deEuge.id)
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toContain('Euge Mateus')
 })

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import { createTestDb, seguir } from './helpers'
 import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
@@ -10,7 +10,7 @@ import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
-import { guardarCumple, hoyLocal, misEventos, seguirLista } from '@/lib/events'
+import { guardarCumple, hoyLocal, misEventos } from '@/lib/events'
 import {
   cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dejarVolverARegalo, dividir, historialDeLista, iniciarRegaloGrupal,
   marcarPagado, misCuentas, parsePesos, pesos, posponerRecordatorio, regalosDeItem, regalosParaCerrar, sacarDeRegalo, salirDeRegalo, saldarCon,
@@ -424,7 +424,7 @@ test('historial: quién se ocupó de cada regalo y cuántos compró cada uno', a
 
   expect((await ultimosRegalos(db, ana.id, [lista.id])).get(lista.id)).toMatchObject({ titulo: 'Vela', encargado: 'Rodri' })
   await guardarCumple(db, mama.id, 1, 1)
-  await seguirLista(db, ana.id, lista.id)
+  await seguir(db, ana.id, lista.id)
   expect((await misEventos(db, ana.id))[0].ultimo).toMatchObject({ encargado: 'Rodri', titulo: 'Vela' })
 })
 
@@ -620,7 +620,7 @@ test('si la dueña cambia el link para regalar, Cuentas no se lo pasa a quien so
   expect(conSofi.neto).toBe(5000)
   expect(conSofi.lineas).toContainEqual(expect.objectContaining({ itemTitulo: 'Perfume', tipo: 'debes', monto: 25000 }))
   // cuando abre el link nuevo (y la sigue), vuelve a tenerlo
-  await seguirLista(db, ana.id, lista.id)
+  await seguir(db, ana.id, lista.id)
   expect((await misCuentas(db, ana.id)).personas[0].lineas[0].href).toBe(`/l/${nuevo}/item/${bici.id}`)
 })
 
