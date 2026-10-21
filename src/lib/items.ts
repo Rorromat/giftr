@@ -62,11 +62,35 @@ async function notifyActiveClaimers(db: Db, itemId: string, tipo: 'item_baja' | 
   }
 }
 
-export async function updateItem(db: Db, itemId: string, userId: string, data: Partial<NewItemData>): Promise<boolean> {
+/** Lo que se puede cambiar de un deseo; null borra un campo opcional (las notas, el precio, la foto…). */
+export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', 'categoria', 'linkTienda'] as const
+type Opcional = (typeof CAMPOS_OPCIONALES)[number]
+export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null }
+
+export async function updateItem(db: Db, itemId: string, userId: string, data: CambiosDeseo): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
-  await db.update(items).set(data).where(eq(items.id, itemId))
+  const [antes] = await db.select().from(items).where(eq(items.id, itemId))
+  // Solo lo que cambió: guardar sin tocar nada no les manda un aviso a los que lo reservaron.
+  const cambios = Object.fromEntries(
+    Object.entries(data).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
+  ) as CambiosDeseo
+  if (!Object.keys(cambios).length) return true
+  await db.update(items).set(cambios).where(eq(items.id, itemId))
   await notifyActiveClaimers(db, itemId, 'item_editado')
   return true
+}
+
+/** Un deseo activo para editarlo, solo si es del usuario (o de un grupo suyo), con su grupo para volver. */
+export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
+  if (!esUuid(itemId)) return null
+  const [row] = await db.select({ item: items, lista: { id: lists.id, tipo: lists.tipo, nombre: lists.nombre } })
+    .from(items).innerJoin(lists, eq(items.listId, lists.id))
+    .where(and(eq(items.id, itemId), esDuenoSql(db, userId)))
+  if (!row || row.item.estadoDueno !== 'activo') return null
+  return {
+    deseo: pickItemFields(row.item),
+    grupo: row.lista.tipo === 'grupo' ? { id: row.lista.id, nombre: row.lista.nombre ?? 'Grupo' } : null,
+  }
 }
 
 export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero'): Promise<boolean> {

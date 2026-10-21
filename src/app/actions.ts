@@ -8,7 +8,8 @@ import { db } from '@/db'
 import { guestIdentities, items, lists, users } from '@/db/schema'
 import { getViewer, GUEST_COOKIE } from '@/lib/viewer'
 import { auth } from '@/auth'
-import { createItem, archiveItem, updateItem, type NewItemData } from '@/lib/items'
+import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
+import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
 import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
@@ -35,16 +36,16 @@ async function itemPerteneceAToken(itemId: string, token: string) {
   return !!row
 }
 
-export async function addItemAction(formData: FormData) {
-  const session = await auth()
-  if (!session?.userId) redirect('/')
-  const tipo = str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto'
+/** Los campos del formulario de un deseo (agregar o editar). Lo vacío queda undefined. Null si falta el título. */
+function deseoDelForm(formData: FormData): NewItemData | null {
   const titulo = str(formData, 'titulo')
-  if (!titulo) redirect('/agregar')
+  if (!titulo) return null
   const p = str(formData, 'prioridad')
   const cant = Math.trunc(Number(str(formData, 'cantidad') ?? '1'))
-  const data: NewItemData = {
-    tipo, titulo,
+  const foto = str(formData, 'fotoUrl')
+  return {
+    tipo: str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto',
+    titulo,
     notas: str(formData, 'notas'),
     precio: str(formData, 'precio'),
     rangoPrecio: str(formData, 'rangoPrecio'),
@@ -53,14 +54,41 @@ export async function addItemAction(formData: FormData) {
     cantidad: Number.isFinite(cant) && cant >= 1 ? cant : 1,
     repetible: formData.get('repetible') === 'on',
     linkTienda: httpUrl(str(formData, 'linkTienda')),
-    fotoUrl: httpUrl(str(formData, 'fotoUrl')),
+    // un link de foto o una foto subida desde el teléfono (/foto/deseo/:id)
+    fotoUrl: httpUrl(foto) ?? (foto && esUrlFotoDeseo(foto) ? foto : undefined),
   }
+}
+
+export async function addItemAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const data = deseoDelForm(formData)
+  if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
   const creado = await createItem(db, session.userId, data, listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect(listaId && creado ? `/grupos/${listaId}` : '/mi-lista')
+}
+
+export async function updateItemAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const itemId = str(formData, 'itemId') ?? ''
+  const editable = await deseoParaEditar(db, itemId, session.userId)
+  if (!editable) redirect('/mi-lista')
+  const volver = editable.grupo ? `/grupos/${editable.grupo.id}` : '/mi-lista'
+  const data = deseoDelForm(formData)
+  if (!data) redirect(`/editar/${itemId}`)
+  // Al editar, lo que quedó vacío se borra (al agregar, simplemente no se carga).
+  const cambios: CambiosDeseo = { ...data }
+  for (const campo of CAMPOS_OPCIONALES) cambios[campo] = data[campo] ?? null
+  await updateItem(db, itemId, session.userId, cambios)
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+  redirect(volver)
 }
 
 export async function archiveItemAction(formData: FormData) {

@@ -50,6 +50,13 @@
       "when": 1792498101820,
       "tag": "0006_codazo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792553335330,
+      "tag": "0007_fotos_deseo",
+      "breakpoints": true
     }
   ]
 }

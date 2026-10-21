@@ -3,23 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AvatarSticker, Icon } from '@/components/ui'
-
-const LADO = 900
-
-/** Achica la foto en el teléfono antes de subirla (las de cámara pesan varios MB). Si no puede, manda el original. */
-async function achicar(archivo: File): Promise<Blob> {
-  try {
-    const img = await createImageBitmap(archivo)
-    const escala = Math.min(1, LADO / Math.max(img.width, img.height))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(img.width * escala)
-    canvas.height = Math.round(img.height * escala)
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-    return await new Promise((ok) => canvas.toBlob((b) => ok(b ?? archivo), 'image/jpeg', 0.88))
-  } catch {
-    return archivo
-  }
-}
+import { achicarFoto } from '@/lib/achicar-foto'
 
 /** Tu foto de perfil: tocás la foto (o el botón) y elegís una de la galería o sacás una. */
 export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string; foto: string | null; size?: number; propia: boolean }) {
@@ -31,7 +15,7 @@ export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string
   async function subir(archivo: File | undefined) {
     if (!archivo) return
     setEstado('subiendo')
-    const r = await fetch('/api/perfil/foto', { method: 'POST', body: await achicar(archivo), headers: { 'content-type': 'image/jpeg' } })
+    const r = await fetch('/api/perfil/foto', { method: 'POST', body: await achicarFoto(archivo, 900), headers: { 'content-type': 'image/jpeg' } })
       .catch(() => null)
     if (!r?.ok) return setEstado('error')
     setActual((await r.json()).url)

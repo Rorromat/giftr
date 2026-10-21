@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { archiveItemAction } from '@/app/actions'
 import { PrioritySelect } from '@/components/PrioritySelect'
 import { Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
@@ -36,8 +37,9 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
                     </span>
                   </summary>
                   <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface shadow-sticker-sm">
+                    <Link href={`/editar/${item.id}`} className="flex min-h-11 items-center px-3 text-sm font-bold">Editar</Link>
                     {/* El link del deseo es el de quien regala: WhatsApp muestra la foto y el precio */}
-                    <a target="_blank" className="flex min-h-11 items-center px-3 text-sm font-bold"
+                    <a target="_blank" className="flex min-h-11 items-center border-t-[2.5px] border-gr-ink px-3 text-sm font-bold"
                        href={`https://wa.me/?text=${encodeURIComponent(textoDueno(item, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${item.id}`))}`}>
                       Mandar por WhatsApp
                     </a>
