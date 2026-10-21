@@ -7,6 +7,7 @@ import { expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql } from '@
 import { dejarAviso, type TipoAviso } from '@/lib/notifications'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { recienHecho } from '@/lib/repetido'
+import { acotarCantidad, LARGO, recortar } from '@/lib/limites'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -22,10 +23,32 @@ export type NewItemData = {
   linkTienda?: string
 }
 
+/**
+ * Lo escrito, con su largo máximo (ver recortar) y la cantidad entre 1 y 99: así un pedido armado a mano no desborda la
+ * columna ni rompe las tarjetas de todos. Un link no se corta (cortado no anda): si se pasa del largo, no va (al editar,
+ * queda el que había).
+ */
+function acotarDeseo<T extends CambiosDeseo>(data: T): T {
+  const r: CambiosDeseo = { ...data }
+  if (typeof r.titulo === 'string') r.titulo = recortar(r.titulo, LARGO.titulo) || undefined
+  for (const k of ['notas', 'precio', 'rangoPrecio', 'categoria'] as const) {
+    const v = r[k]
+    if (typeof v === 'string') r[k] = recortar(v, LARGO[k]) || null
+  }
+  for (const k of ['linkTienda', 'fotoUrl'] as const) {
+    const v = r[k]
+    if (typeof v === 'string' && v.length > LARGO.link) r[k] = undefined
+  }
+  if (r.cantidad !== undefined) r.cantidad = acotarCantidad(r.cantidad)
+  return r as T
+}
+
 /** Agrega a la lista personal del usuario o, con listId, a un grupo del que es dueño. */
-export async function createItem(db: Db, userId: string, data: NewItemData, listId?: string): Promise<OwnerItemView | null> {
+export async function createItem(db: Db, userId: string, deseo: NewItemData, listId?: string): Promise<OwnerItemView | null> {
   // un id que no es UUID no es de nadie (y la base lo rechazaría con un error)
   if (!esUuid(userId) || (listId !== undefined && !esUuid(listId))) return null
+  const data = acotarDeseo(deseo)
+  if (!data.titulo) return null
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const [list] = await t.select().from(lists)
@@ -80,8 +103,9 @@ export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcion
 /** Lo que le importa a quien regala (qué comprar). La prioridad y la categoría no le cambian el regalo: no le avisan. */
 const AVISAN: (keyof CambiosDeseo)[] = ['titulo', 'notas', 'fotoUrl', 'linkTienda', 'precio', 'rangoPrecio', 'cantidad', 'tipo', 'repetible']
 
-export async function updateItem(db: Db, itemId: string, userId: string, data: CambiosDeseo): Promise<boolean> {
+export async function updateItem(db: Db, itemId: string, userId: string, deseo: CambiosDeseo): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
+  const data = acotarDeseo(deseo)
   const [antes] = await db.select().from(items).where(eq(items.id, itemId))
   // Uno archivado no se edita (una pantalla vieja, la prioridad desde Mi lista): avisaría de algo que ya no está.
   if (antes.estadoDueno !== 'activo') return false

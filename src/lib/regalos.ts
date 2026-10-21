@@ -7,6 +7,7 @@ import { desdeQueOcupa, loQueYaTiene, RESERVA_DIAS, reserveItem, vencimientoDeRe
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
+import { notaDeCompra } from '@/lib/limites'
 import { accesoALista } from '@/lib/acceso'
 import { dejarAviso } from '@/lib/notifications'
 
@@ -296,7 +297,7 @@ export async function comprarRegalo(db: Db, giftId: string, userId: string, p: D
     const ahora = new Date()
     await fijarPartes(t, giftId, userId, ids, r.montos)
     await t.update(groupGifts).set({ estado: 'comprado', montoTotal: p.total, compradoAt: ahora }).where(eq(groupGifts.id, giftId))
-    await t.update(claims).set({ estado: 'comprado', notaQueCompre: p.nota ?? null, updatedAt: ahora }).where(eq(claims.id, g.claimId))
+    await t.update(claims).set({ estado: 'comprado', notaQueCompre: notaDeCompra(p.nota), updatedAt: ahora }).where(eq(claims.id, g.claimId))
     return { ok: true }
   })
 }
@@ -342,7 +343,7 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
 
     await fijarPartes(t, giftId, userId, ids, r.montos)
     await t.update(groupGifts).set({ montoTotal: p.total }).where(eq(groupGifts.id, giftId))
-    await t.update(claims).set({ notaQueCompre: p.nota ?? null }).where(eq(claims.id, g.claimId))
+    await t.update(claims).set({ notaQueCompre: notaDeCompra(p.nota) }).where(eq(claims.id, g.claimId))
     await dejarAviso(t, itemId, 'compra_corregida', cambiaron.map((id) => ({ userId: id, guestId: null })))
     return { ok: true }
   })

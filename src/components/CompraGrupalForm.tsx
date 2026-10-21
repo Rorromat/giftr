@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { buyGroupGiftAction, fixGroupGiftAction } from '@/app/actions'
 import { dividir, parsePesos, partePesos, pesos } from '@/lib/pesos'
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { LARGO } from '@/lib/limites'
 
 const soloDigitos = (v: string) => v.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
 /** "45000" → "45.000" mientras se escribe. */
@@ -103,7 +104,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
           : `Te pasaste ${pesos(-diferencia)} del total.`}
       </p>
 
-      <input name="nota" placeholder="¿Qué compraste? (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} className="gr-input shadow-none" />
+      <input name="nota" maxLength={LARGO.notaCompra} placeholder="¿Qué compraste? (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} className="gr-input shadow-none" />
       <BotonEnviar disabled={!valido} pendiente="Guardando…" className="gr-btn-primary gr-btn--sm w-full">
         {corregir ? (valido ? `Guardar · dividir ${pesos(totalN)}` : 'Guardar') : valido ? `Lo compré · dividir ${pesos(totalN)}` : 'Lo compré'}
       </BotonEnviar>

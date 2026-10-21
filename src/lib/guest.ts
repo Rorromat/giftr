@@ -5,12 +5,13 @@ import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
 import { esOFueDuenoSql } from '@/lib/groups'
 import { desdeQueOcupa, loQueYaTiene } from '@/lib/claims'
 import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
+import { sinControl } from '@/lib/limites'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
 
 /** El nombre de un invitado: recortado, sin espacios de más, no vacío y de hasta 60 caracteres. */
 export function validarNombre(valor: unknown): NombreValidado {
-  const nombre = typeof valor === 'string' ? valor.trim().replace(/\s+/g, ' ') : ''
+  const nombre = typeof valor === 'string' ? sinControl(valor).trim().replace(/\s+/g, ' ') : ''
   if (!nombre) return { ok: false, motivo: 'vacio', error: 'Poné tu nombre así los demás saben quién sos.' }
   // por caracteres de verdad: un emoji cuenta como uno
   if ([...nombre].length > NOMBRE_INVITADO_MAXIMO) {

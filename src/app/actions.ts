@@ -11,10 +11,8 @@ import {
   anotarCuenta, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
-import {
-  CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, restoreItem, updateItem, type CambiosDeseo, type NewItemData,
-} from '@/lib/items'
-import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
+import { createItem, archiveItem, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
+import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
@@ -33,6 +31,7 @@ import {
 } from '@/lib/regalos'
 import { parsePesos, partePesos, pesos } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
+import { LARGO, recortar } from '@/lib/limites'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
 export type EstadoForm = { error: string } | null
@@ -47,8 +46,6 @@ const entero = (fd: FormData, k: string) => {
   const v = str(fd, k)
   return v && /^-?\d{1,12}$/.test(v) ? Number(v) : undefined
 }
-
-const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
 
 /** Solo rutas de la app ("/l/…"), nunca a otro sitio. */
 const rutaPropia = (v?: string) => (v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : '/')
@@ -75,39 +72,14 @@ function volverALista(fd: FormData, token: string) {
 
 const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${ruta.includes('?') ? '&' : '?'}${clave}=${valor}`
 
-/** Los campos del formulario de un deseo (agregar o editar). Lo vacío queda undefined. Null si falta el título. */
-function deseoDelForm(formData: FormData): NewItemData | null {
-  const titulo = str(formData, 'titulo')
-  if (!titulo) return null
-  const p = str(formData, 'prioridad')
-  const cant = Math.trunc(Number(str(formData, 'cantidad') ?? '1'))
-  const foto = str(formData, 'fotoUrl')
-  const tipo = str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto'
-  return {
-    tipo,
-    titulo,
-    notas: str(formData, 'notas'),
-    precio: str(formData, 'precio'),
-    rangoPrecio: str(formData, 'rangoPrecio'),
-    categoria: str(formData, 'categoria'),
-    prioridad: p === 'mucho' || p === 'suelta' ? p : 'gustaria',
-    cantidad: Number.isFinite(cant) && cant >= 1 ? cant : 1,
-    // solo las ideas se repiten (en "Quiero ESTO" el casillero se esconde, pero puede venir tildado de antes)
-    repetible: tipo === 'idea' && formData.get('repetible') === 'on',
-    linkTienda: httpUrl(str(formData, 'linkTienda')),
-    // un link de foto o una foto subida desde el teléfono (/foto/deseo/:id)
-    fotoUrl: httpUrl(foto) ?? (foto && esUrlFotoDeseo(foto) ? foto : undefined),
-  }
-}
-
 export async function addItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const data = deseoDelForm(formData)
+  const data = deseoDesdeForm(formData)
   if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
-  const creado = await createItem(db, session.userId, data, listaId)
+  const creado = await createItem(db, session.userId, paraAgregar(data), listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect(listaId && creado ? `/grupos/${listaId}` : '/mi-lista')
@@ -120,12 +92,10 @@ export async function updateItemAction(formData: FormData) {
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
   const volver = editable.grupo ? `/grupos/${editable.grupo.id}` : '/mi-lista'
-  const data = deseoDelForm(formData)
+  const data = deseoDesdeForm(formData)
   if (!data) redirect(`/editar/${itemId}`)
-  // Al editar, lo que quedó vacío se borra (al agregar, simplemente no se carga).
-  const cambios: CambiosDeseo = { ...data }
-  for (const campo of CAMPOS_OPCIONALES) cambios[campo] = data[campo] ?? null
-  await updateItem(db, itemId, session.userId, cambios)
+  // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
+  await updateItem(db, itemId, session.userId, data)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
@@ -165,13 +135,13 @@ export async function updatePriorityAction(formData: FormData) {
 export async function createGroupAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const nombre = str(formData, 'nombre')
+  const nombre = recortar(str(formData, 'nombre') ?? '', LARGO.nombreGrupo)
   if (!nombre) redirect('/grupos/nuevo')
   const fecha = str(formData, 'fecha')
   // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
   // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
   const id = await crearGrupo(db, session.userId, {
-    nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120),
+    nombre, descripcion: recortar(str(formData, 'descripcion') ?? '', LARGO.descripcionGrupo) || undefined,
     eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on',
   })
   revalidatePath('/mi-lista')

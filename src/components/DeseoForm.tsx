@@ -1,6 +1,7 @@
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoField } from '@/components/FotoField'
 import { Hearts, PRIORIDADES } from '@/components/ui'
+import { CANTIDAD_MAXIMA, LARGO } from '@/lib/limites'
 import type { OwnerItemView } from '@/lib/serialize'
 
 const CATEGORIAS = ['Tecnología', 'Casa', 'Ropa', 'Libros', 'Experiencias', 'Hobbies']
@@ -35,7 +36,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
       <div className="gr-sticker flex flex-col gap-3 p-3.5">
         <label className="flex flex-col gap-1">
           <span className="gr-label">¿Qué querés?</span>
-          <input name="titulo" required placeholder="Pegá un link o escribí" defaultValue={deseo?.titulo}
+          {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); el título se corta en el servidor */}
+          <input name="titulo" required maxLength={LARGO.link} placeholder="Pegá un link o escribí" defaultValue={deseo?.titulo}
                  className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
         </label>
         <FotoField inicial={deseo?.fotoUrl} />
@@ -46,12 +48,15 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
         <label><input type="radio" name="tipo" value="idea" defaultChecked={deseo?.tipo === 'idea'} className="sr-only" />Algo así</label>
       </div>
 
-      <input name="linkTienda" placeholder="Link a la tienda (opcional)" defaultValue={deseo?.linkTienda ?? ''} className="gr-input" />
+      {/* sin https:// también vale (el servidor se lo agrega); sin punto no es un link, y se avisa antes de mandar */}
+      <input name="linkTienda" placeholder="Link a la tienda (opcional)" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"
+             maxLength={LARGO.link} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+             pattern="\S+\.\S+" title="Pegá el link de la tienda (por ejemplo mercadolibre.com.ar/…)" />
       <div className="flex gap-3">
-        <input name="precio" placeholder="Precio (ej. $45.000)" defaultValue={deseo?.precio ?? ''} className="gr-input w-1/2" />
-        <input name="cantidad" type="number" min="1" defaultValue={deseo?.cantidad ?? 1} aria-label="Cantidad" className="gr-input w-1/2" />
+        <input name="precio" maxLength={LARGO.precio} placeholder="Precio (ej. $45.000)" defaultValue={deseo?.precio ?? ''} className="gr-input w-1/2" />
+        <input name="cantidad" type="number" min="1" max={CANTIDAD_MAXIMA} defaultValue={deseo?.cantidad ?? 1} aria-label="Cantidad" className="gr-input w-1/2" />
       </div>
-      <input name="rangoPrecio" placeholder="Rango si es idea (ej. $10–30k)" defaultValue={deseo?.rangoPrecio ?? ''} className="gr-input" />
+      <input name="rangoPrecio" maxLength={LARGO.rangoPrecio} placeholder="Rango si es idea (ej. $10–30k)" defaultValue={deseo?.rangoPrecio ?? ''} className="gr-input" />
 
       <div className="flex flex-col gap-2">
         <span id="categoria-label" className="gr-label">Categoría</span>
@@ -81,7 +86,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
         </div>
       </div>
 
-      <textarea name="notas" placeholder="Notas (talle, color…)" defaultValue={deseo?.notas ?? ''} className="gr-input min-h-24" />
+      <textarea name="notas" maxLength={LARGO.notas} placeholder="Notas (talle, color…)" defaultValue={deseo?.notas ?? ''} className="gr-input min-h-24" />
       {/* solo para "Algo así": un "Quiero ESTO" no se repite (el servidor lo guarda sin la marca aunque venga tildado) */}
       <label className="hidden min-h-11 items-center gap-3 text-sm font-semibold group-has-[input[name=tipo][value=idea]:checked]/deseo:flex">
         <input type="checkbox" name="repetible" defaultChecked={deseo?.repetible} className="size-[22px] accent-gr-ink" />

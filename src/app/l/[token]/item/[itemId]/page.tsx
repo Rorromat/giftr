@@ -16,6 +16,7 @@ import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import type { GiverItemView, OwnerItemView } from '@/lib/serialize'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
+import { LARGO } from '@/lib/limites'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
 function ultimoDia(hasta: Date) {
@@ -103,7 +104,7 @@ export default async function DetalleItem({ params, searchParams }: {
           <h1 className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
           {cuantos && <p className="text-sm font-semibold">{cuantos}</p>}
           {item.notas && (
-            <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug">
+            <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="font-bold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
@@ -135,7 +136,7 @@ export default async function DetalleItem({ params, searchParams }: {
             <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border-2 border-gr-ink`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
             </span>
-            <span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">
               {c.esMia
                 ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
                 : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
@@ -168,7 +169,7 @@ export default async function DetalleItem({ params, searchParams }: {
                   <input type="hidden" name="token" value={token} />
                   <input type="hidden" name="itemId" value={item.id} />
                   <input type="hidden" name="claimId" value={vencida.claimId} />
-                  <input name="nota" placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
+                  <input name="nota" maxLength={LARGO.notaCompra} placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
                   <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Ya lo compré</BotonEnviar>
                 </form>
                 <GuestGate token={token} itemId={item.id} identified={identified} volver={aqui} conCartel={!!reserva} texto="Reservar de nuevo" />
@@ -199,7 +200,7 @@ export default async function DetalleItem({ params, searchParams }: {
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
               <input type="hidden" name="claimId" value={miClaim.id} />
-              <input name="nota" placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
+              <input name="nota" maxLength={LARGO.notaCompra} placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
               <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Ya lo compré</BotonEnviar>
             </form>
             <form action={releaseAction}>
@@ -221,7 +222,7 @@ export default async function DetalleItem({ params, searchParams }: {
           </h2>
           <ul className="flex flex-col gap-2">
             {comments.map((c) => (
-              <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm">
+              <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
                 <span className="font-bold">{c.autorNombre}:</span> {c.texto}
               </li>
             ))}
@@ -229,7 +230,7 @@ export default async function DetalleItem({ params, searchParams }: {
           <form action={commentAction} className="flex gap-2">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
-            <input name="texto" required placeholder="Coordiná con los demás…" className="gr-input flex-1 shadow-none" />
+            <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
             <BotonEnviar className="gr-btn bg-gr-ink text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
           </form>
         </section>

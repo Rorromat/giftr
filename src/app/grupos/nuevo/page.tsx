@@ -4,6 +4,7 @@ import { createGroupAction } from '@/app/actions'
 import { ANIO_MAXIMO, ANIO_MINIMO } from '@/lib/groups'
 import { BackLink } from '@/components/ui'
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { LARGO } from '@/lib/limites'
 
 export default async function NuevoGrupo() {
   const session = await auth()
@@ -23,13 +24,13 @@ export default async function NuevoGrupo() {
         <div className="gr-sticker flex flex-col gap-3 p-3.5">
           <label className="flex flex-col gap-1">
             <span className="gr-label">¿Cómo se llama?</span>
-            <input name="nombre" required maxLength={60} placeholder="Nuestra casa"
+            <input name="nombre" required maxLength={LARGO.nombreGrupo} placeholder="Nuestra casa"
                    className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
           </label>
         </div>
         <label className="flex flex-col gap-2">
           <span className="gr-label">¿Para qué es? (opcional)</span>
-          <input name="descripcion" maxLength={120} placeholder="Para equipar la casa" className="gr-input" />
+          <input name="descripcion" maxLength={LARGO.descripcionGrupo} placeholder="Para equipar la casa" className="gr-input" />
         </label>
         <div className="flex flex-col gap-2">
           <label htmlFor="fecha" className="gr-label">¿Hay una fecha? (opcional)</label>

@@ -5,6 +5,7 @@ import type { Viewer } from '@/lib/types'
 import { abrirListaAInvitado, accesoALista, listasAjenasSql } from '@/lib/acceso'
 import { esRepetible } from '@/lib/serialize'
 import { esUuid } from '@/lib/groups'
+import { notaDeCompra } from '@/lib/limites'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 
 export async function expireStaleClaims(db: Db, itemId?: string) {
@@ -147,7 +148,7 @@ export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQu
     if (!item || !c) return no
     if (c.estado === 'comprado') return { ok: true }
     const marcar = async (id: string): Promise<CompraSueltaResult> => {
-      const filas = await t.update(claims).set({ estado: 'comprado', notaQueCompre: notaQueCompre ?? null, updatedAt: new Date() })
+      const filas = await t.update(claims).set({ estado: 'comprado', notaQueCompre: notaDeCompra(notaQueCompre), updatedAt: new Date() })
         .where(and(eq(claims.id, id), eq(claims.estado, 'reservado')))
         .returning({ id: claims.id })
       return filas.length ? { ok: true } : no

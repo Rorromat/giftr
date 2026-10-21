@@ -195,7 +195,7 @@ export default async function ListaAjena({
               <Link href={`/l/${token}/item/${hero.id}`} className="font-display text-[22px] leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere]">
                 {hero.titulo}
               </Link>
-              {hero.notas && <p className="text-sm leading-snug">{hero.notas}</p>}
+              {hero.notas && <p className="text-sm leading-snug [overflow-wrap:anywhere]">{hero.notas}</p>}
               {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
             </div>
             <div className="flex items-center gap-2">

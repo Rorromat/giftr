@@ -10,10 +10,7 @@ import { esUuid } from '@/lib/groups'
 export const FOTO_DESEO_MAX_BYTES = 6_000_000
 const LADO = 1200
 
-const RUTA = /^\/foto\/deseo\/([0-9a-f-]{36})$/i
-
-/** Si el valor es la URL de una foto de deseo subida (y no un link cualquiera). */
-export const esUrlFotoDeseo = (v: string) => RUTA.test(v)
+export { esUrlFotoDeseo } from '@/lib/links'
 
 /**
  * Deja cualquier imagen como JPEG de hasta 1200px de lado (sin recortar ni agrandar), derecha (EXIF) y sin
