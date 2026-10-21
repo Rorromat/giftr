@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
@@ -669,6 +669,11 @@ test.each([
   ['$20-30.000', 20000], ['$2-3.000.000', 2000000], ['$500-1.500', 500], ['$20.000 - $30.000', 20000],
   // un guion entre palabras no es un menos
   ['Talle M - $30.000', 30000], ['Modelo XR-500, $80.000', 80000], ['Aprox. – $20.000', 20000],
+  // sin "$", un número pelado detrás de una palabra es de esa palabra (talle, número, cuántos, año): no es el de abajo de
+  // un rango; el precio es el que sigue. Si no hay otro, ese
+  ['Talle 42 - 30.000', 30000], ['N° 3 - 45.000', 45000], ['Pack x 6 - 12.000', 12000], ['Modelo 2024 - 150.000', 150000],
+  ['Talle 42 color 3 - 30.000', 30000], ['Juego de 6 copas 12.000', 12000], ['Zapatillas 30000', 30000],
+  ['aprox. 20 - 30 mil', 20000], ['de 6 a 12 mil', 6000], ['Precio 45.000', 45000],
   ['US$ 300', null], ['USD 300', null], ['U$S 300', null], ['u$d 300', null], ['€ 50', null], ['50 euros', null], ['R$ 100', null],
   ['AR$ 100', 100],
   ['-$5.000', null], ['$ -5000', null], ['- 5000', null], ['aprox -5000', null], ['', null], ['   ', null],
@@ -797,28 +802,76 @@ test('si el deseo salió de la lista (se lo dieron), el encargado corrige la com
   expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
 })
 
-test('si nadie le debe nada al encargado, no hay compra para corregir (ni queda para siempre en Cuentas)', async () => {
+test('si nadie le debe nada al encargado, la compra se corrige solo el primer mes (y no queda para siempre en Cuentas)', async () => {
   const { db, mama, rodri, sofi, bici, perfume } = await setup()
-  // la bici: Rodri lo armó, no se sumó nadie y la compró solo
+  // la bici: Rodri lo armó, no se sumó nadie y la compró solo: no hay división que corregir
   const solo = await iniciarRegaloGrupal(db, bici.id, rodri.id)
   if (!solo.ok) throw new Error(solo.reason)
   await comprarRegalo(db, solo.giftId, rodri.id, { total: 90000 })
-  // el perfume: Sofi se sumó, pero al final no puso ("A mano", en 0)
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].corregible).toBe(false)
+  expect(await corregirCompra(db, solo.giftId, rodri.id, { total: 9000 })).toEqual({ ok: false, reason: 'nada_que_corregir' })
+  // el perfume: Sofi se sumó, pero al final no puso ("A mano", en 0). Recién comprado se corrige (por si fue un error)
   const tele = await iniciarRegaloGrupal(db, perfume.id, rodri.id)
   if (!tele.ok) throw new Error(tele.reason)
   await sumarseARegalo(db, tele.giftId, sofi.id)
   await comprarRegalo(db, tele.giftId, rodri.id, { total: 50000, partes: { [rodri.id]: 50000, [sofi.id]: 0 } })
-  for (const itemId of [bici.id, perfume.id]) expect((await regalosDeItem(db, itemId, { userId: rodri.id }))[0].corregible).toBe(false)
-  // una parte en 0 que figuraba saldada no se vuelve deuda meses después
+  expect((await regalosDeItem(db, perfume.id, { userId: rodri.id }))[0].corregible).toBe(true)
+  // pasado el mes no: una parte en 0 que figuraba saldada no se vuelve deuda meses después
+  await db.update(groupGifts).set({ compradoAt: new Date(Date.now() - 31 * DIA) }).where(eq(groupGifts.id, tele.giftId))
+  expect((await regalosDeItem(db, perfume.id, { userId: rodri.id }))[0].corregible).toBe(false)
   expect(await corregirCompra(db, tele.giftId, rodri.id, { total: 50000, partes: { [rodri.id]: 25000, [sofi.id]: 25000 } }))
     .toEqual({ ok: false, reason: 'nada_que_corregir' })
-  expect(await corregirCompra(db, solo.giftId, rodri.id, { total: 9000 })).toEqual({ ok: false, reason: 'nada_que_corregir' })
   // se los dieron en el cumple: Cuentas sigue vacía
   await archiveItem(db, bici.id, mama.id, 'lo_tengo')
   await archiveItem(db, perfume.id, mama.id, 'lo_tengo')
   expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
   expect(await misCuentas(db, rodri.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
   expect((await misCuentas(db, sofi.id)).personas).toEqual([])
+})
+
+test('una corrección que deja a los demás en 0 por error se arregla en el primer mes, también desde Cuentas', async () => {
+  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  const todos = [rodri.id, sofi.id, ana.id]
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  // "A mano", puso 90.000 en su parte y borró las de ellas: no queda fija para siempre
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 90000, [sofi.id]: 0, [ana.id]: 0 } }))
+    .toEqual({ ok: true })
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0].corregible).toBe(true)
+  // se lo dieron en el cumple: se corrige desde Cuentas
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  const [c] = await comprasParaCorregir(db, rodri.id)
+  expect(c.miembros.map((m) => [m.nombre, m.monto])).toEqual([['Rodri', 90000], ['Sofi', 0], ['Ana', 0]])
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos })).toEqual({ ok: true })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+})
+
+test('corregir la compra no le cambia la parte al que después se sumó al grupo de la lista (ya no la ve)', async () => {
+  const db = await createTestDb()
+  const [delfina, rodri, sofi, tia] = [await usuario(db, 'Delfina'), await usuario(db, 'Rodri'), await usuario(db, 'Sofi'), await usuario(db, 'Tía')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const tele = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Tele' }, grupoId))!
+  const g = await iniciarRegaloGrupal(db, tele.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  await sumarseARegalo(db, g.giftId, tia.id)
+  const todos = [rodri.id, sofi.id, tia.id]
+  await comprarRegalo(db, g.giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 45000, [sofi.id]: 45000, [tia.id]: 0 } })
+  // la Tía se suma al grupo: ya no ve el regalo, ni Cuentas, ni el aviso de una corrección
+  await unirseAGrupo(db, grupo.inviteToken!, tia.id)
+  expect(await corregirCompra(db, g.giftId, rodri.id, { total: 90000, miembros: todos }))
+    .toEqual({ ok: false, reason: 'de_la_lista', nombre: 'Tía', monto: 0 })
+  expect(await db.select().from(notifications).where(eq(notifications.userId, tia.id))).toEqual([])
+  expect((await misCuentas(db, rodri.id)).personas.map((p) => [p.nombre, p.neto])).toEqual([['Sofi', 45000]])
+  // dejándole la suya, sí
+  expect(await corregirCompra(db, g.giftId, rodri.id, { total: 80000, miembros: todos, partes: { [rodri.id]: 40000, [sofi.id]: 40000, [tia.id]: 0 } }))
+    .toEqual({ ok: true })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(40000)
+  // y si salió del grupo, tampoco: sigue sin ver nada de la lista
+  expect(await salirDeGrupo(db, grupoId, tia.id)).toBe(true)
+  expect(await corregirCompra(db, g.giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 40000, [sofi.id]: 40000, [tia.id]: 10000 } }))
+    .toMatchObject({ ok: false, reason: 'de_la_lista' })
+  expect((await misCuentas(db, tia.id)).personas).toEqual([])
 })
 
 test('corregir la compra le avisa a quien le cambió la parte (y a nadie más)', async () => {
@@ -984,4 +1037,44 @@ test('el recordatorio de cerrar un regalo grupal espera al evento, y "Sigue en p
   // uno comprado no se pospone
   await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
   expect(await posponerRecordatorio(db, giftId, rodri.id)).toBe(false)
+})
+
+test('un regalo armado al poco de pasar el cumple ("se nos pasó") se recuerda a las 2 semanas, y ninguno espera más de 6', async () => {
+  const { db, mama, rodri, giftId } = await conRegalo()
+  const recordados = async (cumpleHace: number, armadoHace: number) => {
+    const cumple = new Date(hoyLocal().getTime() - cumpleHace * DIA)
+    await guardarCumple(db, mama.id, cumple.getUTCDate(), cumple.getUTCMonth() + 1)
+    await db.update(groupGifts).set({ createdAt: new Date(Date.now() - armadoHace * DIA) }).where(eq(groupGifts.id, giftId))
+    return (await regalosParaCerrar(db, rodri.id)).map((r) => r.giftId)
+  }
+  // el cumple fue hace 30 días y lo armaron 5 días después: es de ese cumple, no del año que viene
+  expect(await recordados(30, 25)).toEqual([giftId])
+  // armado hace 10, unos días después del cumple: como una reserva, todavía no
+  expect(await recordados(20, 10)).toEqual([])
+  // armado casi 3 semanas después del cumple, para el que viene: no espera hasta 3 días antes, sale a las 6 semanas
+  expect(await recordados(60, 40)).toEqual([])
+  expect(await recordados(60, 43)).toEqual([giftId])
+})
+
+test('un regalo grupal en el que no se sumó nadie se recuerda cuando su reserva habría vencido, aunque el cumple esté lejos', async () => {
+  const { db, mama, rodri, sofi, martin, bici } = await setup()
+  const en90 = new Date(hoyLocal().getTime() + 90 * DIA)
+  await guardarCumple(db, mama.id, en90.getUTCDate(), en90.getUTCMonth() + 1)
+  // Rodri lo había reservado y lo hizo regalo grupal: no se sumó nadie
+  const r = await reserveItem(db, bici.id, { userId: rodri.id })
+  if (!r.ok) throw new Error(r.reason)
+  const g = await iniciarRegaloGrupal(db, bici.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  const armado = (dias: number) => db.update(groupGifts).set({ createdAt: new Date(Date.now() - dias * DIA) }).where(eq(groupGifts.id, g.giftId))
+  await armado(13)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  // a las 2 semanas, como la reserva suelta: no se queda con el deseo meses sin que nadie le pregunte
+  await armado(15)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([expect.objectContaining({ giftId: g.giftId, itemTitulo: 'Bici' })])
+  expect(await reserveItem(db, bici.id, { userId: martin.id })).toEqual({ ok: false, reason: 'sin_stock' })
+  // con Sofi adentro sí espera (al cumple, hasta 6 semanas); si se baja, vuelve a ser como una reserva
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  await salirDeRegalo(db, g.giftId, sofi.id)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([expect.objectContaining({ giftId: g.giftId })])
 })

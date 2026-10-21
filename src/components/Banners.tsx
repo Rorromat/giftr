@@ -74,8 +74,9 @@ export async function Banners() {
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </QuizasLink>
       ))}
-      {/* Un regalo grupal no vence solo (tiene gente adentro): al que lo organiza se le recuerda que lo cierre. Si todavía
-          no es momento, "Sigue en pie" lo saca por 2 semanas. */}
+      {/* Un regalo grupal no vence solo (quizás ya lo compró, y con gente adentro se perdería la coordinación): al que lo
+          organiza se le recuerda que lo cierre (ver cuandoRecordar). Si todavía no es momento, "Sigue en pie" lo saca por 2
+          semanas. */}
       {sinCerrar.map((r) => (
         <div key={r.giftId} className="relative rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink pb-1 pl-3.5 pr-12 pt-3 text-sm font-medium text-gr-bg">
           <Link href={r.href} className="block">

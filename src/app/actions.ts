@@ -529,6 +529,9 @@ const ERRORES_COMPRA = {
 
 /** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
 function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
+  if (r.reason === 'de_la_lista') {
+    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${pesos(r.monto)}.`
+  }
   if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
   const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
   return suma < p.total

@@ -125,14 +125,18 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
 
 /**
  * Lo que compró en un regalo y no puede corregir en el deseo (lo sacaron de la lista, o cambiaron el link): desde acá,
- * mientras nadie le pagó. Cambia con cada corrección: el formulario vuelve a arrancar cerrado y con lo nuevo.
+ * mientras nadie le pagó (o el primer mes, si los demás quedaron en 0: ver sePuedeCorregir). Cambia con cada corrección:
+ * el formulario vuelve a arrancar cerrado y con lo nuevo.
  */
 function Corregir({ c }: { c: CompraParaCorregir }) {
+  const alguienDebe = c.miembros.some((m) => !m.esYo && m.monto > 0)
   return (
     <li className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
       <p className="text-sm leading-snug">
         <span className="font-bold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
-        <span className="block text-xs font-medium text-gr-muted">Lo compraste por {pesos(c.total)} · nadie te pagó todavía</span>
+        <span className="block text-xs font-medium text-gr-muted">
+          Lo compraste por {pesos(c.total)} · {alguienDebe ? 'nadie te pagó todavía' : 'los demás quedaron en $0'}
+        </span>
       </p>
       <details key={`${c.total}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
         <summary className={`${linkSubrayado} flex cursor-pointer list-none items-center text-sm [&::-webkit-details-marker]:hidden`}>

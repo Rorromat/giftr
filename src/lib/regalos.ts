@@ -3,8 +3,8 @@ import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { desdeQueOcupa, loQueYaTiene, RESERVA_DIAS, reserveItem, type ReserveResult } from '@/lib/claims'
-import { eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
+import { desdeQueOcupa, loQueYaTiene, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult } from '@/lib/claims'
+import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
@@ -18,6 +18,8 @@ export { dividir, parsePesos, pesos } from '@/lib/pesos'
 // esto llega a sus vistas.
 
 export const MONTO_MAXIMO = 100_000_000
+
+const DIA = 86400_000
 
 type Persona = { id: string; nombre: string }
 
@@ -51,7 +53,8 @@ export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult
 
 /**
  * Arma un regalo grupal sobre un deseo: el usuario queda de encargado.
- * Si ya lo tenía reservado solo, convierte esa reserva (y deja de vencer); si no, lo reserva.
+ * Si ya lo tenía reservado solo, convierte esa reserva (y deja de vencer: mientras no se sume nadie, se le recuerda cerrarlo
+ * cuando la reserva habría vencido, ver cuandoRecordar); si no, lo reserva.
  * Si ya está en un regalo abierto de este deseo (un doble toque, la lista y el detalle abiertos a la vez), es ese.
  */
 export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string): Promise<IniciarResult> {
@@ -200,10 +203,14 @@ export async function cancelarRegalo(db: Db, giftId: string, userId: string): Pr
   })
 }
 
-/** cambiaron: se sumó o se bajó alguien desde que el encargado vio la división. ya_pagaron, nada_que_corregir: ver corregirCompra. */
+/**
+ * cambiaron: se sumó o se bajó alguien desde que el encargado vio la división. ya_pagaron, nada_que_corregir, de_la_lista:
+ * ver corregirCompra.
+ */
 export type CompraResult =
   | { ok: true }
   | { ok: false; reason: 'no_permitido' | 'monto_invalido' | 'no_suma' | 'cambiaron' | 'ya_pagaron' | 'nada_que_corregir' }
+  | { ok: false; reason: 'de_la_lista'; nombre: string; monto: number }
 
 /**
  * Lo que cargó el encargado. miembros: con quiénes vio la división (los ids de la pantalla). partes: "A mano"; si no,
@@ -218,13 +225,22 @@ type Parte = { userId: string; monto: number | null; pagado: boolean }
 /** Alguien que no es el encargado ya figura como pago. Las partes en 0 no cuentan: quedan pagas solas al comprar. */
 const alguienPago = (filas: Parte[], encargado: string) => filas.some((f) => f.userId !== encargado && f.pagado && (f.monto ?? 0) > 0)
 
+/** Cuántos días después de comprarlo se corrige un regalo en el que los demás quedaron en 0 (ver sePuedeCorregir). */
+const CORREGIR_EN_CERO_DIAS = 30
+
 /**
- * Lo que se puede corregir (ver corregirCompra): nadie le pagó y alguien le debe. Si nadie debe nada (lo compró solo, o
- * los demás no ponen) no hay qué corregir: si no, "Lo que compraste" no se iría nunca de Cuentas, y una parte en 0 que
- * figuraba saldada podría volverse deuda meses después.
+ * Lo que se puede corregir (ver corregirCompra): con alguien más en el regalo y nadie que le haya pagado, mientras alguien
+ * le debe, o en el primer mes si los demás quedaron en 0. Ese mes es para el error al cargarla (borrar la parte de otro),
+ * que si no quedaría fijo para siempre. Después, sin deudas no hay qué corregir: "Lo que compraste" no se queda para
+ * siempre en Cuentas, y una parte en 0 que figuraba saldada no se vuelve deuda meses después. Si lo compró solo, no: no
+ * hay división que arreglar.
  */
-const sePuedeCorregir = (filas: Parte[], encargado: string) =>
-  !alguienPago(filas, encargado) && filas.some((f) => f.userId !== encargado && !f.pagado && (f.monto ?? 0) > 0)
+function sePuedeCorregir(filas: Parte[], encargado: string, compradoAt: Date | null) {
+  const otros = filas.filter((f) => f.userId !== encargado)
+  if (!otros.length || alguienPago(filas, encargado)) return false
+  const reciente = !!compradoAt && Date.now() - compradoAt.getTime() < CORREGIR_EN_CERO_DIAS * DIA
+  return reciente || otros.some((f) => !f.pagado && (f.monto ?? 0) > 0)
+}
 
 /**
  * Cuánto pone cada uno (ids: el encargado primero y después por orden de llegada, como en la pantalla). Si la gente no es
@@ -287,9 +303,11 @@ export async function comprarRegalo(db: Db, giftId: string, userId: string, p: D
 
 /**
  * "Corregir la compra": el encargado cambia el total o las partes de un regalo ya comprado (un cero de más, el precio de
- * la lista que no era el que pagó), mientras alguien le debe y nadie más que él figura como pago (ver sePuedeCorregir).
- * Si alguien ya pagó, cambiarle la parte pisaría eso: primero se deshace el pago. Al que le cambia la parte se le avisa:
- * es su deuda. La fecha de la compra queda (la usan Cuentas, el historial y el deseo).
+ * la lista que no era el que pagó), mientras nadie más que él figura como pago (ver sePuedeCorregir). Si alguien ya pagó,
+ * cambiarle la parte pisaría eso: primero se deshace el pago. Al que le cambia la parte se le avisa: es su deuda. Al que
+ * después se sumó a la lista (el grupo) no se le cambia: ya no ve el regalo, ni el aviso, ni Cuentas, y sería armarle una
+ * deuda en silencio (de_la_lista, con su nombre y su parte para dejársela). La fecha de la compra queda (la usan Cuentas,
+ * el historial y el deseo).
  */
 export async function corregirCompra(db: Db, giftId: string, userId: string, p: DatosCompra): Promise<CompraResult> {
   if (!montoValido(p.total)) return { ok: false, reason: 'monto_invalido' }
@@ -299,7 +317,7 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
     // el aviso de abajo toca el deseo: primero su lock, como comprarRegalo
     const itemId = await lockDeseoDelRegalo(t, giftId)
     if (!itemId) return { ok: false, reason: 'no_permitido' }
-    const [g] = await t.select({ claimId: groupGifts.claimId, listId: items.listId }).from(groupGifts)
+    const [g] = await t.select({ claimId: groupGifts.claimId, listId: items.listId, compradoAt: groupGifts.compradoAt }).from(groupGifts)
       .innerJoin(items, eq(groupGifts.itemId, items.id))
       .where(and(eq(groupGifts.id, giftId), eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'comprado')))
       .for('update', { of: groupGifts })
@@ -310,16 +328,21 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
       .from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId)).orderBy(asc(groupGiftMembers.createdAt))
       .for('update')
     if (alguienPago(filas, userId)) return { ok: false, reason: 'ya_pagaron' }
-    if (!sePuedeCorregir(filas, userId)) return { ok: false, reason: 'nada_que_corregir' }
+    if (!sePuedeCorregir(filas, userId, g.compradoAt)) return { ok: false, reason: 'nada_que_corregir' }
     const ids = encargadoPrimero(filas, userId)
     const r = repartir(ids, p)
     if (!r.ok) return r
+    const antes = new Map(filas.map((f) => [f.userId, f.monto ?? 0]))
+    const cambiaron = ids.filter((id, i) => id !== userId && antes.get(id) !== r.montos[i])
+    for (const id of cambiaron) {
+      if (!(await esOFueDuenoDeLista(t, g.listId, id))) continue
+      const [u] = await t.select({ nombre: users.nombre }).from(users).where(eq(users.id, id))
+      return { ok: false, reason: 'de_la_lista', nombre: u?.nombre ?? 'Alguien', monto: antes.get(id) ?? 0 }
+    }
 
     await fijarPartes(t, giftId, userId, ids, r.montos)
     await t.update(groupGifts).set({ montoTotal: p.total }).where(eq(groupGifts.id, giftId))
     await t.update(claims).set({ notaQueCompre: p.nota ?? null }).where(eq(claims.id, g.claimId))
-    const antes = new Map(filas.map((f) => [f.userId, f.monto ?? 0]))
-    const cambiaron = ids.filter((id, i) => id !== userId && antes.get(id) !== r.montos[i])
     await dejarAviso(t, itemId, 'compra_corregida', cambiaron.map((id) => ({ userId: id, guestId: null })))
     return { ok: true }
   })
@@ -332,6 +355,9 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
  */
 export async function marcarPagado(db: Db, giftId: string, deudorId: string, actorId: string, pagado = true, visto?: number): Promise<boolean> {
   if (!esUuid(giftId) || !esUuid(deudorId)) return false
+  // visto viene del formulario: una parte es un entero entre 0 y MONTO_MAXIMO, y otro número (fuera de lo que entra en la
+  // columna) haría fallar la consulta
+  if (visto !== undefined && !(Number.isSafeInteger(visto) && visto >= 0 && visto <= MONTO_MAXIMO)) return false
   const [g] = await db.select({ encargado: groupGifts.organizerUserId }).from(groupGifts)
     .where(and(eq(groupGifts.id, giftId), eq(groupGifts.estado, 'comprado')))
   if (!g || deudorId === g.encargado || (actorId !== g.encargado && actorId !== deudorId)) return false
@@ -422,7 +448,7 @@ export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Pro
       soyParte,
       soyEncargado,
       montoTotal: soyParte ? gift.montoTotal : null,
-      corregible: soyEncargado && gift.estado === 'comprado' && sePuedeCorregir(suyos.map((x) => x.m), gift.organizerUserId),
+      corregible: soyEncargado && gift.estado === 'comprado' && sePuedeCorregir(suyos.map((x) => x.m), gift.organizerUserId, gift.compradoAt),
       sacados: soyEncargado ? fuera.map(({ id, nombre }) => ({ id, nombre })) : [],
       meSacaron: !!viewer.userId && fuera.some((x) => x.id === viewer.userId),
       miembros: suyos.map((x) => ({
@@ -616,7 +642,7 @@ export type CompraParaCorregir = {
  */
 export async function comprasParaCorregir(db: Db, userId: string): Promise<CompraParaCorregir[]> {
   const compras = await db.select({
-    giftId: groupGifts.id, total: groupGifts.montoTotal, nota: claims.notaQueCompre, compradoEl: claims.updatedAt,
+    giftId: groupGifts.id, total: groupGifts.montoTotal, nota: claims.notaQueCompre, compradoEl: claims.updatedAt, compradoAt: groupGifts.compradoAt,
     listId: lists.id, tipoDeseo: items.tipo, repetible: items.repetible, ...columnasDestino(db, userId),
   }).from(groupGifts)
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
@@ -625,9 +651,12 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
     .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
     .where(and(
       eq(groupGifts.organizerUserId, userId), enCuentasDe(db, userId),
-      // de entrada, solo las que alguien todavía le debe (la parte del encargado queda paga al comprar)
-      inArray(groupGifts.id, db.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers)
-        .where(and(eq(groupGiftMembers.pagado, false), gt(groupGiftMembers.monto, 0)))),
+      // de entrada, solo las que alguien todavía le debe (la parte del encargado queda paga al comprar) o las del último mes
+      or(
+        inArray(groupGifts.id, db.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers)
+          .where(and(eq(groupGiftMembers.pagado, false), gt(groupGiftMembers.monto, 0)))),
+        gt(groupGifts.compradoAt, new Date(Date.now() - CORREGIR_EN_CERO_DIAS * DIA)),
+      ),
     ))
     .orderBy(desc(groupGifts.compradoAt))
   const lejos: typeof compras = []
@@ -642,7 +671,7 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
     .orderBy(asc(groupGiftMembers.createdAt))
   return lejos.flatMap((c) => {
     const suyos = filas.filter((f) => f.m.giftId === c.giftId)
-    if (!sePuedeCorregir(suyos.map((f) => f.m), userId)) return []
+    if (!sePuedeCorregir(suyos.map((f) => f.m), userId, c.compradoAt)) return []
     return [{
       giftId: c.giftId, itemTitulo: c.itemTitulo, para: destino(c).para, total: c.total ?? 0, nota: c.nota,
       miembros: [...suyos.filter((f) => f.m.userId === userId), ...suyos.filter((f) => f.m.userId !== userId)]
@@ -651,25 +680,34 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
   })
 }
 
-const DIA = 86400_000
+/** Lo más que espera el recordatorio a un evento lejano: después, "Sigue en pie" cada 2 semanas. */
+const ESPERA_MAXIMA_DIAS = 6 * 7
 
 /**
- * Cuándo recordarle al encargado que cierre un regalo abierto. Si dijo "Sigue en pie", a las 2 semanas de eso. Si no,
- * cerca del evento que viene después de armarlo (3 días antes, como el vencimiento de una reserva, o ya, si pasó): uno
- * armado en octubre para un casamiento en enero no lo molesta hasta enero. Si la lista no tiene fecha, a las 2 semanas.
+ * Cuándo recordarle al encargado que cierre un regalo abierto. Si dijo "Sigue en pie", a las 2 semanas de eso.
+ * - Si no se sumó nadie, cuando una reserva suelta habría vencido (ver vencimientoDeReserva): es una reserva con otro
+ *   nombre, y si no tendría el deseo meses sin que nadie le pregunte.
+ * - Con gente, cerca del evento que viene después de armarlo (3 días antes, o ya, si pasó), pero no más de 6 semanas: uno
+ *   armado en octubre para un casamiento en enero no lo molesta enseguida, y uno armado en marzo para el cumple de
+ *   febrero no espera un año.
+ * - Si se armó al poco de pasar el evento ("se nos pasó, armemos algo"), es de ese: a las 2 semanas, como sin fecha.
  * Nunca antes de 24 horas.
  */
-async function cuandoRecordar(db: Db, listId: string, armado: Date, sigueEnPie: Date | null): Promise<Date> {
+async function cuandoRecordar(db: Db, listId: string, armado: Date, sigueEnPie: Date | null, conGente: boolean): Promise<Date> {
   if (sigueEnPie) return new Date(sigueEnPie.getTime() + RESERVA_DIAS * DIA)
-  const evento = await eventoDeLista(db, listId, hoyLocal(armado))
-  const cuando = evento ? inicioDelDia(evento.fecha).getTime() - 3 * DIA : armado.getTime() + RESERVA_DIAS * DIA
+  if (!conGente) return vencimientoDeReserva(db, listId, armado)
+  const atrasado = armado.getTime() - (await desdeElUltimoEvento(db, listId, armado)).getTime() < RESERVA_DIAS * DIA
+  const evento = atrasado ? null : await eventoDeLista(db, listId, hoyLocal(armado))
+  const cuando = evento
+    ? Math.min(inicioDelDia(evento.fecha).getTime() - 3 * DIA, armado.getTime() + ESPERA_MAXIMA_DIAS * DIA)
+    : armado.getTime() + RESERVA_DIAS * DIA
   return new Date(Math.max(armado.getTime() + DIA, cuando))
 }
 
 /**
  * Los regalos grupales que organiza y siguen abiertos cuando ya toca recordárselo (ver cuandoRecordar): un cartel para que
- * lo compre y lo divida, lo cancele o diga que sigue en pie. No vencen solos: tienen gente adentro, y quizás ya lo compró y
- * le falta cargarlo. Al deseo; a Cuentas si desde ahí no se puede.
+ * lo compre y lo divida, lo cancele o diga que sigue en pie. No vencen solos: quizás ya lo compró y le falta cargarlo, y si
+ * tienen gente adentro se perdería la coordinación. Al deseo; a Cuentas si desde ahí no se puede.
  */
 export async function regalosParaCerrar(db: Db, userId: string): Promise<{ giftId: string; itemTitulo: string; href: string }[]> {
   const abiertos = await db.select({
@@ -682,9 +720,16 @@ export async function regalosParaCerrar(db: Db, userId: string): Promise<{ giftI
     .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
     .where(and(eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
     .orderBy(asc(groupGifts.createdAt))
+  if (!abiertos.length) return []
+  // en cuáles se sumó alguien más
+  const conGente = new Set((await db.select({ giftId: groupGiftMembers.giftId }).from(groupGiftMembers)
+    .where(and(inArray(groupGiftMembers.giftId, abiertos.map((a) => a.giftId)), ne(groupGiftMembers.userId, userId))))
+    .map((m) => m.giftId))
   const ahora = new Date()
   const viejos: typeof abiertos = []
-  for (const a of abiertos) if (ahora >= (await cuandoRecordar(db, a.listId, a.createdAt, a.recordatorioAt))) viejos.push(a)
+  for (const a of abiertos) {
+    if (ahora >= (await cuandoRecordar(db, a.listId, a.createdAt, a.recordatorioAt, conGente.has(a.giftId)))) viejos.push(a)
+  }
   return viejos.map((a) => ({
     giftId: a.giftId, itemTitulo: a.itemTitulo,
     href: a.activo && a.tieneElLink ? `/l/${a.shareToken}/item/${a.itemId}` : '/cuentas',

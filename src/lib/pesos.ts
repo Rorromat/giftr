@@ -13,6 +13,9 @@ const NUMERO = /(\d{1,3}(?:([., \u00a0])\d{3}(?!\d))(?:\2\d{3}(?!\d))*|\d+)(?:[.
 const HASTA = /^\s*(?:hasta|al|a|y|-|–|—)\s*\$?\s*/i
 // "2 x 45.000": cuántos, y después el precio de cada uno.
 const POR = /^\s*[x×]\s*\$?\s*(?=\d)/i
+// Las palabras que van antes de un precio sin "$" ("entre 10 y 15 lucas", "aprox. 20.000"). Otra palabra dice qué es el
+// número que sigue: "Talle 42 - 30.000", "N° 3", "Pack x 6", "Modelo 2024".
+const ANTES_DEL_PRECIO = /^(?:entre|de|desde|hasta|aprox|aproximadamente|unos|unas|alrededor|cerca|m[aá]s|menos|o|como|tipo|precio|sale|cuesta|ars|pesos)$/i
 
 function leerNumero(texto: string) {
   const m = texto.match(NUMERO)
@@ -29,6 +32,12 @@ function leerNumero(texto: string) {
   }
 }
 
+/** Antes del primer número hay una palabra que no es de precio (ver ANTES_DEL_PRECIO). */
+function conEtiqueta(texto: string) {
+  const antes = texto.slice(0, Math.max(0, texto.search(/\d/)))
+  return (antes.match(/[a-záéíóúñü]+/gi) ?? []).some((p) => !ANTES_DEL_PRECIO.test(p))
+}
+
 /** Un menos antes del primer número (ver NEGATIVO). */
 function esNegativo(texto: string) {
   const i = texto.search(/\d/)
@@ -38,8 +47,8 @@ function esNegativo(texto: string) {
 /**
  * El precio (texto libre) en pesos: "$45.000", "45.000,50" (redondeado), "45k", "15 lucas", "1,5k", "$ 45 000", "$45,000".
  * De un rango, el de abajo ("$10–30k" → 10.000, "$20-30.000" → 20.000). Desde el primer "$" si hay uno ("2 x $10.000" →
- * 10.000); sin "$", "2 x 45.000" → 45.000. Null si no hay un número o si no son pesos (otra moneda, negativo): mejor no
- * estimar que estimar mal.
+ * 10.000); sin "$", "2 x 45.000" → 45.000 y "Talle 42 - 30.000" → 30.000. Null si no hay un número o si no son pesos
+ * (otra moneda, negativo): mejor no estimar que estimar mal.
  */
 export function parsePesos(texto: string | null | undefined): number | null {
   if (!texto || OTRA_MONEDA.test(texto)) return null
@@ -47,6 +56,14 @@ export function parsePesos(texto: string | null | undefined): number | null {
   const desdeAca = desde >= 0 ? texto.slice(desde) : texto
   if (esNegativo(texto) || esNegativo(desdeAca)) return null
   let n = leerNumero(desdeAca)
+  // Sin "$", un número pelado (sin miles ni "k") detrás de una palabra es de esa palabra (el talle, el número, cuántos, el
+  // año): el precio es el que sigue, si hay otro. Si no, puede ser el precio ("Zapatillas 30000").
+  for (let antes = desdeAca; desde < 0 && n && !n.grupos && !n.por && conEtiqueta(antes);) {
+    const sigue = leerNumero(n.resto)
+    if (!sigue) break
+    antes = n.resto
+    n = sigue
+  }
   // "2 x 45.000": el primero es cuántos si no tiene "$" delante y es más chico que el que sigue ("100 x 2" son 100)
   if (desde < 0 && n?.corto && POR.test(n.resto)) {
     const cada = leerNumero(n.resto.replace(POR, ''))

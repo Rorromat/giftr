@@ -5,6 +5,7 @@ import type { Db } from '@/db/types'
 import { groupGiftMembers, groupGifts, lists } from '@/db/schema'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createItem } from '@/lib/items'
+import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { getUnreadNotifications } from '@/lib/notifications'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, misCuentas, regalosDeItem, sacarDeRegalo, sumarseARegalo } from '@/lib/regalos'
 
@@ -125,6 +126,11 @@ test('"Ya le pagué" y "Saldar todo" mandan lo que se veía: si cambió, no marc
   const pago = (monto: string) => compra({ giftId, deudorId: sofi.id, pagado: '1', monto }, [])
   await markPaidAction(pago('20000'))
   expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+  // uno armado a mano, que no entra en la columna (integer): no marca nada, y no es un error de la consulta
+  await markPaidAction(pago('999999999999'))
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 3_000_000_000)).toBe(false)
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 1.5)).toBe(false)
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
   await markPaidAction(pago('30000'))
   expect((await misCuentas(db, sofi.id)).debes).toBe(0)
   // el encargado, "Me pagó todo" con Caro
@@ -154,4 +160,32 @@ test('dejar volver a uno que sacó y posponer el recordatorio: solo el encargado
   h.session = { userId: caro.id }
   await joinGroupGiftAction(compra({ giftId }, []))
   expect(await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).toHaveLength(3)
+})
+
+test('corregir la parte del que después se sumó al grupo: el formulario dice de quién y cuánto dejarle', async () => {
+  h.db = await createTestDb()
+  const db = h.db
+  const usuario = (nombre: string) => upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre}@test.com`, nombre })
+  const [delfina, rodri, sofi, tia] = [await usuario('Delfina'), await usuario('Rodri'), await usuario('Sofi'), await usuario('Tía')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const tele = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Tele' }, grupoId))!
+  const g = await iniciarRegaloGrupal(db, tele.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  await sumarseARegalo(db, g.giftId, tia.id)
+  const todos = [rodri.id, sofi.id, tia.id]
+  await comprarRegalo(db, g.giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 30000, [sofi.id]: 30000, [tia.id]: 30000 } })
+  await unirseAGrupo(db, grupo.inviteToken!, tia.id)
+  h.session = { userId: rodri.id }
+  // la parte de la Tía, en 0 y sumada a la de Rodri
+  expect(await fixGroupGiftAction(null, compra({
+    giftId: g.giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '60.000', [`parte:${sofi.id}`]: '30.000', [`parte:${tia.id}`]: '',
+  }, todos))).toEqual({
+    error: 'Tía se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole $30.000.',
+  })
+  await expect(fixGroupGiftAction(null, compra({
+    giftId: g.giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '45.000', [`parte:${sofi.id}`]: '15.000', [`parte:${tia.id}`]: '30.000',
+  }, todos))).rejects.toMatchObject({ url: '/cuentas?correccion=ok' })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(15000)
 })
