@@ -44,6 +44,16 @@ export type GiverItemView = OwnerItemView & {
 /** "Se puede repetir" es solo de las ideas: un "Quiero ESTO" con la marca (de antes de que se forzara) tiene cupo. */
 export const esRepetible = (i: { tipo: 'exacto' | 'idea'; repetible: boolean }) => i.tipo === 'idea' && i.repetible
 
+/**
+ * Si a un deseo le queda lugar, con las reservas que lo ocupan (ver ocupaSql), como en reserveItem: una idea que se
+ * puede repetir no tiene cupo; el resto, hasta su cantidad. Lo usan la lista del regalador y las fotos de Eventos.
+ */
+export function cupoDe(i: { tipo: 'exacto' | 'idea'; repetible: boolean; cantidad: number }, ocupados: number) {
+  if (esRepetible(i)) return { quedan: null, disponible: true }
+  const quedan = Math.max(0, i.cantidad - ocupados)
+  return { quedan, disponible: quedan > 0 }
+}
+
 export function pickItemFields(i: ItemRow): OwnerItemView {
   return {
     id: i.id, tipo: i.tipo, titulo: i.titulo, notas: i.notas, fotoUrl: i.fotoUrl,

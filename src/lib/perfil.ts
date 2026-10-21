@@ -51,6 +51,8 @@ export async function miFoto(db: Db, userId: string): Promise<string | null> {
 }
 
 export type PerfilPublico = {
+  /** La lista del link (para seguirla al abrir el perfil con sesión). */
+  listId: string
   id: string
   nombre: string
   foto: string | null
@@ -80,5 +82,5 @@ export async function perfilPublico(db: Db, token: string, quien?: string, hoy =
   const otros = duenos.length > 1
     ? await Promise.all(duenos.filter((d) => d.id !== u.id).map(async (d) => ({ id: d.id, nombre: d.nombre, foto: await miFoto(db, d.id) })))
     : []
-  return { id: u.id, nombre: u.nombre, foto: urlFoto(u), cumple, secciones: seccionesDeGustos(u.gustos), talles, otros }
+  return { listId: list.id, id: u.id, nombre: u.nombre, foto: urlFoto(u), cumple, secciones: seccionesDeGustos(u.gustos), talles, otros }
 }

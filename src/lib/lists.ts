@@ -4,7 +4,7 @@ import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { expireStaleClaims, miReservaVencida, ocupaSql } from '@/lib/claims'
 import { desdeElUltimoEvento } from '@/lib/events'
-import { esRepetible, pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
+import { cupoDe, esRepetible, pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { duenosDeLista, esDuenoSql, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
@@ -79,10 +79,7 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
 }
 
 function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimView[]): GiverItemView {
-  // una idea que se puede repetir no tiene cupo: la reservan todos los que quieran (como en reserveItem)
-  if (row.repetible) return { ...row, claims: itemClaims, quedan: null, disponible: true }
-  const quedan = Math.max(0, row.cantidad - itemClaims.length)
-  return { ...row, claims: itemClaims, quedan, disponible: quedan > 0 }
+  return { ...row, claims: itemClaims, ...cupoDe(row, itemClaims.length) }
 }
 
 function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaRegalador {

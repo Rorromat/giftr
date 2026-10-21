@@ -13,7 +13,7 @@ import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
-import { hoyLocal, MESES } from '@/lib/events'
+import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import type { GiverItemView, OwnerItemView } from '@/lib/serialize'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
@@ -69,6 +69,8 @@ export default async function DetalleItem({ params, searchParams }: {
     identified ? nombreDeViewer(db, viewer) : null,
     // volviendo de entrar con Google ("Me sumo"): si en este navegador había un invitado, se le pregunta si es él
     viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
+    // como en la lista: abrir un deseo con sesión (el link de un regalo grupal, el que mandó el dueño) la sigue
+    viewer.userId ? seguirLista(db, viewer.userId, detalle.listId) : null,
   ])
   // La reserva de un regalo grupal se maneja desde el regalo; acá solo las sueltas. Una por persona: con una comprada
   // tampoco se vuelve a ofrecer reservar (reserveItem devolvería esa). La compra se deshace solo si es de este evento.

@@ -5,9 +5,12 @@ import { claims, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, fechaDeGrupoValida } from '@/lib/groups'
+import { archiveItem } from '@/lib/items'
+import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, salirDeRegalo, sumarseARegalo } from '@/lib/regalos'
+import { miGente } from '@/lib/gente'
 import {
-  calendarioDelAnio, diasEntre, eventoDeLista, fechaCorta, fechaLarga, guardarCumple, guardarFechaGrupo,
-  hoyLocal, misEventos, proximaDeGrupo, proximaFecha, rotuloFechaGrupo, seguirLista,
+  calendarioDelAnio, desdeElUltimoEvento, diasEntre, eventoDeLista, fechaCorta, fechaDeGrupo, fechaLarga, guardarCumple,
+  guardarFechaGrupo, hoyLocal, inicioDelDia, misEventos, proximaDeGrupo, proximaFecha, rotuloFechaGrupo, seguirLista,
 } from '@/lib/events'
 
 const HOY = new Date(Date.UTC(2026, 7, 8)) // sábado 8 de agosto de 2026
@@ -73,13 +76,25 @@ test('el regalador ve el cumple de su gente con los 3 que más quiere sin reserv
 })
 
 test('REGLA DE LA SORPRESA: en sus propios eventos el dueño no recibe nada de reservas', async () => {
-  const { db, euge, caro } = await setup()
+  const { db, euge, caro, sofi, lista } = await setup()
+  // también con un regalo grupal armado y uno comprado, y con lo que ya no tiene lugar
+  const deseos = await db.select().from(items).where(eq(items.listId, lista.id))
+  const mate = deseos.find((d) => d.titulo === 'Mate')!
+  const copas = deseos.find((d) => d.titulo === 'Copas')!
+  const r = await iniciarRegaloGrupal(db, mate.id, sofi.id)
+  if (!r.ok) throw new Error('no se armó el regalo')
+  await sumarseARegalo(db, r.giftId, caro.id)
+  const otro = await iniciarRegaloGrupal(db, copas.id, caro.id)
+  if (!otro.ok) throw new Error('no se armó el regalo')
+  await comprarRegalo(db, otro.giftId, caro.id, { total: 30000 })
+
   const [tuCumple] = await misEventos(db, euge.id, HOY)
   expect(tuCumple).toMatchObject({ titulo: 'Tu cumple', propio: true, href: '/mi-lista' })
   expect(tuCumple.fotos).toEqual(['mate.jpg', 'zapas.jpg', 'copas.jpg']) // las reservadas también: no delata nada
   expect(tuCumple).not.toHaveProperty('misReservas')
+  expect(tuCumple).not.toHaveProperty('misGrupales')
   const json = JSON.stringify(await misEventos(db, euge.id, HOY)).toLowerCase()
-  for (const palabra of ['rodri', 'reserv', 'claim', 'comprado']) expect(json).not.toContain(palabra)
+  for (const palabra of ['rodri', 'sofi', 'caro', 'reserv', 'claim', 'comprado', 'grupal']) expect(json).not.toContain(palabra)
   const [mellizos] = await misEventos(db, caro.id, HOY)
   expect(mellizos).toMatchObject({ titulo: 'Cumple de los mellizos', propio: true, contexto: 'Tu grupo' })
   expect(mellizos).not.toHaveProperty('misReservas')
@@ -149,15 +164,138 @@ test('cuenta regresiva de una lista: cumple del dueño o fecha del grupo', async
   expect(await eventoDeLista(db, (await listaDe(db, rodri.id)).id, HOY)).toBeNull()
 })
 
+const cumpleEl = (dia: number, mes: number) => ({ cae: { dia, mes, anio: null, anual: true } })
+
 test('calendario del año: días por mes, eventos y hoy', () => {
   const meses = calendarioDelAnio([
-    { fecha: dia('2026-08-22'), anual: true },
-    { fecha: dia('2027-03-01'), anual: true }, // anual: se marca en marzo aunque la próxima sea el año que viene
-    { fecha: dia('2027-01-15'), anual: false }, // única del año que viene: no se marca en este calendario
+    cumpleEl(22, 8),
+    cumpleEl(1, 3), // anual: se marca en marzo aunque la próxima sea el año que viene
+    { cae: fechaDeGrupo('2027-01-15', false) }, // única del año que viene: no se marca en este calendario
   ], HOY)
   expect(meses).toHaveLength(12)
   expect(meses[1]).toMatchObject({ nombre: 'Feb', dias: 28 })
   expect(meses[7]).toMatchObject({ nombre: 'Ago', dias: 31, eventos: [22], hoy: 8, actual: true })
   expect(meses[2].eventos).toEqual([1])
   expect(meses[0].eventos).toEqual([])
+})
+
+const deseoDe = async (db: Db, listId: string, titulo: string) =>
+  (await db.select().from(items).where(eq(items.listId, listId))).find((d) => d.titulo === titulo)!
+
+async function regalo(db: Db, itemId: string, encargado: string) {
+  const r = await iniciarRegaloGrupal(db, itemId, encargado)
+  if (!r.ok) throw new Error(`no se armó el regalo: ${r.reason}`)
+  return r.giftId
+}
+
+test('Ya te ocupás: el que se sumó a un regalo grupal no ve "Todavía no reservaste nada", abierto o comprado', async () => {
+  const { db, lista, rodri, sofi } = await setup()
+  const mate = await deseoDe(db, lista.id, 'Mate')
+  const giftId = await regalo(db, mate.id, rodri.id)
+  expect(await sumarseARegalo(db, giftId, sofi.id)).toBe(true)
+  const deSofi = async () => (await misEventos(db, sofi.id, HOY)).find((e) => e.listId === lista.id)!
+  const deRodri = async () => (await misEventos(db, rodri.id, HOY)).find((e) => e.listId === lista.id)!
+  expect(await deSofi()).toMatchObject({ misReservas: 1, misGrupales: 1 })
+  // el encargado: las zapatillas sueltas y el mate en el regalo (que es suyo y de la reserva a su nombre: cuenta una vez)
+  expect(await deRodri()).toMatchObject({ misReservas: 2, misGrupales: 1 })
+
+  expect(await salirDeRegalo(db, giftId, sofi.id)).toBe(true)
+  expect(await deSofi()).toMatchObject({ misReservas: 0, misGrupales: 0 })
+  expect(await sumarseARegalo(db, giftId, sofi.id)).toBe(true)
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 40000 })).toEqual({ ok: true })
+  expect(await deSofi()).toMatchObject({ misReservas: 1, misGrupales: 1 })
+
+  // uno cancelado ya no es de nadie
+  const copas = await deseoDe(db, lista.id, 'Copas')
+  const otro = await regalo(db, copas.id, rodri.id)
+  expect(await sumarseARegalo(db, otro, sofi.id)).toBe(true)
+  expect(await deSofi()).toMatchObject({ misReservas: 2, misGrupales: 2 })
+  expect(await cancelarRegalo(db, otro, rodri.id)).toBe(true)
+  expect(await deSofi()).toMatchObject({ misReservas: 1, misGrupales: 1 })
+})
+
+test('Ya reservaste: solo lo de este cumple y de deseos que siguen en la lista', async () => {
+  const { db, euge, lista, rodri, sofi } = await setup()
+  const [libro, mate, copas] = [await deseoDe(db, lista.id, 'Libro'), await deseoDe(db, lista.id, 'Mate'), await deseoDe(db, lista.id, 'Copas')]
+  // el cumple pasado fue el 22/8/2025: lo comprado hasta ese día ya se regaló
+  await db.insert(claims).values([
+    { itemId: libro.id, claimerUserId: rodri.id, estado: 'comprado', createdAt: dia('2025-08-01'), updatedAt: dia('2025-08-15') },
+    { itemId: mate.id, claimerUserId: rodri.id, estado: 'comprado', createdAt: dia('2026-07-20'), updatedAt: dia('2026-08-01') },
+    { itemId: copas.id, claimerUserId: rodri.id, estado: 'comprado', createdAt: dia('2026-07-20'), updatedAt: dia('2026-08-01') },
+  ])
+  // las copas ya se las dieron: "Ya lo tengo" las saca de la lista
+  expect(await archiveItem(db, copas.id, euge.id, 'lo_tengo')).toBe(true)
+  const [cumple] = await misEventos(db, rodri.id, HOY)
+  expect(cumple).toMatchObject({ titulo: 'Cumple de Euge', misReservas: 2, misGrupales: 0 }) // las zapatillas y el mate
+
+  // un regalo grupal comprado para el cumple pasado tampoco: al año siguiente vuelve "Todavía no reservaste nada"
+  const [bici] = await db.insert(items).values({ listId: lista.id, tipo: 'exacto', titulo: 'Bici' }).returning()
+  const giftId = await regalo(db, bici.id, sofi.id)
+  await comprarRegalo(db, giftId, sofi.id, { total: 20000 })
+  await db.update(claims).set({ updatedAt: dia('2025-08-20') }).where(eq(claims.claimerUserId, sofi.id))
+  expect((await misEventos(db, sofi.id, HOY)).find((e) => e.listId === lista.id)).toMatchObject({ misReservas: 0, misGrupales: 0 })
+})
+
+test('fotos del evento: los deseos que todavía se pueden reservar (repetibles y con cantidad), como en la lista', async () => {
+  const { db, lista, rodri, sofi, caro } = await setup()
+  const [vinos, medias] = await db.insert(items).values([
+    { listId: lista.id, tipo: 'idea', titulo: 'Vinos', repetible: true, prioridad: 'mucho', fotoUrl: 'vinos.jpg' },
+    { listId: lista.id, tipo: 'exacto', titulo: 'Medias', cantidad: 3, prioridad: 'mucho', fotoUrl: 'medias.jpg' },
+  ]).returning()
+  await db.insert(claims).values([
+    { itemId: vinos.id, claimerUserId: rodri.id, expiresAt: new Date(Date.now() + 86400_000) },
+    { itemId: vinos.id, claimerUserId: caro.id, estado: 'comprado' },
+    { itemId: medias.id, claimerUserId: rodri.id, expiresAt: new Date(Date.now() + 86400_000) },
+    { itemId: medias.id, claimerUserId: caro.id, estado: 'comprado' },
+  ])
+  const fotos = async () => (await misEventos(db, sofi.id, HOY)).find((e) => e.listId === lista.id)!.fotos
+  expect(await fotos()).toEqual(['mate.jpg', 'vinos.jpg', 'medias.jpg']) // a las medias les queda 1 de 3
+  await db.insert(claims).values({ itemId: medias.id, claimerUserId: sofi.id, estado: 'comprado' })
+  expect(await fotos()).toEqual(['mate.jpg', 'vinos.jpg', 'copas.jpg'])
+})
+
+test('una fecha anual que todavía no cayó nunca cuenta hasta la primera vez, no hasta la de este año', async () => {
+  const hoy = dia('2026-10-21')
+  expect(proximaDeGrupo('2027-11-20', true, hoy)).toEqual(dia('2027-11-20'))
+  expect(proximaDeGrupo('2027-02-10', true, hoy)).toEqual(dia('2027-02-10'))
+  expect(proximaDeGrupo('2026-11-20', true, hoy)).toEqual(dia('2026-11-20'))
+  expect(proximaDeGrupo('2020-11-20', true, hoy)).toEqual(dia('2026-11-20'))
+  expect(proximaDeGrupo('2028-02-29', true, hoy)).toEqual(dia('2028-02-29'))
+  expect(rotuloFechaGrupo('2027-11-20', true, hoy)).toBe('Sábado 20 de noviembre · en 395 días')
+
+  const { db, caro, rodri } = await setup()
+  const casamiento = await crearGrupo(db, caro.id, { nombre: 'Casamiento de Ana y Beto', eventoFecha: '2027-11-20', eventoAnual: true })
+  await seguirLista(db, rodri.id, casamiento)
+  const deRodri = (await misEventos(db, rodri.id, hoy)).find((e) => e.listId === casamiento)!
+  expect(deRodri).toMatchObject({ fecha: dia('2027-11-20'), dias: 395 })
+  expect((await misEventos(db, caro.id, hoy)).find((e) => e.listId === casamiento)).toMatchObject({ dias: 395 })
+  expect(await eventoDeLista(db, casamiento, hoy)).toMatchObject({ fecha: dia('2027-11-20'), dias: 395 })
+  expect((await miGente(db, rodri.id, hoy)).find((c) => c.listId === casamiento)!.proxima).toMatchObject({ dias: 395 })
+  // en la grilla de este año no está (todavía no fue nunca); en la del que viene, sí
+  expect(calendarioDelAnio([deRodri], hoy)[10].eventos).toEqual([])
+  expect(calendarioDelAnio([deRodri], dia('2027-01-05'))[10].eventos).toEqual([20])
+  // y no hubo "uno anterior": lo de antes de un 20/11/2026 que no existió no queda afuera
+  const ahora = new Date('2026-12-01T15:00:00Z')
+  expect(await desdeElUltimoEvento(db, casamiento, ahora)).toEqual(new Date(ahora.getTime() - 365 * 86400_000))
+  // cuando ya pasó la primera, el anterior es esa
+  expect(await desdeElUltimoEvento(db, casamiento, new Date('2027-12-01T15:00:00Z'))).toEqual(inicioDelDia(dia('2027-11-21')))
+})
+
+test('el 29/2 en la grilla del año: el 28 en los años que no son bisiestos, el 29 en los que sí (como proximaFecha)', async () => {
+  // la próxima es el 29/2/2028, pero en la grilla de 2027 febrero tiene 28 días
+  expect(calendarioDelAnio([cumpleEl(29, 2)], dia('2027-06-01'))[1]).toMatchObject({ dias: 28, eventos: [28] })
+  // la próxima es el 28/2/2029, pero en 2028 cae el 29
+  expect(calendarioDelAnio([cumpleEl(29, 2)], dia('2028-06-01'))[1]).toMatchObject({ dias: 29, eventos: [29] })
+  expect(calendarioDelAnio([{ cae: fechaDeGrupo('2024-02-29', true) }], dia('2027-06-01'))[1].eventos).toEqual([28])
+  expect(calendarioDelAnio([cumpleEl(28, 2)], dia('2028-06-01'))[1].eventos).toEqual([28]) // un 28 de verdad sigue en el 28
+
+  // de punta a punta: Martín cumple el 29/2
+  const { db, sofi } = await setup()
+  const martin = await usuario(db, 'Martín')
+  await guardarCumple(db, martin.id, 29, 2)
+  await seguirLista(db, sofi.id, (await listaDe(db, martin.id)).id)
+  const hoy = dia('2027-06-01')
+  const eventos = await misEventos(db, sofi.id, hoy)
+  expect(eventos.find((e) => e.titulo === 'Cumple de Martín')!.fecha).toEqual(dia('2028-02-29'))
+  expect(calendarioDelAnio(eventos, hoy)[1].eventos).toEqual([28])
 })

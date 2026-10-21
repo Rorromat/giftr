@@ -1,9 +1,10 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
-import { claims, items, listFollows, listMembers, lists, users } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib/groups'
 import { expireStaleClaims } from '@/lib/claims'
 import { ultimosRegalos } from '@/lib/regalos'
+import { cupoDe } from '@/lib/serialize'
 
 // Eventos: los cumples de la gente cuyas listas abriste (las que "seguís") y las fechas de tus grupos,
 // más los tuyos. Las fechas se manejan como Date UTC a medianoche para que no se corran con la hora.
@@ -53,13 +54,41 @@ export const fechaCorta = (f: Date) => `${f.getUTCDate()} ${MESES[f.getUTCMonth(
 /** "12/10" */
 export const diaMes = (f: Date) => `${f.getUTCDate()}/${f.getUTCMonth() + 1}`
 
+/**
+ * Cuándo cae un evento: el cumple del dueño (todos los años, sin año: anio null) o la fecha de un grupo, que es la de la
+ * primera vez (anual o una sola).
+ */
+export type FechaEvento = { dia: number; mes: number; anio: number | null; anual: boolean }
+
+export function fechaDeGrupo(eventoFecha: string, anual: boolean): FechaEvento {
+  const [anio, mes, dia] = eventoFecha.split('-').map(Number)
+  return { dia, mes, anio, anual }
+}
+
+const primeraVez = (f: FechaEvento) => (f.anio === null ? null : new Date(Date.UTC(f.anio, f.mes - 1, f.dia)))
+
+/**
+ * La próxima vez (hoy incluido) que cae, o null si era una sola y ya pasó. Uno anual nunca antes de la primera: un
+ * casamiento cargado para dentro de un año y medio (con "Se repite todos los años" tildado) no es dentro de un mes.
+ */
+export function proximaVez(f: FechaEvento, hoy: Date): Date | null {
+  const primera = primeraVez(f)
+  if (primera && primera >= hoy) return primera
+  return f.anual ? proximaFecha(f.dia, f.mes, hoy) : null
+}
+
+/** La última vez que cayó antes de hoy, o null si todavía no cayó nunca. */
+export function vezAnterior(f: FechaEvento, hoy: Date): Date | null {
+  const primera = primeraVez(f)
+  if (!f.anual) return primera && primera < hoy ? primera : null
+  const esteAnio = enAnio(f.dia, f.mes, hoy.getUTCFullYear())
+  const anterior = esteAnio < hoy ? esteAnio : enAnio(f.dia, f.mes, hoy.getUTCFullYear() - 1)
+  return primera && anterior < primera ? null : anterior
+}
+
 /** Fecha de un grupo ('YYYY-MM-DD') vista desde hoy: la próxima si es anual, o la única si todavía no pasó. */
 export function proximaDeGrupo(eventoFecha: string | null, anual: boolean, hoy: Date): Date | null {
-  if (!eventoFecha) return null
-  const [y, m, d] = eventoFecha.split('-').map(Number)
-  if (anual) return proximaFecha(d, m, hoy)
-  const unica = new Date(Date.UTC(y, m - 1, d))
-  return unica >= hoy ? unica : null
+  return eventoFecha ? proximaVez(fechaDeGrupo(eventoFecha, anual), hoy) : null
 }
 
 /**
@@ -82,17 +111,25 @@ const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0]
 export type Evento = {
   listId: string
   titulo: string
+  /** La próxima vez que cae. */
   fecha: Date
   dias: number
   anual: boolean
+  /** Cuándo cae (para la grilla del año: el día de cada año, no el de la próxima vez). */
+  cae: FechaEvento
   propio: boolean
   href: string
   personas: string[]
   contexto: string | null
-  /** Hasta 3 fotos de los deseos que más quiere. Si sos regalador, solo los que nadie reservó. */
+  /** Hasta 3 fotos de los deseos que más quiere. Si sos regalador, solo los que todavía se pueden reservar. */
   fotos: string[]
-  /** Solo para el regalador: cuántos deseos de esa lista reservaste vos. Nunca está en eventos propios. */
+  /**
+   * Solo para el regalador: de cuántos deseos de esa lista te ocupás para este evento (ver misEventos): lo que reservaste
+   * o compraste y los regalos grupales en los que estás. Nunca está en eventos propios.
+   */
   misReservas?: number
+  /** Solo para el regalador: de esos, en cuántos estás en un regalo grupal. */
+  misGrupales?: number
   /** Solo para el regalador: el último regalo comprado de esa lista y quién se ocupó. */
   ultimo?: { encargado: string; titulo: string; fecha: Date }
 }
@@ -127,24 +164,27 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       : [],
   ])
 
-  const conFecha: Omit<Evento, 'fotos' | 'misReservas' | 'ultimo'>[] = []
+  const conFecha: Omit<Evento, 'fotos' | 'misReservas' | 'misGrupales' | 'ultimo'>[] = []
   for (const { list, propio } of todas) {
     if (list.tipo === 'personal') {
       const owner = owners.find((o) => o.id === list.ownerId)
       if (!owner?.cumpleDia || !owner.cumpleMes) continue
-      const fecha = proximaFecha(owner.cumpleDia, owner.cumpleMes, hoy)
+      const cae: FechaEvento = { dia: owner.cumpleDia, mes: owner.cumpleMes, anio: null, anual: true }
+      const fecha = proximaFecha(cae.dia, cae.mes, hoy)
       conFecha.push({
-        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: true, propio,
+        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: true, cae, propio,
         titulo: propio ? 'Tu cumple' : `Cumple de ${primerNombre(owner.nombre)}`,
         href: propio ? '/mi-lista' : `/l/${list.shareToken}`,
         personas: [owner.nombre],
         contexto: propio ? 'Tu lista' : null,
       })
     } else {
-      const fecha = proximaDeGrupo(list.eventoFecha, list.eventoAnual, hoy)
+      if (!list.eventoFecha) continue
+      const cae = fechaDeGrupo(list.eventoFecha, list.eventoAnual)
+      const fecha = proximaVez(cae, hoy)
       if (!fecha) continue
       conFecha.push({
-        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, propio,
+        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
         titulo: list.nombre ?? 'Grupo',
         href: propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
         personas: miembros.filter((m) => m.listId === list.id).map((m) => m.nombre),
@@ -157,32 +197,58 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   const ids = conFecha.map((e) => e.listId)
   const ajenas = conFecha.filter((e) => !e.propio).map((e) => e.listId)
   if (ajenas.length) await expireStaleClaims(db)
-  const [deseos, ocupados, ultimos] = await Promise.all([
-    db.select({ id: items.id, listId: items.listId, fotoUrl: items.fotoUrl, prioridad: items.prioridad, createdAt: items.createdAt })
-      .from(items).where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo'))),
-    // reservas solo de listas ajenas: el dueño nunca recibe información de reservas
+  const [deseos, ocupados, enGrupales, ultimos] = await Promise.all([
+    db.select({
+      id: items.id, listId: items.listId, fotoUrl: items.fotoUrl, prioridad: items.prioridad, createdAt: items.createdAt,
+      tipo: items.tipo, repetible: items.repetible, cantidad: items.cantidad,
+    }).from(items).where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo'))),
+    // reservas solo de listas ajenas, y de deseos que siguen en la lista: el dueño nunca recibe información de reservas
     ajenas.length
-      ? db.select({ itemId: claims.itemId, claimerUserId: claims.claimerUserId, listId: items.listId })
+      ? db.select({
+        id: claims.id, itemId: claims.itemId, claimerUserId: claims.claimerUserId, listId: items.listId,
+        estado: claims.estado, updatedAt: claims.updatedAt,
+      })
         .from(claims).innerJoin(items, eq(claims.itemId, items.id))
-        .where(and(inArray(items.listId, ajenas), inArray(claims.estado, ['reservado', 'comprado'])))
+        .where(and(inArray(items.listId, ajenas), eq(items.estadoDueno, 'activo'), inArray(claims.estado, ['reservado', 'comprado'])))
       : [],
+    // los regalos grupales en los que está (como encargado o sumado): su reserva es una sola, a nombre del encargado
+    ajenas.length
+      ? db.select({ claimId: groupGifts.claimId }).from(groupGiftMembers)
+        .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
+        .innerJoin(items, eq(groupGifts.itemId, items.id))
+        .where(and(eq(groupGiftMembers.userId, userId), inArray(groupGifts.estado, ['abierto', 'comprado']), inArray(items.listId, ajenas)))
+        .then((rows) => new Set(rows.map((r) => r.claimId)))
+      : new Set<string>(),
     ultimosRegalos(db, userId, ajenas),
   ])
-  const reservados = new Set(ocupados.map((c) => c.itemId))
+  const porDeseo = new Map<string, number>()
+  for (const c of ocupados) porDeseo.set(c.itemId, (porDeseo.get(c.itemId) ?? 0) + 1)
 
   return conFecha.map((e) => {
+    // para el regalador, como en su lista: lo que ya no tiene lugar no se muestra (una idea que se puede repetir, sí)
     const fotos = deseos
-      .filter((d) => d.listId === e.listId && d.fotoUrl && (e.propio || !reservados.has(d.id)))
+      .filter((d) => d.listId === e.listId && d.fotoUrl && (e.propio || cupoDe(d, porDeseo.get(d.id) ?? 0).disponible))
       .sort((a, b) => PESO[a.prioridad] - PESO[b.prioridad] || a.createdAt.getTime() - b.createdAt.getTime())
       .slice(0, 3).map((d) => d.fotoUrl!)
     if (e.propio) return { ...e, fotos }
-    const misReservas = new Set(ocupados.filter((c) => c.listId === e.listId && c.claimerUserId === userId).map((c) => c.itemId)).size
+    // De qué se ocupa para el evento que viene: lo reservado (vence, o es un regalo grupal abierto) y lo comprado para
+    // este (desde el día siguiente al anterior, ver desdeElUltimoEvento): lo que regaló el año pasado ya se regaló.
+    const desde = desdeDe(e.cae, hoy, inicioDelDia(hoy))
+    const suyos = ocupados.filter((c) => c.listId === e.listId && (c.claimerUserId === userId || enGrupales.has(c.id)) &&
+      (c.estado === 'reservado' || c.updatedAt >= desde))
+    const grupales = new Set(suyos.filter((c) => enGrupales.has(c.id)).map((c) => c.itemId))
     const u = ultimos.get(e.listId)
-    return { ...e, fotos, misReservas, ...(u && { ultimo: { encargado: u.encargado, titulo: u.titulo, fecha: u.fecha } }) }
+    return {
+      ...e, fotos, misReservas: new Set(suyos.map((c) => c.itemId)).size, misGrupales: grupales.size,
+      ...(u && { ultimo: { encargado: u.encargado, titulo: u.titulo, fecha: u.fecha } }),
+    }
   }).sort((a, b) => a.dias - b.dias || a.titulo.localeCompare(b.titulo))
 }
 
-/** Guarda la lista entre las que sigue el usuario (al abrirla como regalador). */
+/**
+ * Guarda la lista entre las que sigue el usuario: al abrir con sesión cualquier página de una lista ajena (la lista, un
+ * deseo, el perfil de un dueño), también al volver de entrar con Google desde ahí.
+ */
 export async function seguirLista(db: Db, userId: string, listId: string) {
   await db.insert(listFollows).values({ userId, listId }).onConflictDoNothing()
 }
@@ -194,46 +260,39 @@ export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
 }
 
 /** La fecha de una lista: el cumple del dueño (todos los años) o la del grupo. */
-async function fechaDeLista(db: Db, listId: string) {
+async function fechaDeLista(db: Db, listId: string): Promise<(FechaEvento & { esCumple: boolean }) | null> {
   if (!esUuid(listId)) return null
   const [row] = await db.select({ list: lists, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes })
     .from(lists).leftJoin(users, eq(lists.ownerId, users.id)).where(eq(lists.id, listId))
   if (!row) return null
   if (row.list.tipo === 'personal') {
-    return row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: 0, anual: true } : null
+    return row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null
   }
   if (!row.list.eventoFecha) return null
-  const [anio, mes, dia] = row.list.eventoFecha.split('-').map(Number)
-  return { esCumple: false, dia, mes, anio, anual: row.list.eventoAnual }
+  return { esCumple: false, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) }
 }
 
 /** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
 export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
   const f = await fechaDeLista(db, listId)
-  if (!f) return null
-  const unica = new Date(Date.UTC(f.anio, f.mes - 1, f.dia))
-  const fecha = f.anual ? proximaFecha(f.dia, f.mes, hoy) : unica >= hoy ? unica : null
-  if (!fecha) return null
+  const fecha = f && proximaVez(f, hoy)
+  if (!f || !fecha) return null
   return { esCumple: f.esCumple, fecha, dias: diasEntre(hoy, fecha) }
+}
+
+/** desdeElUltimoEvento con la fecha ya leída (null: la lista no tiene). */
+function desdeDe(f: FechaEvento | null, hoy: Date, ahora: Date): Date {
+  const anterior = f && vezAnterior(f, hoy)
+  return anterior ? inicioDelDia(new Date(anterior.getTime() + DIA)) : new Date(ahora.getTime() - 365 * DIA)
 }
 
 /**
  * Desde cuándo algo es "para el evento que viene" en una lista: desde el día siguiente al último que ya pasó (el cumple
- * del dueño o la fecha del grupo; el día del evento todavía es de ese). Sin uno anterior (sin fecha, o una única que
- * todavía no llegó), un año para atrás. Lo de antes ya se regaló: es historial.
+ * del dueño o la fecha del grupo; el día del evento todavía es de ese). Sin uno anterior (sin fecha, o una que todavía
+ * no cayó nunca), un año para atrás. Lo de antes ya se regaló: es historial.
  */
 export async function desdeElUltimoEvento(db: Db, listId: string, ahora = new Date()): Promise<Date> {
-  const hoy = hoyLocal(ahora)
-  const f = await fechaDeLista(db, listId)
-  let anterior: Date | null = null
-  if (f?.anual) {
-    const esteAnio = enAnio(f.dia, f.mes, hoy.getUTCFullYear())
-    anterior = esteAnio < hoy ? esteAnio : enAnio(f.dia, f.mes, hoy.getUTCFullYear() - 1)
-  } else if (f) {
-    const unica = new Date(Date.UTC(f.anio, f.mes - 1, f.dia))
-    anterior = unica < hoy ? unica : null
-  }
-  return anterior ? inicioDelDia(new Date(anterior.getTime() + DIA)) : new Date(ahora.getTime() - 365 * DIA)
+  return desdeDe(await fechaDeLista(db, listId), hoyLocal(ahora), ahora)
 }
 
 export async function miCumple(db: Db, userId: string): Promise<{ dia: number; mes: number } | null> {
@@ -262,15 +321,22 @@ export async function guardarFechaGrupo(db: Db, listId: string, userId: string, 
 
 export type MesCalendario = { nombre: string; dias: number; eventos: number[]; hoy: number | null; actual: boolean }
 
-/** Los 12 meses del año de hoy con los días que tienen eventos (anuales en su día; únicos solo si caen este año). */
-export function calendarioDelAnio(eventos: Pick<Evento, 'fecha' | 'anual'>[], hoy: Date): MesCalendario[] {
+/**
+ * Los 12 meses del año de hoy con los días que tienen eventos: los anuales en el día en que caen este año (el 29/2, el
+ * 28 si este no es bisiesto, como en proximaFecha), si ya había sido la primera vez; los únicos, solo si son de este año.
+ */
+export function calendarioDelAnio(eventos: Pick<Evento, 'cae'>[], hoy: Date): MesCalendario[] {
   const anio = hoy.getUTCFullYear()
+  const enEsteAnio = eventos.flatMap(({ cae: f }) => {
+    if (!f.anual) return f.anio === anio ? [new Date(Date.UTC(anio, f.mes - 1, f.dia))] : []
+    const dia = enAnio(f.dia, f.mes, anio)
+    const primera = primeraVez(f)
+    return primera && dia < primera ? [] : [dia]
+  })
   return MESES.map((nombre, m) => ({
     nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1, 3),
     dias: new Date(Date.UTC(anio, m + 1, 0)).getUTCDate(),
-    eventos: [...new Set(eventos
-      .filter((e) => e.fecha.getUTCMonth() === m && (e.anual || e.fecha.getUTCFullYear() === anio))
-      .map((e) => e.fecha.getUTCDate()))],
+    eventos: [...new Set(enEsteAnio.filter((f) => f.getUTCMonth() === m).map((f) => f.getUTCDate()))],
     hoy: hoy.getUTCMonth() === m ? hoy.getUTCDate() : null,
     actual: hoy.getUTCMonth() === m,
   }))

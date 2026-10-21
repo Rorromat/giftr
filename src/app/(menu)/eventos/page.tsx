@@ -18,13 +18,24 @@ function Fotos({ e }: { e: Evento }) {
   )
 }
 
+/** "Ya reservaste 1 regalo · Estás en un regalo grupal": los sueltos y los grupales por separado (sumarse no es reservar). */
+function TeOcupas({ e }: { e: Evento }) {
+  const grupales = e.misGrupales ?? 0
+  const sueltos = (e.misReservas ?? 0) - grupales
+  const partes = [
+    sueltos > 0 && `Ya reservaste ${sueltos} ${sueltos === 1 ? 'regalo' : 'regalos'}`,
+    grupales > 0 && `Estás en ${grupales === 1 ? 'un regalo grupal' : `${grupales} regalos grupales`}`,
+  ].filter(Boolean)
+  return <p className="text-[13px] font-semibold">{partes.join(' · ')}</p>
+}
+
 function Estado({ e }: { e: Evento }) {
   // Al dueño nunca se le dice nada de reservas: solo se le recuerda revisar su lista.
   if (e.propio) return <p className="text-[13px] font-semibold text-gr-muted">¿Tu lista está al día?</p>
   return (
     <>
       {e.misReservas
-        ? <p className="text-[13px] font-semibold">Ya reservaste {e.misReservas} {e.misReservas === 1 ? 'regalo' : 'regalos'}</p>
+        ? <TeOcupas e={e} />
         : <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-[13px] font-bold">Todavía no reservaste nada</p>}
       {e.ultimo && <p className="text-[13px] font-medium text-gr-muted [overflow-wrap:anywhere]">El último lo compró {e.ultimo.encargado}: {e.ultimo.titulo}</p>}
     </>
