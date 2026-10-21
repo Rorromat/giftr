@@ -9,7 +9,10 @@ export function PrioritySelect({ itemId, prioridad }: { itemId: string; priorida
   return (
     <form ref={formRef} action={updatePriorityAction} className="relative inline-flex items-center">
       <input type="hidden" name="itemId" value={itemId} />
+      {/* key: con lo guardado se arma de nuevo; si no, al terminar la acción React deja el formulario como estaba al
+          montarse y el select volvía al valor viejo (la etiqueta de la foto decía otra cosa) */}
       <select
+        key={prioridad}
         name="prioridad"
         aria-label="Cuánto lo querés"
         defaultValue={prioridad}

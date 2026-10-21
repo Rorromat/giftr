@@ -10,6 +10,8 @@ import { misGustos } from '@/lib/bienvenida'
 import { miFoto } from '@/lib/perfil'
 import { FotoPerfil } from '@/components/FotoPerfil'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { CumpleCampos } from '@/components/CumpleCampos'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
 import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
@@ -22,8 +24,8 @@ import { Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
-export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string }> }) {
-  const { nuevo } = await searchParams
+export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string }> }) {
+  const { nuevo, cumple: avisoCumple } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, cuentas, gustos] = await Promise.all([
@@ -123,25 +125,31 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         <Icon name="chevron" size={20} strokeWidth={2.6} />
       </Link>
 
-      {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista */}
-      <form id="cumple" action={saveBirthdayAction} className="gr-sticker flex flex-col gap-3 p-3.5">
+      {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista. La key lo vuelve a armar con lo
+          guardado: React deja el formulario como estaba al montarse y un <select> volvía al valor viejo. */}
+      <form key={`${cumple?.dia ?? ''}-${cumple?.mes ?? ''}-${avisoCumple ?? ''}`} id="cumple" action={saveBirthdayAction}
+            className="gr-sticker flex scroll-mt-6 flex-col gap-3 p-3.5">
         <div>
           <p className="font-display text-lg font-extrabold">Tu cumple</p>
           <p className="text-[13px] font-medium leading-snug">
             {cumple ? `El ${cumple.dia} de ${MESES[cumple.mes - 1]}. ` : ''}Tu gente lo ve en Eventos, con tiempo para elegir.
           </p>
         </div>
+        {avisoCumple === 'invalido' && (
+          <>
+            <input type="hidden" name="conAviso" value="1" />
+            <p role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
+          </>
+        )}
         <div className="flex gap-2">
-          <select name="dia" aria-label="Día" defaultValue={cumple?.dia ?? ''} className="gr-input w-[30%] min-w-0">
-            <option value="">Día</option>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select name="mes" aria-label="Mes" defaultValue={cumple?.mes ?? ''} className="gr-input min-w-0 flex-1">
-            <option value="">Mes</option>
-            {MESES.map((m, i) => <option key={m} value={i + 1}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
-          </select>
-          <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
+          <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" />
+          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</BotonEnviar>
         </div>
+        {cumple && (
+          <BotonEnviar name="quitar" value="1" formNoValidate className="self-start min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">
+            Quitar mi cumple
+          </BotonEnviar>
+        )}
       </form>
 
       {invitado && <UnirInvitado nombre={invitado} />}

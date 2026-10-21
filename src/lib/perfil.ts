@@ -51,8 +51,9 @@ export async function miFoto(db: Db, userId: string): Promise<string | null> {
 }
 
 export type PerfilPublico = {
-  /** La lista del link (para seguirla al abrir el perfil con sesión). */
+  /** La lista del link (para seguirla al abrir el perfil con sesión) y si es de un grupo. */
   listId: string
+  tipo: 'personal' | 'grupo'
   id: string
   nombre: string
   foto: string | null
@@ -69,7 +70,7 @@ export type PerfilPublico = {
  * En un grupo, `quien` elige el dueño (por defecto el primero). Null si el token o el dueño no existen.
  */
 export async function perfilPublico(db: Db, token: string, quien?: string, hoy = hoyLocal()): Promise<PerfilPublico | null> {
-  const [list] = await db.select({ id: lists.id, ownerId: lists.ownerId }).from(lists).where(eq(lists.shareToken, token))
+  const [list] = await db.select({ id: lists.id, ownerId: lists.ownerId, tipo: lists.tipo }).from(lists).where(eq(lists.shareToken, token))
   if (!list) return null
   const duenos = await duenosDeLista(db, list)
   const elegido = (quien && duenos.find((d) => d.id === quien)) || duenos[0]
@@ -82,5 +83,5 @@ export async function perfilPublico(db: Db, token: string, quien?: string, hoy =
   const otros = duenos.length > 1
     ? await Promise.all(duenos.filter((d) => d.id !== u.id).map(async (d) => ({ id: d.id, nombre: d.nombre, foto: await miFoto(db, d.id) })))
     : []
-  return { listId: list.id, id: u.id, nombre: u.nombre, foto: urlFoto(u), cumple, secciones: seccionesDeGustos(u.gustos), talles, otros }
+  return { listId: list.id, tipo: list.tipo, id: u.id, nombre: u.nombre, foto: urlFoto(u), cumple, secciones: seccionesDeGustos(u.gustos), talles, otros }
 }

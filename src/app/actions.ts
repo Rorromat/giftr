@@ -165,12 +165,23 @@ export async function setGroupDateAction(formData: FormData) {
 
 const numero = (fd: FormData, k: string) => { const v = Number(str(fd, k)); return Number.isInteger(v) && v > 0 ? v : null }
 
+/**
+ * "Tu cumple" en Perfil. Se borra solo con "Quitar": un envío con los campos vacíos (un segundo "Guardar" después de que el
+ * formulario volvió a como estaba) no lo borra. Si falta el día o el mes, o la fecha no existe, vuelve con el aviso
+ * (antes no se guardaba y no decía nada).
+ */
 export async function saveBirthdayAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+  const [dia, mes] = [numero(formData, 'dia'), numero(formData, 'mes')]
+  const ok = formData.get('quitar')
+    ? await guardarCumple(db, session.userId, null, null)
+    : dia !== null && mes !== null && await guardarCumple(db, session.userId, dia, mes)
   revalidatePath('/perfil')
   revalidatePath('/eventos')
+  if (!ok) redirect('/perfil?cumple=invalido#cumple')
+  // si arriba quedó el aviso de un intento anterior, se va
+  if (str(formData, 'conAviso')) redirect('/perfil#cumple')
 }
 
 /** Bienvenida (o editar gustos desde Perfil): guarda lo elegido, aunque se corte a mitad de camino. */
@@ -178,11 +189,14 @@ export async function saveGustosAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   await guardarGustos(db, session.userId, gustosDesdeForm(formData))
-  if (formData.has('dia')) await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+  // los dos vacíos lo borran (los campos vienen con el cumple guardado); uno sin el otro, o uno que no existe, no se guarda
+  const cumpleOk = !formData.has('dia') || await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
   revalidatePath('/perfil')
   revalidatePath('/eventos')
   revalidatePath('/mi-lista')
   const desdePerfil = str(formData, 'volver') === 'perfil'
+  // lo demás ya se guardó: vuelve al primer paso a avisar, en vez de seguir como si el cumple estuviera
+  if (!cumpleOk) redirect(`/bienvenida?${desdePerfil ? 'editar=1&' : ''}paso=0&cumple=invalido`)
   if (formData.has('corte')) redirect(desdePerfil ? '/perfil' : '/mi-lista')
   redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/listo')
 }
