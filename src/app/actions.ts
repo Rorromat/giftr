@@ -18,7 +18,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { crearGrupo, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
@@ -50,14 +50,16 @@ const entero = (fd: FormData, k: string) => {
 /** Solo rutas de la app ("/l/…"), nunca a otro sitio. */
 const rutaPropia = (v?: string) => (v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : '/')
 
+/** La lista del link para regalar. Un token que no puede ser (armado a mano, con un \u0000) no es de ninguna. */
 async function listaDeToken(token: string): Promise<string | null> {
+  if (!esToken(token)) return null
   const [row] = await db.select({ id: lists.id }).from(lists).where(eq(lists.shareToken, token))
   return row?.id ?? null
 }
 
 /** La lista del deseo, si el deseo es de la lista de ese token. Un id que no es de un deseo no es de ninguna. */
 async function listaDelItem(itemId: string, token: string): Promise<string | null> {
-  if (!esUuid(itemId)) return null
+  if (!esUuid(itemId) || !esToken(token)) return null
   const [row] = await db.select({ id: lists.id }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, token)))
@@ -206,6 +208,8 @@ export async function saveGustosAction(formData: FormData) {
 
 export async function joinGroupAction(formData: FormData) {
   const invite = str(formData, 'invite') ?? ''
+  // una invitación que no puede ser no es de ningún grupo (y no se arma una dirección con lo que vino)
+  if (!esToken(invite)) redirect('/mi-lista')
   const session = await auth()
   if (!session?.userId) redirect(`/grupos/unirme/${invite}`)
   const id = await unirseAGrupo(db, invite, session.userId)

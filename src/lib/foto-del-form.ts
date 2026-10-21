@@ -23,6 +23,19 @@ export function estadoDelLink(escrito: string, guardado: string | null, probados
 }
 
 /**
+ * Por qué el formulario todavía no se puede mandar (null si se puede). Mientras sube una foto o se prueba un link, escrito o
+ * copiado con Pegar, el deseo se guardaría sin la foto; con un link que no es una foto, se mandaría sin foto y el que lo
+ * escribió no se entera. Con una foto subida, lo escrito en el link ya no cuenta (la subida lo vacía).
+ */
+export function porQueEsperar(p: { subiendo: boolean; probandoPegado: boolean; subida: boolean; estado: EstadoLink | null }):
+  'subiendo' | Exclude<EstadoLink, 'ok'> | null {
+  if (p.subiendo) return 'subiendo'
+  if (p.probandoPegado) return 'probando'
+  if (p.subida || p.estado === 'ok') return null
+  return p.estado
+}
+
+/**
  * Un pegado que trae una imagen, en cualquier campo del formulario. Una planilla o una nota copian el texto y además una
  * imagen de cómo se ve: el texto se pega normal en el campo y la imagen se sube solo si todavía no hay foto. Una imagen
  * sola ("Copiar imagen", que a veces trae también su link) es la foto. Nunca dos subidas a la vez.

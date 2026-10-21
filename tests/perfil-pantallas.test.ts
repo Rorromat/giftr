@@ -31,6 +31,7 @@ import { saveBirthdayAction, saveGustosAction } from '@/app/actions'
 import Listo from '@/app/bienvenida/listo/page'
 import Bienvenida from '@/app/bienvenida/page'
 import PerfilPublico from '@/app/l/[token]/perfil/page'
+import Perfil from '@/app/(menu)/perfil/page'
 
 function form(campos: Record<string, string>) {
   const fd = new FormData()
@@ -67,6 +68,34 @@ test('Tu cumple en Perfil: se borra solo con "Quitar"; vacío, a medias o imposi
   expect(await miCumple(h.db, owner.id)).toEqual({ dia: 29, mes: 2 })
   expect(await redirige(saveBirthdayAction(form({ dia: '', mes: '', quitar: '1' })))).toBeNull()
   expect(await miCumple(h.db, owner.id)).toBeNull()
+})
+
+/** El elemento con ese id en lo que devuelve una página (sin renderizar los componentes: solo el árbol). */
+function conId(nodo: React.ReactNode, id: string): React.ReactElement | null {
+  if (Array.isArray(nodo)) {
+    for (const n of nodo) {
+      const r = conId(n, id)
+      if (r) return r
+    }
+    return null
+  }
+  if (!nodo || typeof nodo !== 'object' || !('props' in nodo)) return null
+  const el = nodo as React.ReactElement<{ id?: string; children?: React.ReactNode }>
+  return el.props.id === id ? el : conId(el.props.children, id)
+}
+
+test('Tu cumple en Perfil: el formulario se vuelve a armar con lo guardado (si no, un select quedaba en el valor viejo)', async () => {
+  const { owner } = await preparar()
+  const formCumple = async (sp: Record<string, string> = {}) => conId(await Perfil({ searchParams: Promise.resolve(sp) }), 'cumple')!.key
+  const sinCumple = await formCumple()
+  await guardarCumple(h.db, owner.id, 12, 10)
+  const conCumple = await formCumple()
+  // con el aviso de un cumple que no se guardó también se arma de nuevo (el aviso y los selects con lo guardado)
+  const conAviso = await formCumple({ cumple: 'invalido' })
+  expect(new Set([sinCumple, conCumple, conAviso]).size).toBe(3)
+  await guardarCumple(h.db, owner.id, 3, 4)
+  expect(await formCumple()).not.toBe(conCumple)
+  expect(await formCumple()).toBe(await formCumple())
 })
 
 test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gustos y vuelve al primer paso con el aviso', async () => {

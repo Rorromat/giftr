@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { duenosDeLista, esUuid, juntarNombres } from '@/lib/groups'
+import { duenosDeLista, esToken, esUuid, juntarNombres } from '@/lib/groups'
 
 // Lo que se muestra al compartir un link (vista previa de WhatsApp, imagen Open Graph).
 // Es lo mismo que ve cualquiera con el link, y NUNCA incluye reservas, compras ni comentarios:
@@ -27,6 +27,7 @@ export type ListaCompartida = {
 const PESO = { mucho: 0, gustaria: 1, suelta: 2 } as const
 
 async function listaPorToken(db: Db, token: string) {
+  if (!esToken(token)) return null
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, token))
   if (!list) return null
   const duenos = await duenosDeLista(db, list)

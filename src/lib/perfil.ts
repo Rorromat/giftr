@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import sharp from 'sharp'
 import { fotosPerfil, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { duenosDeLista, esUuid } from '@/lib/groups'
+import { duenosDeLista, esToken, esUuid } from '@/lib/groups'
 import { diasEntre, hoyLocal, proximaFecha } from '@/lib/events'
 import { seccionesDeGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { urlFoto } from '@/lib/users'
@@ -70,6 +70,7 @@ export type PerfilPublico = {
  * En un grupo, `quien` elige el dueño (por defecto el primero). Null si el token o el dueño no existen.
  */
 export async function perfilPublico(db: Db, token: string, quien?: string, hoy = hoyLocal()): Promise<PerfilPublico | null> {
+  if (!esToken(token)) return null
   const [list] = await db.select({ id: lists.id, ownerId: lists.ownerId, tipo: lists.tipo }).from(lists).where(eq(lists.shareToken, token))
   if (!list) return null
   const duenos = await duenosDeLista(db, list)

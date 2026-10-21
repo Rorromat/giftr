@@ -3,7 +3,7 @@ import webpush from 'web-push'
 import { codazos, config, lists, pushSubs } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { duenosDeLista, esDuenoSql } from '@/lib/groups'
+import { duenosDeLista, esDuenoSql, esToken } from '@/lib/groups'
 
 // Codazo: quien regala le pide al dueño que cargue su lista. Le llega como aviso push (si lo activó)
 // y como cartel en Mi lista. No dice nada de reservas: solo quién le dio el codazo.
@@ -91,6 +91,7 @@ export type CodazoResult =
  */
 export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNombre: string, enviar: Enviar = enviarConWebPush): Promise<CodazoResult> {
   if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
+  if (!esToken(token)) return { ok: false, reason: 'no_existe' }
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, token))
   if (!list) return { ok: false, reason: 'no_existe' }
   const duenos = await duenosDeLista(db, list)

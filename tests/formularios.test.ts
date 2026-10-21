@@ -6,7 +6,7 @@ import { claims, comments, items, lists, notifications } from '@/db/schema'
 import { createItem, updateItem } from '@/lib/items'
 import { addComment } from '@/lib/comments'
 import { markBought, reserveItem } from '@/lib/claims'
-import { AVISO_LINK_LARGO, avisoDelLink, avisoDelTitulo, deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
+import { AVISO_LINK_LARGO, AVISO_NO_ES_LINK, avisoDelLink, avisoDelTitulo, deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { largo, recortar } from '@/lib/limites'
 import { linkHttp } from '@/lib/links'
 import { guardarGustos, misGustos } from '@/lib/bienvenida'
@@ -79,6 +79,32 @@ test('recortar: un carácter con cientos de miles de marcas encimadas (texto "za
   expect((await h.db.select().from(comments))[0].texto.length).toBe(5)
 })
 
+test('recortar: un carácter de cientos de unidades sin marcas (emojis con ZWJ, tonos de piel, etiquetas, jamo) no pasa entero', async () => {
+  // cada uno es un solo carácter de verdad, sin un \p{M}: antes entraba entero si el largo de JS entraba
+  const enteros = ['😀\u200d'.repeat(160) + '😀', '👍' + '🏻'.repeat(240), '🏴' + '\u{E0067}'.repeat(240), 'ᄀ'.repeat(480)]
+  for (const uno of enteros) {
+    expect(largo(uno)).toBe(1)
+    expect(recortar(uno, 500).length).toBeLessThanOrEqual(32)
+    expect(recortar(`Mate ${uno} rojo`, 120)).toMatch(/^Mate \S+ rojo$/u)
+    expect(recortar(`Mate ${uno} rojo`, 120).length).toBeLessThan(45)
+  }
+  const nombre = validarNombre(`Ro${enteros[0]}`)
+  expect(nombre.ok && nombre.nombre.length).toBeLessThanOrEqual(34)
+
+  const { owner, giver } = await preparar()
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: enteros[0].slice(0, 119) }))!
+  expect(item.titulo.length).toBeLessThanOrEqual(32)
+  expect(await addComment(h.db, item.id, { userId: giver.id }, enteros[1])).toBe(true)
+  expect((await h.db.select().from(comments))[0].texto.length).toBeLessThanOrEqual(32)
+})
+
+test('sin los caracteres que dan vuelta lo que sigue: un nombre con U+202E no da vuelta "Reservado por …"', () => {
+  expect(validarNombre('Rodri\u202e\u2066x\u2069')).toEqual({ ok: true, nombre: 'Rodrix' })
+  expect(recortar('hola\u202a\u202b\u202c\u202d\u202e\u2067\u2068chau', 20)).toBe('holachau')
+  // los de dirección que no dan vuelta nada (y el texto en otro alfabeto) quedan
+  expect(recortar('שלום\u200f ok', 20)).toBe('שלום\u200f ok')
+})
+
 test('links: sin https:// se lo agrega si tiene pinta de dominio; lo que no es un link de una página, no', () => {
   const casos: [string, string | null][] = [
     ['mercadolibre.com.ar/MLA-1', 'https://mercadolibre.com.ar/MLA-1'],
@@ -118,8 +144,9 @@ test('el formulario de un deseo: el link pegado en el título pasa a "Link a la 
   expect(deseoDesdeForm(form({ titulo: ML }))).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: ML })
   expect(deseoDesdeForm(form({ titulo: `Mate imperial ${ML}` }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
   expect(deseoDesdeForm(form({ titulo: 'www.zara.com/ar/campera' }))).toMatchObject({ titulo: 'zara.com', linkTienda: 'https://www.zara.com/ar/campera' })
-  // si ya puso un link a la tienda, no se pisa: el del título se va
-  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: 'https://otra.com/x' }))).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: 'https://otra.com/x' })
+  // si ya puso otro link a la tienda, no se pisa ni se pierde el del título: queda en el título
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: 'https://otra.com/x' }))).toMatchObject({ titulo: ML, linkTienda: 'https://otra.com/x' })
+  expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: 'otra.com/x' }))).toMatchObject({ titulo: `Mate ${ML}`, linkTienda: 'https://otra.com/x' })
   // un título sin link queda como está
   expect(deseoDesdeForm(form({ titulo: 'Zara.com gift card' }))).toMatchObject({ titulo: 'Zara.com gift card', linkTienda: null })
   expect(deseoDesdeForm(form({ titulo: '   ' }))).toBeNull()
@@ -137,6 +164,37 @@ test('el formulario de un deseo: vacío es null, un link que no es link es undef
   expect(deseoDesdeForm(form({ titulo: 'x', fotoUrl: '/foto/deseo/6a1c701f-89b2-4797-ad8e-0bec5918fc9a' }))!.fotoUrl)
     .toBe('/foto/deseo/6a1c701f-89b2-4797-ad8e-0bec5918fc9a')
   expect(deseoDesdeForm(form({ titulo: 'x', fotoUrl: 'javascript:alert(1)' }))!.fotoUrl).toBeUndefined()
+  // una foto subida va como la ruta, en minúsculas (con mayúsculas la ruta no la encuentra, y la limpieza tampoco)
+  expect(deseoDesdeForm(form({ titulo: 'x', fotoUrl: '/FOTO/DESEO/6A1C701F-89B2-4797-AD8E-0BEC5918FC9A' }))!.fotoUrl)
+    .toBe('/foto/deseo/6a1c701f-89b2-4797-ad8e-0bec5918fc9a')
+})
+
+test('volver a cargar enseguida el mismo deseo con otra cantidad, prioridad o "se puede repetir" no es un doble toque', async () => {
+  const { owner, list } = await preparar()
+  const base = { tipo: 'idea' as const, titulo: 'Velas', linkTienda: 'https://velas.com/x' }
+  const primero = (await createItem(h.db, owner.id, base))!
+  // un doble toque manda lo mismo: sin venir, la cantidad, la prioridad y la marca son las de la columna
+  expect((await createItem(h.db, owner.id, { ...base, cantidad: 1, prioridad: 'gustaria', repetible: false }))!.id).toBe(primero.id)
+  for (const otro of [{ cantidad: 3 }, { prioridad: 'mucho' as const }, { repetible: true }]) {
+    const creado = (await createItem(h.db, owner.id, { ...base, ...otro }))!
+    expect(creado.id).not.toBe(primero.id)
+    expect(creado).toMatchObject(otro)
+  }
+  expect(await h.db.select().from(items).where(eq(items.listId, list.id))).toHaveLength(4)
+})
+
+test('editar un deseo de antes con un link en el título y otro a la tienda: cambiar la prioridad no le toca el título ni avisa', async () => {
+  const { owner, giver } = await preparar()
+  const titulo = `Mate ${ML}`
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Mate', linkTienda: 'https://otra.com/x' }))!
+  await h.db.update(items).set({ titulo }).where(eq(items.id, item.id))
+  const r = await reserveItem(h.db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error('no reservó')
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, linkTienda: 'https://otra.com/x', prioridad: 'mucho' }))))
+    .toBe('/mi-lista')
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
+    .toMatchObject({ titulo, linkTienda: 'https://otra.com/x', prioridad: 'mucho' })
+  expect(await h.db.select().from(notifications)).toEqual([])
 })
 
 test('dos productos de la misma tienda pegados seguidos en el título son dos deseos (no un doble toque)', async () => {
@@ -225,6 +283,31 @@ test('el título y el link avisan en el navegador antes de que el servidor los c
   expect(avisoDelLink(largoLink)).toBe(AVISO_LINK_LARGO)
   expect(avisoDelLink(ML)).toBe('')
   expect(avisoDelLink('')).toBe('')
+  // lo que el servidor no toma como link (y descartaba sin avisar: al agregar no se guardaba, al editar quedaba el de antes)
+  for (const v of ['@lacasadelmate.ar', 'tienda.com.ar.', 'tienda..com', 'zara campera']) {
+    expect(avisoDelLink(v), v).toBe(AVISO_NO_ES_LINK)
+    expect(deseoDesdeForm(form({ titulo: 'Mate', linkTienda: v }))!.linkTienda, v).toBeUndefined()
+  }
+  expect(avisoDelLink('mercadolibre.com.ar/MLA-1')).toBe('')
+  // con otro link a la tienda, el del título se queda en el título: ahí cuenta en el largo
+  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`, true)).toContain('sobran')
+  expect(avisoDelTitulo('Mate imperial', true)).toBe('')
+})
+
+test('sin Intl.Segmenter (Firefox antes de 125, Safari antes de 14.1) los formularios cargan igual', async () => {
+  const original = Intl.Segmenter
+  Object.defineProperty(Intl, 'Segmenter', { value: undefined, configurable: true, writable: true })
+  vi.resetModules()
+  try {
+    // antes se creaba al cargar el archivo, y la página de agregar ni hidrataba
+    const viejo = await import('@/lib/deseo-form')
+    expect(viejo.avisoDelTitulo('x'.repeat(121))).toContain('sobran 1.')
+    const limites = await import('@/lib/limites')
+    expect(limites.recortar('ab😀cd', 3)).toBe('ab😀')
+    expect(limites.largo('hola')).toBe(4)
+  } finally {
+    Object.defineProperty(Intl, 'Segmenter', { value: original, configurable: true, writable: true })
+  }
 })
 
 test('comentarios de hasta 500 caracteres; con un id que no es de un deseo, no hace nada (ni un error)', async () => {

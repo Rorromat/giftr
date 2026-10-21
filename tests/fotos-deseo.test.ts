@@ -6,7 +6,7 @@ import { fotosDeseo, items, lists } from '@/db/schema'
 import { createItem } from '@/lib/items'
 import { getListForViewer } from '@/lib/lists'
 import { esUrlFotoDeseo, FOTOS_POR_DIA, guardarFotoDeseo, leerFotoDeseo, procesarFotoDeseo, quedanFotos } from '@/lib/fotos-deseo'
-import { alPegarImagen, estadoDelLink } from '@/lib/foto-del-form'
+import { alPegarImagen, estadoDelLink, porQueEsperar } from '@/lib/foto-del-form'
 
 // La subida (POST /api/deseo/foto) con la base en PGlite y la sesión simulada.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db, session: null as { userId: string } | null }))
@@ -71,8 +71,9 @@ test('al subir se borran las fotos propias de más de un día que ningún deseo 
   const jpeg = await procesarFotoDeseo(await imagen(20, 20).png().toBuffer())
   const ayer = new Date(Date.now() - 25 * 3600_000)
   const vieja = async (userId: string) => (await db.insert(fotosDeseo).values({ userId, datos: jpeg, createdAt: ayer }).returning())[0].id
-  const [huerfana, enMiDeseo, enUnArchivado, enDeseoAjeno, conLinkEntero, deOtro] = [
-    await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(giver.id),
+  const [huerfana, enMiDeseo, enUnArchivado, enDeseoAjeno, conLinkEntero, enMayusculas, conQuery, deOtro] = [
+    await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(owner.id), await vieja(owner.id),
+    await vieja(owner.id), await vieja(giver.id),
   ]
   const [reciente] = await db.insert(fotosDeseo).values({ userId: owner.id, datos: jpeg }).returning()
   const [listaDeRodri] = await db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' }).returning()
@@ -81,13 +82,33 @@ test('al subir se borran las fotos propias de más de un día que ningún deseo 
     { listId: list.id, tipo: 'exacto', titulo: 'Velas', fotoUrl: `/foto/deseo/${enUnArchivado}`, estadoDueno: 'no_lo_quiero' },
     { listId: listaDeRodri.id, tipo: 'exacto', titulo: 'Termo', fotoUrl: `/foto/deseo/${enDeseoAjeno}` },
     { listId: listaDeRodri.id, tipo: 'exacto', titulo: 'Copas', fotoUrl: `https://giftr.app/foto/deseo/${conLinkEntero}` },
+    // como venga escrito: el id en mayúsculas, o el link de la foto con "?…" (se ven bien, así que están en uso)
+    { listId: listaDeRodri.id, tipo: 'exacto', titulo: 'Vaso', fotoUrl: `/foto/deseo/${enMayusculas.toUpperCase()}` },
+    { listId: listaDeRodri.id, tipo: 'exacto', titulo: 'Taza', fotoUrl: `https://giftr.app/foto/deseo/${conQuery}?v=1` },
   ])
 
   const nueva = (await guardarFotoDeseo(db, owner.id, jpeg))!
   const quedan = (await db.select({ id: fotosDeseo.id }).from(fotosDeseo)).map((f) => f.id)
   expect(quedan).not.toContain(huerfana)
-  expect(quedan).toEqual(expect.arrayContaining([enMiDeseo, enUnArchivado, enDeseoAjeno, conLinkEntero, deOtro, reciente.id, nueva.split('/').at(-1)]))
-  expect(quedan).toHaveLength(7)
+  expect(quedan).toEqual(expect.arrayContaining([
+    enMiDeseo, enUnArchivado, enDeseoAjeno, conLinkEntero, enMayusculas, conQuery, deOtro, reciente.id, nueva.split('/').at(-1),
+  ]))
+  expect(quedan).toHaveLength(9)
+})
+
+test('el formulario no se manda mientras sube una foto o prueba un link, también el pegado con el botón Pegar', () => {
+  const sin = { subiendo: false, probandoPegado: false, subida: false, estado: null }
+  expect(porQueEsperar(sin)).toBeNull()
+  expect(porQueEsperar({ ...sin, subiendo: true })).toBe('subiendo')
+  // el link copiado todavía no está en el campo (se pone si carga como foto): antes se mandaba sin la foto
+  expect(porQueEsperar({ ...sin, probandoPegado: true })).toBe('probando')
+  expect(porQueEsperar({ ...sin, probandoPegado: true, subida: true })).toBe('probando')
+  expect(porQueEsperar({ ...sin, estado: 'probando' })).toBe('probando')
+  expect(porQueEsperar({ ...sin, estado: 'no-es-foto' })).toBe('no-es-foto')
+  expect(porQueEsperar({ ...sin, estado: 'muy-largo' })).toBe('muy-largo')
+  expect(porQueEsperar({ ...sin, estado: 'ok' })).toBeNull()
+  // con una foto subida, lo escrito en el link no cuenta
+  expect(porQueEsperar({ ...sin, subida: true, estado: 'no-es-foto' })).toBeNull()
 })
 
 test('la subida: con el cupo lleno, 429 antes de procesar la foto', async () => {

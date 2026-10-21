@@ -15,6 +15,12 @@ export type Dueno = { id: string; nombre: string; foto: string | null }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const esUuid = (s: string) => UUID.test(s)
 
+// Los links para regalar y las invitaciones son base64url (newShareToken, newInviteToken). Lo que no lo es (/l/%00, un
+// formulario armado a mano) no es de ninguna lista: se busca igual, la base rechazaba algunos (un \u0000) con un error y
+// se veía la pantalla de error en vez del 404.
+const TOKEN = /^[A-Za-z0-9_-]{1,64}$/
+export const esToken = (s: string) => TOKEN.test(s)
+
 // El invite_token da permisos de dueño, así que es más largo que el link para regalar.
 export function newInviteToken(): string {
   return randomBytes(16).toString('base64url')
@@ -152,6 +158,7 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
 
 /** Lo que ve alguien que abre una invitación: nombre del grupo y quiénes lo arman. */
 export async function grupoPorInvitacion(db: Db, inviteToken: string) {
+  if (!esToken(inviteToken)) return null
   const [list] = await db.select().from(lists)
     .where(and(eq(lists.inviteToken, inviteToken), eq(lists.tipo, 'grupo')))
   if (!list) return null
@@ -170,6 +177,7 @@ export async function grupoPorInvitacion(db: Db, inviteToken: string) {
  * Lo que quedó trabado de antes de esto lo destrabó la migración 0011_destrabar_co_duenos (la misma lógica, en SQL).
  */
 export async function unirseAGrupo(db: Db, inviteToken: string, userId: string): Promise<string | null> {
+  if (!esToken(inviteToken)) return null
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const [list] = await t.select({ id: lists.id }).from(lists)

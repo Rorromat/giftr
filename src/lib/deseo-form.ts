@@ -32,16 +32,18 @@ export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'r
  * lo que había). Los largos y el tope de la cantidad los ponen createItem/updateItem.
  * - Un link sin https:// ("mercadolibre.com.ar/…") va con https://.
  * - Un link pegado en "¿Qué querés?" (lo que pide el formulario) pasa a "Link a la tienda" si no hay otro, y el título
- *   queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo cambie.
+ *   queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo cambie. Si ya hay otro, el
+ *   título queda como vino: sacárselo perdía ese link, y al editar un deseo de antes (con el link en el título y otro a la
+ *   tienda) cualquier cambio le cambiaba el título y les avisaba a los que lo reservaron.
  */
 export function deseoDesdeForm(fd: FormData): DeseoDelForm | null {
   let titulo = campo(fd, 'titulo')
   if (!titulo) return null
   let linkTienda = link(fd, 'linkTienda')
-  const enTitulo = linkEnTexto(titulo)
+  const enTitulo = linkTienda ? null : linkEnTexto(titulo)
   if (enTitulo) {
     titulo = enTitulo.resto || sitioDeLink(enTitulo.link)
-    if (!linkTienda) linkTienda = enTitulo.link
+    linkTienda = enTitulo.link
   }
   const p = campo(fd, 'prioridad')
   const foto = campo(fd, 'fotoUrl')
@@ -58,8 +60,8 @@ export function deseoDesdeForm(fd: FormData): DeseoDelForm | null {
     // solo las ideas se repiten (en "Quiero ESTO" el casillero se esconde, pero puede venir tildado de antes)
     repetible: tipo === 'idea' && fd.get('repetible') === 'on',
     linkTienda,
-    // una foto subida desde el teléfono (/foto/deseo/:id) o el link de una foto
-    fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto : linkHttp(foto) ?? undefined,
+    // una foto subida desde el teléfono (/foto/deseo/:id, en minúsculas como la ruta) o el link de una foto
+    fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto.toLowerCase() : linkHttp(foto) ?? undefined,
   }
 }
 
@@ -70,17 +72,29 @@ export function paraAgregar(d: DeseoDelForm): NewItemData {
 
 export const AVISO_LINK_LARGO = 'Ese link es muy largo. Probá copiarlo sin lo que va después del "?".'
 
+export const AVISO_NO_ES_LINK = 'Eso no parece un link. Copiá el de la página de la tienda (por ejemplo mercadolibre.com.ar/…).'
+
 /**
  * Lo que frena el envío del título en el navegador ('' si está bien), en vez de que el servidor lo corte sin avisar. No
  * lleva maxLength: tiene que entrar un link pegado entero (pasa a "Link a la tienda") y el navegador corta lo pegado en
- * silencio. Lo que cuenta es el texto sin el link.
+ * silencio. Lo que cuenta es el texto sin el link, salvo que ya haya otro link a la tienda: ahí el del título se queda en
+ * el título (ver deseoDesdeForm) y cuenta.
  */
-export function avisoDelTitulo(escrito: string): string {
+export function avisoDelTitulo(escrito: string, conLinkTienda = false): string {
   const v = escrito.trim()
   if (v.split(/\s+/).some((p) => p.length > LARGO.link)) return AVISO_LINK_LARGO
-  const n = largo(linkEnTexto(v)?.resto ?? v)
+  const n = largo(conLinkTienda ? v : linkEnTexto(v)?.resto ?? v)
   return n > LARGO.titulo ? `Hasta ${LARGO.titulo} letras: sobran ${n - LARGO.titulo}. Lo demás va en Notas.` : ''
 }
 
-/** El de "Link a la tienda": entero o nada (cortado no anda, y si se pasa el servidor no lo guarda). */
-export const avisoDelLink = (escrito: string) => (escrito.trim().length > LARGO.link ? AVISO_LINK_LARGO : '')
+/**
+ * El de "Link a la tienda": entero o nada (cortado no anda, y si se pasa el servidor no lo guarda), y un link que el
+ * servidor entienda (ver linkHttp): lo que no ("@lacasadelmate.ar", "tienda.com.ar." con el punto de la oración) se
+ * descartaba sin avisar.
+ */
+export function avisoDelLink(escrito: string): string {
+  const v = escrito.trim()
+  if (!v) return ''
+  if (v.length > LARGO.link) return AVISO_LINK_LARGO
+  return linkHttp(v) ? '' : AVISO_NO_ES_LINK
+}

@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, customType } from 'drizzle-orm/pg-core'
+import { sql, type SQL } from 'drizzle-orm'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
 
 export const users = pgTable('users', {
@@ -29,6 +30,13 @@ export const fotosPerfil = pgTable('fotos_perfil', {
   datos: bytea('datos').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * El id de la foto subida que usa un foto_url (/foto/deseo/:id, o un link entero a esa ruta, con lo que siga), en
+ * minúsculas; null si no usa ninguna. La limpieza de fotos (guardarFotoDeseo) busca con esto, y el índice de items es
+ * sobre esto mismo: si no, para cada foto recorría todos los deseos de la base.
+ */
+export const idDeFotoDeseo = (fotoUrl: AnyPgColumn): SQL => sql`lower(substring(${fotoUrl} from '/foto/deseo/([0-9A-Fa-f-]{36})'))`
 
 // Foto de un deseo subida desde el teléfono (galería, cámara o pegada): JPEG de hasta 1200px, sin metadatos.
 // El deseo la usa como /foto/deseo/:id; se sube antes de guardar el deseo, por eso no apunta a items.
@@ -94,7 +102,7 @@ export const items = pgTable('items', {
   estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
   linkTienda: text('link_tienda'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl))])
 
 // Un invitado por link: solo su nombre. Su credencial es la cookie con el id firmado (src/lib/cookie-invitado.ts).
 export const guestIdentities = pgTable('guest_identities', {

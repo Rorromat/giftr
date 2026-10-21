@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
 import { achicarFoto } from '@/lib/achicar-foto'
-import { alPegarImagen, estadoDelLink } from '@/lib/foto-del-form'
+import { alPegarImagen, estadoDelLink, porQueEsperar } from '@/lib/foto-del-form'
 import { linkHttp } from '@/lib/links'
 
 const ES_LINK = /^https?:\/\/\S+$/i
@@ -48,10 +48,13 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   // la vista previa que no cargó (la foto guardada de una tienda que la sacó)
   const [rota, setRota] = useState<string | null>(null)
   // Una subida a la vez (un pegado y un toque en Foto seguidos no corren juntos), y lo último que se hizo gana: si
-  // mientras sube se escribe un link o se quita la foto, lo que llega tarde no lo pisa.
+  // mientras sube (o mientras se prueba un link pegado) se elige otra foto, se escribe un link o se quita la foto, lo que
+  // llega tarde no lo pisa.
   const enCurso = useRef(false)
   const ultima = useRef(0)
   const espera = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // el link copiado que se está probando con Pegar: hasta que carga, el formulario no se manda
+  const [probandoPegado, setProbandoPegado] = useState(false)
 
   const delLink = estadoDelLink(url, guardado, probados)
   const foto = subida ?? (delLink.estado === 'ok' ? delLink.link : null)
@@ -60,10 +63,16 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     setProbados((p) => ({ ...p, [l]: ok }))
   }
 
+  /** Algo nuevo con la foto: lo que estaba en curso (una subida, la prueba de un link pegado) ya no lo pisa al terminar. */
+  function nuevaAccion() {
+    setProbandoPegado(false)
+    return ++ultima.current
+  }
+
   async function subir(imagen: Blob) {
     if (enCurso.current) return
     enCurso.current = true
-    const n = ++ultima.current
+    const n = nuevaAccion()
     setSubiendo(true)
     setAviso(null)
     try {
@@ -92,11 +101,15 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
           const l = linkHttp(await (await copiado.getType('text/plain')).text())
           if (l) {
             // se prueba antes de ponerlo: el link de un producto (lo más común de copiar) no es una foto
+            const n = nuevaAccion()
+            setProbandoPegado(true)
             setAviso('probando')
             const ok = probados[l] ?? await cargaComoFoto(l)
             anotar(l, ok)
+            // si mientras cargaba eligió otra foto, escribió un link o la quitó, gana eso
+            if (n !== ultima.current) return
+            setProbandoPegado(false)
             if (!ok) return setAviso('no-es-foto')
-            ultima.current++
             setSubida(null)
             setUrl(l)
             return setAviso(null)
@@ -110,7 +123,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }
 
   function escribir(v: string) {
-    ultima.current++
+    nuevaAccion()
     setUrl(v)
     setSubida(null)
     setAviso(null)
@@ -121,7 +134,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }
 
   function quitar() {
-    ultima.current++
+    nuevaAccion()
     setSubida(null)
     setUrl('')
     setAviso(null)
@@ -145,12 +158,11 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     return () => document.removeEventListener('paste', escuchar)
   }, [])
 
-  // El formulario no se manda mientras sube o prueba (el deseo se guardaría sin la foto), ni con un link que no es una
-  // foto: se manda sin foto y el que escribió el link no se entera.
-  const bloqueo = subiendo ? 'Esperá que termine de subir la foto.'
-    : subida ? ''
-      : delLink.estado === 'probando' ? 'Esperá que cargue la foto.'
-        : delLink.estado === 'no-es-foto' || delLink.estado === 'muy-largo' ? AVISOS[delLink.estado] : ''
+  // el formulario no se manda hasta que la foto esté, ni con un link que no es una foto (ver porQueEsperar)
+  const frena = porQueEsperar({ subiendo, probandoPegado, subida: !!subida, estado: delLink.estado })
+  const bloqueo = frena === 'subiendo' ? 'Esperá que termine de subir la foto.'
+    : frena === 'probando' ? 'Esperá que cargue la foto.'
+      : frena ? AVISOS[frena] : ''
   useEffect(() => {
     link.current?.setCustomValidity(bloqueo)
   }, [bloqueo])

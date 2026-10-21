@@ -113,6 +113,13 @@
       "when": 1792613103881,
       "tag": "0015_fotos_deseo_por_usuario",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792618277023,
+      "tag": "0016_items_foto_deseo_idx",
+      "breakpoints": true
     }
   ]
 }

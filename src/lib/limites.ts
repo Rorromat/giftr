@@ -11,17 +11,31 @@ export const CANTIDAD_MAXIMA = 99
 
 export const acotarCantidad = (n: number) => (Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 1), CANTIDAD_MAXIMA) : 1)
 
-const segmentos = new Intl.Segmenter('es', { granularity: 'grapheme' })
+// Intl.Segmenter se crea recién cuando hace falta, y si no existe se cuenta por puntos de código: este archivo también va
+// en los formularios del navegador, y en uno sin Intl.Segmenter (Firefox antes de 125, Safari antes de 14.1) no se podía ni
+// cargar la página.
+let segmentador: Intl.Segmenter | null | undefined
 
-/** Sin los caracteres de control que Postgres no acepta (\u0000) o que no se ven; los saltos de línea y el tab quedan. */
-export const sinControl = (t: string) => t.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+/** Los caracteres de verdad del texto, uno por uno (sin Intl.Segmenter, una tilde o un tono de piel cuentan aparte). */
+function* caracteres(t: string): Generator<string> {
+  segmentador ??= typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('es', { granularity: 'grapheme' }) : null
+  if (!segmentador) yield* t
+  else for (const { segment } of segmentador.segment(t)) yield segment
+}
+
+/**
+ * Sin los caracteres de control que Postgres no acepta (\u0000) o que no se ven, ni los que dan vuelta lo que sigue
+ * (U+202E en el nombre de un invitado daba vuelta el resto de "Reservado por …"). Los saltos de línea y el tab quedan.
+ */
+export const sinControl = (t: string) => t.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '')
 
 /** Cuántos caracteres de verdad tiene: un emoji (aunque sea una familia o una bandera) cuenta como uno. */
-export const largo = (t: string) => [...segmentos.segment(t)].length
+export const largo = (t: string) => [...caracteres(t)].length
 
-// Un carácter de verdad puede llevar cientos de miles de marcas encimadas (el texto "zalgo"): cuenta como uno, pero
-// desborda hacia arriba y abajo y tapa lo de al lado. Con tildes, una letra lleva una o dos; un emoji, a lo sumo dos
-// (las de la tecla del 1️⃣), y el más largo (una familia con tonos de piel) no llega a 20 unidades de JS.
+// Un carácter de verdad puede llevar cientos de miles de marcas encimadas (el texto "zalgo"), o de emojis unidos con
+// ZWJ, que no son marcas: cuenta como uno, pero desborda hacia arriba y abajo, o es un bloque que no se puede partir y se
+// sale de la tarjeta. Con tildes, una letra lleva una o dos marcas; un emoji, a lo sumo dos (las de la tecla del 1️⃣), y el
+// más largo (una familia con tonos de piel) no llega a 20 unidades de JS.
 const MARCAS_POR_CARACTER = 4
 const UNIDADES_POR_CARACTER = 32
 const MARCA = /\p{M}/u
@@ -39,19 +53,20 @@ function sinEncimar(caracter: string): string {
   return r
 }
 
-/** Sin las marcas encimadas de más (ver sinEncimar), para lo que no pasa por recortar (el nombre de un invitado). */
-export const sinZalgo = (t: string) => (MARCA.test(t) ? [...segmentos.segment(t)].map((s) => sinEncimar(s.segment)).join('') : t)
+/** Sin lo encimado de más (ver sinEncimar), para lo que no pasa por recortar (el nombre de un invitado). */
+export const sinZalgo = (t: string) => Array.from(caracteres(t), sinEncimar).join('')
 
-/** Sin espacios en las puntas y de hasta max caracteres de verdad, sin partir un emoji al medio ni encimar marcas. */
+/**
+ * Sin espacios en las puntas y de hasta max caracteres de verdad, sin partir un emoji al medio ni encimar. Se mira siempre
+ * carácter por carácter: aunque el largo de JS entre, uno solo puede ocupar cientos de unidades sin tener una marca.
+ */
 export function recortar(texto: string, max: number): string {
   const t = sinControl(texto).trim()
-  // sin marcas, cada carácter de verdad ocupa al menos una unidad de JS: si el largo de JS entra, entra
-  if (t.length <= max && !MARCA.test(t)) return t
   let r = ''
   let n = 0
-  for (const { segment } of segmentos.segment(t)) {
+  for (const c of caracteres(t)) {
     if (n === max) break
-    r += sinEncimar(segment)
+    r += sinEncimar(c)
     n++
   }
   return r.trim()

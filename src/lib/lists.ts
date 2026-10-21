@@ -5,7 +5,7 @@ import type { Viewer } from '@/lib/types'
 import { expireStaleClaims, miReservaVencida, ocupaSql } from '@/lib/claims'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { cupoDe, esRepetible, pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { duenosDeLista, esDuenoSql, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
+import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
 import { accesoALista, type MotivoAnonimo } from '@/lib/acceso'
@@ -88,6 +88,7 @@ function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaR
 }
 
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {
+  if (!esToken(shareToken)) return null
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, shareToken))
   if (!list) return null
 
@@ -154,7 +155,7 @@ export type ItemDetail =
 
 export async function getItemForViewer(db: Db, shareToken: string, itemId: string, viewer: Viewer): Promise<ItemDetail | null> {
   // un link cortado (/l/tok/item/3f2a1c) no es de ningún deseo: 404, no un error de la base
-  if (!esUuid(itemId)) return null
+  if (!esUuid(itemId) || !esToken(shareToken)) return null
   const [row] = await db.select({ item: items, list: lists })
     .from(items)
     .innerJoin(lists, eq(items.listId, lists.id))

@@ -4,10 +4,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { items } from '@/db/schema'
-import { getItemForViewer } from '@/lib/lists'
+import { getItemForViewer, getListForViewer } from '@/lib/lists'
 import { releaseClaim, reserveItem } from '@/lib/claims'
 import { iniciarRegaloGrupal } from '@/lib/regalos'
-import { itemParaCompartir } from '@/lib/compartir'
+import { itemParaCompartir, listaParaCompartir } from '@/lib/compartir'
+import { perfilPublico } from '@/lib/perfil'
+import { crearGrupo, grupoPorInvitacion, unirseAGrupo } from '@/lib/groups'
+import { mandarCodazo } from '@/lib/codazos'
 
 // Un id que no es UUID (un link cortado de WhatsApp, un formulario armado a mano) da 404 o no hace nada, nunca un error
 // de la base. Con la base en PGlite y la sesión y las redirecciones de Next simuladas.
@@ -25,9 +28,13 @@ vi.mock('next/navigation', () => ({
 }))
 
 import {
-  boughtAction, commentAction, joinGroupGiftAction, releaseAction, reserveAction, startGroupGiftAction, unboughtAction,
+  boughtAction, codazoAction, commentAction, identificarseAction, joinGroupAction, joinGroupGiftAction, releaseAction, reserveAction,
+  startGroupGiftAction, unboughtAction, verLoReservadoAction,
 } from '@/app/actions'
 import DetalleItem from '@/app/l/[token]/item/[itemId]/page'
+import ListaAjena from '@/app/l/[token]/page'
+import PerfilDeLista from '@/app/l/[token]/perfil/page'
+import Unirme from '@/app/grupos/unirme/[token]/page'
 import { Codazo } from '@/components/Codazo'
 import NoEncontrado from '@/app/not-found'
 import ErrorDePantalla from '@/app/error'
@@ -84,6 +91,37 @@ test('las acciones de una lista con ids armados a mano no hacen nada (ni un erro
   // sin los campos, tampoco
   await expect(releaseAction(form({}))).resolves.toBeUndefined()
   await expect(commentAction(form({}))).resolves.toBeUndefined()
+})
+
+test('un token que no puede ser (/l/%00, un formulario armado a mano): 404 o no hace nada, no un error de la base', async () => {
+  const { owner, giver, list, item } = await preparar()
+  await crearGrupo(h.db, owner.id, { nombre: 'Casa' })
+  h.session = { userId: giver.id }
+  const sinEnviar = async () => 0
+  for (const token of ['tok\u0000x', '\u0000', 'tok euge', 'tok/../x', 'x'.repeat(200), "x' or 1=1 --", '']) {
+    const viewer = { userId: giver.id }
+    expect(await getListForViewer(h.db, token, viewer)).toBeNull()
+    expect(await getItemForViewer(h.db, token, item.id, viewer)).toBeNull()
+    expect(await listaParaCompartir(h.db, token)).toBeNull()
+    expect(await itemParaCompartir(h.db, token, item.id)).toBeNull()
+    expect(await perfilPublico(h.db, token)).toBeNull()
+    expect(await grupoPorInvitacion(h.db, token)).toBeNull()
+    expect(await unirseAGrupo(h.db, token, giver.id)).toBeNull()
+    expect(await mandarCodazo(h.db, token, viewer, 'Rodri', sinEnviar)).toEqual({ ok: false, reason: 'no_existe' })
+    await expect(reserveAction(null, form({ token, itemId: item.id }))).resolves.toBeNull()
+    await expect(identificarseAction(null, form({ token, nombre: 'Rodri' }))).resolves.toBeNull()
+    await expect(verLoReservadoAction(form({ token }))).resolves.toBeUndefined()
+    await expect(commentAction(form({ token, itemId: item.id, texto: 'hola' }))).resolves.toBeUndefined()
+    await expect(codazoAction(form({ token }))).rejects.toMatchObject({ url: '/' })
+    await expect(joinGroupAction(form({ invite: token }))).rejects.toMatchObject({ url: '/mi-lista' })
+    for (const pagina of [
+      ListaAjena({ params: Promise.resolve({ token }), searchParams: Promise.resolve({}) }),
+      PerfilDeLista({ params: Promise.resolve({ token }), searchParams: Promise.resolve({}) }),
+      Unirme({ params: Promise.resolve({ token }) }),
+    ]) await expect(pagina).rejects.toMatchObject({ notFound: true })
+  }
+  // el de verdad sigue andando
+  expect(await getListForViewer(h.db, list.shareToken, { userId: giver.id })).toMatchObject({ role: 'giver' })
 })
 
 test('?codazo= solo muestra los mensajes propios: __proto__, valueOf o toString no tiran abajo la lista', () => {

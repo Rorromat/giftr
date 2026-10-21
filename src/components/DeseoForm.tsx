@@ -49,10 +49,9 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
         <label><input type="radio" name="tipo" value="idea" defaultChecked={deseo?.tipo === 'idea'} className="sr-only" />Algo así</label>
       </div>
 
-      {/* sin https:// también vale (el servidor se lo agrega); sin punto no es un link, y se avisa antes de mandar */}
+      {/* sin https:// también vale (el servidor se lo agrega); lo que el servidor no tomaría como link avisa antes de mandar */}
       <CampoLink name="linkTienda" placeholder="Link a la tienda (opcional)" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"
-                 inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-                 pattern="\S+\.\S+" title="Pegá el link de la tienda (por ejemplo mercadolibre.com.ar/…)" />
+                 inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
       <div className="flex gap-3">
         <input name="precio" maxLength={LARGO.precio} placeholder="Precio (ej. $45.000)" defaultValue={deseo?.precio ?? ''} className="gr-input w-1/2" />
         {/* uno de antes del tope con más se sigue pudiendo editar (si no se toca, queda como estaba) */}
