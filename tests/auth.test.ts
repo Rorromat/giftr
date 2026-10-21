@@ -1,7 +1,8 @@
 import { expect, test, vi } from 'vitest'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
-import { claims, guestIdentities, items } from '@/db/schema'
+import { eq } from 'drizzle-orm'
+import { claims, guestIdentities, items, lists, users } from '@/db/schema'
 import { CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerCuentas, sumarCuenta } from '@/lib/cookie-invitado'
 import { createGuest } from '@/lib/guest'
 import { reserveItem } from '@/lib/claims'
@@ -87,4 +88,32 @@ test('una sesión que ya existía (sin account) no toca cookies ni invitados', a
   h.jar.set(GUEST_COOKIE, firmarInvitado(ana.id))
   expect(await h.jwt({ token: { userId: 'u-1' } })).toEqual({ userId: 'u-1' })
   expect([...h.jar.keys()]).toEqual([GUEST_COOKIE])
+})
+
+test('un email que ya tenía otra cuenta de Google no traba el login ni la une a esa; si cambia en Google, se pone al día', async () => {
+  await preparar()
+  const conGoogle = (sub: string, email: string) =>
+    h.jwt({ token: {}, account: { provider: 'google' }, profile: { sub, email, name: 'Ana' } })
+  const vieja = await conGoogle('g-ana-vieja', 'ana@empresa.com')
+  const [listaVieja] = await h.db.select().from(lists).where(eq(lists.ownerId, vieja.userId as string))
+  const [deEuge] = await h.db.select({ listId: items.listId }).from(items)
+  const [mate] = await h.db.insert(items).values({ listId: deEuge.listId, tipo: 'exacto', titulo: 'Mate' }).returning()
+  expect((await reserveItem(h.db, mate.id, { userId: vieja.userId as string })).ok).toBe(true)
+
+  // la cuenta de trabajo se borró y se volvió a crear, o la dirección pasó a otra persona: otro sub, el mismo email
+  const nueva = await conGoogle('g-ana-nueva', 'ana@empresa.com')
+  expect(nueva.userId).toEqual(expect.any(String))
+  expect(nueva.userId).not.toBe(vieja.userId)
+  // entra como alguien nuevo, con su propia lista: la de la otra cuenta y su reserva siguen siendo de la otra
+  const [listaNueva] = await h.db.select().from(lists).where(eq(lists.ownerId, nueva.userId as string))
+  expect(listaNueva.id).not.toBe(listaVieja.id)
+  expect(await h.db.select({ id: claims.id }).from(claims).where(eq(claims.claimerUserId, nueva.userId as string))).toEqual([])
+  expect(await h.db.select({ id: claims.id }).from(claims).where(eq(claims.claimerUserId, vieja.userId as string))).toHaveLength(1)
+  // y vuelve a entrar sin problema
+  expect((await conGoogle('g-ana-nueva', 'ana@empresa.com')).userId).toBe(nueva.userId)
+
+  // la cuenta vieja cambia su email en Google: es la misma cuenta, con el email de ahora
+  expect((await conGoogle('g-ana-vieja', 'ana.perez@empresa.com')).userId).toBe(vieja.userId)
+  const [u] = await h.db.select().from(users).where(eq(users.id, vieja.userId as string))
+  expect(u.email).toBe('ana.perez@empresa.com')
 })

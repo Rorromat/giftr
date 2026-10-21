@@ -9,13 +9,15 @@ export function newShareToken(): string {
 
 // El invitado que usaba este navegador se une a la cuenta si, ya adentro, dice que es él (por la cookie, en
 // PreguntaInvitado), no por email: el email que escribía un invitado nadie lo verificaba.
+// La cuenta es la de google_id; el email se pone al día si cambió en Google. Un email que ya tenía otra cuenta no la
+// traba ni la une a esa (ver users.email).
 export async function upsertUserFromGoogle(
   db: Db,
   p: { googleId: string; email: string; nombre: string; avatarUrl?: string | null },
 ) {
   const [user] = await db.insert(users)
     .values({ googleId: p.googleId, email: p.email, nombre: p.nombre, avatarUrl: p.avatarUrl ?? null })
-    .onConflictDoUpdate({ target: users.googleId, set: { nombre: p.nombre, avatarUrl: p.avatarUrl ?? null } })
+    .onConflictDoUpdate({ target: users.googleId, set: { email: p.email, nombre: p.nombre, avatarUrl: p.avatarUrl ?? null } })
     .returning()
   await db.insert(lists)
     .values({ ownerId: user.id, shareToken: newShareToken() })

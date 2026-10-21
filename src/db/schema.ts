@@ -6,7 +6,10 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   googleId: text('google_id').notNull().unique(),
   nombre: text('nombre').notNull(),
-  email: text('email').notNull().unique(),
+  // El último email que dio Google para esta cuenta, solo como dato. No es único ni identifica a nadie (eso es google_id):
+  // si Google le da ese email a otra cuenta (una de trabajo que se borró y se volvió a crear, o una dirección que pasó a
+  // otra persona), entra como alguien nuevo. Unirla a la vieja por el email le daría las reservas y listas del otro.
+  email: text('email').notNull(),
   avatarUrl: text('avatar_url'),
   // Cumpleaños sin año (alimenta Eventos de la gente que sigue su lista).
   cumpleDia: smallint('cumple_dia'),
