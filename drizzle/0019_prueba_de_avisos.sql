@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "aviso_probado_at" timestamp with time zone;

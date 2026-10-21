@@ -85,9 +85,9 @@ test('un nombre vacío o de más de 60 caracteres vuelve con un mensaje y no ano
   expect(await identificarseAction(null, form({ token: 'tok-euge', nombre: 'a'.repeat(61) }))).toEqual({ error: expect.stringContaining('60') })
   // reservar desde el diálogo del nombre
   expect(await reserveAction(null, form({ token: 'tok-euge', itemId: item.id, nombre: '  ' }))).toEqual({ error: expect.any(String) })
-  // el codazo vuelve con su motivo
-  expect(await redirigeA(codazoAction(form({ token: 'tok-euge', nombre: 'a'.repeat(61) })))).toBe('/l/tok-euge?codazo=nombre_largo#codazo')
-  expect(await redirigeA(codazoAction(form({ token: 'tok-euge', nombre: ' ' })))).toBe('/l/tok-euge?codazo=sin_identidad#codazo')
+  // el codazo no anota a nadie: sin decir antes quién es, vuelve con el motivo (aunque mande un nombre)
+  expect(await redirigeA(codazoAction(form({ token: 'tok-euge', nombre: 'Abuela' })))).toBe('/l/tok-euge?codazo=sin_identidad#codazo')
+  expect(await redirigeA(codazoAction(form({ token: 'tok-euge' })))).toBe('/l/tok-euge?codazo=sin_identidad#codazo')
   // un token inventado tampoco anota a nadie
   expect(await identificarseAction(null, form({ token: 'no-existe', nombre: 'Abuela' }))).toBeNull()
   expect(await redirigeA(codazoAction(form({ token: 'no-existe', nombre: 'Abuela' })))).toBe('/')
@@ -234,9 +234,10 @@ test('"No soy yo": lo del invitado queda como estaba, no se le pregunta más a e
 
 test('la dueña que fue invitada, entra con Google sin contestar "¿Sos vos?" y cierra sesión: en su lista no ve nada', async () => {
   const { owner, giver, item } = await preparar()
-  // Euge, sin su sesión, le da un codazo a Rodri y queda anotada como invitada "Euge"
+  // Euge, sin su sesión, se anota como "Euge" en la lista de Rodri y le da un codazo
   await h.db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' })
-  await redirigeA(codazoAction(form({ token: 'tok-rodri', nombre: 'Euge' })))
+  await identificarseAction(null, form({ token: 'tok-rodri', nombre: 'Euge' }))
+  expect(await redirigeA(codazoAction(form({ token: 'tok-rodri' })))).toMatch(/^\/l\/tok-rodri\?codazo=(avisado|cartel)#codazo$/)
   const [comoInvitada] = await h.db.select().from(guestIdentities)
   // Rodri le reserva el Termo
   await reserveItem(h.db, item.id, { userId: giver.id })

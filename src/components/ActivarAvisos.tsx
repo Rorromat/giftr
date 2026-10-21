@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { desuscribirAvisosAction, probarAvisoAction, suscribirAvisosAction } from '@/app/actions'
-
-type Estado = 'cargando' | 'no-soportado' | 'ios-instalar' | 'bloqueado' | 'apagado' | 'activado'
+import { confirmarAvisosAction, desuscribirAvisosAction, probarAvisoAction, suscribirAvisosAction } from '@/app/actions'
+import { estadoAlAbrir, trasPedirPermiso, type EstadoAvisos } from '@/lib/avisos-del-navegador'
 
 /** La clave pública VAPID viene en base64url; el navegador la quiere en bytes. */
 function bytes(base64url: string): Uint8Array<ArrayBuffer> {
@@ -16,24 +15,27 @@ const instalada = () => window.matchMedia('(display-mode: standalone)').matches 
 
 /** "Avisos": para que los codazos lleguen como notificación. En iPhone solo anda con GiftR agregado a inicio. */
 export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
-  const [estado, setEstado] = useState<Estado>('cargando')
+  const [estado, setEstado] = useState<EstadoAvisos>('cargando')
   const [mensaje, setMensaje] = useState<string | null>(null)
 
   useEffect(() => {
-    (async () => {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-        return setEstado(esIOS() && !instalada() ? 'ios-instalar' : 'no-soportado')
-      }
-      if (Notification.permission === 'denied') return setEstado('bloqueado')
-      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
-      setEstado((await reg.pushManager.getSubscription()) ? 'activado' : 'apagado')
-    })().catch(() => setEstado('no-soportado'))
+    const soporta = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+    estadoAlAbrir({
+      soporta,
+      pedirInstalar: esIOS() && !instalada(),
+      permiso: soporta ? Notification.permission : 'default',
+      suscripcion: async () => (await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })).pushManager.getSubscription(),
+    }, confirmarAvisosAction).then(setEstado, () => setEstado('no-soportado'))
   }, [])
 
   async function activar() {
     setMensaje(null)
     try {
-      if (await Notification.requestPermission() !== 'granted') return setEstado('bloqueado')
+      const sinPermiso = trasPedirPermiso(await Notification.requestPermission())
+      if (sinPermiso) {
+        setEstado(sinPermiso.estado)
+        return setMensaje(sinPermiso.mensaje ?? null)
+      }
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes(vapidPublica) })
       if (!(await suscribirAvisosAction(sub.toJSON()))) throw new Error('no se guardó')
@@ -55,7 +57,8 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
   async function probar() {
     setMensaje(null)
     const n = await probarAvisoAction()
-    setMensaje(n ? 'Listo: te mandamos uno de prueba.' : 'No llegó. Desactivalos y volvé a activarlos.')
+    setMensaje(n === 'espera' ? 'Recién te mandamos uno. Esperá un minuto para probar de nuevo.'
+      : n ? 'Listo: te mandamos uno de prueba.' : 'No llegó. Desactivalos y volvé a activarlos.')
   }
 
   return (

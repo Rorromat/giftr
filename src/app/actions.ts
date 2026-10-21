@@ -23,7 +23,7 @@ import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
-import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
+import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import {
   cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
@@ -579,26 +579,32 @@ export async function suscribirAvisosAction(suscripcion: unknown): Promise<boole
   return guardarSuscripcion(db, session.userId, suscripcion)
 }
 
+/** Al abrir Perfil: si los avisos de este navegador están a nombre de uno (y si faltaban, los vuelve a guardar). */
+export async function confirmarAvisosAction(suscripcion: unknown): Promise<boolean> {
+  const session = await auth()
+  if (!session?.userId) return false
+  return confirmarSuscripcion(db, session.userId, suscripcion)
+}
+
 export async function desuscribirAvisosAction(endpoint: string) {
   const session = await auth()
   if (session?.userId) await borrarSuscripcion(db, session.userId, endpoint)
 }
 
-/** Un aviso de prueba a los dispositivos de uno mismo. Devuelve a cuántos llegó. */
-export async function probarAvisoAction(): Promise<number> {
+/** Un aviso de prueba a los dispositivos de uno mismo. Devuelve a cuántos llegó, o 'espera' si probó hace menos de un minuto. */
+export async function probarAvisoAction(): Promise<number | 'espera'> {
   const session = await auth()
   if (!session?.userId) return 0
-  return avisar(db, session.userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' })
+  const r = await probarAviso(db, session.userId)
+  return r.ok ? r.llegaron : r.reason
 }
 
 export async function codazoAction(formData: FormData) {
   const token = str(formData, 'token') ?? ''
-  // antes de anotar a nadie: un token inventado no crea invitados
-  const listId = await listaDeToken(token)
-  if (!listId) redirect('/')
-  const quien = await viewerIdentificandoGuest(formData, listId)
-  if (!quien.ok) redirect(`/l/${token}?codazo=${quien.motivo === 'vacio' ? 'sin_identidad' : 'nombre_largo'}#codazo`)
-  const r = await mandarCodazo(db, token, quien.viewer, (await nombreDeViewer(db, quien.viewer)) ?? 'Alguien')
+  if (!(await listaDeToken(token))) redirect('/')
+  // Sin decir quién es no hay codazo, y acá no se anota a nadie: se anota arriba ("¿Quién sos?") o entra con Google.
+  const viewer = await getViewer()
+  const r = await mandarCodazo(db, token, viewer, (await nombreDeViewer(db, viewer)) ?? 'Alguien')
   redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)
 }
 

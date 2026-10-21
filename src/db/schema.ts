@@ -20,6 +20,8 @@ export const users = pgTable('users', {
   bienvenidaAt: timestamp('bienvenida_at', { withTimezone: true }),
   // Cuándo subió su foto de perfil (versiona la URL /foto/:id). Vacío: se usa la de Google o las iniciales.
   fotoAt: timestamp('foto_at', { withTimezone: true }),
+  // Cuándo tocó "Probar" en Avisos por última vez: uno por minuto (ver probarAviso).
+  avisoProbadoAt: timestamp('aviso_probado_at', { withTimezone: true }),
 })
 
 const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
@@ -226,7 +228,8 @@ export const config = pgTable('config', {
   valor: text('valor').notNull(),
 })
 
-// Dispositivos donde un usuario activó los avisos (Web Push). Uno por navegador/teléfono.
+// Dispositivos donde un usuario activó los avisos (Web Push). Uno por navegador/teléfono, como mucho 10 por usuario.
+// created_at: cuándo se activó o se confirmó por última vez (al abrir Perfil); con el tope se van las más viejas.
 export const pushSubs = pgTable('push_subs', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id),

@@ -246,7 +246,7 @@ export default async function ListaAjena({
 
       <div className="mt-4">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
-                identified={identified} resultado={codazo} />
+                identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
       </div>
 
       {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}

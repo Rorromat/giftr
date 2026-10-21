@@ -134,6 +134,13 @@
       "when": 1792620487503,
       "tag": "0018_email_de_usuario_no_unico",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792620700241,
+      "tag": "0019_prueba_de_avisos",
+      "breakpoints": true
     }
   ]
 }

@@ -134,6 +134,18 @@ test('?codazo= solo muestra los mensajes propios: __proto__, valueOf o toString 
   expect(render('avisado')).toContain('¡Codazo enviado! A Euge le llegó un aviso.')
 })
 
+test('el codazo sin nombre no se manda desde ahí: lleva a decir quién es (o a entrar con Google)', () => {
+  const render = (props: { identified: boolean; conGoogle?: boolean }) =>
+    renderToStaticMarkup(createElement(Codazo, { token: 'tok', para: 'Euge', plural: false, ...props }))
+  expect(render({ identified: true })).toContain('Mandar un codazo')
+  for (const sinNombre of [render({ identified: false }), render({ identified: false, conGoogle: true })]) {
+    expect(sinNombre).not.toContain('<form')
+    expect(sinNombre).not.toContain('name="nombre"')
+  }
+  expect(render({ identified: false })).toContain('href="#quien-sos"')
+  expect(render({ identified: false, conGoogle: true })).toContain('href="#otra-cuenta"')
+})
+
 test('las pantallas de 404 y de error, en castellano y con salida al inicio', () => {
   const noEsta = renderToStaticMarkup(createElement(NoEncontrado))
   expect(noEsta).toContain('Esto no está')
