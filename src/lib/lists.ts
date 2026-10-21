@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -107,13 +107,15 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
 /**
  * Un link para regalar nuevo (de la lista personal o de un grupo, cualquiera de sus dueños): el anterior deja de andar.
  * También se olvida quién la seguía: Tu gente y Eventos arman el link con el token de ahora, así que si no, les pasarían
- * el nuevo a todos los que tenían el viejo. Lo reservado queda como está. Devuelve el token nuevo, o null.
+ * el nuevo a todos los que tenían el viejo. Por lo mismo se anota cuándo (share_token_at): Cuentas y la unión de un
+ * invitado no le pasan el nuevo a quien solo tenía algo de antes. Lo reservado queda como está. Devuelve el token nuevo, o null.
  */
 export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: string): Promise<string | null> {
   if (!esUuid(listId)) return null
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
-    const [list] = await t.update(lists).set({ shareToken: newShareToken() })
+    // la hora de la base, la misma con la que se anotan las reservas (ver unirInvitadoACuenta)
+    const [list] = await t.update(lists).set({ shareToken: newShareToken(), shareTokenAt: sql`now()` })
       .where(and(eq(lists.id, listId), esDuenoSql(t, userId)))
       .returning({ shareToken: lists.shareToken })
     if (!list) return null

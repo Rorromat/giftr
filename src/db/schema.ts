@@ -51,6 +51,8 @@ export const lists = pgTable('lists', {
   nombre: text('nombre'),
   descripcion: text('descripcion'),
   inviteToken: text('invite_token').unique(),
+  // Cuándo se cambió el link para regalar por última vez (vacío: nunca). Lo de antes de esa fecha no lleva al link nuevo.
+  shareTokenAt: timestamp('share_token_at', { withTimezone: true }),
   // Fecha del grupo ("cumplen el 12/10"); anual se repite todos los años, si no es una sola vez.
   eventoFecha: date('evento_fecha'),
   eventoAnual: boolean('evento_anual').notNull().default(true),
@@ -132,7 +134,8 @@ export const notifications = pgTable('notifications', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id),
   guestId: uuid('guest_id').references(() => guestIdentities.id),
-  tipo: text('tipo', { enum: ['item_baja', 'item_editado'] }).notNull(),
+  // regalo_encargo: ahora organiza un regalo grupal. regalo_cancelado: el regalo grupal en el que estaba se canceló.
+  tipo: text('tipo', { enum: ['item_baja', 'item_editado', 'regalo_encargo', 'regalo_cancelado'] }).notNull(),
   itemId: uuid('item_id').notNull().references(() => items.id),
   leida: boolean('leida').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

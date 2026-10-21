@@ -6,13 +6,18 @@ import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/r
 import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
+/** Un link si lo hay; si no (cambiaron el link para regalar y no lo tiene), lo mismo sin link. */
+function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
+  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
+}
+
 function Linea({ l }: { l: LineaCuenta }) {
   return (
     <li className="flex items-center gap-2 py-2">
-      <Link href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
-        <span className="font-bold underline decoration-2 underline-offset-2 [overflow-wrap:anywhere]">{l.itemTitulo}</span>
+      <QuizasLink href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
+        <span className={`font-bold [overflow-wrap:anywhere] ${l.href ? 'underline decoration-2 underline-offset-2' : ''}`}>{l.itemTitulo}</span>
         <span className="block text-xs font-medium text-gr-muted">para {l.para} · {l.tipo === 'debes' ? 'tu parte' : 'su parte'}</span>
-      </Link>
+      </QuizasLink>
       <span className="font-display text-lg font-extrabold tabular-nums">{pesos(l.monto)}</span>
       <form action={markPaidAction}>
         <input type="hidden" name="giftId" value={l.giftId} />
@@ -100,15 +105,15 @@ export default async function Cuentas() {
           <ul className="flex flex-col gap-2.5">
             {c.enCurso.map((r) => (
               <li key={r.giftId}>
-                <Link href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+                <QuizasLink href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
                   <span className="min-w-0 flex-1 text-sm leading-snug">
                     <span className="font-bold [overflow-wrap:anywhere]">{r.itemTitulo}</span> para {r.para}
                     <span className="block text-xs font-medium text-gr-muted">
                       {r.soyEncargado ? 'Lo organizás vos' : `Lo organiza ${r.encargado}`} · {r.personas.length} {r.personas.length === 1 ? 'persona' : 'personas'} · todavía no se compró
                     </span>
                   </span>
-                  <Icon name="chevron" size={18} strokeWidth={2.6} />
-                </Link>
+                  {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
+                </QuizasLink>
                 {!r.sigueEnLaLista && (
                   <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
                     <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>

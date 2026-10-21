@@ -18,7 +18,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { crearGrupo, esUuid, fechaDeGrupoValida, nuevaInvitacion, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
@@ -210,6 +210,17 @@ export async function leaveGroupAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect('/mi-lista')
+}
+
+/** "Se sumó por error": un dueño saca a alguien que se sumó después que él y lo devuelve a regalador. */
+export async function removeMemberAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const sacado = await sacarDelGrupo(db, id, session.userId, str(formData, 'userId') ?? '')
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  if (sacado) redirect(`/grupos/${id}?nuevo=sacado`)
 }
 
 /** "Generar un link de invitación nuevo": el anterior deja de servir para sumarse al grupo. */

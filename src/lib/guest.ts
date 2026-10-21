@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
@@ -76,7 +76,7 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
 /**
  * Entró con Google en un navegador donde era invitado y confirmó que es esa persona ("Sí, soy yo"):
  * sus reservas, comentarios, avisos y codazos pasan a la cuenta, todo junto o nada, y las listas donde reservaba
- * pasan a ser de su gente (como si las hubiera abierto con sesión).
+ * pasan a ser de su gente (como si las hubiera abierto con sesión), salvo las que cambiaron el link después.
  * Lo que hizo sobre listas de las que la cuenta es (o fue) dueña o co-dueña queda a nombre del invitado: nadie puede terminar
  * con reservas de sus propios deseos ni enterarse por un aviso. Lo que reservó ahí sin comprar se libera: unido y sin
  * cookie, nadie más lo podría liberar ni marcar comprado, y les trabaría el deseo a los que regalan de verdad
@@ -100,8 +100,10 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() })
       .where(and(eq(claims.claimerGuestId, guestId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseosPropios)))
 
+    // si después cambiaron el link para regalar, lo reservado antes no le pasa el nuevo: puede ser justo a quien se lo sacaron
     const dondeReservaba = await t.selectDistinct({ listId: items.listId }).from(claims)
-      .innerJoin(items, eq(claims.itemId, items.id)).where(delInvitado)
+      .innerJoin(items, eq(claims.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
+      .where(and(delInvitado, or(isNull(lists.shareTokenAt), gt(claims.createdAt, lists.shareTokenAt))))
     if (dondeReservaba.length) {
       await t.insert(listFollows).values(dondeReservaba.map((l) => ({ userId, listId: l.listId }))).onConflictDoNothing()
     }

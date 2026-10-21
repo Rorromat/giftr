@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, gt, inArray, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { claims, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { reserveItem, type ReserveResult } from '@/lib/claims'
@@ -74,12 +74,15 @@ export async function sumarseARegalo(db: Db, giftId: string, userId: string): Pr
   if (!esUuid(giftId)) return false
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
-    // lock del regalo: si a la vez se une al grupo (unirseAGrupo lo baja de los regalos), uno espera al otro
-    const [row] = await t.select({ estado: groupGifts.estado, listId: items.listId })
-      .from(groupGifts).innerJoin(items, eq(groupGifts.itemId, items.id))
-      .where(eq(groupGifts.id, giftId)).for('update', { of: groupGifts })
-    if (!row || row.estado !== 'abierto') return false
-    if (await esOFueDuenoDeLista(t, row.listId, userId)) return false
+    const [regalo] = await t.select({ itemId: groupGifts.itemId }).from(groupGifts).where(eq(groupGifts.id, giftId))
+    if (!regalo) return false
+    // Lock del deseo y después del regalo, en el mismo orden que unirseAGrupo: si a la vez se une al grupo, uno espera al
+    // otro. El del regalo solo no alcanza: unirseAGrupo encuentra los regalos por sus miembros y no vería esta fila sin
+    // confirmar, así que no esperaría.
+    const [item] = await t.select({ listId: items.listId }).from(items).where(eq(items.id, regalo.itemId)).for('update')
+    const [g] = await t.select({ estado: groupGifts.estado }).from(groupGifts).where(eq(groupGifts.id, giftId)).for('update')
+    if (!item || g?.estado !== 'abierto') return false
+    if (await esOFueDuenoDeLista(t, item.listId, userId)) return false
     await t.insert(groupGiftMembers).values({ giftId, userId }).onConflictDoNothing()
     return true
   })
@@ -87,12 +90,19 @@ export async function sumarseARegalo(db: Db, giftId: string, userId: string): Pr
 
 /** Bajarse mientras está abierto. El encargado no se baja: cancela. */
 export async function salirDeRegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
-  const borrados = await db.delete(groupGiftMembers)
-    .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, userId),
-      inArray(groupGiftMembers.giftId, db.select({ id: groupGifts.id }).from(groupGifts)
-        .where(and(eq(groupGifts.estado, 'abierto'), ne(groupGifts.organizerUserId, userId))))))
-    .returning({ userId: groupGiftMembers.userId })
-  return borrados.length > 0
+  if (!esUuid(giftId)) return false
+  return db.transaction(async (tx) => {
+    // lock del regalo: si a la vez le pasan el encargo (unirseAGrupo), o espera y ya es encargado, o se baja antes y el
+    // encargo pasa a otro; nunca queda de encargado sin estar en el regalo
+    const [g] = await tx.select({ id: groupGifts.id }).from(groupGifts)
+      .where(and(eq(groupGifts.id, giftId), eq(groupGifts.estado, 'abierto'), ne(groupGifts.organizerUserId, userId)))
+      .for('update')
+    if (!g) return false
+    const borrados = await tx.delete(groupGiftMembers)
+      .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, userId)))
+      .returning({ userId: groupGiftMembers.userId })
+    return borrados.length > 0
+  })
 }
 
 /** Solo el encargado y mientras está abierto: libera el deseo para que lo reserve otro. */
@@ -228,7 +238,8 @@ export type LineaCuenta = {
   giftId: string
   itemTitulo: string
   para: string
-  href: string
+  /** null: cambiaron el link para regalar y no lo tiene (ver columnasDestino). */
+  href: string | null
   monto: number
   /** debes: vos le debés al encargado. te_deben: sos el encargado y el otro te debe. */
   tipo: 'debes' | 'te_deben'
@@ -243,7 +254,7 @@ export type CuentaPersona = Persona & {
 }
 
 export type RegaloEnCurso = {
-  giftId: string; itemTitulo: string; para: string; href: string; encargado: string; soyEncargado: boolean; personas: string[]
+  giftId: string; itemTitulo: string; para: string; href: string | null; encargado: string; soyEncargado: boolean; personas: string[]
   /** false si el dueño lo sacó de su lista: el encargado lo cancela desde Cuentas. */
   sigueEnLaLista: boolean
 }
@@ -260,17 +271,28 @@ const encargados = alias(users, 'encargados')
 const deudores = alias(users, 'deudores')
 const duenosPersonales = alias(users, 'duenos_personales')
 
-function destino(r: { tipo: 'personal' | 'grupo'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string; activo: boolean }) {
+type Destino = {
+  tipo: 'personal' | 'grupo'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string
+  activo: boolean; tieneElLink: boolean
+}
+
+function destino(r: Destino, conLink = r.tieneElLink) {
   return {
     para: r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? 'Alguien',
-    href: r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`,
+    href: !conLink ? null : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`,
   }
 }
 
-const columnasDestino = {
+/**
+ * Para qué deseo y lista es cada línea. Si cambiaron el link para regalar, el nuevo solo va en las líneas de quien sigue
+ * la lista (la abrió con ese link): un regalo de antes no se lo pasa a alguien al que justo se lo quisieron sacar.
+ */
+const columnasDestino = (db: Db, userId: string) => ({
   tipo: lists.tipo, listaNombre: lists.nombre, duenoNombre: duenosPersonales.nombre, shareToken: lists.shareToken,
   itemId: items.id, itemTitulo: items.titulo, activo: sql<boolean>`${items.estadoDueno} = 'activo'`,
-}
+  tieneElLink: sql<boolean>`${or(isNull(lists.shareTokenAt),
+    inArray(lists.id, db.select({ id: listFollows.listId }).from(listFollows).where(eq(listFollows.userId, userId))))}`,
+})
 
 /**
  * Todo junto: cuánto debés, cuánto te deben, el neto con cada persona y los regalos en curso.
@@ -281,7 +303,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre,
     deudorId: groupGiftMembers.userId, deudorNombre: deudores.nombre,
     monto: groupGiftMembers.monto, pagado: groupGiftMembers.pagado, pagadoAt: groupGiftMembers.pagadoAt,
-    compradoAt: groupGifts.compradoAt, ...columnasDestino,
+    compradoAt: groupGifts.compradoAt, ...columnasDestino(db, userId),
   }).from(groupGiftMembers)
     .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
     .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
@@ -321,7 +343,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
   }
 
   const abiertos = await db.select({
-    giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre, ...columnasDestino,
+    giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre, ...columnasDestino(db, userId),
   }).from(groupGiftMembers)
     .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
     .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
@@ -342,7 +364,8 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     // primero a quien más le debés, después quien más te debe
     personas: [...porPersona.values()].sort((a, b) => a.neto - b.neto),
     enCurso: abiertos.map((a) => ({
-      giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a),
+      // el encargado siempre llega al deseo: es donde se compra o se cancela, y si no el regalo quedaría trabado
+      giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a, a.tieneElLink || a.encargadoId === userId),
       encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
       personas: nombres.filter((n) => n.giftId === a.giftId).map((n) => n.nombre),
     })),

@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { claims, comments, items, lists, users } from '@/db/schema'
+import { claims, comments, items, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { cambiarLinkParaRegalar, getListForViewer, getItemForViewer, getOwnList } from '@/lib/lists'
 import {
-  crearGrupo, grupoParaDueno, grupoPorInvitacion, juntarNombres, nombresDeMisGrupos, nuevaInvitacion, salirDeGrupo, unirseAGrupo,
+  crearGrupo, grupoParaDueno, grupoPorInvitacion, juntarNombres, nombresDeMisGrupos, nuevaInvitacion, sacarDelGrupo, salirDeGrupo,
+  unirseAGrupo,
 } from '@/lib/groups'
 import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { markBought, reserveItem } from '@/lib/claims'
@@ -14,6 +15,7 @@ import { upsertUserFromGoogle } from '@/lib/users'
 import { guardarFechaGrupo, misEventos, seguirLista } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 import { comprarRegalo, historialDeLista, iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo, ultimosRegalos } from '@/lib/regalos'
+import { getUnreadNotifications } from '@/lib/notifications'
 
 const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo'].sort()
 
@@ -181,6 +183,56 @@ test('salir del grupo: el último dueño no puede; un co-dueño sí, deja de edi
   expect(await salirDeGrupo(db, grupo.id, delfina.id)).toBe(false)
   expect(await salirDeGrupo(db, grupo.id, martin.id)).toBe(false)
   expect(await grupoParaDueno(db, grupo.id, delfina.id)).not.toBeNull()
+})
+
+test('un co-dueño, y después ex, no recibe avisos de lo que compró como regalador antes de sumarse', async () => {
+  const { db, delfina, intruso, grupo } = await setup()
+  const vela = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Vela' }, grupo.id))!
+  const r = await reserveItem(db, vela.id, { userId: intruso.id })
+  if (!r.ok) throw new Error(r.reason)
+  await markBought(db, r.claimId, { userId: intruso.id })
+  await unirseAGrupo(db, grupo.inviteToken!, intruso.id)
+  await updateItem(db, vela.id, delfina.id, { titulo: 'Vela de soja' })
+  expect(await getUnreadNotifications(db, { userId: intruso.id })).toEqual([])
+  await salirDeGrupo(db, grupo.id, intruso.id)
+  await updateItem(db, vela.id, delfina.id, { notas: 'la del frasco' })
+  expect(await getUnreadNotifications(db, { userId: intruso.id })).toEqual([])
+  // los avisos están (la compra sigue a su nombre), pero nunca se le muestran: le dirían que lo editaron porque alguien lo compró
+  expect(await db.select().from(notifications).where(eq(notifications.userId, intruso.id))).toHaveLength(2)
+})
+
+test('sacar a quien se sumó por error: vuelve a regalar, y solo lo saca alguien que ya estaba', async () => {
+  const { db, delfina, martin, rodri, intruso, grupo } = await setup()
+  const [tio, tia] = [await usuario(db, 'Tío'), await usuario(db, 'Tía')]
+  const vela = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Vela' }, grupo.id))!
+  // a Martín se le escapó la invitación en el grupo de la familia: el tío se sumó, y la tía se sumó y salió
+  await unirseAGrupo(db, grupo.inviteToken!, tio.id)
+  await unirseAGrupo(db, grupo.inviteToken!, tia.id)
+  await salirDeGrupo(db, grupo.id, tia.id)
+  expect(await reserveItem(db, vela.id, { userId: tia.id })).toEqual({ ok: false, reason: 'propio' })
+  expect((await grupoParaDueno(db, grupo.id, martin.id))!.sacables).toEqual([
+    { id: tio.id, nombre: 'Tío', salio: false }, { id: tia.id, nombre: 'Tía', salio: true },
+  ])
+  expect((await grupoParaDueno(db, grupo.id, tio.id))!.sacables).toEqual([{ id: tia.id, nombre: 'Tía', salio: true }])
+
+  // el que llegó después no saca a los que armaron la lista; tampoco uno de afuera ni uno que ya salió
+  expect(await sacarDelGrupo(db, grupo.id, tio.id, martin.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupo.id, intruso.id, tio.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupo.id, tia.id, tio.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupo.id, martin.id, martin.id)).toBe(false)
+  expect(await sacarDelGrupo(db, 'no-es-un-uuid', martin.id, tio.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupo.id, martin.id, 'no-es-un-uuid')).toBe(false)
+
+  expect(await sacarDelGrupo(db, grupo.id, martin.id, tio.id)).toBe(true)
+  expect(await sacarDelGrupo(db, grupo.id, delfina.id, tia.id)).toBe(true)
+  for (const quien of [tio, tia]) {
+    expect((await getListForViewer(db, grupo.shareToken, { userId: quien.id }))?.role).toBe('giver')
+    expect(await grupoParaDueno(db, grupo.id, quien.id)).toBeNull()
+  }
+  expect(await reserveItem(db, vela.id, { userId: tia.id })).toMatchObject({ ok: true })
+  expect(await getListForViewer(db, grupo.shareToken, { userId: rodri.id })).toMatchObject({ duenos: ['Delfina', 'Martín'] })
+  expect((await grupoParaDueno(db, grupo.id, martin.id))!.sacables).toEqual([])
+  expect(await sacarDelGrupo(db, grupo.id, martin.id, tio.id)).toBe(false)
 })
 
 test('generar una invitación nueva: la anterior deja de servir, y solo la genera un dueño', async () => {

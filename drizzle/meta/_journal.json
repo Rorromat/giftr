@@ -71,6 +71,20 @@
       "when": 1792582865029,
       "tag": "0009_ex_miembros_de_grupo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792585556605,
+      "tag": "0010_link_para_regalar_cambiado",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792585560390,
+      "tag": "0011_destrabar_co_duenos",
+      "breakpoints": true
     }
   ]
 }

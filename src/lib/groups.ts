@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm'
-import { claims, groupGiftMembers, groupGifts, items, listMembers, lists, users } from '@/db/schema'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
+import { claims, groupGiftMembers, groupGifts, items, listMembers, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
@@ -117,9 +118,16 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
   const [list] = await db.select().from(lists)
     .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId)))
   if (!list) return null
-  const [duenos, rows] = await Promise.all([
+  const otros = alias(listMembers, 'otros')
+  const [duenos, rows, despues] = await Promise.all([
     duenosDeLista(db, list),
     db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt)),
+    // los que se sumaron después que él, también los que ya salieron: a esos los puede sacar (ver sacarDelGrupo)
+    db.select({ id: users.id, nombre: users.nombre, salioAt: otros.salioAt }).from(listMembers)
+      .innerJoin(otros, and(eq(otros.listId, listMembers.listId), gt(otros.createdAt, listMembers.createdAt)))
+      .innerJoin(users, eq(otros.userId, users.id))
+      .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId)))
+      .orderBy(asc(otros.createdAt)),
   ])
   return {
     id: list.id,
@@ -130,6 +138,7 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
     shareToken: list.shareToken,
     inviteToken: list.inviteToken!,
     duenos,
+    sacables: despues.map((m) => ({ id: m.id, nombre: m.nombre, salio: !!m.salioAt })),
     items: rows.map(pickItemFields),
   }
 }
@@ -149,8 +158,9 @@ export async function grupoPorInvitacion(db: Db, inviteToken: string) {
  * (el deseo lo manda al grupo, Cuentas lo esconde), así que si quedara les trabaría el deseo a los que regalan.
  * - Sus reservas sin comprar se liberan.
  * - De los regalos grupales abiertos se baja. Si organizaba uno, pasa al que se sumó primero de los que quedan (con la
- *   reserva a su nombre); si no queda nadie, se cancela y el deseo se libera.
+ *   reserva a su nombre, y se le avisa); si no queda nadie, se cancela, el deseo se libera y se les avisa a los que estaban.
  * - Lo ya comprado queda como está: son compras y deudas de verdad.
+ * Lo que quedó trabado de antes de esto lo destrabó la migración 0011_destrabar_co_duenos (la misma lógica, en SQL).
  */
 export async function unirseAGrupo(db: Db, inviteToken: string, userId: string): Promise<string | null> {
   return db.transaction(async (tx) => {
@@ -163,17 +173,20 @@ export async function unirseAGrupo(db: Db, inviteToken: string, userId: string):
     if (antes && !antes.salioAt) return list.id
     await t.insert(listMembers).values({ listId: list.id, userId })
       .onConflictDoUpdate({ target: [listMembers.listId, listMembers.userId], set: { salioAt: null } })
-    // Lock de los deseos, como reserveItem: una reserva que llega a la vez espera y después ve que ya es dueño
-    // (siempre en el mismo orden, así dos que se unen a la vez no se traban entre ellos).
-    const deseos = (await t.select({ id: items.id }).from(items).where(eq(items.listId, list.id))
-      .orderBy(asc(items.id)).for('update')).map((d) => d.id)
-    if (deseos.length) await soltarLoQueRegalaba(t, list.id, deseos, userId)
+    // Lock de los deseos, el mismo que toman reserveItem, iniciarRegaloGrupal y sumarseARegalo: si llega una reserva o un
+    // regalo a la vez, o espera y después ve que ya es dueño, o se confirma antes y lo de abajo lo encuentra.
+    // Siempre en el mismo orden, así dos que se unen a la vez no se traban entre ellos.
+    await t.select({ id: items.id }).from(items).where(eq(items.listId, list.id)).orderBy(asc(items.id)).for('update')
+    await soltarLoQueRegalaba(t, list.id, userId)
     return list.id
   })
 }
 
-async function soltarLoQueRegalaba(t: Db, listId: string, deseos: string[], userId: string) {
+async function soltarLoQueRegalaba(t: Db, listId: string, userId: string) {
   const ahora = new Date()
+  // subconsultas, no los ids de arriba: también entra un deseo que se cargó y reservó en este mismo instante
+  const deseos = t.select({ id: items.id }).from(items).where(eq(items.listId, listId))
+  const duenos = t.select({ id: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, listId))
   await t.update(claims).set({ estado: 'liberado', updatedAt: ahora })
     .where(and(eq(claims.claimerUserId, userId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseos),
       notInArray(claims.id, t.select({ id: groupGifts.claimId }).from(groupGifts))))
@@ -193,17 +206,27 @@ async function soltarLoQueRegalaba(t: Db, listId: string, deseos: string[], user
     const [siguiente] = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
       .where(and(
         eq(groupGiftMembers.giftId, g.id),
-        notInArray(groupGiftMembers.userId, t.select({ id: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, listId))),
+        notInArray(groupGiftMembers.userId, duenos),
         notInArray(groupGiftMembers.userId, t.select({ id: claims.claimerUserId }).from(claims).where(and(
           eq(claims.itemId, g.itemId), inArray(claims.estado, ['reservado', 'comprado']), isNotNull(claims.claimerUserId)))),
       ))
       .orderBy(asc(groupGiftMembers.createdAt)).limit(1)
+      .for('update')
     if (siguiente) {
       await t.update(groupGifts).set({ organizerUserId: siguiente.userId }).where(eq(groupGifts.id, g.id))
       await t.update(claims).set({ claimerUserId: siguiente.userId, updatedAt: ahora }).where(eq(claims.id, g.claimId))
+      // si no se entera, el regalo queda quieto hasta que entre a Cuentas
+      await t.insert(notifications).values({ userId: siguiente.userId, tipo: 'regalo_encargo', itemId: g.itemId })
     } else {
       await t.update(groupGifts).set({ estado: 'cancelado' }).where(eq(groupGifts.id, g.id))
       await t.update(claims).set({ estado: 'liberado', updatedAt: ahora }).where(eq(claims.id, g.claimId))
+      // Los que quedan (los que tienen su propia reserva de este deseo) se enteran: si no, el regalo les desaparece de
+      // "En curso" sin explicación. No se dice por qué: es cosa de quien se unió.
+      const quedan = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
+        .where(and(eq(groupGiftMembers.giftId, g.id), notInArray(groupGiftMembers.userId, duenos)))
+      if (quedan.length) {
+        await t.insert(notifications).values(quedan.map((q) => ({ userId: q.userId, tipo: 'regalo_cancelado' as const, itemId: g.itemId })))
+      }
     }
   }
 }
@@ -220,6 +243,28 @@ export async function salirDeGrupo(db: Db, listId: string, userId: string): Prom
     if (miembros.length < 2 || !miembros.some((m) => m.userId === userId)) return false
     await tx.update(listMembers).set({ salioAt: new Date() })
       .where(and(eq(listMembers.listId, listId), eq(listMembers.userId, userId)))
+    return true
+  })
+}
+
+/**
+ * "Se sumó por error": un dueño saca a alguien que se sumó después que él (siga o ya haya salido) y lo devuelve a
+ * regalador. A diferencia de salir, la fila se borra: vuelve a reservar y a ver lo reservado, así que es solo para quien
+ * no armó la lista (la pantalla lo avisa). Solo a los que llegaron después: el que entró con una invitación que circuló
+ * de más no puede sacar a los que la armaron. Lo que tenía reservado se liberó al unirse y no vuelve.
+ */
+export async function sacarDelGrupo(db: Db, listId: string, actorId: string, userId: string): Promise<boolean> {
+  if (!esUuid(listId) || !esUuid(userId) || actorId === userId) return false
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const otro = alias(listMembers, 'otro')
+    // bloquea las dos filas: si a la vez el otro sale o vuelve con la invitación, uno espera al otro
+    const [fila] = await t.select({ id: otro.userId }).from(listMembers)
+      .innerJoin(otro, and(eq(otro.listId, listMembers.listId), eq(otro.userId, userId), gt(otro.createdAt, listMembers.createdAt)))
+      .where(and(eq(listMembers.listId, listId), eq(listMembers.userId, actorId), isNull(listMembers.salioAt)))
+      .for('update')
+    if (!fila) return false
+    await t.delete(listMembers).where(and(eq(listMembers.listId, listId), eq(listMembers.userId, userId)))
     return true
   })
 }

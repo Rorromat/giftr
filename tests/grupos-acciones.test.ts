@@ -2,9 +2,9 @@ import { expect, test, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createTestDb } from './helpers'
 import type { Db } from '@/db/types'
-import { lists } from '@/db/schema'
+import { listMembers, lists } from '@/db/schema'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo } from '@/lib/groups'
+import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 
 // Las acciones de los grupos y los links tal cual, con la base en PGlite y la sesión y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db, session: null as { userId: string } | null }))
@@ -16,7 +16,7 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
 }))
 
-import { createGroupAction, newInviteAction, newShareLinkAction, setGroupDateAction } from '@/app/actions'
+import { createGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction } from '@/app/actions'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -82,4 +82,20 @@ test('los links nuevos: invitación y para regalar del grupo, y el de la lista p
   await newInviteAction(form({ grupoId: id }))
   await newShareLinkAction(form({ grupoId: id }))
   expect(await grupo(db, id)).toEqual(despues)
+})
+
+test('sacar a quien se sumó por error vuelve al grupo con el aviso; si no se puede, no avisa nada', async () => {
+  const { db, caro } = await preparar()
+  const id = await crearGrupo(db, caro.id, { nombre: 'Mellizos' })
+  const tio = await upsertUserFromGoogle(db, { googleId: 'g-tio', email: 'tio@test.com', nombre: 'Tío' })
+  await unirseAGrupo(db, (await grupo(db, id)).inviteToken!, tio.id)
+  const miembros = () => db.select({ userId: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, id))
+
+  // el tío no puede sacar a Caro, que la armó
+  h.session = { userId: tio.id }
+  await removeMemberAction(form({ grupoId: id, userId: caro.id }))
+  expect(await miembros()).toHaveLength(2)
+  h.session = { userId: caro.id }
+  expect(await redirigeA(removeMemberAction(form({ grupoId: id, userId: tio.id })))).toBe(`/grupos/${id}?nuevo=sacado`)
+  expect(await miembros()).toEqual([{ userId: caro.id }])
 })

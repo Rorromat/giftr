@@ -1,0 +1,1 @@
+ALTER TABLE "lists" ADD COLUMN "share_token_at" timestamp with time zone;

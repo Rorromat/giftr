@@ -8,8 +8,8 @@ import { createGuest, unirInvitadoACuenta, validarNombre, viewerDeCookie } from 
 import { firmarInvitado, leerCuentas, leerInvitado, sumarCuenta } from '@/lib/cookie-invitado'
 import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
 import { asegurarListaPropia, upsertUserFromGoogle } from '@/lib/users'
-import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
-import { crearGrupo } from '@/lib/groups'
+import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem, updateItem } from '@/lib/items'
 
 test('un guest puede reservar', async () => {
@@ -209,6 +209,47 @@ test('al unirse, la cuenta sigue las listas donde reservaba como invitado (apare
   const seguidas = (await db.select().from(listFollows).where(eq(listFollows.userId, giver.id))).map((f) => f.listId)
   expect(seguidas.sort()).toEqual([list.id, listaMarta.id].sort())
   expect(await db.select().from(listFollows).where(eq(listFollows.userId, owner.id))).toEqual([])
+})
+
+test('al unirse, lo que el invitado hizo en un grupo del que la cuenta salió queda a nombre del invitado, y lo reservado se libera', async () => {
+  const db = await createTestDb()
+  const { owner, giver } = await seedOwnerAndGiver(db)
+  const grupoId = await crearGrupo(db, owner.id, { nombre: 'Nuestra casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const mate = (await createItem(db, owner.id, { tipo: 'exacto', titulo: 'Mate' }, grupoId))!
+  // Rodri reservó el mate como invitado en la compu; con su cuenta se sumó al grupo y después salió
+  const enLaCompu = await createGuest(db, 'Rodri')
+  expect(await reserveItem(db, mate.id, { guestId: enLaCompu.id })).toMatchObject({ ok: true })
+  await unirseAGrupo(db, grupo.inviteToken!, giver.id)
+  expect(await salirDeGrupo(db, grupoId, giver.id)).toBe(true)
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  // sigue siendo un deseo que armó: no se queda con la reserva (ni la sigue), y el mate queda libre para otro
+  const [reserva] = await db.select().from(claims).where(eq(claims.itemId, mate.id))
+  expect(reserva).toMatchObject({ estado: 'liberado', claimerGuestId: enLaCompu.id, claimerUserId: null })
+  expect(await db.select().from(listFollows).where(eq(listFollows.userId, giver.id))).toEqual([])
+})
+
+test('al unirse, no sigue una lista que cambió el link para regalar después de que reservó', async () => {
+  const db = await createTestDb()
+  const { list, owner, giver } = await seedOwnerAndGiver(db)
+  const [sofi] = await db.insert(users).values({ googleId: 'g-sofi', nombre: 'Sofi', email: 'sofi@test.com' }).returning()
+  const [termo] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Termo' }).returning()
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  // Rodri reservó el termo como invitado con el link de antes; Euge lo cambió para sacárselo
+  const rodri = await createGuest(db, 'Rodri')
+  await reserveItem(db, termo.id, { guestId: rodri.id })
+  expect(await cambiarLinkParaRegalar(db, list.id, owner.id)).toBeTruthy()
+  // Sofi reservó el mate con el link nuevo
+  const enLaCompu = await createGuest(db, 'Sofi')
+  await reserveItem(db, mate.id, { guestId: enLaCompu.id })
+
+  expect(await unirInvitadoACuenta(db, rodri.id, giver.id)).toBe(true)
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, sofi.id)).toBe(true)
+  // la reserva de Rodri pasa a su cuenta (las reservas quedan), pero Tu gente y Eventos no le dan el link nuevo
+  expect(await db.select({ claimerUserId: claims.claimerUserId }).from(claims).where(eq(claims.itemId, termo.id))).toEqual([{ claimerUserId: giver.id }])
+  expect(await db.select().from(listFollows).where(eq(listFollows.userId, giver.id))).toEqual([])
+  expect((await db.select().from(listFollows).where(eq(listFollows.userId, sofi.id))).map((f) => f.listId)).toEqual([list.id])
 })
 
 test('al unirse, queda una sola reserva activa por persona y por deseo', async () => {
