@@ -1,10 +1,11 @@
-import { and, eq, inArray, ne } from 'drizzle-orm'
-import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
+import { and, eq, gte, inArray } from 'drizzle-orm'
+import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esRepetible, pickItemFields, type OwnerItemView } from '@/lib/serialize'
 import { esDuenoSql, esUuid } from '@/lib/groups'
 import { noEsDeRegaloGrupal } from '@/lib/claims'
-import { dejarAviso } from '@/lib/notifications'
+import { dejarAviso, type TipoAviso } from '@/lib/notifications'
+import { desdeElUltimoEvento } from '@/lib/events'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -135,11 +136,40 @@ export async function archiveItem(db: Db, itemId: string, userId: string, estado
   })
 }
 
-/** "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre). */
+/**
+ * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre). Lo
+ * que se les dijo a los que regalan al sacarlo ya no vale (y el cartel ahora lleva al deseo diciendo que salió):
+ * - Al que se le liberó la reserva o se le canceló el regalo grupal y todavía no lo vio, el aviso pasa a decir eso.
+ * - Al que lo compró para este evento y se le dijo que lo cambiara ("Ya no lo quiero"), que volvió y sigue a su nombre:
+ *   si ya lo cambió, que lo diga, así otro lo puede regalar. Con "Ya lo tengo" no se le había dicho nada.
+ * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
+ */
 export async function restoreItem(db: Db, itemId: string, userId: string): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
-  const filas = await db.update(items).set({ estadoDueno: 'activo' })
-    .where(and(eq(items.id, itemId), ne(items.estadoDueno, 'activo')))
-    .returning({ id: items.id })
-  return filas.length > 0
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez
+    const [antes] = await t.select({ estado: items.estadoDueno, listId: items.listId }).from(items).where(eq(items.id, itemId)).for('update')
+    if (!antes || antes.estado === 'activo') return false
+    await t.update(items).set({ estadoDueno: 'activo' }).where(eq(items.id, itemId))
+
+    const sinLeer = (tipo: TipoAviso) => and(eq(notifications.itemId, itemId), eq(notifications.tipo, tipo), eq(notifications.leida, false))
+    const ahora = new Date()
+    await t.update(notifications).set({ tipo: 'item_vuelve', createdAt: ahora }).where(sinLeer('item_baja'))
+    await t.update(notifications).set({ tipo: 'regalo_cancelado', createdAt: ahora }).where(sinLeer('regalo_baja'))
+    await t.update(notifications).set({ leida: true }).where(sinLeer('item_baja_comprado'))
+
+    if (antes.estado === 'no_lo_quiero') {
+      const compras = await t.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId, giftId: groupGifts.id }).from(claims)
+        .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
+        .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'comprado'), gte(claims.updatedAt, await desdeElUltimoEvento(t, antes.listId))))
+      await dejarAviso(t, itemId, 'compra_vuelve', compras.filter((c) => !c.giftId))
+      const regalos = compras.flatMap((c) => (c.giftId ? [c.giftId] : []))
+      if (regalos.length) {
+        const pusieron = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers).where(inArray(groupGiftMembers.giftId, regalos))
+        await dejarAviso(t, itemId, 'regalo_vuelve', pusieron.map((m) => ({ userId: m.userId, guestId: null })))
+      }
+    }
+    return true
+  })
 }

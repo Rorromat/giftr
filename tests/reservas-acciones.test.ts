@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { claims, items, users } from '@/db/schema'
-import { reserveItem } from '@/lib/claims'
+import { markBought, reserveItem } from '@/lib/claims'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
 
 // Las acciones de deseos y reservas tal cual, con la base en PGlite y la sesión y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({
@@ -79,4 +80,33 @@ test('archivar y "Volver a mi lista" desde las acciones', async () => {
   await archiveItemAction(form({ estado: 'lo_tengo' }))
   await restoreItemAction(form({ itemId: 'no-es-uuid' }))
   expect((await h.db.select().from(items))[0].estadoDueno).toBe('activo')
+})
+
+test('"Ya lo compré" dos veces no dice que la reserva había vencido: la compra salió', async () => {
+  const { giver, item } = await preparar()
+  const r = await reserveItem(h.db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error(r.reason)
+  h.session = { userId: giver.id }
+  const datos = form({ token: 'tok-euge', itemId: item.id, claimId: r.claimId })
+  await boughtAction(datos)
+  await boughtAction(datos) // sin redirección
+  expect((await h.db.select().from(claims))[0].estado).toBe('comprado')
+})
+
+test('"Ya lo compré" sobre una vencida con el link de antes no reserva de nuevo (le pasaría el link nuevo)', async () => {
+  const { owner, giver, list, item } = await preparar()
+  const [vieja] = await h.db.insert(claims).values({
+    itemId: item.id, claimerUserId: giver.id, estado: 'expirado', expiresAt: new Date(Date.now() - 86400_000),
+  }).returning()
+  const nuevo = await cambiarLinkParaRegalar(h.db, list.id, owner.id)
+  h.session = { userId: giver.id }
+  await boughtAction(form({ token: 'tok-euge', itemId: item.id, claimId: vieja.id }))
+  expect(await h.db.select().from(claims)).toEqual([expect.objectContaining({ id: vieja.id, estado: 'expirado' })])
+  // ni después con "Me equivoqué": no hay nada suyo comprado
+  await unboughtAction(form({ token: 'tok-euge', itemId: item.id, claimId: vieja.id }))
+  expect(await h.db.select().from(claims)).toHaveLength(1)
+  // con el de ahora, sí
+  await boughtAction(form({ token: nuevo!, itemId: item.id, claimId: vieja.id }))
+  expect((await h.db.select().from(claims)).map((c) => c.estado).sort()).toEqual(['comprado', 'expirado'])
+  expect(await markBought(h.db, vieja.id, { userId: giver.id })).toEqual({ ok: false, reason: 'no_permitido' })
 })

@@ -120,7 +120,7 @@ test('al confirmar que es el invitado de ese navegador, la cuenta hereda sus res
   const vista = await getListForViewer(db, 'tok-euge', { userId: user.id })
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
   expect(vista.items[0].claims[0].esMia).toBe(true)
-  expect(await markBought(db, r.claimId, { userId: user.id })).toBe(true)
+  expect(await markBought(db, r.claimId, { userId: user.id })).toEqual({ ok: true })
   // no se une dos veces
   expect(await unirInvitadoACuenta(db, ana.id, user.id)).toBe(false)
 })

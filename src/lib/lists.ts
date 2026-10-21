@@ -1,9 +1,10 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, notInArray, or, sql } from 'drizzle-orm'
 import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { expireStaleClaims, miReservaVencida } from '@/lib/claims'
-import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
+import { expireStaleClaims, miReservaVencida, ocupaSql } from '@/lib/claims'
+import { desdeElUltimoEvento } from '@/lib/events'
+import { esRepetible, pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { duenosDeLista, esDuenoSql, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
@@ -23,17 +24,25 @@ export type ListView =
 
 export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
 
-async function loadClaimViews(db: Db, itemIds: string[], viewer: Viewer) {
-  if (!itemIds.length) return new Map<string, ClaimView[]>()
+/** Las reservas de unos deseos de una lista, como las ve quien regala. */
+async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer) {
+  if (!deseos.length) return new Map<string, ClaimView[]>()
+  // Lo de este evento: en una idea que se puede repetir, lo comprado para uno anterior ya no se cuenta (ver ocupaSql), y
+  // una compra se deshace solo si es de este (ver desmarcarComprado).
+  const desde = await desdeElUltimoEvento(db, listId)
+  const repetibles = deseos.filter(esRepetible).map((i) => i.id)
   const rows = await db.select({
     id: claims.id, itemId: claims.itemId, estado: claims.estado,
-    notaQueCompre: claims.notaQueCompre, expiresAt: claims.expiresAt,
+    notaQueCompre: claims.notaQueCompre, expiresAt: claims.expiresAt, updatedAt: claims.updatedAt,
     claimerUserId: claims.claimerUserId, claimerGuestId: claims.claimerGuestId,
     userNombre: users.nombre, guestNombre: guestIdentities.nombre,
   }).from(claims)
     .leftJoin(users, eq(claims.claimerUserId, users.id))
     .leftJoin(guestIdentities, eq(claims.claimerGuestId, guestIdentities.id))
-    .where(and(inArray(claims.itemId, itemIds), inArray(claims.estado, ['reservado', 'comprado'])))
+    .where(and(
+      inArray(claims.itemId, deseos.map((i) => i.id)), inArray(claims.estado, ['reservado', 'comprado']),
+      repetibles.length ? or(notInArray(claims.itemId, repetibles), ocupaSql(desde)) : undefined,
+    ))
 
   // Regalos grupales de esas reservas, con su gente (el encargado primero).
   const grupales = rows.length
@@ -58,6 +67,7 @@ async function loadClaimViews(db: Db, itemIds: string[], viewer: Viewer) {
       esMia,
       // cuándo vence una reserva es cosa de quien la hizo
       vence: esMia && r.estado === 'reservado' ? r.expiresAt : null,
+      deshacer: esMia && r.estado === 'comprado' && !gente.length && r.updatedAt >= desde,
       notaQueCompre: r.notaQueCompre,
       grupal: gente.length
         ? { giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId) }
@@ -101,7 +111,7 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
   }
 
   await expireStaleClaims(db)
-  const claimMap = await loadClaimViews(db, activos.map((i) => i.id), viewer)
+  const claimMap = await loadClaimViews(db, list.id, activos, viewer)
   return {
     role: 'giver', shareToken, ...paraRegalador(list, duenos),
     items: activos.map((i) => toGiverView(pickItemFields(i), claimMap.get(i.id) ?? [])),
@@ -162,7 +172,7 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
 
   await expireStaleClaims(db, itemId)
   const [claimMap, regalos, vencida] = await Promise.all([
-    loadClaimViews(db, [itemId], viewer), regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
+    loadClaimViews(db, row.list.id, [row.item], viewer), regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
   ])
   const itemClaims = claimMap.get(itemId) ?? []
   const commentRows = await db.select({

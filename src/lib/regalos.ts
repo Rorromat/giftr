@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { reserveItem, type ReserveResult } from '@/lib/claims'
+import { loQueYaTiene, reserveItem, type ReserveResult } from '@/lib/claims'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
@@ -51,23 +51,17 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
   return db.transaction(async (tx): Promise<IniciarResult> => {
     const t = tx as unknown as Db
     // lock del deseo (como reserveItem): si a la vez se une al grupo, uno de los dos espera al otro
-    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno }).from(items).where(eq(items.id, itemId)).for('update')
+    const [item] = await t.select({ id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible, estado: items.estadoDueno })
+      .from(items).where(eq(items.id, itemId)).for('update')
     if (!item) return { ok: false, reason: 'no_existe' }
     if (await esOFueDuenoDeLista(t, item.listId, userId)) return { ok: false, reason: 'propio' }
     if (item.estado !== 'activo') return { ok: false, reason: 'archivado' }
-    const [abierto] = await t.select({ id: groupGifts.id }).from(groupGifts)
-      .where(and(eq(groupGifts.itemId, itemId), eq(groupGifts.estado, 'abierto'), or(
-        eq(groupGifts.organizerUserId, userId),
-        inArray(groupGifts.id, t.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers).where(eq(groupGiftMembers.userId, userId))),
-      )))
-    if (abierto) return { ok: true, giftId: abierto.id }
-    const suyas = await t.select({ id: claims.id, estado: claims.estado, regalo: groupGifts.id }).from(claims)
-      .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
-      .where(and(eq(claims.itemId, itemId), eq(claims.claimerUserId, userId), inArray(claims.estado, ['reservado', 'comprado'])))
-    const propia = suyas.find((c) => c.estado === 'reservado' && !c.regalo)
-    // Una persona, una reserva por deseo: si ya lo compró (suelto o en otro regalo), no arma otro encima.
-    if (suyas.some((c) => c !== propia)) return { ok: false, reason: 'ya_comprado' }
-    let claimId = propia?.id
+    // Una persona, una reserva por deseo (lo mismo que mira reserveItem): si ya lo compró (suelto o en otro regalo), no
+    // arma otro encima.
+    const ya = await loQueYaTiene(t, item, { userId })
+    if (ya?.giftId) return ya.estado === 'reservado' ? { ok: true, giftId: ya.giftId } : { ok: false, reason: 'ya_comprado' }
+    if (ya && ya.estado !== 'reservado') return { ok: false, reason: 'ya_comprado' }
+    let claimId = ya?.claimId
     if (claimId) {
       await t.update(claims).set({ expiresAt: null, updatedAt: new Date() }).where(eq(claims.id, claimId))
     } else {

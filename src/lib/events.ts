@@ -40,7 +40,8 @@ export function proximaFecha(dia: number, mes: number, hoy: Date): Date {
   return esteAnio >= hoy ? esteAnio : enAnio(dia, mes, hoy.getUTCFullYear() + 1)
 }
 
-export const diasEntre = (desde: Date, hasta: Date) => Math.round((hasta.getTime() - desde.getTime()) / 86400_000)
+const DIA = 86400_000
+export const diasEntre = (desde: Date, hasta: Date) => Math.round((hasta.getTime() - desde.getTime()) / DIA)
 
 const SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -192,17 +193,47 @@ export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
   await db.delete(listFollows).where(and(eq(listFollows.userId, userId), eq(listFollows.listId, listId)))
 }
 
-/** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
-export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
+/** La fecha de una lista: el cumple del dueño (todos los años) o la del grupo. */
+async function fechaDeLista(db: Db, listId: string) {
   if (!esUuid(listId)) return null
   const [row] = await db.select({ list: lists, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes })
     .from(lists).leftJoin(users, eq(lists.ownerId, users.id)).where(eq(lists.id, listId))
   if (!row) return null
-  const fecha = row.list.tipo === 'grupo'
-    ? proximaDeGrupo(row.list.eventoFecha, row.list.eventoAnual, hoy)
-    : row.cumpleDia && row.cumpleMes ? proximaFecha(row.cumpleDia, row.cumpleMes, hoy) : null
+  if (row.list.tipo === 'personal') {
+    return row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: 0, anual: true } : null
+  }
+  if (!row.list.eventoFecha) return null
+  const [anio, mes, dia] = row.list.eventoFecha.split('-').map(Number)
+  return { esCumple: false, dia, mes, anio, anual: row.list.eventoAnual }
+}
+
+/** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
+export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
+  const f = await fechaDeLista(db, listId)
+  if (!f) return null
+  const unica = new Date(Date.UTC(f.anio, f.mes - 1, f.dia))
+  const fecha = f.anual ? proximaFecha(f.dia, f.mes, hoy) : unica >= hoy ? unica : null
   if (!fecha) return null
-  return { esCumple: row.list.tipo === 'personal', fecha, dias: diasEntre(hoy, fecha) }
+  return { esCumple: f.esCumple, fecha, dias: diasEntre(hoy, fecha) }
+}
+
+/**
+ * Desde cuándo algo es "para el evento que viene" en una lista: desde el día siguiente al último que ya pasó (el cumple
+ * del dueño o la fecha del grupo; el día del evento todavía es de ese). Sin uno anterior (sin fecha, o una única que
+ * todavía no llegó), un año para atrás. Lo de antes ya se regaló: es historial.
+ */
+export async function desdeElUltimoEvento(db: Db, listId: string, ahora = new Date()): Promise<Date> {
+  const hoy = hoyLocal(ahora)
+  const f = await fechaDeLista(db, listId)
+  let anterior: Date | null = null
+  if (f?.anual) {
+    const esteAnio = enAnio(f.dia, f.mes, hoy.getUTCFullYear())
+    anterior = esteAnio < hoy ? esteAnio : enAnio(f.dia, f.mes, hoy.getUTCFullYear() - 1)
+  } else if (f) {
+    const unica = new Date(Date.UTC(f.anio, f.mes - 1, f.dia))
+    anterior = unica < hoy ? unica : null
+  }
+  return anterior ? inicioDelDia(new Date(anterior.getTime() + DIA)) : new Date(ahora.getTime() - 365 * DIA)
 }
 
 export async function miCumple(db: Db, userId: string): Promise<{ dia: number; mes: number } | null> {

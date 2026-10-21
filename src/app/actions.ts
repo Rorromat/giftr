@@ -392,11 +392,13 @@ export async function noSoyElInvitadoAction() {
 export async function boughtAction(formData: FormData) {
   const viewer = await getViewer()
   const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
-  const ok = await markBought(db, str(formData, 'claimId') ?? '', viewer, str(formData, 'nota'))
+  // Volver a reservar una que venció pide lo mismo que reservar: el deseo, con el link para regalar de ahora (ver markBought).
+  const conLink = esUuid(itemId) && !!(await listaDelItem(itemId, token))
+  const r = await markBought(db, str(formData, 'claimId') ?? '', viewer, str(formData, 'nota'), conLink ? itemId : undefined)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
-  // casi siempre: la reserva había vencido y el lugar ya lo tomó otro. Que se entere, en vez de que no pase nada.
-  if (!ok && esUuid(itemId) && (await listaDelItem(itemId, token))) redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
+  // la reserva había vencido y el lugar ya lo tomó otro: que se entere, en vez de que no pase nada
+  if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
 }
 
 /** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva. */

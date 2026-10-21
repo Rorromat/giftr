@@ -71,10 +71,10 @@ export default async function DetalleItem({ params, searchParams }: {
     viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
   ])
   // La reserva de un regalo grupal se maneja desde el regalo; acá solo las sueltas. Una por persona: con una comprada
-  // tampoco se vuelve a ofrecer reservar (reserveItem devolvería esa).
+  // tampoco se vuelve a ofrecer reservar (reserveItem devolvería esa). La compra se deshace solo si es de este evento.
   const mia = claims.find((c) => c.esMia && !c.grupal)
   const miClaim = mia?.estado === 'reservado' ? mia : undefined
-  const miCompra = mia?.estado === 'comprado' ? mia : undefined
+  const miCompra = mia?.estado === 'comprado' && mia.deshacer ? mia : undefined
   const vencida = giver?.miVencida ?? null
   const enUnRegalo = regalos.some((r) => r.soyParte)
   const cuantos = cantidad(item, giver?.item ?? null)
@@ -165,6 +165,8 @@ export default async function DetalleItem({ params, searchParams }: {
                   <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Ya lo compré</BotonEnviar>
                 </form>
                 <GuestGate token={token} itemId={item.id} identified={identified} volver={aqui} conCartel={!!reserva} texto="Reservar de nuevo" />
+                {/* el de abajo no sale mientras se ve esto: que también pueda armar uno */}
+                <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />
               </>
             )}
           </div>

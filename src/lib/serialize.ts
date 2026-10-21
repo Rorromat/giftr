@@ -27,6 +27,8 @@ export type ClaimView = {
   esMia: boolean
   /** Solo en la reserva propia sin comprar: hasta cuándo dura. */
   vence: Date | null
+  /** Solo en la compra suelta propia de este evento: "Me equivoqué, todavía no lo compré" (ver desmarcarComprado). */
+  deshacer: boolean
   notaQueCompre: string | null
   /** Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. */
   grupal: { giftId: string; personas: string[]; soyParte: boolean } | null

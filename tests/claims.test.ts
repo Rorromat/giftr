@@ -7,10 +7,11 @@ import {
   vencimientoDeReserva,
 } from '@/lib/claims'
 import { guardarCumple, guardarFechaGrupo, hoyLocal, inicioDelDia } from '@/lib/events'
-import { crearGrupo } from '@/lib/groups'
-import { getItemForViewer, getListForViewer } from '@/lib/lists'
+import { crearGrupo, unirseAGrupo } from '@/lib/groups'
+import { archiveItem } from '@/lib/items'
+import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer } from '@/lib/lists'
 import { createGuest } from '@/lib/guest'
-import { comprarRegalo, iniciarRegaloGrupal } from '@/lib/regalos'
+import { comprarRegalo, historialDeLista, iniciarRegaloGrupal } from '@/lib/regalos'
 
 async function setup(extra: Partial<typeof items.$inferInsert> = {}) {
   const db = await createTestDb()
@@ -78,8 +79,8 @@ test('comprar y liberar solo sobre claims propios', async () => {
   const [otro] = await db.insert(users).values({ googleId: 'g-otro', nombre: 'Otro', email: 'otro@test.com' }).returning()
   const r = await reserveItem(db, item.id, { userId: giver.id })
   if (!r.ok) throw new Error('reserva falló')
-  expect(await markBought(db, r.claimId, { userId: otro.id })).toBe(false)
-  expect(await markBought(db, r.claimId, { userId: giver.id }, 'set Batman')).toBe(true)
+  expect(await markBought(db, r.claimId, { userId: otro.id })).toMatchObject({ ok: false })
+  expect(await markBought(db, r.claimId, { userId: giver.id }, 'set Batman')).toEqual({ ok: true })
   const [c] = await db.select().from(claims)
   expect(c.estado).toBe('comprado')
   expect(c.notaQueCompre).toBe('set Batman')
@@ -143,7 +144,7 @@ test('una persona, una reserva por deseo: un doble toque devuelve la misma y no 
 
   // ya comprada, también: es la misma (no reserva otra copa)
   if (!primera.ok) throw new Error(primera.reason)
-  expect(await markBought(db, primera.claimId, { userId: giver.id })).toBe(true)
+  expect(await markBought(db, primera.claimId, { userId: giver.id })).toEqual({ ok: true })
   expect(await reserveItem(db, item.id, { userId: giver.id })).toEqual(primera)
   expect(await db.select().from(claims)).toHaveLength(2)
 })
@@ -218,7 +219,8 @@ test('una reserva vencida no deja trabado: si sigue habiendo lugar, "Ya lo compr
   if (detalle?.role !== 'giver') throw new Error('esperaba giver')
   expect(detalle.miVencida).toEqual({ claimId: vieja.id, vencio: vieja.expiresAt })
   expect(await miReservaVencida(db, item.id, { userId: giver.id })).toEqual({ claimId: vieja.id, vencio: vieja.expiresAt })
-  expect(await markBought(db, vieja.id, { userId: giver.id }, 'el negro')).toBe(true)
+  // (con el deseo del link de ahora, como lo manda la acción: ver el test de abajo)
+  expect(await markBought(db, vieja.id, { userId: giver.id }, 'el negro', item.id)).toEqual({ ok: true })
   const filas = await db.select().from(claims).where(eq(claims.itemId, item.id))
   expect(filas.map((c) => c.estado).sort()).toEqual(['comprado', 'expirado'])
   expect(filas.find((c) => c.estado === 'comprado')).toMatchObject({ claimerUserId: giver.id, notaQueCompre: 'el negro' })
@@ -232,7 +234,7 @@ test('una reserva vencida no deja trabado: si sigue habiendo lugar, "Ya lo compr
   const [otra] = await db.insert(claims).values({ itemId: mate.id, claimerUserId: giver.id, expiresAt: new Date(Date.now() - DIA) }).returning()
   const [caro] = await db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
   expect((await reserveItem(db, mate.id, { userId: caro.id })).ok).toBe(true)
-  expect(await markBought(db, otra.id, { userId: giver.id })).toBe(false)
+  expect(await markBought(db, otra.id, { userId: giver.id }, undefined, mate.id)).toEqual({ ok: false, reason: 'sin_lugar' })
   expect(await db.select().from(claims).where(eq(claims.itemId, mate.id))).toHaveLength(2)
   // una reserva que venció hace mucho ya no se ofrece
   await db.update(claims).set({ expiresAt: new Date(Date.now() - 40 * DIA) }).where(eq(claims.id, otra.id))
@@ -244,7 +246,7 @@ test('"Ya lo compré" se deshace: vuelve a reservado con un vencimiento nuevo; n
   const [otro] = await db.insert(users).values({ googleId: 'g-otro', nombre: 'Otro', email: 'otro@test.com' }).returning()
   const r = await reserveItem(db, item.id, { userId: giver.id })
   if (!r.ok) throw new Error(r.reason)
-  expect(await markBought(db, r.claimId, { userId: giver.id }, 'set Batman')).toBe(true)
+  expect(await markBought(db, r.claimId, { userId: giver.id }, 'set Batman')).toEqual({ ok: true })
   await db.update(claims).set({ expiresAt: new Date(Date.now() - DIA) }) // el plazo de antes ya pasó
   const [comprada] = await db.select().from(claims)
   expect(await desmarcarComprado(db, comprada.id, { userId: otro.id })).toBe(false)
@@ -263,7 +265,7 @@ test('"Ya lo compré" se deshace: vuelve a reservado con un vencimiento nuevo; n
   await comprarRegalo(db, g.giftId, giver.id, { total: 1000 })
   const [delRegalo] = await db.select({ claimId: groupGifts.claimId }).from(groupGifts)
   expect(await desmarcarComprado(db, delRegalo.claimId, { userId: giver.id })).toBe(false)
-  expect(await markBought(db, delRegalo.claimId, { userId: giver.id })).toBe(false)
+  expect(await markBought(db, delRegalo.claimId, { userId: giver.id })).toMatchObject({ ok: false })
 })
 
 test('el cartel de vencimiento lleva al deseo, salvo que hayan cambiado el link después; de un deseo que salió de la lista, nada', async () => {
@@ -282,4 +284,153 @@ test('el cartel de vencimiento lleva al deseo, salvo que hayan cambiado el link 
   await db.update(items).set({ estadoDueno: 'no_lo_quiero' }).where(eq(items.id, item.id))
   expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([])
   expect(await db.select().from(guestIdentities)).toEqual([])
+})
+
+test('una vencida se vuelve a reservar solo con el link para regalar de ahora y hasta 30 días después de vencer', async () => {
+  const { db, item, giver, owner, list } = await setup()
+  const abuela = await createGuest(db, 'Abuela')
+  const vencida = async (viewer: { userId?: string; guestId?: string }, hace: number) => (await db.insert(claims).values({
+    itemId: item.id, claimerUserId: viewer.userId, claimerGuestId: viewer.guestId,
+    createdAt: new Date(Date.now() - (hace + 14) * DIA), expiresAt: new Date(Date.now() - hace * DIA), estado: 'expirado',
+  }).returning())[0]
+  const deRodri = await vencida({ userId: giver.id }, 2)
+  const deLaAbuela = await vencida({ guestId: abuela.id }, 2)
+  // la dueña cambió el link: la acción no le pasa el deseo a quien llega con el de antes, y sin eso no se crea nada (una
+  // reserva nueva contaría como que tiene el link nuevo: ver cambiarLinkParaRegalar)
+  expect(await cambiarLinkParaRegalar(db, list.id, owner.id)).not.toBeNull()
+  expect(await markBought(db, deRodri.id, { userId: giver.id })).toEqual({ ok: false, reason: 'no_permitido' })
+  expect(await markBought(db, deLaAbuela.id, { guestId: abuela.id })).toEqual({ ok: false, reason: 'no_permitido' })
+  // ni con el de otro deseo
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  expect(await markBought(db, deRodri.id, { userId: giver.id }, undefined, mate.id)).toEqual({ ok: false, reason: 'no_permitido' })
+  expect(await db.select().from(claims)).toHaveLength(2)
+  // una que venció hace más de 30 días tampoco, aunque tenga el link
+  await db.update(claims).set({ expiresAt: new Date(Date.now() - 40 * DIA) }).where(eq(claims.id, deRodri.id))
+  expect(await markBought(db, deRodri.id, { userId: giver.id }, undefined, item.id)).toEqual({ ok: false, reason: 'no_permitido' })
+  expect(await db.select().from(claims)).toHaveLength(2)
+  // con el link de ahora y a tiempo, sí
+  expect(await markBought(db, deLaAbuela.id, { guestId: abuela.id }, undefined, item.id)).toEqual({ ok: true })
+  expect((await db.select().from(claims)).map((c) => c.estado).sort()).toEqual(['comprado', 'expirado', 'expirado'])
+})
+
+test('"Ya lo compré" dos veces (un doble toque, otra pestaña) sale bien las dos, también sobre una vencida', async () => {
+  const { db, item, giver, list } = await setup()
+  const r = await reserveItem(db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error(r.reason)
+  expect(await markBought(db, r.claimId, { userId: giver.id }, 'el negro')).toEqual({ ok: true })
+  expect(await markBought(db, r.claimId, { userId: giver.id })).toEqual({ ok: true })
+  expect((await db.select().from(claims))[0]).toMatchObject({ estado: 'comprado', notaQueCompre: 'el negro' })
+
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  const [vieja] = await db.insert(claims).values({ itemId: mate.id, claimerUserId: giver.id, estado: 'expirado', expiresAt: new Date(Date.now() - DIA) }).returning()
+  expect(await markBought(db, vieja.id, { userId: giver.id }, undefined, mate.id)).toEqual({ ok: true })
+  expect(await markBought(db, vieja.id, { userId: giver.id }, undefined, mate.id)).toEqual({ ok: true })
+  const delMate = await db.select().from(claims).where(eq(claims.itemId, mate.id))
+  expect(delMate.map((c) => c.estado).sort()).toEqual(['comprado', 'expirado'])
+})
+
+test('con dos reservas de la misma persona (de antes de esto), "Ya lo compré" marca la que pidió y después la otra', async () => {
+  const { db, item, giver } = await setup({ titulo: 'Copas', cantidad: 3 })
+  const [c1, c2] = await db.insert(claims).values([
+    { itemId: item.id, claimerUserId: giver.id, createdAt: new Date(Date.now() - 2000), expiresAt: new Date(Date.now() + 5 * DIA) },
+    { itemId: item.id, claimerUserId: giver.id, createdAt: new Date(Date.now() - 1000), expiresAt: new Date(Date.now() + 5 * DIA) },
+  ]).returning()
+  expect(await markBought(db, c2.id, { userId: giver.id })).toEqual({ ok: true })
+  const estado = async (id: string) => (await db.select().from(claims).where(eq(claims.id, id)))[0].estado
+  expect([await estado(c1.id), await estado(c2.id)]).toEqual(['reservado', 'comprado'])
+  expect(await markBought(db, c1.id, { userId: giver.id })).toEqual({ ok: true })
+  expect([await estado(c1.id), await estado(c2.id)]).toEqual(['comprado', 'comprado'])
+})
+
+test('si después de que venció la reservó de nuevo y la liberó, ya no se le ofrece la vencida (y puede armar un regalo)', async () => {
+  const { db, item, giver } = await setup()
+  await db.insert(claims).values({ itemId: item.id, claimerUserId: giver.id, estado: 'expirado', createdAt: new Date(Date.now() - 16 * DIA), expiresAt: new Date(Date.now() - 2 * DIA) })
+  expect(await miReservaVencida(db, item.id, { userId: giver.id })).not.toBeNull()
+  const r = await reserveItem(db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error(r.reason)
+  expect(await releaseClaim(db, r.claimId, { userId: giver.id })).toBe(true)
+  expect(await miReservaVencida(db, item.id, { userId: giver.id })).toBeNull()
+  const detalle = await getItemForViewer(db, 'tok-euge', item.id, { userId: giver.id })
+  if (detalle?.role !== 'giver') throw new Error('esperaba giver')
+  expect(detalle.miVencida).toBeNull()
+})
+
+test('en una idea que se puede repetir, lo comprado para un evento anterior no ocupa: se reserva de nuevo y no se deshace', async () => {
+  const { db, item, giver, list } = await setup({ tipo: 'idea', titulo: 'Medias', repetible: true })
+  // Rodri le regaló medias rayadas hace un año y pico (la lista no tiene fecha: cuenta el último año)
+  const [vieja] = await db.insert(claims).values({
+    itemId: item.id, claimerUserId: giver.id, estado: 'comprado', notaQueCompre: 'rayadas',
+    createdAt: new Date(Date.now() - 395 * DIA), updatedAt: new Date(Date.now() - 380 * DIA), expiresAt: new Date(Date.now() - 381 * DIA),
+  }).returning()
+  const vista = await vistaDe(db, giver.id, item.id)
+  expect(vista.claims).toEqual([])
+  const r = await reserveItem(db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error(r.reason)
+  expect(r.claimId).not.toBe(vieja.id)
+  expect((await vistaDe(db, giver.id, item.id)).claims).toEqual([expect.objectContaining({ id: r.claimId, estado: 'reservado', esMia: true })])
+  // la de antes ya se regaló: no se deshace ni se pierde del historial, y no le sale "¿Conseguiste…?" por ella
+  expect(await desmarcarComprado(db, vieja.id, { userId: giver.id })).toBe(false)
+  expect((await db.select().from(claims).where(eq(claims.id, vieja.id)))[0]).toMatchObject({ estado: 'comprado', notaQueCompre: 'rayadas' })
+  expect((await historialDeLista(db, list.id, { userId: giver.id }))!.entradas).toHaveLength(1)
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([])
+})
+
+test('lo de "este evento" empieza el día después del último cumple: lo comprado antes es de ese', async () => {
+  const { db, item, giver, owner } = await setup({ tipo: 'idea', titulo: 'Medias', repetible: true })
+  const [termo] = await db.insert(items).values({ listId: item.listId, tipo: 'exacto', titulo: 'Termo', cantidad: 2 }).returning()
+  const hace10 = new Date(hoyLocal().getTime() - 10 * DIA)
+  await guardarCumple(db, owner.id, hace10.getUTCDate(), hace10.getUTCMonth() + 1)
+  const compra = async (itemId: string, hace: number) => (await db.insert(claims).values({
+    itemId, claimerUserId: giver.id, estado: 'comprado', createdAt: new Date(Date.now() - (hace + 1) * DIA), updatedAt: new Date(Date.now() - hace * DIA),
+  }).returning())[0]
+  // las medias que compró para ese cumple ya no ocupan; las que compró después, sí (es la misma)
+  const paraElCumple = await compra(item.id, 20)
+  expect((await vistaDe(db, giver.id, item.id)).claims).toEqual([])
+  await db.update(claims).set({ updatedAt: new Date(Date.now() - 5 * DIA) }).where(eq(claims.id, paraElCumple.id))
+  expect(await reserveItem(db, item.id, { userId: giver.id })).toEqual({ ok: true, claimId: paraElCumple.id })
+  expect((await vistaDe(db, giver.id, item.id)).claims).toEqual([expect.objectContaining({ id: paraElCumple.id, deshacer: true })])
+  // un "Quiero ESTO" comprado para el cumple sigue comprado (no se repite), pero ya no se deshace
+  const delTermo = await compra(termo.id, 20)
+  expect(await reserveItem(db, termo.id, { userId: giver.id })).toEqual({ ok: true, claimId: delTermo.id })
+  expect((await vistaDe(db, giver.id, termo.id)).claims).toEqual([expect.objectContaining({ id: delTermo.id, deshacer: false })])
+  expect(await desmarcarComprado(db, delTermo.id, { userId: giver.id })).toBe(false)
+  // la de este evento, sí; y el "¿Conseguiste…?" cuenta desde que la deshizo, no desde que la reservó
+  expect(await desmarcarComprado(db, paraElCumple.id, { userId: giver.id })).toBe(true)
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([])
+})
+
+test('"Me equivoqué" no vale para un co-dueño que lo compró antes de sumarse, ni sobre un deseo que salió de la lista', async () => {
+  const { db, item, owner, giver } = await setup()
+  const grupoId = await crearGrupo(db, owner.id, { nombre: 'Casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const [vela] = await db.insert(items).values({ listId: grupoId, tipo: 'exacto', titulo: 'Vela' }).returning()
+  const comprar = async (itemId: string) => {
+    const r = await reserveItem(db, itemId, { userId: giver.id })
+    if (!r.ok) throw new Error(r.reason)
+    expect(await markBought(db, r.claimId, { userId: giver.id })).toEqual({ ok: true })
+    return r.claimId
+  }
+  const deLaVela = await comprar(vela.id)
+  const delTermo = await comprar(item.id)
+  // Rodri se suma al grupo: su compra queda como está, pero no la vuelve una reserva de un dueño que nadie libera
+  expect(await unirseAGrupo(db, grupo.inviteToken!, giver.id)).toBe(grupoId)
+  expect(await desmarcarComprado(db, deLaVela, { userId: giver.id })).toBe(false)
+  // Euge ya lo tiene: tampoco
+  expect(await archiveItem(db, item.id, owner.id, 'lo_tengo')).toBe(true)
+  expect(await desmarcarComprado(db, delTermo, { userId: giver.id })).toBe(false)
+  expect((await db.select({ estado: claims.estado }).from(claims)).map((c) => c.estado)).toEqual(['comprado', 'comprado'])
+})
+
+test('deshacer una compra de antes de que cambiaran el link para regalar no le pasa el nuevo', async () => {
+  const { db, item, giver, owner, list } = await setup()
+  const r = await reserveItem(db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error(r.reason)
+  await markBought(db, r.claimId, { userId: giver.id })
+  await db.update(claims).set({ createdAt: new Date(Date.now() - 20 * DIA) })
+  await cambiarLinkParaRegalar(db, list.id, owner.id)
+  expect(await desmarcarComprado(db, r.claimId, { userId: giver.id })).toBe(true)
+  // queda con la fecha de antes: el cartel sale, pero sin el link nuevo
+  const [c] = await db.select().from(claims)
+  expect(c.createdAt.getTime()).toBeLessThan(Date.now() - 19 * DIA)
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([expect.objectContaining({ claimId: r.claimId, href: null })])
 })

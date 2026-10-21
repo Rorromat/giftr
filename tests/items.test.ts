@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import { eq } from 'drizzle-orm'
 import { claims, comments, notifications, users } from '@/db/schema'
-import { getMyClaimWarnings, markBought, reserveItem } from '@/lib/claims'
+import { desmarcarComprado, getMyClaimWarnings, markBought, reserveItem } from '@/lib/claims'
 import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getUnreadNotifications, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { addComment } from '@/lib/comments'
@@ -121,7 +121,28 @@ test('"Volver a mi lista": vuelve con lo que tenía (lo comprado sigue a su nomb
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
   expect(vista.items[0]).toMatchObject({ estadoDueno: 'activo', quedan: 2, disponible: true })
   expect(vista.items[0].claims).toEqual([expect.objectContaining({ claimerNombre: 'Caro', estado: 'comprado' })])
+  // con "Ya lo tengo" a Caro no se le había dicho nada, y no se le dice; a Rodri, que se le liberó la reserva, que volvió
   expect(await getUnreadNotifications(db, { userId: caro.id })).toEqual([])
+  expect(await getUnreadNotifications(db, { userId: giver.id })).toEqual([
+    expect.objectContaining({ tipo: 'item_vuelve', href: `/l/tok-euge/item/${copas.id}` }),
+  ])
+})
+
+test('"Volver a mi lista" después de "Ya no lo quiero": al que lo compró se le avisa que volvió, y lo puede deshacer', async () => {
+  const { db, owner, giver, caro, abuela, copas } = await conCopas()
+  await archiveItem(db, copas.id, owner.id, 'no_lo_quiero')
+  expect(await restoreItem(db, copas.id, owner.id)).toBe(true)
+  // el "cambialo" ya no vale (y ahora llevaría al deseo diciendo que salió): le llega que volvió y sigue a su nombre
+  expect(await getUnreadNotifications(db, { userId: caro.id })).toEqual([
+    expect.objectContaining({ tipo: 'compra_vuelve', href: `/l/tok-euge/item/${copas.id}` }),
+  ])
+  expect(textoDeAviso('compra_vuelve', 'Copas')).toContain('Me equivoqué')
+  expect((await getUnreadNotifications(db, { guestId: abuela.id })).map((n) => n.tipo)).toEqual(['item_vuelve'])
+  expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => n.tipo)).toEqual(['item_vuelve'])
+  const [deCaro] = await db.select().from(claims).where(eq(claims.claimerUserId, caro.id))
+  expect(await desmarcarComprado(db, deCaro.id, { userId: caro.id })).toBe(true)
+  // un aviso que ya había leído queda leído; a la dueña, nada
+  expect(await db.select().from(notifications).where(eq(notifications.userId, owner.id))).toEqual([])
 })
 
 test('REGLA DE LA SORPRESA: archivar y volver a poner le responden igual al dueño, haya o no reservas', async () => {

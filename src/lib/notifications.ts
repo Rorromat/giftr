@@ -11,6 +11,9 @@ const TEXTOS = {
   regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
   item_baja_comprado: (t: string) => `"${t}" salió de la lista porque ya no lo quiere — si todavía podés, cambialo por otra cosa.`,
   regalo_baja: (t: string) => `"${t}" fue dado de baja por su dueño y se canceló el regalo grupal — si ya lo habían comprado, arréglenlo entre ustedes; si no, elijan otro regalo.`,
+  item_vuelve: (t: string) => `"${t}" volvió a la lista, pero tu reserva ya se había liberado — si todavía lo querés regalar, reservalo de nuevo.`,
+  compra_vuelve: (t: string) => `"${t}" volvió a la lista y sigue como comprado por vos — si ya lo cambiaste, tocá "Me equivoqué, todavía no lo compré" así lo puede regalar otro.`,
+  regalo_vuelve: (t: string) => `"${t}" volvió a la lista y el regalo grupal sigue como comprado — si ya lo cambiaron, cuéntenlo en el hilo del deseo.`,
 } as const
 
 /**
