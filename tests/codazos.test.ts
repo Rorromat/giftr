@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest'
 import { createECDH, randomBytes } from 'node:crypto'
+import { parse as parseUrl } from 'node:url'
 import { eq } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import { conConsultas, createTestDb } from './helpers'
 import { claims, codazos, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
@@ -70,6 +71,37 @@ test('suscripciones: se validan, un endpoint es de un solo usuario y se pueden b
   expect(await tieneAvisos(db, rodri.id)).toBe(true)
   await borrarSuscripcion(db, rodri.id, sub('1').endpoint)
   expect(await tieneAvisos(db, rodri.id)).toBe(false)
+})
+
+test('el host que se controla es el mismo al que web-push se conecta: un %2E no lo cambia por el camino', async () => {
+  const db = await createTestDb()
+  const euge = await usuario(db, 'Euge')
+  const push = pushFalso()
+  // new URL lee "localhost.fcm.googleapis.com" y url.parse (el de web-push) lee "localhost"
+  const raros = [
+    'https://localhost%2Efcm.googleapis.com/fcm/send/x', 'https://10.0.0.5%2Efcm.googleapis.com/fcm/send/x',
+    'https://atacante.example%2Eweb.push.apple.com/x', 'https://FCM.googleapis.com/fcm/send/x', 'https://fcm.googleapis.com/fcm/send/a\u0000b',
+    'https://fcm.googleapis.com/fcm/send/a\tb', ' https://fcm.googleapis.com/fcm/send/x', 'https://fcm.googleapis.com\\fcm/send/x',
+  ]
+  for (const endpoint of raros) {
+    // un carácter nulo tampoco llega a Postgres: no hay 500, es que no
+    expect(await guardarSuscripcion(db, euge.id, { endpoint, keys: CLAVES }), endpoint).toBe(false)
+    expect(await confirmarSuscripcion(db, euge.id, { endpoint, keys: CLAVES }), endpoint).toBe(false)
+    await borrarSuscripcion(db, euge.id, endpoint)
+  }
+  // los que quedaron de antes se borran sin mandarles nada (ni "Probar" ni un codazo les hace un POST)
+  await db.insert(pushSubs).values(raros.slice(0, 3).map((endpoint) => ({ userId: euge.id, endpoint, ...CLAVES })))
+  expect(await probarAviso(db, euge.id, push.enviar)).toEqual({ ok: true, llegaron: 0 })
+  expect(push.enviados).toEqual([])
+  expect(await db.select().from(pushSubs)).toEqual([])
+  // los de verdad, para los dos parsers el mismo host
+  for (const endpoint of [
+    'https://fcm.googleapis.com/fcm/send/cX7:APA91bH-abc_d', 'https://updates.push.services.mozilla.com/wpush/v2/gAAAAABk-x_y=',
+    'https://web.push.apple.com/QGuQyavXutnMH', 'https://wns2-par02p.notify.windows.com/w/?token=BQYAAAB%2bvL%2fg%3d%3d',
+  ]) {
+    expect(parseUrl(endpoint).hostname).toBe(new URL(endpoint).hostname)
+    expect(await guardarSuscripcion(db, euge.id, { endpoint, keys: CLAVES }), endpoint).toBe(true)
+  }
 })
 
 test('como mucho 10 dispositivos por persona: al activar otro se va el más viejo, y avisar limpia lo que no sirve', async () => {
@@ -261,6 +293,16 @@ test('los topes del codazo valen también con pedidos a la vez', async () => {
   expect(varios.filter((r) => r.ok)).toHaveLength(CODAZOS_POR_DIA - 1)
   expect(await db.select().from(codazos)).toHaveLength(CODAZOS_POR_DIA)
   expect(push.enviados).toHaveLength(CODAZOS_POR_DIA)
+
+  // Lo de arriba pasaría igual sin el lock: PGlite corre las transacciones de a una. En Postgres (Neon) corren a la vez, y
+  // lo que hace esperar al segundo hasta que el primero grabó es el lock de la lista, antes de contar.
+  const espia = conConsultas(db)
+  const tia = await usuario(db, 'Tía')
+  await mandarCodazo(espia.db, lista.shareToken, { userId: tia.id }, 'Tía', push.enviar)
+  const lock = espia.consultas.findIndex((q) => /from "lists" .*for no key update/i.test(q))
+  const cuenta = espia.consultas.findIndex((q) => /count\(/i.test(q) && q.includes('"codazos"'))
+  expect(lock).toBeGreaterThanOrEqual(0)
+  expect(lock).toBeLessThan(cuenta)
 })
 
 test('los invitados (cada navegador sin cookie es uno nuevo) no les sacan el lugar a los que tienen cuenta', async () => {

@@ -67,7 +67,7 @@ export type ReserveResult =
   | { ok: false; reason: 'propio' | 'sin_stock' | 'archivado' | 'no_existe' | 'sin_identidad' | 'muchas' }
 
 // sinVencimiento: la reserva de un regalo grupal no vence (la maneja el encargado). comprada: se marca comprada enseguida
-// (una vencida que ya había comprado). Ninguna de las dos es una reserva suelta que queda tomada: no cuentan para el tope.
+// (una vencida que ya había comprado): no queda tomada, así que no la frena el tope. Un regalo grupal recién armado sí.
 export async function reserveItem(
   db: Db, itemId: string, viewer: Viewer, opts: { sinVencimiento?: boolean; comprada?: boolean } = {},
 ): Promise<ReserveResult> {
@@ -104,14 +104,7 @@ export async function reserveItem(
     }
 
     // Nadie más puede soltar una reserva ajena: sin tope, una sola persona dejaba la lista entera tomada (ver RESERVAS_POR_LISTA)
-    if (!opts.sinVencimiento && !opts.comprada) {
-      const [{ tomadas }] = await tx.select({ tomadas: count() }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
-        .where(and(
-          eq(items.listId, row.listId), claimEsDe(viewer), eq(claims.estado, 'reservado'), noEsDeRegaloGrupal(),
-          or(isNull(claims.expiresAt), gt(claims.expiresAt, new Date())),
-        ))
-      if (tomadas >= RESERVAS_POR_LISTA) return { ok: false, reason: 'muchas' }
-    }
+    if (!opts.comprada && (await tomadasEnLista(t, row.listId, viewer)) >= RESERVAS_POR_LISTA) return { ok: false, reason: 'muchas' }
 
     const [claim] = await tx.insert(claims).values({
       itemId,
@@ -128,6 +121,27 @@ export async function reserveItem(
  * único de group_gifts.claim_id: un not in recorría todos los regalos de la base en cada consulta.
  */
 export const noEsDeRegaloGrupal = () => sql`not exists (select 1 from ${groupGifts} where ${groupGifts.claimId} = ${claims.id})`
+
+/**
+ * Lo que una persona tiene tomado sin comprar en una lista, para el tope (RESERVAS_POR_LISTA): sus reservas sueltas sin
+ * vencer y los regalos grupales abiertos que encarga sin nadie más. Esos se arman con un toque, no vencen y solo los
+ * cancela el encargado: sin contarlos, "Regalo grupal" en cada deseo dejaba la lista tomada para siempre. Uno al que se
+ * sumó alguien ya no cuenta (si después se baja, vuelve a contar, pero no se deshace).
+ * Antes de contar toma un lock por persona y lista hasta el fin de la transacción: dos reservas a la vez sobre deseos
+ * distintos (dos pestañas, un script) no cuentan las dos lo mismo y se pasan. Se toma después del lock del deseo.
+ */
+async function tomadasEnLista(t: Db, listId: string, viewer: Viewer): Promise<number> {
+  const quien = viewer.userId ? `u:${viewer.userId}` : `g:${viewer.guestId}`
+  await t.execute(sql`select pg_advisory_xact_lock(hashtext(${`reservas:${listId}:${quien}`}))`)
+  const regaloSolo = sql`exists (select 1 from ${groupGifts} where ${groupGifts.claimId} = ${claims.id} and ${groupGifts.estado} = 'abierto'
+    and not exists (select 1 from ${groupGiftMembers} where ${groupGiftMembers.giftId} = ${groupGifts.id} and ${groupGiftMembers.userId} <> ${groupGifts.organizerUserId}))`
+  const [{ tomadas }] = await t.select({ tomadas: count() }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
+    .where(and(
+      eq(items.listId, listId), eq(items.estadoDueno, 'activo'), claimEsDe(viewer), eq(claims.estado, 'reservado'),
+      or(and(noEsDeRegaloGrupal(), or(isNull(claims.expiresAt), gt(claims.expiresAt, new Date()))), regaloSolo),
+    ))
+  return tomadas
+}
 
 function claimEsDe(viewer: Viewer) {
   return viewer.userId
@@ -187,24 +201,32 @@ export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQu
   })
 }
 
+export type DeshacerCompraResult = { ok: true } | { ok: false; reason: 'muchas' | 'no_permitido' }
+
 /**
  * "Me equivoqué, no lo compré": la compra suelta propia vuelve a estar reservada, con un vencimiento nuevo (el de antes
  * puede haber pasado). Solo la de este evento (ver desdeElUltimoEvento): la de un cumple pasado ya se regaló, y deshacerla
  * borraría el historial. Las de un regalo grupal no: tienen montos y deudas. Solo mientras el deseo sigue en la lista y el
  * que lo pide ve la coordinación: un co-dueño que lo compró antes de sumarse no la vuelve una reserva de un dueño.
+ * Vuelve a ser una reserva sin comprar, así que pasa por el mismo tope que reservar ('muchas'): si no, marcar compradas
+ * 10, reservar otras 10 y deshacer las compras lo salteaba.
  */
-export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer): Promise<boolean> {
-  if (!esUuid(claimId)) return false
-  return db.transaction(async (tx) => {
+export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer): Promise<DeshacerCompraResult> {
+  const no = { ok: false, reason: 'no_permitido' } as const
+  if (!esUuid(claimId)) return no
+  return db.transaction(async (tx): Promise<DeshacerCompraResult> => {
     const t = tx as unknown as Db
     const suya = and(eq(claims.id, claimId), eq(claims.estado, 'comprado'), claimEsDe(viewer), noEsDeRegaloGrupal())
     const [c] = await t.select({ itemId: claims.itemId, createdAt: claims.createdAt }).from(claims).where(suya)
-    if (!c) return false
+    if (!c) return no
     // lock del deseo: si a la vez lo archivan, o esto lo ve archivado, o termina antes y archivar libera la reserva (y avisa)
     const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno, linkAt: lists.shareTokenAt })
       .from(items).innerJoin(lists, eq(items.listId, lists.id))
       .where(eq(items.id, c.itemId)).for('update', { of: items })
-    if (item?.estado !== 'activo' || (await accesoALista(t, item.listId, viewer)) !== 'regalador') return false
+    if (item?.estado !== 'activo' || (await accesoALista(t, item.listId, viewer)) !== 'regalador') return no
+    const deEsteEvento = and(suya, gte(claims.updatedAt, await desdeElUltimoEvento(t, item.listId)))
+    if (!(await t.select({ id: claims.id }).from(claims).where(deEsteEvento)).length) return no
+    if ((await tomadasEnLista(t, item.listId, viewer)) >= RESERVAS_POR_LISTA) return { ok: false, reason: 'muchas' }
     // El plazo nuevo cuenta desde ahora (si no, "¿Conseguiste…?" sale enseguida), salvo que eso lo haga parecer de después
     // de un cambio del link para regalar: le pasaría el nuevo a quien reservó antes (ver cambiarLinkParaRegalar).
     const desdeAhora = !item.linkAt || c.createdAt > item.linkAt
@@ -213,9 +235,9 @@ export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer)
         estado: 'reservado', notaQueCompre: null, expiresAt: await vencimientoDeReserva(t, item.listId), updatedAt: new Date(),
         createdAt: desdeAhora ? sql`greatest(now(), ${claims.createdAt})` : undefined,
       })
-      .where(and(suya, gte(claims.updatedAt, await desdeElUltimoEvento(t, item.listId))))
+      .where(deEsteEvento)
       .returning({ id: claims.id })
-    return updated.length > 0
+    return updated.length ? { ok: true } : no
   })
 }
 

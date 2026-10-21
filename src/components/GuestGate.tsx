@@ -17,7 +17,9 @@ const MOTIVOS: Record<string, string> = {
   no_existe: 'Ese deseo ya no está en la lista.',
   propio: 'En tu propia lista no podés reservar.',
   sin_identidad: 'Para reservar, decinos quién sos.',
-  muchas: `Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista. Marcá las que ya compraste o soltá alguna para reservar otra.`,
+  muchas: `Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista (cuentan también los regalos grupales en los que seguís solo). Marcá las que ya compraste o soltá alguna para reservar otra.`,
+  // "Me equivoqué, todavía no lo compré" con el tope lleno: volvería a ser una reserva más
+  muchas_deshacer: `Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista. Para que esta vuelva a quedar reservada, marcá las que ya compraste o soltá alguna.`,
   // "Ya lo compré" sobre una reserva que había vencido, cuando el lugar ya lo tomó otro
   vencida: 'Tu reserva ya había vencido y ahora no queda lugar. Si lo habías comprado, contalo en el hilo de abajo.',
 }

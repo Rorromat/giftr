@@ -436,7 +436,7 @@ test('con la fecha cambiada, la compra del evento que pasó no se deshace ni ocu
   expect(await guardarFechaGrupo(db, casa, caro.id, enDias(60), false)).toBe(true)
   expect((await misEventos(db, rodri.id, hoy)).find((e) => e.listId === casa)).toMatchObject({ dias: 60, misReservas: 0 })
   // sin "Me equivoqué" sobre la pava de la casa nueva
-  expect(await desmarcarComprado(db, compraPava.id, { userId: rodri.id })).toBe(false)
+  expect(await desmarcarComprado(db, compraPava.id, { userId: rodri.id })).toEqual({ ok: false, reason: 'no_permitido' })
   // y el vino se puede reservar para el evento nuevo: no le devuelve la compra de antes
   const r = await reserveItem(db, vino.id, { userId: rodri.id })
   expect(r.ok && r.claimId !== compraVino.id).toBe(true)

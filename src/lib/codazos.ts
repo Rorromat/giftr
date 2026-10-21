@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
+import { parse as parseUrl } from 'node:url'
 import webpush from 'web-push'
 import { codazos, config, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
@@ -50,6 +51,10 @@ const base64url = (s: string) => (/^[A-Za-z0-9_-]+={0,2}$/.test(s) ? Buffer.from
  * Una suscripción que se puede usar: https a un servicio de push conocido (sin puerto ni usuario) y las claves como las
  * pide web-push (la pública del navegador, P-256 sin comprimir, de 65 bytes, y el secreto de 16). Con claves basura
  * web-push falla antes de mandar y la fila no se borraba nunca.
+ * El host se mira en el texto tal cual se guarda, no solo en el que arma new URL: web-push lo vuelve a leer con url.parse,
+ * y con un "%2E" en el host ("localhost%2Efcm.googleapis.com") cada uno veía otro, así que pasaba el control y el POST iba
+ * a localhost. El navegador da el endpoint ya normalizado: si new URL lo cambia (un %2E, mayúsculas, un carácter de
+ * control), no es uno de verdad.
  */
 export function esSuscripcion(s: unknown): s is SuscripcionPush {
   const x = s as SuscripcionPush
@@ -57,7 +62,9 @@ export function esSuscripcion(s: unknown): s is SuscripcionPush {
   if (typeof x.keys?.p256dh !== 'string' || typeof x.keys?.auth !== 'string' || x.keys.p256dh.length > 200 || x.keys.auth.length > 100) return false
   let u: URL
   try { u = new URL(x.endpoint) } catch { return false }
-  if (u.protocol !== 'https:' || u.port || u.username || u.password || !esServicioPush(u.hostname)) return false
+  if (u.href !== x.endpoint || u.protocol !== 'https:' || u.port || u.username || u.password || !esServicioPush(u.hostname)) return false
+  // el host escrito con letras, números, guiones y puntos, y el mismo para el parser con el que web-push se conecta
+  if (x.endpoint.match(/^https:\/\/([a-z0-9.-]+)\//)?.[1] !== u.hostname || parseUrl(x.endpoint).hostname !== u.hostname) return false
   const [p256dh, auth] = [base64url(x.keys.p256dh), base64url(x.keys.auth)]
   return p256dh?.length === 65 && p256dh[0] === 4 && !!auth && auth.length >= 16
 }
@@ -101,6 +108,8 @@ export async function confirmarSuscripcion(db: Db, userId: string, s: unknown): 
 }
 
 export async function borrarSuscripcion(db: Db, userId: string, endpoint: string) {
+  // viene del navegador tal cual: con un carácter nulo, Postgres tira error (y la acción, un 500) en vez de no borrar nada
+  if (typeof endpoint !== 'string' || endpoint.length >= 1000 || endpoint.includes('\0')) return
   await db.delete(pushSubs).where(and(eq(pushSubs.userId, userId), eq(pushSubs.endpoint, endpoint)))
 }
 

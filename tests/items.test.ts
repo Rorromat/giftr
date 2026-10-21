@@ -143,7 +143,7 @@ test('"Volver a mi lista" después de "Ya no lo quiero": al que lo compró se le
   expect((await getUnreadNotifications(db, { guestId: abuela.id })).map((n) => n.tipo)).toEqual(['item_vuelve'])
   expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => n.tipo)).toEqual(['item_vuelve'])
   const [deCaro] = await db.select().from(claims).where(eq(claims.claimerUserId, caro.id))
-  expect(await desmarcarComprado(db, deCaro.id, { userId: caro.id })).toBe(true)
+  expect(await desmarcarComprado(db, deCaro.id, { userId: caro.id })).toEqual({ ok: true })
   // un aviso que ya había leído queda leído; a la dueña, nada
   expect(await db.select().from(notifications).where(eq(notifications.userId, owner.id))).toEqual([])
 })

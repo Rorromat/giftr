@@ -14,6 +14,16 @@ export async function createTestDb(): Promise<Db> {
   return db as unknown as Db
 }
 
+/**
+ * La misma base, anotando cada consulta (también las de adentro de una transacción). PGlite corre las transacciones de a
+ * una, así que dos pedidos a la vez no se pisan nunca acá aunque falte un lock: para fijar que el lock está, se mira el SQL.
+ */
+export function conConsultas(db: Db): { db: Db; consultas: string[] } {
+  const consultas: string[] = []
+  const espia = drizzle((db as unknown as { $client: PGlite }).$client, { schema, logger: { logQuery: (q) => { consultas.push(q) } } })
+  return { db: espia as unknown as Db, consultas }
+}
+
 export async function seedOwnerAndGiver(db: Db) {
   const [owner] = await db.insert(users).values({ googleId: 'g-owner', nombre: 'Euge', email: 'euge@test.com' }).returning()
   const [giver] = await db.insert(users).values({ googleId: 'g-giver', nombre: 'Rodri', email: 'rodri@test.com' }).returning()

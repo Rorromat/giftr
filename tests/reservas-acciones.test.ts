@@ -21,7 +21,9 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
 }))
 
-import { addItemAction, archiveItemAction, boughtAction, reserveAction, restoreItemAction, unboughtAction } from '@/app/actions'
+import {
+  addItemAction, archiveItemAction, boughtAction, reserveAction, restoreItemAction, startGroupGiftAction, unboughtAction,
+} from '@/app/actions'
 import { CartelReserva } from '@/components/GuestGate'
 import { RESERVAS_POR_LISTA } from '@/lib/types'
 
@@ -132,4 +134,17 @@ test('con 10 reservas sin comprar en la lista, reservar otra vuelve a la misma p
   expect(cartel).toContain(`Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista`)
   // el link con ?reserva=muchas abierto por la dueña sin su sesión no muestra nada
   expect(renderToStaticMarkup(createElement(CartelReserva, { motivo: 'muchas', veTodo: false, conNombre: false }))).toBe('')
+
+  // armar un regalo grupal (en el que estaría solo) tampoco: vuelve al deseo con el mismo cartel
+  expect(await redirigeA(startGroupGiftAction(form({ token: 'tok-euge', itemId: otro.id })))).toBe(`/l/tok-euge/item/${otro.id}?reserva=muchas`)
+  // ni "Me equivoqué" sobre una compra: volvería a ser una reserva más
+  const [primera] = await h.db.select().from(claims).where(eq(claims.itemId, deseos[0].id))
+  expect(await markBought(h.db, primera.id, { userId: giver.id })).toEqual({ ok: true })
+  expect((await reserveItem(h.db, otro.id, { userId: giver.id })).ok).toBe(true)
+  expect(await redirigeA(unboughtAction(form({ token: 'tok-euge', itemId: deseos[0].id, claimId: primera.id }))))
+    .toBe(`/l/tok-euge/item/${deseos[0].id}?reserva=muchas_deshacer`)
+  expect((await h.db.select().from(claims).where(eq(claims.id, primera.id)))[0].estado).toBe('comprado')
+  expect(renderToStaticMarkup(createElement(CartelReserva, { motivo: 'muchas_deshacer', veTodo: true, conNombre: true })))
+    .toContain('Para que esta vuelva a quedar reservada')
+  expect(renderToStaticMarkup(createElement(CartelReserva, { motivo: 'muchas_deshacer', veTodo: false, conNombre: false }))).toBe('')
 })

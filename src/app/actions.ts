@@ -402,13 +402,14 @@ export async function boughtAction(formData: FormData) {
   if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
 }
 
-/** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva. */
+/** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva (si no tiene ya el tope de reservas en la lista). */
 export async function unboughtAction(formData: FormData) {
   const viewer = await getViewer()
-  const token = str(formData, 'token') ?? ''
-  await desmarcarComprado(db, str(formData, 'claimId') ?? '', viewer)
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  const r = await desmarcarComprado(db, str(formData, 'claimId') ?? '', viewer)
   revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${str(formData, 'itemId')}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  if (!r.ok && r.reason === 'muchas' && (await listaDelItem(itemId, token))) redirect(`/l/${token}/item/${itemId}?reserva=muchas_deshacer`)
 }
 
 export async function releaseAction(formData: FormData) {
@@ -456,8 +457,10 @@ export async function startGroupGiftAction(formData: FormData) {
   const token = str(formData, 'token') ?? ''
   const itemId = str(formData, 'itemId') ?? ''
   if (!(await listaDelItem(itemId, token))) return
-  await iniciarRegaloGrupal(db, itemId, userId)
+  const r = await iniciarRegaloGrupal(db, itemId, userId)
   revalidarRegalo(formData)
+  // un regalo en el que está solo cuenta para el tope de reservas (ver tomadasEnLista): que sepa por qué no se armó
+  if (!r.ok && r.reason === 'muchas') redirect(`/l/${token}/item/${itemId}?reserva=muchas`)
 }
 
 export async function joinGroupGiftAction(formData: FormData) {

@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { desdeQueOcupa, loQueYaTiene, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult } from '@/lib/claims'
+import { desdeQueOcupa, expireStaleClaims, loQueYaTiene, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
@@ -68,6 +68,9 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
     if (!item) return { ok: false, reason: 'no_existe' }
     if (await esOFueDuenoDeLista(t, item.listId, userId)) return { ok: false, reason: 'propio' }
     if (item.estado !== 'activo') return { ok: false, reason: 'archivado' }
+    // Una reserva propia que ya venció no se convierte (dejaría de vencer sin pasar por el tope de reservas): se reserva de
+    // nuevo, como en reserveItem
+    await expireStaleClaims(t, itemId)
     // Una persona, una reserva por deseo (lo mismo que mira reserveItem): si ya lo compró (suelto o en otro regalo), no
     // arma otro encima.
     const ya = await loQueYaTiene(t, item, { userId })
