@@ -1,20 +1,24 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import type { Viewer } from '@/lib/types'
+import { identificado, type Viewer } from '@/lib/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { duenosDeLista, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
+import { asegurarListaPropia } from '@/lib/users'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
 // Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
 // perfiles: para la foto y el link al perfil de cada dueño (sin nada de reservas).
 type ListaRegalador = { listId: string; ownerNombre: string; duenos: string[]; perfiles: Dueno[]; grupoNombre: string | null }
 
+// anonimo: sin sesión ni nombre no sabemos quién mira (puede ser el dueño sin su sesión, desde la app de inicio
+// o el navegador de WhatsApp), así que ve los deseos como los ve el dueño: sin nada de la capa oculta.
 export type ListView =
   | ({ role: 'owner'; shareToken: string; items: OwnerItemView[] } & ListaDueno)
   | ({ role: 'giver'; shareToken: string; items: GiverItemView[] } & ListaRegalador)
+  | ({ role: 'anonimo'; shareToken: string; items: OwnerItemView[] } & ListaRegalador)
 
 export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
 
@@ -85,8 +89,12 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
     return { role: 'owner', listId: list.id, tipo: list.tipo, shareToken, items: allItems.map(pickItemFields) }
   }
 
-  await expireStaleClaims(db)
   const activos = allItems.filter((i) => i.estadoDueno === 'activo')
+  if (!identificado(viewer)) {
+    return { role: 'anonimo', shareToken, ...paraRegalador(list, duenos), items: activos.map(pickItemFields) }
+  }
+
+  await expireStaleClaims(db)
   const claimMap = await loadClaimViews(db, activos.map((i) => i.id), viewer)
   return {
     role: 'giver', shareToken, ...paraRegalador(list, duenos),
@@ -94,8 +102,9 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
   }
 }
 
+/** La lista personal (si le faltaba, se crea). Null solo si el usuario no existe. */
 export async function getOwnList(db: Db, userId: string) {
-  const [list] = await db.select().from(lists).where(eq(lists.ownerId, userId))
+  const list = await asegurarListaPropia(db, userId)
   if (!list) return null
   const rows = await db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt))
   return { shareToken: list.shareToken, items: rows.map(pickItemFields) }
@@ -104,6 +113,7 @@ export async function getOwnList(db: Db, userId: string) {
 export type ItemDetail =
   | ({ role: 'owner'; item: OwnerItemView } & ListaDueno)
   | ({ role: 'giver'; item: GiverItemView; comments: CommentView[]; regalos: RegaloView[] } & ListaRegalador)
+  | ({ role: 'anonimo'; item: OwnerItemView } & ListaRegalador)
 
 export async function getItemForViewer(db: Db, shareToken: string, itemId: string, viewer: Viewer): Promise<ItemDetail | null> {
   const [row] = await db.select({ item: items, list: lists })
@@ -118,6 +128,7 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
   }
 
   if (row.item.estadoDueno !== 'activo') return null
+  if (!identificado(viewer)) return { role: 'anonimo', ...paraRegalador(row.list, duenos), item: pickItemFields(row.item) }
 
   await expireStaleClaims(db, itemId)
   const [claimMap, regalos] = await Promise.all([loadClaimViews(db, [itemId], viewer), regalosDeItem(db, itemId, viewer)])

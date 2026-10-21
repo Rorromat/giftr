@@ -5,10 +5,13 @@ import { getItemForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { GuestGate } from '@/components/GuestGate'
+import { NoSoyYo, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
+import { nombreDeViewer } from '@/lib/guest'
+import { identificado } from '@/lib/types'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
 // La vista previa al compartir (WhatsApp): qué es, para quién y cuánto sale. La imagen sale de opengraph-image.
@@ -31,11 +34,18 @@ export default async function DetalleItem({ params, searchParams }: {
   if (!detalle) notFound()
   if (detalle.role === 'owner') redirect(detalle.tipo === 'grupo' ? `/grupos/${detalle.listId}` : '/mi-lista')
 
-  const { item, comments, ownerNombre, regalos } = detalle
+  const { item, ownerNombre } = detalle
   const plural = detalle.duenos.length > 1
-  const identified = !!viewer.userId || !!viewer.guestId
+  const identified = identificado(viewer)
+  // Sin identificarse no se ve nada de la coordinación (puede ser el dueño sin su sesión): ni reservas, ni regalos, ni comentarios.
+  const giver = detalle.role === 'giver' ? detalle : null
+  const claims = giver?.item.claims ?? []
+  const regalos = giver?.regalos ?? []
+  const comments = giver?.comments ?? []
+  const disponible = giver?.item.disponible ?? true
+  const quien = identified ? await nombreDeViewer(db, viewer) : null
   // La reserva de un regalo grupal se maneja desde el regalo; acá solo las sueltas.
-  const miClaim = item.claims.find((c) => c.esMia && c.estado === 'reservado' && !c.grupal)
+  const miClaim = claims.find((c) => c.esMia && c.estado === 'reservado' && !c.grupal)
   const enUnRegalo = regalos.some((r) => r.soyParte)
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
@@ -46,7 +56,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
       <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
         <div className="relative">
-          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!item.disponible && !miClaim && !enUnRegalo} />
+          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !miClaim && !enUnRegalo} />
           <PriorityTag prioridad={item.prioridad} className="absolute left-3 top-3 h-[30px]" />
           {precio && <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{precio}</PriceSticker>}
         </div>
@@ -73,7 +83,9 @@ export default async function DetalleItem({ params, searchParams }: {
       </article>
 
       <section className="flex flex-col gap-2.5">
-        {item.claims.filter((c) => !c.grupal).map((c) => (
+        {!identified && <QuienSos token={token} volver={`/l/${token}/item/${item.id}`} />}
+
+        {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
             <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border-2 border-gr-ink`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
@@ -90,13 +102,13 @@ export default async function DetalleItem({ params, searchParams }: {
         {regalos.map((r) => (
           <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
                         precio={parsePesos(precio)} logueado={logueado}
-                        nota={item.claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} error={r.soyEncargado ? error : undefined} />
+                        nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} error={r.soyEncargado ? error : undefined} />
         ))}
 
-        {item.disponible && !miClaim && !enUnRegalo && (
+        {disponible && !miClaim && !enUnRegalo && (
           <>
             <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" />
-            <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />
+            {identified && <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />}
           </>
         )}
 
@@ -120,29 +132,28 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
       </section>
 
-      <section className="mt-2 flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
-          <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-          Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
-        </h2>
-        <ul className="flex flex-col gap-2">
-          {comments.map((c) => (
-            <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm">
-              <span className="font-bold">{c.autorNombre}:</span> {c.texto}
-            </li>
-          ))}
-        </ul>
-        {identified ? (
+      {identified && (
+        <section className="mt-2 flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
+            <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
+            Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {comments.map((c) => (
+              <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm">
+                <span className="font-bold">{c.autorNombre}:</span> {c.texto}
+              </li>
+            ))}
+          </ul>
           <form action={commentAction} className="flex gap-2">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
             <input name="texto" required placeholder="Coordiná con los demás…" className="gr-input flex-1 shadow-none" />
             <button className="gr-btn bg-gr-ink text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</button>
           </form>
-        ) : (
-          <p className="text-sm text-gr-muted">Reservá algo para participar de la coordinación.</p>
-        )}
-      </section>
+          {quien && <NoSoyYo nombre={quien} volver={`/l/${token}/item/${item.id}`} conCuenta={logueado} />}
+        </section>
+      )}
 
     </main>
   )

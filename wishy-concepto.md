@@ -48,7 +48,7 @@ Consecuencias de diseño que se derivan de la regla:
 |---|---|
 | **Dueño (owner)** | Crear/editar sus listas e items, categorizarlos, compartirlos, marcar "ya lo tengo / ya no lo quiero", ver su historial. No ve estados de reserva propios. |
 | **Regalador (giver)** | Ver listas compartidas con él, filtrar, reservar items, marcar comprado, comentar en la capa oculta, iniciar o sumarse a regalos grupales. |
-| **Invitado por link (guest)** | Versión liviana del regalador para el PoC: entra por link sin instalar nada, se identifica con nombre (+ email opcional) y puede reservar. Clave para que la abuela participe. |
+| **Invitado por link (guest)** | Versión liviana del regalador para el PoC: entra por link sin instalar nada, se identifica con su nombre y puede reservar. Clave para que la abuela participe. |
 | **Co-dueño** | Miembro de una lista compartida (pareja/familia). Igual que dueño, con ceguera compartida sobre los items de esa lista. |
 
 Una misma persona es dueña de sus listas y regaladora en las de los demás — los roles son por lista, no por cuenta.
@@ -144,13 +144,13 @@ Datos que hacen acertar incluso fuera de la lista:
 
 Esta sección es la que más vale llevar a Claude Code tal cual — son las reglas de negocio.
 
-1. **Dueño ciego, siempre en servidor.** La API nunca devuelve estados de reserva de items cuyo dueño (o co-dueño) sea el solicitante. No es un filtro de frontend.
+1. **Dueño ciego, siempre en servidor.** La API nunca devuelve estados de reserva de items cuyo dueño (o co-dueño) sea el solicitante. No es un filtro de frontend. Si el que pide no se identificó (sin sesión ni nombre), puede ser el dueño sin su sesión: ve los deseos sin estados hasta que diga quién es.
 2. **"Ya lo tengo / ya no lo quiero" con reserva activa.** Si el dueño archiva un item que alguien ya reservó o compró, el regalador recibe una notificación discreta e inmediata: "Un item que reservaste fue dado de baja por su dueño — te conviene elegir otro". Al dueño no se le dice nada (decirle "ojo que alguien ya lo compró" rompería la regla). Es el caso borde más doloroso: la app debe minimizarlo avisando al regalador lo antes posible.
 3. **Edición de item reservado.** Si el dueño edita un item reservado (cambia talle, color, link), los regaladores con reserva reciben la notificación del cambio.
 4. **Cantidad > 1.** El item muestra a los regaladores "quedan 4 de 6". Al llegar a 0 pasa a COMPRADO. El dueño solo ve su item, sin contadores.
 5. **Carrera por reservar.** La reserva es atómica: el primero que confirma se lo queda; el segundo ve "recién lo reservó otra persona" y el hilo para coordinar (quizás lo convierten en grupal).
 6. **Item idea con repetición permitida** admite múltiples reservas en paralelo, cada una con su nota de "qué compré".
-7. **Guest por link.** El guest se identifica con nombre (+ email opcional para recuperar su reserva). Su reserva vale igual que la de un usuario registrado. Si después crea cuenta con ese email, hereda sus reservas.
+7. **Guest por link.** El guest se identifica con su nombre (su cookie va firmada: es su credencial). Su reserva vale igual que la de un usuario registrado. Si después entra con Google en ese mismo navegador, su cuenta hereda sus reservas, salvo las de listas propias.
 8. **Un regalador con dos listas de la misma persona** (wishlist + lista de cumpleaños): los items compartidos entre ambas muestran el mismo estado — el estado vive en el item, no en la relación item-lista.
 9. **Auto-regalo prohibido**: nadie puede reservar items propios (obvio, pero hay que validarlo — cubre el caso del co-dueño curioso).
 10. **Privacidad del historial**: lo que reservaste/compraste solo lo ven los regaladores de ese círculo, no es público ni cross-grupo.
@@ -250,7 +250,7 @@ Para el plan de implementación en Claude Code. Entidades y relaciones clave:
 - **Circle** (grupo de personas) y **CircleMember**
 - **Event** (fecha, recurrencia, listas y círculo asociados)
 - **Comment** (hilo por item, visible solo para no-dueños)
-- **GuestIdentity** (nombre + email opcional, ligado a sus claims, promocionable a User)
+- **GuestIdentity** (nombre, ligado a sus claims; se une a un User si entra con Google en el mismo navegador)
 
 **Regla de oro para la API:** el serializer de Item hacia un dueño/co-dueño excluye Claims, Comments y GroupGifts. Test de integración obligatorio: "el dueño no puede obtener estados de sus items por ningún endpoint".
 

@@ -5,7 +5,9 @@ import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
-import type { GiverItemView } from '@/lib/serialize'
+import type { ClaimView, OwnerItemView } from '@/lib/serialize'
+import { identificado } from '@/lib/types'
+import { nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
@@ -13,10 +15,14 @@ import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
 import { GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
+import { NoSoyYo, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
-function estadoNoDisponible(item: GiverItemView) {
+// Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
+type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
+
+function estadoNoDisponible(item: Tarjeta) {
   if (item.claims.some((c) => c.estado === 'comprado')) return '✓ Comprado'
   const grupal = item.claims.find((c) => c.grupal)?.grupal
   if (grupal) return grupal.soyParte ? 'Estás en el regalo grupal' : `Regalo grupal de ${grupal.personas.length} · sumate`
@@ -54,22 +60,26 @@ export default async function ListaAjena({
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
-  const identified = !!viewer.userId || !!viewer.guestId
-  const [evento, historial, gustos] = await Promise.all([
+  const identified = identificado(viewer)
+  const [evento, historial, gustos, quien] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
     identified ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
+    identified ? nombreDeViewer(db, viewer) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
   ])
   const cuenta = evento && evento.dias <= 60
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
     : null
 
-  const categorias = [...new Set(vista.items.map((i) => i.categoria).filter(Boolean))] as string[]
-  let mostrados = vista.items
+  const tarjetas: Tarjeta[] = vista.role === 'giver'
+    ? vista.items
+    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null }))
+  const categorias = [...new Set(tarjetas.map((i) => i.categoria).filter(Boolean))] as string[]
+  let mostrados = tarjetas
   if (cat) mostrados = mostrados.filter((i) => i.categoria === cat)
-  if (disp === '1') mostrados = mostrados.filter((i) => i.disponible)
+  if (disp === '1' && identified) mostrados = mostrados.filter((i) => i.disponible)
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
 
@@ -102,10 +112,12 @@ export default async function ListaAjena({
         </p>
       )}
 
-      <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
-        <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-        {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
-      </p>
+      {identified ? (
+        <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
+          <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
+          {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
+        </p>
+      ) : <QuienSos token={token} volver={`/l/${token}`} />}
 
       {gustos.map((g) => (
         <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
@@ -116,7 +128,7 @@ export default async function ListaAjena({
 
       <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1">
         <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
-        <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>
+        {identified && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
         {categorias.map((c) => (
           <Link key={c} href={`/l/${token}?cat=${encodeURIComponent(c)}`} aria-current={cat === c ? 'page' : undefined}
                 className="gr-chip">
@@ -127,7 +139,7 @@ export default async function ListaAjena({
 
       {mostrados.length === 0 && (
         <p className="mt-8 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
-          {vista.items.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
+          {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
         </p>
       )}
 
@@ -146,7 +158,7 @@ export default async function ListaAjena({
                 {hero.titulo}
               </Link>
               {hero.notas && <p className="text-sm leading-snug">{hero.notas}</p>}
-              {hero.cantidad > 1 && <p className="text-xs font-semibold text-gr-muted">quedan {hero.quedan} de {hero.cantidad}</p>}
+              {hero.cantidad > 1 && hero.quedan !== null && <p className="text-xs font-semibold text-gr-muted">quedan {hero.quedan} de {hero.cantidad}</p>}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-[1.3]">
@@ -182,7 +194,7 @@ export default async function ListaAjena({
                     {item.titulo}
                   </Link>
                   {(item.precio ?? item.rangoPrecio) && <p className="text-xs font-semibold">{item.precio ?? item.rangoPrecio}</p>}
-                  {item.cantidad > 1 && <p className="text-xs text-gr-muted">quedan {item.quedan} de {item.cantidad}</p>}
+                  {item.cantidad > 1 && item.quedan !== null && <p className="text-xs text-gr-muted">quedan {item.quedan} de {item.cantidad}</p>}
                   <div className="mt-1 flex flex-col items-start gap-0.5">
                     {item.disponible && (yaEsMio
                       ? <YaLoReservaste grupal={item.claims.some((c) => c.grupal?.soyParte)} />
@@ -205,6 +217,8 @@ export default async function ListaAjena({
       </div>
 
       {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}
+
+      {quien && <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>}
 
       <div className="fixed inset-x-0 bottom-0 z-10 bg-gr-ink text-gr-bg">
         <div className="mx-auto flex h-[74px] max-w-md items-center justify-between px-[18px] pb-2.5">

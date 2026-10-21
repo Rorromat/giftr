@@ -88,9 +88,11 @@ export const items = pgTable('items', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// Un invitado por link: solo su nombre. Su credencial es la cookie con el id firmado (src/lib/cookie-invitado.ts).
 export const guestIdentities = pgTable('guest_identities', {
   id: uuid('id').defaultRandom().primaryKey(),
   nombre: text('nombre').notNull(),
+  // De antes: ya no se pide ni se usa para unirlo a una cuenta (nadie lo verificaba).
   email: text('email'),
   promotedToUserId: uuid('promoted_to_user_id').references(() => users.id),
 })

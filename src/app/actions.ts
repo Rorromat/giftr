@@ -5,14 +5,15 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { guestIdentities, items, lists, users } from '@/db/schema'
-import { getViewer, GUEST_COOKIE } from '@/lib/viewer'
-import { auth } from '@/auth'
+import { items, lists } from '@/db/schema'
+import { getViewer } from '@/lib/viewer'
+import { firmarInvitado, GUEST_COOKIE, OPCIONES_COOKIE_INVITADO } from '@/lib/cookie-invitado'
+import { auth, signIn, signOut } from '@/auth'
 import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
 import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
 import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest } from '@/lib/guest'
+import { createGuest, nombreDeViewer, validarNombre, type NombreValidado } from '@/lib/guest'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
@@ -20,7 +21,10 @@ import { guardarGustos } from '@/lib/bienvenida'
 import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
-import type { Viewer } from '@/lib/types'
+import { identificado, type Viewer } from '@/lib/types'
+
+/** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
+export type EstadoForm = { error: string } | null
 
 const str = (fd: FormData, k: string) => {
   const v = fd.get(k)
@@ -28,6 +32,14 @@ const str = (fd: FormData, k: string) => {
 }
 
 const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
+
+/** Solo rutas de la app ("/l/…"), nunca a otro sitio. */
+const rutaPropia = (v?: string) => (v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : '/')
+
+async function listaExiste(token: string) {
+  const [row] = await db.select({ id: lists.id }).from(lists).where(eq(lists.shareToken, token))
+  return !!row
+}
 
 async function itemPerteneceAToken(itemId: string, token: string) {
   const [row] = await db.select({ id: items.id }).from(items)
@@ -186,25 +198,58 @@ export async function unfollowAction(formData: FormData) {
   revalidatePath('/eventos')
 }
 
-async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {
-  let viewer = await getViewer()
-  const nombre = str(formData, 'nombre')
-  if (!viewer.userId && !viewer.guestId && nombre) {
-    const guest = await createGuest(db, nombre, str(formData, 'email'))
-    ;(await cookies()).set(GUEST_COOKIE, guest.id, { httpOnly: true, maxAge: 31536000, path: '/' })
-    viewer = { guestId: guest.id }
-  }
-  return viewer
+/**
+ * El que mira. Si no se sabe quién es y el formulario trae un nombre, lo anota como invitado
+ * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
+ */
+async function viewerIdentificandoGuest(formData: FormData): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
+  const viewer = await getViewer()
+  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer }
+  const v = validarNombre(formData.get('nombre'))
+  if (!v.ok) return v
+  const guest = await createGuest(db, v.nombre)
+  ;(await cookies()).set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  return { ok: true, viewer: { guestId: guest.id } }
 }
 
-export async function reserveAction(formData: FormData) {
-  const token = str(formData, 'token')!
-  const itemId = str(formData, 'itemId')!
-  if (!(await itemPerteneceAToken(itemId, token))) return
-  const viewer = await viewerIdentificandoGuest(formData)
-  await reserveItem(db, itemId, viewer)
+export async function reserveAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await itemPerteneceAToken(itemId, token))) return null
+  const quien = await viewerIdentificandoGuest(formData)
+  if (!quien.ok) return { error: quien.error }
+  await reserveItem(db, itemId, quien.viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
+  return null
+}
+
+/** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */
+export async function identificarseAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  if (!(await listaExiste(token))) return null
+  const quien = await viewerIdentificandoGuest(formData)
+  if (!quien.ok) return { error: quien.error }
+  revalidatePath(`/l/${token}`, 'layout')
+  return null
+}
+
+/** "Entrar con Google" desde una lista o un deseo: vuelve a la misma página (ahí se une el invitado, si lo era). */
+export async function entrarConGoogleAction(formData: FormData) {
+  await signIn('google', { redirectTo: rutaPropia(str(formData, 'volver')) })
+}
+
+/**
+ * "Cerrar sesión" (Perfil) o "¿No sos X?" (en una lista): este navegador se olvida de quién es.
+ * Borra la cookie de invitado y, si hay sesión de Google, la cierra.
+ */
+export async function salirAction(formData: FormData) {
+  const volver = rutaPropia(str(formData, 'volver'))
+  ;(await cookies()).delete(GUEST_COOKIE)
+  const session = await auth()
+  if (session?.userId) await signOut({ redirectTo: volver })
+  revalidatePath(volver, 'layout')
+  redirect(volver)
 }
 
 export async function boughtAction(formData: FormData) {
@@ -330,17 +375,13 @@ export async function probarAvisoAction(): Promise<number> {
   return avisar(db, session.userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' })
 }
 
-async function nombreDe(viewer: Viewer): Promise<string> {
-  const [fila] = viewer.userId
-    ? await db.select({ nombre: users.nombre }).from(users).where(eq(users.id, viewer.userId))
-    : viewer.guestId ? await db.select({ nombre: guestIdentities.nombre }).from(guestIdentities).where(eq(guestIdentities.id, viewer.guestId)) : []
-  return fila?.nombre ?? 'Alguien'
-}
-
 export async function codazoAction(formData: FormData) {
   const token = str(formData, 'token') ?? ''
-  const viewer = await viewerIdentificandoGuest(formData)
-  const r = await mandarCodazo(db, token, viewer, await nombreDe(viewer))
+  // antes de anotar a nadie: un token inventado no crea invitados
+  if (!(await listaExiste(token))) redirect('/')
+  const quien = await viewerIdentificandoGuest(formData)
+  if (!quien.ok) redirect(`/l/${token}?codazo=${quien.motivo === 'vacio' ? 'sin_identidad' : 'nombre_largo'}#codazo`)
+  const r = await mandarCodazo(db, token, quien.viewer, (await nombreDeViewer(db, quien.viewer)) ?? 'Alguien')
   redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)
 }
 

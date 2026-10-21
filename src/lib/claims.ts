@@ -2,7 +2,7 @@ import { and, count, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import { claims, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { esDuenoDeLista } from '@/lib/groups'
+import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
 
 export async function expireStaleClaims(db: Db, itemId?: string) {
   const vencida = and(eq(claims.estado, 'reservado'), lt(claims.expiresAt, new Date()))
@@ -82,8 +82,9 @@ export async function getMyClaimWarnings(db: Db, viewer: Viewer) {
   const rows = await db.select({
     claimId: claims.id, itemTitulo: items.titulo,
     createdAt: claims.createdAt, expiresAt: claims.expiresAt,
-  }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
-    .where(and(eq(claims.estado, 'reservado'), claimEsDe(viewer)))
+  }).from(claims).innerJoin(items, eq(claims.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
+    // por si una reserva quedó sobre una lista propia (venga de donde venga): ese cartel le contaría la sorpresa
+    .where(and(eq(claims.estado, 'reservado'), claimEsDe(viewer), viewer.userId ? noEsDuenoSql(db, viewer.userId) : undefined))
   const ahora = Date.now()
   return rows
     .filter((r) => r.expiresAt && ahora > (r.createdAt.getTime() + r.expiresAt.getTime()) / 2)

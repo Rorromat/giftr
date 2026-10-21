@@ -1,5 +1,6 @@
 import { codazoAction } from '@/app/actions'
 import { Icon } from '@/components/ui'
+import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
 
 const RESULTADOS: Record<string, (para: string) => string> = {
   avisado: (p) => `¡Codazo enviado! A ${p} le llegó un aviso.`,
@@ -7,6 +8,7 @@ const RESULTADOS: Record<string, (para: string) => string> = {
   ya_mandaste: () => 'Ya le diste un codazo hoy. Mañana podés de nuevo.',
   muchos: () => 'Hoy ya le dieron varios codazos. Probá mañana.',
   sin_identidad: () => 'Decinos tu nombre así sabe quién le dio el codazo.',
+  nombre_largo: () => `Tu nombre puede tener hasta ${NOMBRE_INVITADO_MAXIMO} letras.`,
 }
 
 /**
@@ -38,7 +40,7 @@ export function Codazo({ token, para, plural, identified, resultado }: {
             Mandale{plural ? 's' : ''} un codazo: {plural ? 'les' : 'le'} avisamos a {para} que querés saber qué regalar{plural ? 'les' : 'le'}.
           </p>
         </div>
-        {!identified && <input name="nombre" required maxLength={40} placeholder="Tu nombre" aria-label="Tu nombre" className="gr-input shadow-none" />}
+        {!identified && <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" className="gr-input shadow-none" />}
         <button className="gr-btn-primary gr-btn--sm w-full">👉 Mandar un codazo</button>
       </form>
     </section>

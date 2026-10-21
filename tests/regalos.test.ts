@@ -240,6 +240,11 @@ test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni hist
     await getItemForViewer(db, lista.shareToken, bici.id, yo),
     await getOwnList(db, mama.id),
     eventos,
+    // y sin su sesión (la app de inicio, el navegador de WhatsApp): sin identificarse no se ve la coordinación
+    await getListForViewer(db, lista.shareToken, {}),
+    await getItemForViewer(db, lista.shareToken, bici.id, {}),
+    await historialDeLista(db, lista.id, {}),
+    await regalosDeItem(db, bici.id, {}),
   ]
   for (const json of vistas.map((v) => JSON.stringify(v).toLowerCase())) {
     // "Vela" es un deseo suyo: solo se chequea que no aparezca como regalo en el historial (arriba)

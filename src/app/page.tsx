@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth, signIn } from '@/auth'
+import { db } from '@/db'
+import { asegurarListaPropia } from '@/lib/users'
 import { Starburst } from '@/components/ui'
 
 // Collage de fotos troqueladas (posiciones relativas al centro para que no se desarme en pantallas anchas).
@@ -12,7 +14,9 @@ const COLLAGE = [
 
 export default async function Home() {
   const session = await auth()
-  if (session?.userId) redirect('/mi-lista')
+  // Solo si la sesión tiene lista (si le faltaba, se crea): una sesión de un usuario que ya no existe
+  // ve la portada y vuelve a entrar, en vez de rebotar entre / y /mi-lista.
+  if (session?.userId && await asegurarListaPropia(db, session.userId)) redirect('/mi-lista')
   return (
     <main className="flex min-h-screen flex-col pb-10">
       <div className="relative -mx-[18px] h-[380px] overflow-hidden">

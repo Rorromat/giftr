@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-or
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import type { Viewer } from '@/lib/types'
+import { identificado, type Viewer } from '@/lib/types'
 import { reserveItem, type ReserveResult } from '@/lib/claims'
 import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
@@ -170,8 +170,9 @@ export async function saldarCon(db: Db, userId: string, otroId: string): Promise
   return filas.length
 }
 
-/** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño nunca se le llama (y devuelve []). */
+/** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño nunca se le llama (y devuelve []), ni a quien no se identificó. */
 export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Promise<RegaloView[]> {
+  if (!identificado(viewer)) return []
   const [item] = await db.select({ listId: items.listId }).from(items).where(eq(items.id, itemId))
   if (!item || (viewer.userId && await esDuenoDeLista(db, item.listId, viewer.userId))) return []
   const regalos = await db.select({ gift: groupGifts, nombre: users.nombre })
@@ -343,7 +344,6 @@ export type EntradaHistorial = {
   titulo: string
   /** Quien lo compró (en un regalo grupal, el encargado). */
   encargado: string
-  encargadoKey: string
   con: string[]
   grupal: boolean
   nota: string | null
@@ -353,10 +353,14 @@ export type EntradaHistorial = {
 export type Historial = {
   entradas: EntradaHistorial[]
   /** Cuántos regalos compró cada uno, de más a menos. */
-  ranking: { key: string; nombre: string; cantidad: number; esYo: boolean }[]
+  ranking: { nombre: string; cantidad: number; esYo: boolean }[]
 }
 
-async function comprasDeListas(db: Db, listIds: string[]): Promise<EntradaHistorial[]> {
+// quien: con qué agrupar el ranking ("u:<id>" o "g:<id>"). Queda del lado del servidor: el id de un invitado
+// es parte de su credencial y no puede llegar a la página (ni como key de React, que viaja en el HTML).
+type Compra = { entrada: EntradaHistorial; quien: string }
+
+async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
   if (!listIds.length) return []
   const sueltas = await db.select({
     id: claims.id, listId: items.listId, titulo: items.titulo, nota: claims.notaQueCompre, fecha: claims.updatedAt,
@@ -385,30 +389,38 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<EntradaHistor
 
   return [
     ...sueltas.map((s) => ({
-      id: s.id, listId: s.listId, titulo: s.titulo, nota: s.nota, fecha: s.fecha, grupal: false, con: [],
-      encargado: s.userNombre ?? s.guestNombre ?? 'Alguien',
-      encargadoKey: s.userId ? `u:${s.userId}` : `g:${s.guestId}`,
+      quien: s.userId ? `u:${s.userId}` : `g:${s.guestId}`,
+      entrada: {
+        id: s.id, listId: s.listId, titulo: s.titulo, nota: s.nota, fecha: s.fecha, grupal: false, con: [],
+        encargado: s.userNombre ?? s.guestNombre ?? 'Alguien',
+      },
     })),
     ...grupales.map((g) => ({
-      id: g.id, listId: g.listId, titulo: g.titulo, nota: g.nota, fecha: g.fecha ?? new Date(0), grupal: true,
-      encargado: g.encargado, encargadoKey: `u:${g.encargadoId}`,
-      con: miembros.filter((m) => m.giftId === g.id && m.userId !== g.encargadoId).map((m) => m.nombre),
+      quien: `u:${g.encargadoId}`,
+      entrada: {
+        id: g.id, listId: g.listId, titulo: g.titulo, nota: g.nota, fecha: g.fecha ?? new Date(0), grupal: true,
+        encargado: g.encargado,
+        con: miembros.filter((m) => m.giftId === g.id && m.userId !== g.encargadoId).map((m) => m.nombre),
+      },
     })),
-  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
+  ].sort((a, b) => b.entrada.fecha.getTime() - a.entrada.fecha.getTime())
 }
 
-/** Historial de regalos comprados de una lista, para quien regala. Null para sus dueños. */
+/** Historial de regalos comprados de una lista, para quien regala con nombre. Null para sus dueños y para quien no se identificó. */
 export async function historialDeLista(db: Db, listId: string, viewer: Viewer): Promise<Historial | null> {
-  if (viewer.userId && await esDuenoDeLista(db, listId, viewer.userId)) return null
-  const entradas = await comprasDeListas(db, [listId])
-  const yo = viewer.userId ? `u:${viewer.userId}` : viewer.guestId ? `g:${viewer.guestId}` : null
+  if (!identificado(viewer) || (viewer.userId && await esDuenoDeLista(db, listId, viewer.userId))) return null
+  const compras = await comprasDeListas(db, [listId])
+  const yo = viewer.userId ? `u:${viewer.userId}` : `g:${viewer.guestId}`
   const conteo = new Map<string, Historial['ranking'][number]>()
-  for (const e of entradas) {
-    const fila = conteo.get(e.encargadoKey) ?? { key: e.encargadoKey, nombre: e.encargado, cantidad: 0, esYo: e.encargadoKey === yo }
+  for (const { entrada, quien } of compras) {
+    const fila = conteo.get(quien) ?? { nombre: entrada.encargado, cantidad: 0, esYo: quien === yo }
     fila.cantidad++
-    conteo.set(e.encargadoKey, fila)
+    conteo.set(quien, fila)
   }
-  return { entradas, ranking: [...conteo.values()].sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre)) }
+  return {
+    entradas: compras.map((c) => c.entrada),
+    ranking: [...conteo.values()].sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre)),
+  }
 }
 
 /** El último regalo comprado de cada lista ajena ("El último lo compró Sofi"). Ignora las listas del usuario. */
@@ -417,6 +429,6 @@ export async function ultimosRegalos(db: Db, userId: string, listIds: string[]):
     ? (await db.select({ id: lists.id }).from(lists).where(and(inArray(lists.id, listIds), noEsDuenoSql(db, userId)))).map((l) => l.id)
     : []
   const ultimos = new Map<string, EntradaHistorial>()
-  for (const e of await comprasDeListas(db, ajenas)) if (!ultimos.has(e.listId)) ultimos.set(e.listId, e)
+  for (const { entrada: e } of await comprasDeListas(db, ajenas)) if (!ultimos.has(e.listId)) ultimos.set(e.listId, e)
   return ultimos
 }

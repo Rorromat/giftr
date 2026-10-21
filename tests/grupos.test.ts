@@ -69,8 +69,8 @@ test('el regalador ve una sola lista con el nombre del grupo y sus dueños', asy
   expect(vista.duenos).toEqual(['Delfina', 'Martín'])
   expect(vista.ownerNombre).toBe('Delfina y Martín')
   expect(vista.items[0].claims[0]).toMatchObject({ claimerNombre: 'Rodri', esMia: true })
-  // y un anónimo también
-  expect((await getListForViewer(db, grupo.shareToken, {}))?.role).toBe('giver')
+  // sin identificarse, los deseos sin estados (puede ser un co-dueño sin su sesión)
+  expect((await getListForViewer(db, grupo.shareToken, {}))?.role).toBe('anonimo')
 })
 
 test('la invitación muestra el grupo, es idempotente y no sirve una inválida', async () => {

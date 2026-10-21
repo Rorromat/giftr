@@ -28,8 +28,9 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
         <figure className="gr-sticker p-3.5">
           <figcaption className="mb-2.5 text-xs font-bold uppercase tracking-wide text-gr-muted">Regalos comprados por persona</figcaption>
           <ul className="flex flex-col gap-2.5">
-            {ranking.map((r) => (
-              <li key={r.key} title={`${nombre(r)}: ${r.cantidad} ${r.cantidad === 1 ? 'regalo' : 'regalos'}`}
+            {/* key por posición: el ranking no lleva ids (el de un invitado es parte de su credencial) */}
+            {ranking.map((r, i) => (
+              <li key={i} title={`${nombre(r)}: ${r.cantidad} ${r.cantidad === 1 ? 'regalo' : 'regalos'}`}
                   className="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)] items-center gap-2.5">
                 <span className={`truncate text-sm ${r.esYo ? 'font-extrabold' : 'font-semibold'}`}>{nombre(r)}</span>
                 <span className="flex min-w-0 items-center gap-2">

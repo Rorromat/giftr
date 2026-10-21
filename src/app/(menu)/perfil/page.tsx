@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { saveBirthdayAction } from '@/app/actions'
+import { salirAction, saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
@@ -124,6 +124,12 @@ export default async function Perfil() {
           </select>
           <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
         </div>
+      </form>
+
+      {/* Para dejar este dispositivo (el de la familia, la tablet) o entrar con otra cuenta */}
+      <form action={salirAction} className="self-center">
+        <input type="hidden" name="volver" value="/" />
+        <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Cerrar sesión</button>
       </form>
     </Seccion>
   )
