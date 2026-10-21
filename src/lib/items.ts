@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, or } from 'drizzle-orm'
+import { and, eq, gte, inArray, or, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esRepetible, pickItemFields, type OwnerItemView } from '@/lib/serialize'
@@ -55,9 +55,14 @@ export async function createItem(db: Db, userId: string, deseo: NewItemData, lis
       .where(listId ? and(eq(lists.id, listId), esDuenoSql(t, userId)) : eq(lists.ownerId, userId))
       .for('update')
     if (!list) return null
-    // Un doble toque en "Agregar" no lo duplica (dos deseos iguales son dos lugares para reservar el mismo regalo).
+    // Un doble toque en "Agregar" no lo duplica (dos deseos iguales son dos lugares para reservar el mismo regalo). Es
+    // un doble toque solo si vino todo igual: con un link pegado en el título queda de título el sitio, y dos productos de
+    // la misma tienda cargados seguidos son dos deseos.
     const [repetido] = await t.select().from(items)
-      .where(and(eq(items.listId, list.id), eq(items.titulo, data.titulo), eq(items.tipo, data.tipo), recienHecho(items.createdAt)))
+      .where(and(
+        eq(items.listId, list.id), eq(items.titulo, data.titulo), eq(items.tipo, data.tipo), recienHecho(items.createdAt),
+        ...CAMPOS_OPCIONALES.map((k) => sql`${items[k]} is not distinct from ${data[k] ?? null}`),
+      ))
     if (repetido) return pickItemFields(repetido)
     const [item] = await t.insert(items).values({ ...soloIdeasSeRepiten(data), listId: list.id }).returning()
     return pickItemFields(item)
@@ -105,14 +110,16 @@ const AVISAN: (keyof CambiosDeseo)[] = ['titulo', 'notas', 'fotoUrl', 'linkTiend
 
 export async function updateItem(db: Db, itemId: string, userId: string, deseo: CambiosDeseo): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
-  const data = acotarDeseo(deseo)
   const [antes] = await db.select().from(items).where(eq(items.id, itemId))
   // Uno archivado no se edita (una pantalla vieja, la prioridad desde Mi lista): avisaría de algo que ya no está.
   if (antes.estadoDueno !== 'activo') return false
-  // Solo lo que cambió: guardar sin tocar nada no les manda un aviso a los que lo reservaron.
-  const cambios = Object.fromEntries(
-    Object.entries(soloIdeasSeRepiten(data, antes.tipo)).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
+  // Solo lo que cambió: guardar sin tocar nada no les manda un aviso a los que lo reservaron. Y solo eso se acota: un
+  // deseo de antes de los topes (un título largo pegado de una tienda) no se corta en silencio, ni les avisa a todos que
+  // cambió, porque el dueño tocó las notas.
+  const distinto = (d: CambiosDeseo) => Object.fromEntries(
+    Object.entries(d).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
   ) as CambiosDeseo
+  const cambios = distinto(soloIdeasSeRepiten(acotarDeseo(distinto(deseo)), antes.tipo))
   if (!Object.keys(cambios).length) return true
   await db.update(items).set(cambios).where(eq(items.id, itemId))
   // Bajar la cantidad por debajo de lo reservado también llega así (sin nada distinto para el dueño, que no lo sabe).

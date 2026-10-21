@@ -24,10 +24,12 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
   notFound: () => { throw new Error('NEXT_NOT_FOUND') },
+  useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }))
 
 import { saveBirthdayAction, saveGustosAction } from '@/app/actions'
 import Listo from '@/app/bienvenida/listo/page'
+import Bienvenida from '@/app/bienvenida/page'
 import PerfilPublico from '@/app/l/[token]/perfil/page'
 
 function form(campos: Record<string, string>) {
@@ -73,10 +75,30 @@ test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gu
   expect(await redirige(saveGustosAction(form({ deportes: 'Pádel', dia: '15', mes: '' })))).toBe('/bienvenida?paso=0&cumple=invalido')
   expect((await misGustos(h.db, owner.id))?.deportes).toEqual(['Pádel'])
   expect(await miCumple(h.db, owner.id)).toEqual({ dia: 3, mes: 4 })
-  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/bienvenida?editar=1&paso=0&cumple=invalido')
+  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil' })))).toBe('/bienvenida?editar=1&paso=0&cumple=invalido')
+  // "Más tarde" (o "Guardar" arriba, desde Perfil) quería salir: sale a Perfil, que avisa al lado de su cumple
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Cocinar', dia: '', mes: '7', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
+  expect((await misGustos(h.db, owner.id))?.hobbies).toEqual(['Cocinar'])
+  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
   // los dos vacíos es que lo sacó (los campos vienen con el guardado)
   expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/bienvenida/listo')
   expect(await miCumple(h.db, owner.id)).toBeNull()
+})
+
+test('bienvenida con el aviso del cumple: se arma de nuevo en el primer paso y el aviso se ve', async () => {
+  await preparar()
+  type Pagina = React.ReactElement<{ children: React.ReactElement }>
+  const pagina = async (sp: Record<string, string>) => await Bienvenida({ searchParams: Promise.resolve(sp) }) as Pagina
+  // Cambiar solo la dirección no vuelve a montar el formulario (el router guarda su estado: seguía en el último paso,
+  // con el aviso escondido en el primero). Con otra key, sí.
+  const [antes, despues] = [await pagina({}), await pagina({ paso: '0', cumple: 'invalido' })]
+  expect(despues.props.children.key).not.toBe(antes.props.children.key)
+  const visto = renderToStaticMarkup(despues)
+  const aviso = visto.indexOf('Tu cumple no se guardó')
+  expect(aviso).toBeGreaterThan(-1)
+  // en la sección del paso que se ve, no en una escondida
+  expect(visto.slice(visto.lastIndexOf('<section', aviso), aviso)).not.toContain('class="hidden"')
+  expect(renderToStaticMarkup(antes)).not.toContain('Tu cumple no se guardó')
 })
 
 test('los días del cumple son los del mes elegido (29 en febrero)', () => {

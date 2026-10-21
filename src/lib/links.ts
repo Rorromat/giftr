@@ -14,7 +14,8 @@ const DOMINIO = /^[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+(:\d+)?([/?#]\S*)?$/u
  */
 export function linkHttp(valor: string): string | null {
   const v = valor.trim().replace(/^\/\//, '')
-  if (!v || /\s/.test(v) || v.length > LARGO.link) return null
+  // new URL acepta un \u0000 en el medio, y Postgres no: con eso, guardar el deseo daba la pantalla de error
+  if (!v || /[\s\u0000-\u001f\u007f]/.test(v) || v.length > LARGO.link) return null
   const conEsquema = ESQUEMA_HTTP.test(v) ? v : DOMINIO.test(v) ? `https://${v}` : null
   if (!conEsquema || conEsquema.length > LARGO.link) return null
   try {

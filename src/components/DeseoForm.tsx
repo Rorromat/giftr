@@ -1,4 +1,5 @@
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { CampoLink, CampoTitulo } from '@/components/CamposDeseo'
 import { FotoField } from '@/components/FotoField'
 import { Hearts, PRIORIDADES } from '@/components/ui'
 import { CANTIDAD_MAXIMA, LARGO } from '@/lib/limites'
@@ -36,9 +37,9 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
       <div className="gr-sticker flex flex-col gap-3 p-3.5">
         <label className="flex flex-col gap-1">
           <span className="gr-label">¿Qué querés?</span>
-          {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); el título se corta en el servidor */}
-          <input name="titulo" required maxLength={LARGO.link} placeholder="Pegá un link o escribí" defaultValue={deseo?.titulo}
-                 className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
+          {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); si el texto se pasa, avisa antes de mandar */}
+          <CampoTitulo name="titulo" required placeholder="Pegá un link o escribí" defaultValue={deseo?.titulo}
+                       className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
         </label>
         <FotoField inicial={deseo?.fotoUrl} />
       </div>
@@ -49,12 +50,14 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
       </div>
 
       {/* sin https:// también vale (el servidor se lo agrega); sin punto no es un link, y se avisa antes de mandar */}
-      <input name="linkTienda" placeholder="Link a la tienda (opcional)" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"
-             maxLength={LARGO.link} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-             pattern="\S+\.\S+" title="Pegá el link de la tienda (por ejemplo mercadolibre.com.ar/…)" />
+      <CampoLink name="linkTienda" placeholder="Link a la tienda (opcional)" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"
+                 inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                 pattern="\S+\.\S+" title="Pegá el link de la tienda (por ejemplo mercadolibre.com.ar/…)" />
       <div className="flex gap-3">
         <input name="precio" maxLength={LARGO.precio} placeholder="Precio (ej. $45.000)" defaultValue={deseo?.precio ?? ''} className="gr-input w-1/2" />
-        <input name="cantidad" type="number" min="1" max={CANTIDAD_MAXIMA} defaultValue={deseo?.cantidad ?? 1} aria-label="Cantidad" className="gr-input w-1/2" />
+        {/* uno de antes del tope con más se sigue pudiendo editar (si no se toca, queda como estaba) */}
+        <input name="cantidad" type="number" min="1" max={Math.max(CANTIDAD_MAXIMA, deseo?.cantidad ?? 0)} defaultValue={deseo?.cantidad ?? 1}
+               aria-label="Cantidad" className="gr-input w-1/2" />
       </div>
       <input name="rangoPrecio" maxLength={LARGO.rangoPrecio} placeholder="Rango si es idea (ej. $10–30k)" defaultValue={deseo?.rangoPrecio ?? ''} className="gr-input" />
 

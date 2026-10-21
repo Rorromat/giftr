@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { saveGustosAction } from '@/app/actions'
 import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
@@ -54,10 +54,14 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
   cumple: { dia: number; mes: number } | null
   editar: boolean
   pasoInicial?: number
-  /** Volvió porque el cumple no se pudo guardar (falta el día o el mes, o no existe): se avisa en el primer paso. */
+  /**
+   * Volvió porque el cumple no se pudo guardar (falta el día o el mes, o no existe): se avisa en el primer paso. La
+   * página le pone una key con esto, así se arma de nuevo en ese paso: cambiar solo la dirección no lo vuelve a montar.
+   */
   cumpleInvalido?: boolean
 }) {
   const [paso, setPaso] = useState(Math.min(Math.max(pasoInicial, 0), PASOS.length - 1))
+  const [avisoCumple, setAvisoCumple] = useState(cumpleInvalido)
   const [busqueda, setBusqueda] = useState('')
   const clubPropio = inicial.club && ![...CLUBES, NO_FUTBOL, SOLO_SELECCION].includes(inicial.club) ? inicial.club : null
   const [club, setClub] = useState(clubPropio ? 'otro' : inicial.club ?? '')
@@ -71,6 +75,18 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     setPaso(n)
     window.scrollTo({ top: 0 })
   }
+  // Un cumple a medias no se guardaría: en vez de mandar, vuelve a ese paso a avisar (el aviso estaba solo en el primer
+  // paso, escondido, y el usuario se quedaba en el último sin saber por qué). "Más tarde" sale igual: el servidor guarda
+  // lo demás y lo lleva a Perfil, con el aviso al lado del cumple.
+  function alMandar(e: FormEvent<HTMLFormElement>) {
+    if ((e.nativeEvent as SubmitEvent).submitter?.getAttribute('name') === 'corte') return
+    const datos = new FormData(e.currentTarget)
+    if (!datos.get('dia') !== !datos.get('mes')) {
+      e.preventDefault()
+      setAvisoCumple(true)
+      ir(0)
+    }
+  }
   // Enter en un campo de texto pasa al paso siguiente en vez de mandar todo el formulario.
   function alApretarEnter(e: KeyboardEvent<HTMLFormElement>) {
     if (e.key === 'Enter' && e.target instanceof HTMLInputElement && !ultimo) {
@@ -83,7 +99,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     .includes(busqueda.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')))
 
   return (
-    <form action={saveGustosAction} onKeyDown={alApretarEnter} className="flex min-h-[calc(100dvh-52px)] flex-col gap-4 pb-36">
+    <form action={saveGustosAction} onSubmit={alMandar} onKeyDown={alApretarEnter} className="flex min-h-[calc(100dvh-52px)] flex-col gap-4 pb-36">
       {editar && <input type="hidden" name="volver" value="perfil" />}
 
       <div className="flex items-center gap-3">
@@ -125,8 +141,8 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
           <div className="flex gap-2">
             <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" />
           </div>
-          {cumpleInvalido && (
-            <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes.</p>
+          {avisoCumple && (
+            <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
           )}
           <p className="text-[13px] font-medium text-gr-muted">Tu gente lo ve en Eventos, con tiempo para elegir.</p>
         </div>

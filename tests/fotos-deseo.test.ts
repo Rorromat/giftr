@@ -116,6 +116,8 @@ test('el link de una foto en el formulario: el guardado vale, uno nuevo se prueb
   expect(estadoDelLink(ML, null, { [ML]: false }).estado).toBe('no-es-foto')
   expect(estadoDelLink('no es un link', null, {})).toEqual({ link: null, estado: 'no-es-foto' })
   expect(estadoDelLink('__proto__', null, {}).estado).toBe('no-es-foto')
+  // sin maxLength en el campo (cortaría lo pegado): uno que no entra frena el envío con su motivo
+  expect(estadoDelLink(`https://x.com/${'a'.repeat(2000)}.jpg`, null, {})).toEqual({ link: null, estado: 'muy-largo' })
 })
 
 test('pegar algo con imagen: el texto va al campo y la imagen solo si no hay foto; una imagen sola es la foto; nunca dos a la vez', () => {

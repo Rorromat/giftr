@@ -5,7 +5,6 @@ import { Icon } from '@/components/ui'
 import { achicarFoto } from '@/lib/achicar-foto'
 import { alPegarImagen, estadoDelLink } from '@/lib/foto-del-form'
 import { linkHttp } from '@/lib/links'
-import { LARGO } from '@/lib/limites'
 
 const ES_LINK = /^https?:\/\/\S+$/i
 
@@ -17,6 +16,7 @@ const AVISOS = {
   'sin-foto': 'No hay una foto copiada. Mantené apretada una foto, tocá Copiar y volvé a tocar Pegar.',
   'no-es-foto': 'Ese link no es una foto (si es de una tienda, pegalo en Link a la tienda).',
   'no-carga': 'Esa foto ya no carga. Cambiala, o borrá el link.',
+  'muy-largo': 'Ese link es muy largo. Copiá la foto y tocá Pegar.',
 } as const
 
 /** Si el link carga como imagen en este navegador (la página de un producto, no). */
@@ -150,7 +150,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   const bloqueo = subiendo ? 'Esperá que termine de subir la foto.'
     : subida ? ''
       : delLink.estado === 'probando' ? 'Esperá que cargue la foto.'
-        : delLink.estado === 'no-es-foto' ? AVISOS['no-es-foto'] : ''
+        : delLink.estado === 'no-es-foto' || delLink.estado === 'muy-largo' ? AVISOS[delLink.estado] : ''
   useEffect(() => {
     link.current?.setCustomValidity(bloqueo)
   }, [bloqueo])
@@ -192,7 +192,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
         <p role={mensaje === 'subiendo' || mensaje === 'probando' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
       )}
       <input ref={link} value={url} placeholder="O el link de una foto (opcional)" aria-label="Link de una foto"
-             maxLength={LARGO.link} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+             inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
              className="gr-input shadow-none" onChange={(e) => escribir(e.target.value)} />
       <input type="hidden" name="fotoUrl" value={foto ?? ''} />
     </div>

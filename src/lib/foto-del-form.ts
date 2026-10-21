@@ -1,18 +1,21 @@
 import { linkHttp } from '@/lib/links'
+import { LARGO } from '@/lib/limites'
 
 // Las decisiones del campo de foto del formulario de un deseo (FotoField), sin React ni navegador para poder probarlas.
 
-export type EstadoLink = 'ok' | 'probando' | 'no-es-foto'
+export type EstadoLink = 'ok' | 'probando' | 'no-es-foto' | 'muy-largo'
 
 /**
  * El link de foto escrito, listo para mandar, y cómo está: ok si ya cargó como imagen en el navegador (o es el que
  * estaba guardado, al editar: no se vuelve a pedir), probando mientras se prueba, no-es-foto si no es un link o no
- * cargó (una página de tienda). Sin nada escrito, sin estado.
+ * cargó (una página de tienda), muy-largo si no entra (el campo no tiene maxLength: cortaría lo pegado y quedaría una
+ * foto rota). Sin nada escrito, sin estado.
  */
 export function estadoDelLink(escrito: string, guardado: string | null, probados: Record<string, boolean>): { link: string | null; estado: EstadoLink | null } {
   const v = escrito.trim()
   if (!v) return { link: null, estado: null }
   if (v === guardado) return { link: v, estado: 'ok' }
+  if (v.length > LARGO.link) return { link: null, estado: 'muy-largo' }
   const link = linkHttp(v)
   if (!link) return { link: null, estado: 'no-es-foto' }
   const probado = Object.hasOwn(probados, link) ? probados[link] : undefined

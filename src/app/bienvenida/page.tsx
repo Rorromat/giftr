@@ -18,7 +18,8 @@ export default async function Bienvenida({ searchParams }: { searchParams: Promi
 
   return (
     <main className="pt-[52px]">
-      <BienvenidaForm nombre={nombre} nombreCompleto={session.user?.name ?? nombre} foto={foto} inicial={{ ...GUSTOS_VACIOS, ...gustos }}
+      {/* con el aviso de un cumple que no se guardó, se arma de nuevo en el primer paso (ver cumpleInvalido) */}
+      <BienvenidaForm key={errorCumple ?? ''} nombre={nombre} nombreCompleto={session.user?.name ?? nombre} foto={foto} inicial={{ ...GUSTOS_VACIOS, ...gustos }}
                       cumple={cumple} editar={editar === '1'} pasoInicial={Number(paso) || 0} cumpleInvalido={errorCumple === 'invalido'} />
     </main>
   )

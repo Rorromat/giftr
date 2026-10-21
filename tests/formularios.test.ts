@@ -2,11 +2,11 @@ import { expect, test, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
-import { claims, comments, items, lists } from '@/db/schema'
+import { claims, comments, items, lists, notifications } from '@/db/schema'
 import { createItem, updateItem } from '@/lib/items'
 import { addComment } from '@/lib/comments'
 import { markBought, reserveItem } from '@/lib/claims'
-import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
+import { AVISO_LINK_LARGO, avisoDelLink, avisoDelTitulo, deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { largo, recortar } from '@/lib/limites'
 import { linkHttp } from '@/lib/links'
 import { guardarGustos, misGustos } from '@/lib/bienvenida'
@@ -57,6 +57,26 @@ test('recortar: por caracteres de verdad, sin partir un emoji, y sin caracteres 
   expect(recortar('a\u0000b\u0007c\nd', 10)).toBe('abc\nd')
   expect(largo('🇦🇷👨‍👩‍👧‍👦é')).toBe(3)
   for (const t of [recortar('😀'.repeat(200), 120), recortar('x' + '🇦🇷'.repeat(80), 41)]) expect(t.isWellFormed()).toBe(true)
+  // los emojis más largos (una familia con tonos de piel, la bandera de Inglaterra, 1️⃣) y las tildes quedan enteros
+  const largos = '👨🏻‍👩🏻‍👧🏻‍👦🏻🏴󠁧󠁢󠁥󠁮󠁧󠁿1️⃣🏳️‍⚧️ ñandú e\u0301\u0302'
+  expect(recortar(largos, 120)).toBe(largos)
+})
+
+test('recortar: un carácter con cientos de miles de marcas encimadas (texto "zalgo") no pasa entero', async () => {
+  const zalgo = 'a' + '\u0301'.repeat(200_000)
+  expect(largo(zalgo)).toBe(1)
+  expect(recortar(zalgo, 500)).toBe('a\u0301\u0301\u0301\u0301')
+  // también entre otras letras, y con lo que no es una marca (un ZWJ) en el medio
+  expect(recortar(`hola ${'\u0300\u200d'.repeat(1000)}chau`, 500).length).toBeLessThan(50)
+  expect(recortar('b' + '\u0301'.repeat(400), 500)).toBe('b\u0301\u0301\u0301\u0301')
+  expect(validarNombre('Z' + '\u0336'.repeat(59))).toEqual({ ok: true, nombre: 'Z\u0336\u0336\u0336\u0336' })
+
+  const { owner, giver } = await preparar()
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: zalgo, precio: zalgo }))!
+  expect(item.titulo.length).toBe(5)
+  expect(item.precio!.length).toBe(5)
+  expect(await addComment(h.db, item.id, { userId: giver.id }, zalgo)).toBe(true)
+  expect((await h.db.select().from(comments))[0].texto.length).toBe(5)
 })
 
 test('links: sin https:// se lo agrega si tiene pinta de dominio; lo que no es un link de una página, no', () => {
@@ -75,8 +95,23 @@ test('links: sin https:// se lo agrega si tiene pinta de dominio; lo que no es u
     ['https://localhost/x', null],
     ['https://', null],
     [`https://tienda.com/${'x'.repeat(2000)}`, null],
+    // un \u0000 que new URL acepta y Postgres no (guardar daba la pantalla de error), u otro carácter de control
+    ['https://x.com/a\u0000b', null],
+    ['mercadolibre.com.ar/x\u0000y', null],
+    ['https://x.com/a\u007fb', null],
+    ['https://x.com/a\u001bb', null],
   ]
-  for (const [v, esperado] of casos) expect(linkHttp(v), v).toBe(esperado)
+  for (const [v, esperado] of casos) expect(linkHttp(v), JSON.stringify(v)).toBe(esperado)
+})
+
+test('un link con un carácter de control no rompe al guardar: ni en la tienda, ni en la foto, ni pegado en el título', async () => {
+  const { list } = await preparar()
+  const conNul = 'https://articulo.mercadolibre.com.ar/MLA-1\u0000x'
+  expect(await redirigeA(addItemAction(form({ titulo: 'Mate', linkTienda: conNul, fotoUrl: conNul })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: conNul })))).toBe('/mi-lista')
+  const filas = await h.db.select().from(items).where(eq(items.listId, list.id))
+  expect(filas).toHaveLength(2)
+  expect(filas.map((f) => [f.linkTienda, f.fotoUrl])).toEqual([[null, null], [null, null]])
 })
 
 test('el formulario de un deseo: el link pegado en el título pasa a "Link a la tienda" y el título queda legible', () => {
@@ -90,17 +125,33 @@ test('el formulario de un deseo: el link pegado en el título pasa a "Link a la 
   expect(deseoDesdeForm(form({ titulo: '   ' }))).toBeNull()
 })
 
-test('el formulario de un deseo: vacío es null, un link que no es link es undefined (al editar no borra), cantidad de 1 a 99', () => {
+test('el formulario de un deseo: vacío es null, un link que no es link es undefined (al editar no borra), cantidad entera desde 1', () => {
+  // el tope de 99 lo pone createItem/updateItem (ver el test de abajo)
   const d = deseoDesdeForm(form({ titulo: 'Campera', linkTienda: 'www.zara.com/x', fotoUrl: 'no es un link', notas: '', cantidad: '99999999999' }))!
-  expect(d).toMatchObject({ linkTienda: 'https://www.zara.com/x', fotoUrl: undefined, notas: null, cantidad: 99 })
+  expect(d).toMatchObject({ linkTienda: 'https://www.zara.com/x', fotoUrl: undefined, notas: null, cantidad: 99999999999 })
   expect(paraAgregar(d)).not.toHaveProperty('fotoUrl')
   expect(paraAgregar(d)).not.toHaveProperty('notas')
-  for (const [cantidad, esperado] of [['0', 1], ['-3', 1], ['1e20', 99], ['abc', 1], ['2.7', 2], ['42', 42]] as const) {
+  for (const [cantidad, esperado] of [['0', 1], ['-3', 1], ['1e999', 1], ['abc', 1], ['2.7', 2], ['42', 42]] as const) {
     expect(deseoDesdeForm(form({ titulo: 'x', cantidad }))!.cantidad, cantidad).toBe(esperado)
   }
   expect(deseoDesdeForm(form({ titulo: 'x', fotoUrl: '/foto/deseo/6a1c701f-89b2-4797-ad8e-0bec5918fc9a' }))!.fotoUrl)
     .toBe('/foto/deseo/6a1c701f-89b2-4797-ad8e-0bec5918fc9a')
   expect(deseoDesdeForm(form({ titulo: 'x', fotoUrl: 'javascript:alert(1)' }))!.fotoUrl).toBeUndefined()
+})
+
+test('dos productos de la misma tienda pegados seguidos en el título son dos deseos (no un doble toque)', async () => {
+  const { list } = await preparar()
+  const mate = 'https://articulo.mercadolibre.com.ar/MLA-111-mate-imperial-_JM'
+  const termo = 'https://articulo.mercadolibre.com.ar/MLA-222-termo-stanley-_JM'
+  for (const titulo of [mate, termo]) expect(await redirigeA(addItemAction(form({ titulo })))).toBe('/mi-lista')
+  const filas = await h.db.select().from(items).where(eq(items.listId, list.id))
+  expect(filas.map((f) => [f.titulo, f.linkTienda]).sort()).toEqual([['mercadolibre.com.ar', mate], ['mercadolibre.com.ar', termo]])
+  // el mismo dos veces (un doble toque) sigue siendo uno, y lo mismo con otra foto u otras notas son dos
+  expect(await redirigeA(addItemAction(form({ titulo: termo })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la roja' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toBe('/mi-lista')
+  expect(await h.db.select().from(items).where(eq(items.listId, list.id))).toHaveLength(4)
 })
 
 test('agregar pegando el link en el título guarda el link a la tienda; una cantidad enorme queda en 99 y no rompe', async () => {
@@ -140,6 +191,40 @@ test('createItem y updateItem acotan lo que les llegue: textos largos cortados, 
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0].cantidad).toBe(1)
   // un título que no tiene nada no crea nada
   expect(await createItem(h.db, owner.id, { tipo: 'exacto', titulo: '\u0000 ' })).toBeNull()
+})
+
+test('editar un deseo de antes de los topes sin tocar lo largo no lo corta ni les avisa a los que lo reservaron', async () => {
+  const { owner, giver } = await preparar()
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Termo' }))!
+  const titulo = `Termo Stanley Classic Legendary ${'x'.repeat(150)}`
+  await h.db.update(items).set({ titulo, precio: '$'.repeat(60), cantidad: 150 }).where(eq(items.id, item.id))
+  const r = await reserveItem(h.db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error('no reservó')
+  // cambia solo la prioridad (que no avisa), con lo demás como vino en el formulario
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, precio: '$'.repeat(60), cantidad: '150', prioridad: 'mucho' }))))
+    .toBe('/mi-lista')
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
+    .toMatchObject({ titulo, precio: '$'.repeat(60), cantidad: 150, prioridad: 'mucho' })
+  expect(await h.db.select().from(notifications)).toEqual([])
+  // lo que sí cambia se acota
+  expect(await updateItem(h.db, item.id, owner.id, { titulo: `${titulo}!`, cantidad: 151 })).toBe(true)
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo: titulo.slice(0, 120), cantidad: 99 })
+})
+
+test('el título y el link avisan en el navegador antes de que el servidor los corte o los descarte', () => {
+  expect(avisoDelTitulo('Mate imperial')).toBe('')
+  expect(avisoDelTitulo('x'.repeat(120))).toBe('')
+  expect(avisoDelTitulo('😀'.repeat(120))).toBe('')
+  expect(avisoDelTitulo('x'.repeat(135))).toBe('Hasta 120 letras: sobran 15. Lo demás va en Notas.')
+  // un link pegado no cuenta (pasa a "Link a la tienda"), pero el texto que lo acompaña sí
+  expect(avisoDelTitulo(ML)).toBe('')
+  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`)).toBe('')
+  expect(avisoDelTitulo(`${'x'.repeat(121)} ${ML}`)).toContain('sobran 1.')
+  const largoLink = `https://tienda.com/${'x'.repeat(2000)}`
+  expect(avisoDelTitulo(largoLink)).toBe(AVISO_LINK_LARGO)
+  expect(avisoDelLink(largoLink)).toBe(AVISO_LINK_LARGO)
+  expect(avisoDelLink(ML)).toBe('')
+  expect(avisoDelLink('')).toBe('')
 })
 
 test('comentarios de hasta 500 caracteres; con un id que no es de un deseo, no hace nada (ni un error)', async () => {
