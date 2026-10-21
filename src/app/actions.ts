@@ -28,8 +28,8 @@ import { guardarGustos } from '@/lib/bienvenida'
 import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import {
-  cancelarRegalo, comprarRegalo, corregirCompra, iniciarRegaloGrupal, marcarPagado, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo,
-  type CompraResult, type DatosCompra,
+  cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
+  salirDeRegalo, saldarCon, sumarseARegalo, type CompraResult, type DatosCompra,
 } from '@/lib/regalos'
 import { parsePesos, partePesos, pesos } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
@@ -40,6 +40,12 @@ export type EstadoForm = { error: string } | null
 const str = (fd: FormData, k: string) => {
   const v = fd.get(k)
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
+}
+
+/** Un número entero de un campo oculto (lo que mostraba la pantalla); si no vino, undefined. */
+const entero = (fd: FormData, k: string) => {
+  const v = str(fd, k)
+  return v && /^-?\d{1,12}$/.test(v) ? Number(v) : undefined
 }
 
 const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
@@ -484,6 +490,18 @@ export async function removeGroupGiftMemberAction(formData: FormData) {
   revalidarRegalo(formData)
 }
 
+/** "Dejar que vuelva" a alguien que sacó: también solo el encargado de la sesión. */
+export async function letBackGroupGiftMemberAction(formData: FormData) {
+  await dejarVolverARegalo(db, str(formData, 'giftId') ?? '', str(formData, 'miembroId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
+
+/** "Sigue en pie" en el recordatorio de cerrar un regalo abierto. */
+export async function postponeGroupGiftReminderAction(formData: FormData) {
+  await posponerRecordatorio(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  revalidatePath('/', 'layout')
+}
+
 /** Lo que manda CompraGrupalForm: el total, con quiénes vio la división el encargado y, "A mano", la parte de cada uno. */
 function compraDesdeForm(formData: FormData): DatosCompra {
   let partes: Record<string, number> | undefined
@@ -505,6 +523,7 @@ const ERRORES_COMPRA = {
   monto_invalido: 'Revisá los montos: tienen que ser pesos. Si alguien no pone, dejá su parte vacía o en 0.',
   cambiaron: 'Se sumó o se bajó alguien, revisá la división.',
   ya_pagaron: 'Alguien ya figura como que te pagó: para corregir, primero deshacé ese pago.',
+  nada_que_corregir: 'Ya nadie te debe nada de este regalo: no hay nada que corregir.',
   no_permitido: 'No se pudo: puede que ya se haya comprado o cancelado. Recargá la página.',
 }
 
@@ -528,22 +547,33 @@ export async function buyGroupGiftAction(_: EstadoForm, formData: FormData): Pro
   return r.ok ? null : { error: errorDeCompra(r, p) }
 }
 
-/** "Corregir la compra": lo mismo, sobre un regalo ya comprado que nadie le pagó todavía al encargado. */
+/**
+ * "Corregir la compra": lo mismo, sobre un regalo ya comprado que nadie le pagó todavía al encargado. Si sale, o si ya no
+ * se puede corregir (alguien pagó mientras tanto), el formulario se va al volver a armar la página y con él su mensaje:
+ * cómo salió va en la página (?correccion=, ver CartelCorreccion), como el de una reserva que no sale.
+ */
 export async function fixGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const p = compraDesdeForm(formData)
   const r = await corregirCompra(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
   revalidarRegalo(formData)
-  return r.ok ? null : { error: errorDeCompra(r, p) }
+  if (r.ok || r.reason === 'ya_pagaron' || r.reason === 'nada_que_corregir') {
+    const token = str(formData, 'token')
+    const itemId = str(formData, 'itemId')
+    redirect(`${token && itemId && esUuid(itemId) ? `/l/${encodeURIComponent(token)}/item/${itemId}` : '/cuentas'}?correccion=${r.ok ? 'ok' : r.reason}`)
+  }
+  return { error: errorDeCompra(r, p) }
 }
 
+/** monto: la parte que mostraba la pantalla (ver marcarPagado). */
 export async function markPaidAction(formData: FormData) {
   const userId = await usuarioRegalador()
-  await marcarPagado(db, str(formData, 'giftId') ?? '', str(formData, 'deudorId') ?? '', userId, str(formData, 'pagado') !== '0')
+  await marcarPagado(db, str(formData, 'giftId') ?? '', str(formData, 'deudorId') ?? '', userId, str(formData, 'pagado') !== '0', entero(formData, 'monto'))
   revalidarRegalo(formData)
 }
 
+/** neto: lo que decía el botón (ver saldarCon). */
 export async function settleUpAction(formData: FormData) {
-  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '')
+  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '', entero(formData, 'neto'))
   revalidarRegalo(formData)
 }
 

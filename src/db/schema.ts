@@ -135,7 +135,7 @@ export const notifications = pgTable('notifications', {
   userId: uuid('user_id').references(() => users.id),
   guestId: uuid('guest_id').references(() => guestIdentities.id),
   // regalo_encargo: ahora organiza un regalo grupal. regalo_cancelado: el regalo grupal en el que estaba se canceló.
-  // regalo_sacado: el encargado lo sacó del regalo grupal.
+  // regalo_sacado: el encargado lo sacó del regalo grupal. compra_corregida: el encargado corrigió la compra y le cambió la parte.
   // item_baja_comprado: ya lo había comprado y el dueño dijo "Ya no lo quiero". regalo_baja: estaba en un regalo grupal
   // abierto de un deseo que el dueño ya no quiere (el regalo se canceló); regalo_lo_tiene: el dueño dijo "Ya lo tengo" y el
   // regalo sigue abierto para dividirlo o cancelarlo desde Cuentas. Cuando el dueño lo vuelve a poner: item_vuelve, se le
@@ -143,7 +143,7 @@ export const notifications = pgTable('notifications', {
   tipo: text('tipo', {
     enum: [
       'item_baja', 'item_editado', 'regalo_encargo', 'regalo_cancelado', 'item_baja_comprado', 'regalo_baja', 'regalo_lo_tiene',
-      'item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'regalo_sacado',
+      'item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'regalo_sacado', 'compra_corregida',
     ],
   }).notNull(),
   itemId: uuid('item_id').notNull().references(() => items.id),
@@ -161,6 +161,8 @@ export const groupGifts = pgTable('group_gifts', {
   estado: text('estado', { enum: ['abierto', 'comprado', 'cancelado'] }).notNull().default('abierto'),
   montoTotal: integer('monto_total'), // pesos; se fija al comprar
   compradoAt: timestamp('comprado_at', { withTimezone: true }),
+  // el encargado dijo "Sigue en pie" al recordatorio de cerrarlo: el próximo cuenta desde acá (ver regalosParaCerrar)
+  recordatorioAt: timestamp('recordatorio_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -172,6 +174,14 @@ export const groupGiftMembers = pgTable('group_gift_members', {
   pagadoAt: timestamp('pagado_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.giftId, t.userId] }), index('group_gift_members_user_id_idx').on(t.userId)])
+
+// A quién sacó el encargado de un regalo grupal: no se vuelve a sumar con un toque (ver sacarDeRegalo), salvo que el
+// encargado lo deje volver. Aparte de los miembros: el que sacan no está en el regalo, para ninguna cuenta ni vista.
+export const groupGiftSacados = pgTable('group_gift_sacados', {
+  giftId: uuid('gift_id').notNull().references(() => groupGifts.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.giftId, t.userId] })])
 
 // Configuración que genera la app sola (las claves VAPID de los avisos push): nadie las carga a mano.
 export const config = pgTable('config', {

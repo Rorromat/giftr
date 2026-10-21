@@ -92,6 +92,13 @@
       "when": 1792596394371,
       "tag": "0012_limpiar_regalos_repetidos",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792601983248,
+      "tag": "0013_regalo_sacados_y_recordatorio",
+      "breakpoints": true
     }
   ]
 }

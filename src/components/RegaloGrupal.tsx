@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { signIn } from '@/auth'
 import {
-  cancelGroupGiftAction, joinGroupGiftAction, leaveGroupGiftAction, markPaidAction, removeGroupGiftMemberAction, startGroupGiftAction,
+  cancelGroupGiftAction, joinGroupGiftAction, leaveGroupGiftAction, letBackGroupGiftMemberAction, markPaidAction, removeGroupGiftMemberAction,
+  startGroupGiftAction,
 } from '@/app/actions'
 import { juntarNombres } from '@/lib/groups'
 import { pesos } from '@/lib/pesos'
@@ -13,11 +14,16 @@ import { AvatarStack, Icon } from '@/components/ui'
 
 type Ctx = { token: string; itemId: string }
 
-function Ocultos({ token, itemId, giftId }: Ctx & { giftId?: string }) {
+/** Sin token ni deseo (desde Cuentas, que no pasa el link de la lista), solo vuelve a armar Cuentas. */
+function Ocultos({ token, itemId, giftId }: Partial<Ctx> & { giftId?: string }) {
   return (
     <>
-      <input type="hidden" name="token" value={token} />
-      <input type="hidden" name="itemId" value={itemId} />
+      {token && itemId && (
+        <>
+          <input type="hidden" name="token" value={token} />
+          <input type="hidden" name="itemId" value={itemId} />
+        </>
+      )}
       {giftId && <input type="hidden" name="giftId" value={giftId} />}
     </>
   )
@@ -53,27 +59,82 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
 
 const linkSubrayado = 'flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden'
 
-/** Para el encargado mientras está abierto: sacar a alguien que se sumó por error (se le avisa). */
-function SacarDelRegalo({ regalo, token, itemId }: Ctx & { regalo: RegaloView }) {
+/**
+ * Para el encargado mientras está abierto: sacar a alguien que se sumó por error (se le avisa y no se vuelve a sumar solo),
+ * y dejar volver a uno que sacó. En el deseo, o desde Cuentas (sin token ni deseo) si no lo puede terminar ahí.
+ */
+export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partial<Ctx> & {
+  giftId: string
+  /** Los que se sumaron, sin el encargado. */
+  otros: { userId: string; nombre: string }[]
+  sacados: { id: string; nombre: string }[]
+}) {
+  if (!otros.length && !sacados.length) return null
+  const fila = 'flex min-h-12 items-center justify-between gap-2 py-1'
   return (
     <details className="group flex flex-col">
       <summary className={linkSubrayado}>¿Se sumó alguien que no va?</summary>
       <div className="mt-1 flex flex-col gap-1 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
-        <p className="text-[13px] font-medium leading-snug">Si lo sacás, no entra en la división y le avisamos que ya no está.</p>
-        <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
-          {regalo.miembros.filter((m) => !m.esEncargado).map((m) => (
-            <li key={m.userId} className="flex min-h-12 items-center justify-between gap-2 py-1">
-              <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
-              <form action={removeGroupGiftMemberAction}>
-                <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
-                <input type="hidden" name="miembroId" value={m.userId} />
-                <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">Sacar</BotonEnviar>
-              </form>
-            </li>
-          ))}
-        </ul>
+        {otros.length > 0 && (
+          <>
+            <p className="text-[13px] font-medium leading-snug">
+              Si lo sacás, no entra en la división, le avisamos que ya no está y no se puede volver a sumar, salvo que lo dejes.
+            </p>
+            <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+              {otros.map((m) => (
+                <li key={m.userId} className={fila}>
+                  <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
+                  <form action={removeGroupGiftMemberAction}>
+                    <Ocultos token={token} itemId={itemId} giftId={giftId} />
+                    <input type="hidden" name="miembroId" value={m.userId} />
+                    <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">Sacar</BotonEnviar>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {sacados.length > 0 && (
+          <>
+            <p className="text-[13px] font-medium leading-snug">Los que sacaste. Si fue sin querer, dejalos volver y se pueden sumar de nuevo.</p>
+            <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+              {sacados.map((m) => (
+                <li key={m.id} className={fila}>
+                  <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
+                  <form action={letBackGroupGiftMemberAction}>
+                    <Ocultos token={token} itemId={itemId} giftId={giftId} />
+                    <input type="hidden" name="miembroId" value={m.id} />
+                    <BotonEnviar className="min-h-11 px-1 text-[13px] font-bold underline underline-offset-2">Dejar que vuelva</BotonEnviar>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </details>
+  )
+}
+
+const CORRECCION: Record<string, string> = {
+  ok: 'Listo, corregiste la compra. Al que le cambió la parte le avisamos.',
+  ya_pagaron: 'No se corrigió: alguien ya figura como que te pagó. Para corregir, primero deshacé ese pago.',
+  nada_que_corregir: 'No se corrigió: ya nadie te debe nada de ese regalo.',
+}
+
+/**
+ * Cómo salió "Corregir la compra" (?correccion=, ver fixGroupGiftAction): el formulario ya no está para decirlo. cerrar: la
+ * misma página sin el cartel, que si no queda en la dirección y vuelve con cada cambio.
+ */
+export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: string }) {
+  if (!motivo || !Object.hasOwn(CORRECCION, motivo)) return null
+  return (
+    <div role="status" className="flex items-start gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent py-1.5 pl-3.5 pr-1.5 text-sm font-semibold shadow-sticker-sm">
+      <p className="flex-1 py-1.5">{CORRECCION[motivo]}</p>
+      <Link href={cerrar} replace scroll={false} aria-label="Cerrar" className="-my-1 flex size-11 flex-none items-center justify-center">
+        <Icon name="close" size={16} strokeWidth={3} />
+      </Link>
+    </div>
   )
 }
 
@@ -88,6 +149,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
   ocupado?: string | null
 }) {
+  // al que sacó el encargado no se le ofrece volver con un toque (ver sumarseARegalo)
+  const noSeSuma = regalo.meSacaron
+    ? `${regalo.encargado.nombre} te sacó de este regalo. Si vas a poner, hablalo: te puede dejar volver.`
+    : ocupado
   const n = regalo.miembros.length
   const nombres = regalo.miembros.map((m) => (m.esYo ? 'vos' : m.nombre))
   const encargado = regalo.soyEncargado ? 'Lo organizás vos' : `Lo organiza ${regalo.encargado.nombre}`
@@ -126,10 +191,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
             {n === 1 ? `Por ahora ${nombres[0] === 'vos' ? 'estás solo vos' : `está ${nombres[0]}`}.` : `Están ${juntarNombres(nombres)}.`}
             {precio && (regalo.soyParte
               ? ` Si quedan así, sale ~${pesos(Math.ceil(precio / n))} cada uno.`
-              : !ocupado && ` Si te sumás, son ${n + 1}: ~${pesos(Math.ceil(precio / (n + 1)))} cada uno.`)}
+              : !noSeSuma && ` Si te sumás, son ${n + 1}: ~${pesos(Math.ceil(precio / (n + 1)))} cada uno.`)}
           </p>
 
-          {!regalo.soyParte && (ocupado ? <p className="text-xs font-semibold leading-snug text-gr-muted">{ocupado}</p> : logueado ? (
+          {!regalo.soyParte && (noSeSuma ? <p className="text-xs font-semibold leading-snug text-gr-muted">{noSeSuma}</p> : logueado ? (
             <form action={joinGroupGiftAction}>
               <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
               <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Me sumo</BotonEnviar>
@@ -163,7 +228,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
               </details>
-              {n > 1 && <SacarDelRegalo regalo={regalo} token={token} itemId={itemId} />}
+              <SacarDelRegalo giftId={regalo.id} token={token} itemId={itemId} sacados={regalo.sacados}
+                              otros={regalo.miembros.filter((m) => !m.esEncargado)} />
               {/* cancelarlo suelta el deseo (también si antes era una reserva suya): que no lo descubra después */}
               <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction}
                          ocultos={{ token, itemId, giftId: regalo.id }}>
@@ -195,6 +261,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                       <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
                       <input type="hidden" name="deudorId" value={m.userId} />
                       <input type="hidden" name="pagado" value={m.pagado ? '0' : '1'} />
+                      {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
+                      <input type="hidden" name="monto" value={m.monto ?? 0} />
                       <button className={m.pagado ? 'min-h-11 px-1 text-xs font-bold underline underline-offset-2'
                         : 'gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold'}>
                         {m.pagado ? 'Deshacer' : m.esYo ? 'Ya le pagué' : 'Me pagó'}

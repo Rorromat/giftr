@@ -9,7 +9,8 @@ const TEXTOS = {
   item_editado: (t: string) => `"${t}" fue editado por su dueño — revisá los detalles.`,
   regalo_encargo: (t: string) => `Ahora organizás vos el regalo grupal de "${t}" — cuando lo compres, dividí lo que salió (o cancelalo si ya no va).`,
   regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
-  regalo_sacado: (t: string) => `Ya no estás en el regalo grupal de "${t}": te sacó quien lo organiza — si fue un error, hablalo con esa persona.`,
+  regalo_sacado: (t: string) => `Ya no estás en el regalo grupal de "${t}": te sacó quien lo organiza — si fue un error, hablalo con esa persona, que te puede dejar volver.`,
+  compra_corregida: (t: string) => `Quien compró el regalo grupal de "${t}" corrigió la compra y te cambió la parte — fijate en Cuentas cuánto te toca.`,
   item_baja_comprado: (t: string) => `"${t}" salió de la lista porque ya no lo quiere — si todavía podés, cambialo por otra cosa.`,
   regalo_baja: (t: string) => `"${t}" fue dado de baja por su dueño y se canceló el regalo grupal — si ya lo habían comprado, arréglenlo entre ustedes; si no, elijan otro regalo.`,
   regalo_lo_tiene: (t: string) => `"${t}" salió de la lista porque ya lo tiene — el regalo grupal sigue en Cuentas: si ya lo compraron, el que lo organiza divide lo que salió; si no, lo cancela.`,
@@ -72,6 +73,8 @@ function tieneElLinkSql(db: Db, viewer: Viewer) {
   return or(isNull(lists.shareTokenAt), despues)
 }
 
+const A_CUENTAS = new Set<string>(['regalo_lo_tiene', 'compra_corregida'])
+
 export async function getUnreadNotifications(db: Db, viewer: Viewer) {
   if (!viewer.userId && !viewer.guestId) return []
   const filas = await db.select({
@@ -84,8 +87,8 @@ export async function getUnreadNotifications(db: Db, viewer: Viewer) {
   return filas.map(({ itemId, token, activo, conLink, ...n }) => ({
     ...n,
     // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro. El regalo
-    // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista)
-    href: n.tipo === 'regalo_lo_tiene' ? '/cuentas' : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
+    // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista), y una parte corregida se ve ahí
+    href: A_CUENTAS.has(n.tipo) ? '/cuentas' : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
   }))
 }
 

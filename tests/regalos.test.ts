@@ -12,8 +12,9 @@ import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList 
 import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
 import { guardarCumple, hoyLocal, misEventos, seguirLista } from '@/lib/events'
 import {
-  cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dividir, historialDeLista, iniciarRegaloGrupal, marcarPagado,
-  misCuentas, parsePesos, pesos, regalosDeItem, regalosParaCerrar, sacarDeRegalo, salirDeRegalo, saldarCon, sumarseARegalo, ultimosRegalos,
+  cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dejarVolverARegalo, dividir, historialDeLista, iniciarRegaloGrupal,
+  marcarPagado, misCuentas, parsePesos, pesos, posponerRecordatorio, regalosDeItem, regalosParaCerrar, sacarDeRegalo, salirDeRegalo, saldarCon,
+  sumarseARegalo, ultimosRegalos,
 } from '@/lib/regalos'
 import { partePesos } from '@/lib/pesos'
 
@@ -447,6 +448,8 @@ test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni hist
   // ni corrige, ni saca a nadie, ni le llegan carteles de regalos para cerrar
   expect(await corregirCompra(db, giftId, mama.id, { total: 10 })).toEqual({ ok: false, reason: 'no_permitido' })
   expect(await sacarDeRegalo(db, giftId, sofi.id, mama.id)).toBe(false)
+  expect(await dejarVolverARegalo(db, giftId, sofi.id, mama.id)).toBe(false)
+  expect(await posponerRecordatorio(db, giftId, mama.id)).toBe(false)
   expect(await comprasParaCorregir(db, mama.id)).toEqual([])
   expect(await regalosParaCerrar(db, mama.id)).toEqual([])
   expect((await ultimosRegalos(db, mama.id, [lista.id])).size).toBe(0)
@@ -659,8 +662,16 @@ test.each([
   ['$45,000', 45000], ['45 mil', 45000], ['2 x $10.000', 10000], ['$90.000 aprox.', 90000],
   // el ejemplo del rango que sugiere el formulario: la "k" vale para los dos números
   ['$10–30k', 10000], ['$10 a 30 mil', 10000], ['$500 - 2k', 500],
-  ['US$ 300', null], ['USD 300', null], ['U$S 300', null], ['u$d 300', null], ['€ 50', null], ['50 euros', null],
-  ['-$5.000', null], ['$ -5000', null], ['', null], ['   ', null],
+  // "lucas" son miles; sin "$", en "2 x 45.000" el primero es cuántos (pero "100 x 2" son 100)
+  ['15 lucas', 15000], ['$20 lucas', 20000], ['1 luca', 1000], ['entre 10 y 15 lucas', 10000],
+  ['2 x 45.000', 45000], ['2x45.000', 45000], ['45.000 x 2', 45000], ['100 x 2', 100], ['$100 x 2', 100],
+  // los miles escritos solo en el de arriba valen para los dos, si así queda más chico
+  ['$20-30.000', 20000], ['$2-3.000.000', 2000000], ['$500-1.500', 500], ['$20.000 - $30.000', 20000],
+  // un guion entre palabras no es un menos
+  ['Talle M - $30.000', 30000], ['Modelo XR-500, $80.000', 80000], ['Aprox. – $20.000', 20000],
+  ['US$ 300', null], ['USD 300', null], ['U$S 300', null], ['u$d 300', null], ['€ 50', null], ['50 euros', null], ['R$ 100', null],
+  ['AR$ 100', 100],
+  ['-$5.000', null], ['$ -5000', null], ['- 5000', null], ['aprox -5000', null], ['', null], ['   ', null],
 ] as const)('pesos: "%s" → %s', (texto, esperado) => {
   expect(parsePesos(texto)).toBe(esperado)
 })
@@ -786,6 +797,128 @@ test('si el deseo salió de la lista (se lo dieron), el encargado corrige la com
   expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
 })
 
+test('si nadie le debe nada al encargado, no hay compra para corregir (ni queda para siempre en Cuentas)', async () => {
+  const { db, mama, rodri, sofi, bici, perfume } = await setup()
+  // la bici: Rodri lo armó, no se sumó nadie y la compró solo
+  const solo = await iniciarRegaloGrupal(db, bici.id, rodri.id)
+  if (!solo.ok) throw new Error(solo.reason)
+  await comprarRegalo(db, solo.giftId, rodri.id, { total: 90000 })
+  // el perfume: Sofi se sumó, pero al final no puso ("A mano", en 0)
+  const tele = await iniciarRegaloGrupal(db, perfume.id, rodri.id)
+  if (!tele.ok) throw new Error(tele.reason)
+  await sumarseARegalo(db, tele.giftId, sofi.id)
+  await comprarRegalo(db, tele.giftId, rodri.id, { total: 50000, partes: { [rodri.id]: 50000, [sofi.id]: 0 } })
+  for (const itemId of [bici.id, perfume.id]) expect((await regalosDeItem(db, itemId, { userId: rodri.id }))[0].corregible).toBe(false)
+  // una parte en 0 que figuraba saldada no se vuelve deuda meses después
+  expect(await corregirCompra(db, tele.giftId, rodri.id, { total: 50000, partes: { [rodri.id]: 25000, [sofi.id]: 25000 } }))
+    .toEqual({ ok: false, reason: 'nada_que_corregir' })
+  expect(await corregirCompra(db, solo.giftId, rodri.id, { total: 9000 })).toEqual({ ok: false, reason: 'nada_que_corregir' })
+  // se los dieron en el cumple: Cuentas sigue vacía
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  await archiveItem(db, perfume.id, mama.id, 'lo_tengo')
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
+  expect(await misCuentas(db, rodri.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect((await misCuentas(db, sofi.id)).personas).toEqual([])
+})
+
+test('corregir la compra le avisa a quien le cambió la parte (y a nadie más)', async () => {
+  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  const todos = [rodri.id, sofi.id, ana.id]
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000, partes: { [rodri.id]: 50000, [sofi.id]: 40000, [ana.id]: 0 } })
+  // la parte de Ana estaba en la fila de Sofi: con alguien que debe, se corrige, y Ana se entera de que ahora debe
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 50000, [sofi.id]: 20000, [ana.id]: 20000 } }))
+    .toEqual({ ok: true })
+  for (const u of [sofi, ana]) {
+    expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([
+      expect.objectContaining({ tipo: 'compra_corregida', itemTitulo: 'Bici', href: '/cuentas' }),
+    ])
+    await markNotificationsRead(db, { userId: u.id })
+  }
+  expect(await getUnreadNotifications(db, { userId: rodri.id })).toEqual([])
+  expect(await getUnreadNotifications(db, { userId: mama.id })).toEqual([])
+  expect((await misCuentas(db, ana.id)).debes).toBe(20000)
+  // solo el total (la parte de Rodri): a ellas no les cambia nada
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 80000, miembros: todos, partes: { [rodri.id]: 40000, [sofi.id]: 20000, [ana.id]: 20000 } }))
+    .toEqual({ ok: true })
+  for (const u of [sofi, ana]) expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([])
+  expect((await regalosDeItem(db, bici.id, { userId: sofi.id }))[0].montoTotal).toBe(80000)
+})
+
+test('en una idea que se puede repetir, la compra de un evento anterior que nadie pagó se corrige desde Cuentas', async () => {
+  const { db, mama, rodri, sofi } = await setup()
+  const medias = (await createItem(db, mama.id, { tipo: 'idea', titulo: 'Medias', repetible: true }))!
+  const r = await iniciarRegaloGrupal(db, medias.id, rodri.id)
+  if (!r.ok) throw new Error(r.reason)
+  await sumarseARegalo(db, r.giftId, sofi.id)
+  await comprarRegalo(db, r.giftId, rodri.id, { total: 900000 }) // un cero de más
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([]) // se corrige en el deseo
+  // fue para el cumple pasado: el deseo ya no lo muestra (ver regalosDeItem), y Sofi le sigue debiendo
+  const antes = new Date(Date.now() - 395 * DIA)
+  const [gift] = await db.update(groupGifts).set({ compradoAt: antes }).where(eq(groupGifts.id, r.giftId)).returning()
+  await db.update(claims).set({ updatedAt: antes }).where(eq(claims.id, gift.claimId))
+  expect(await regalosDeItem(db, medias.id, { userId: rodri.id })).toEqual([])
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([expect.objectContaining({ giftId: r.giftId, itemTitulo: 'Medias', total: 900000 })])
+  expect(await corregirCompra(db, r.giftId, rodri.id, { total: 90000, miembros: [rodri.id, sofi.id] })).toEqual({ ok: true })
+  expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
+})
+
+test('"Ya le pagué" o "Saldar todo" justo cuando corrigen la compra no marcan pagada una parte que no vieron', async () => {
+  const { db, rodri, sofi, ana, giftId } = await conRegalo()
+  const todos = [rodri.id, sofi.id, ana.id]
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  // Sofi veía $30.000; Rodri la corrigió a $45.000 antes de que tocara
+  await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: { [rodri.id]: 15000, [sofi.id]: 45000, [ana.id]: 30000 } })
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 30000)).toBe(false)
+  expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)).toBe(true)
+  // "Me pagó todo ($30.000)" de Ana, con la parte ya en $20.000: no salda; con lo que dice ahora, sí
+  const nuevas = { [rodri.id]: 25000, [sofi.id]: 45000, [ana.id]: 20000 }
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: nuevas })).toEqual({ ok: false, reason: 'ya_pagaron' })
+  await marcarPagado(db, giftId, sofi.id, rodri.id, false)
+  expect(await corregirCompra(db, giftId, rodri.id, { total: 90000, miembros: todos, partes: nuevas })).toEqual({ ok: true })
+  expect(await saldarCon(db, rodri.id, ana.id, 30000)).toBe(0)
+  expect((await misCuentas(db, ana.id)).debes).toBe(20000)
+  expect(await saldarCon(db, rodri.id, ana.id, 20000)).toBe(1)
+  // desde el lado del que debe, el neto es negativo
+  expect(await saldarCon(db, sofi.id, rodri.id, -45000)).toBe(1)
+  expect((await misCuentas(db, rodri.id)).personas).toEqual([])
+})
+
+test('al que sacó el encargado no vuelve a sumarse con un toque: lo deja volver el encargado', async () => {
+  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(true)
+  expect(await sumarseARegalo(db, giftId, ana.id)).toBe(false)
+  // la pantalla no le ofrece "Me sumo", y el encargado ve a quién sacó (los demás, no)
+  expect((await regalosDeItem(db, bici.id, { userId: ana.id }))[0]).toMatchObject({ soyParte: false, meSacaron: true, sacados: [] })
+  expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0]).toMatchObject({ meSacaron: false, sacados: [{ id: ana.id, nombre: 'Ana' }] })
+  expect((await regalosDeItem(db, bici.id, { userId: sofi.id }))[0]).toMatchObject({ meSacaron: false, sacados: [] })
+  // se lo sacaron por error: solo el encargado lo deja volver, y ella se vuelve a sumar
+  expect(await dejarVolverARegalo(db, giftId, ana.id, sofi.id)).toBe(false)
+  expect(await dejarVolverARegalo(db, giftId, ana.id, rodri.id)).toBe(true)
+  expect((await regalosDeItem(db, bici.id, { userId: ana.id }))[0].meSacaron).toBe(false)
+  expect(await sumarseARegalo(db, giftId, ana.id)).toBe(true)
+  // si la vuelve a sacar, no ve cuánto puso cada uno al comprarse
+  expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(true)
+  expect(await sumarseARegalo(db, giftId, ana.id)).toBe(false)
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: [rodri.id, sofi.id] })
+  const [comprado] = await regalosDeItem(db, bici.id, { userId: ana.id })
+  expect(comprado).toMatchObject({ estado: 'comprado', soyParte: false, montoTotal: null, meSacaron: false })
+  expect(comprado.miembros.map((m) => [m.nombre, m.monto])).toEqual([['Rodri', null], ['Sofi', null]])
+  expect(await dejarVolverARegalo(db, giftId, ana.id, rodri.id)).toBe(false) // ya no está abierto
+  // en Cuentas, si el encargado lo termina desde ahí (Mamá dijo "Ya lo tengo"), también ve a quién sacó
+  const otro = (await createItem(db, mama.id, { tipo: 'exacto', titulo: 'Casco' }))!
+  const g = await iniciarRegaloGrupal(db, otro.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  await sumarseARegalo(db, g.giftId, ana.id)
+  await sacarDeRegalo(db, g.giftId, ana.id, rodri.id)
+  await archiveItem(db, otro.id, mama.id, 'lo_tengo')
+  const [enCurso] = (await misCuentas(db, rodri.id)).enCurso
+  expect(enCurso).toMatchObject({ itemTitulo: 'Casco', sacados: [{ id: ana.id, nombre: 'Ana' }] })
+  expect(enCurso.dividirCon!.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi'])
+  expect((await misCuentas(db, sofi.id)).enCurso[0].sacados).toEqual([])
+})
+
 test('cuentas: con alguien a mano los totales dan 0, pero las partes siguen ahí para marcarlas saldadas', async () => {
   const { db, rodri, sofi, bici, perfume } = await setup()
   const comprado = async (itemId: string, encargado: string, otro: string) => {
@@ -827,4 +960,28 @@ test('un regalo grupal no vence solo, pero al que lo organiza se le recuerda cer
   expect(await regalosParaCerrar(db, sofi.id)).toEqual([expect.objectContaining({ itemTitulo: 'Perfume', href: '/cuentas' })])
   expect(await cancelarRegalo(db, p.giftId, sofi.id)).toBe(true)
   expect(await regalosParaCerrar(db, sofi.id)).toEqual([])
+})
+
+test('el recordatorio de cerrar un regalo grupal espera al evento, y "Sigue en pie" lo saca por 2 semanas', async () => {
+  const { db, mama, rodri, sofi, giftId } = await conRegalo()
+  // el cumple de Mamá es en 3 meses: a las 2 semanas de armarlo todavía no
+  const en90 = new Date(hoyLocal().getTime() + 90 * DIA)
+  await guardarCumple(db, mama.id, en90.getUTCDate(), en90.getUTCMonth() + 1)
+  await db.update(groupGifts).set({ createdAt: new Date(Date.now() - 15 * DIA) }).where(eq(groupGifts.id, giftId))
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  // ya a 2 días del cumple, sí
+  const enDos = new Date(hoyLocal().getTime() + 2 * DIA)
+  await guardarCumple(db, mama.id, enDos.getUTCDate(), enDos.getUTCMonth() + 1)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([expect.objectContaining({ giftId, itemTitulo: 'Bici' })])
+  // "Sigue en pie": solo el encargado, y vuelve a las 2 semanas
+  expect(await posponerRecordatorio(db, giftId, sofi.id)).toBe(false)
+  expect(await posponerRecordatorio(db, giftId, rodri.id)).toBe(true)
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  await db.update(groupGifts).set({ recordatorioAt: new Date(Date.now() - 13 * DIA) }).where(eq(groupGifts.id, giftId))
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([])
+  await db.update(groupGifts).set({ recordatorioAt: new Date(Date.now() - 15 * DIA) }).where(eq(groupGifts.id, giftId))
+  expect(await regalosParaCerrar(db, rodri.id)).toEqual([expect.objectContaining({ giftId })])
+  // uno comprado no se pospone
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  expect(await posponerRecordatorio(db, giftId, rodri.id)).toBe(false)
 })

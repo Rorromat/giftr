@@ -7,7 +7,7 @@ import { boughtAction, commentAction, releaseAction, unboughtAction } from '@/ap
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
-import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
+import { ArmarRegaloGrupal, CartelCorreccion, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
@@ -46,9 +46,9 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
-  searchParams: Promise<{ reserva?: string }>
+  searchParams: Promise<{ reserva?: string; correccion?: string }>
 }) {
-  const [{ token, itemId }, { reserva }] = await Promise.all([params, searchParams])
+  const [{ token, itemId }, { reserva, correccion }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
@@ -126,6 +126,7 @@ export default async function DetalleItem({ params, searchParams }: {
             : detalle.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
               : <QuienSos token={token} volver={aqui} />)}
         <CartelReserva motivo={reserva} veTodo={!!giver} conNombre={identified} />
+        {giver && <CartelCorreccion motivo={correccion} cerrar={aqui} />}
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">

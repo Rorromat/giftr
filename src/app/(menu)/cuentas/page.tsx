@@ -7,6 +7,7 @@ import {
 } from '@/lib/regalos'
 import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
@@ -27,6 +28,8 @@ function Linea({ l }: { l: LineaCuenta }) {
         <input type="hidden" name="giftId" value={l.giftId} />
         <input type="hidden" name="deudorId" value={l.deudorId} />
         <input type="hidden" name="pagado" value="1" />
+        {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
+        <input type="hidden" name="monto" value={l.monto} />
         <button className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</button>
       </form>
     </li>
@@ -51,6 +54,8 @@ function Persona({ p }: { p: CuentaPersona }) {
       {p.lineas.length > 1 && (
         <form action={settleUpAction}>
           <input type="hidden" name="otroId" value={p.id} />
+          {/* lo que dice el botón: si cambió mientras tanto, no salda nada */}
+          <input type="hidden" name="neto" value={p.neto} />
           <button className={`${leDebo ? 'gr-btn-primary' : 'gr-btn font-sans font-bold'} gr-btn--sm mt-1 w-full`}>
             {p.neto === 0 ? 'Marcar todo como saldado' : leDebo ? `Ya le pagué todo (${pesos(-p.neto)})` : `Me pagó todo (${pesos(p.neto)})`}
           </button>
@@ -83,7 +88,7 @@ function MeBajo({ giftId }: { giftId: string }) {
 /**
  * Un regalo abierto que no se puede terminar en el deseo: lo sacaron de la lista ("Ya lo tengo": quizás ya se lo dieron)
  * o cambiaron el link y no lo tiene. Lo que haría en el deseo lo hace desde acá, sin pasar por la lista: el encargado lo
- * compra o lo cancela; los demás se pueden bajar.
+ * compra, saca a alguien que se sumó por error o lo cancela; los demás se pueden bajar.
  */
 function DesdeAca({ r }: { r: RegaloEnCurso }) {
   if (r.dividirCon) {
@@ -102,6 +107,7 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
             <CompraGrupalForm giftId={r.giftId} miembros={r.dividirCon} sugerido={null} />
           </div>
         </details>
+        <SacarDelRegalo giftId={r.giftId} otros={r.dividirCon.filter((m) => !m.esYo)} sacados={r.sacados} />
         <CancelarRegalo giftId={r.giftId} />
       </div>
     )
@@ -141,7 +147,8 @@ function Corregir({ c }: { c: CompraParaCorregir }) {
   )
 }
 
-export default async function Cuentas() {
+export default async function Cuentas({ searchParams }: { searchParams: Promise<{ correccion?: string }> }) {
+  const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
@@ -167,6 +174,8 @@ export default async function Cuentas() {
           <span className="font-display text-[28px] leading-none font-extrabold tabular-nums">{pesos(c.teDeben)}</span>
         </div>
       </div>
+
+      <CartelCorreccion motivo={correccion} cerrar="/cuentas" />
 
       {vacio && (
         <div className="relative mt-2 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">

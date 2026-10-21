@@ -3,7 +3,7 @@ import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getMyClaimWarnings } from '@/lib/claims'
 import { regalosParaCerrar } from '@/lib/regalos'
-import { markNotifsReadAction, vistoCodazosAction } from '@/app/actions'
+import { markNotifsReadAction, postponeGroupGiftReminderAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
@@ -74,14 +74,20 @@ export async function Banners() {
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </QuizasLink>
       ))}
-      {/* un regalo grupal no vence solo (tiene gente adentro): al que lo organiza se le recuerda que lo cierre */}
+      {/* Un regalo grupal no vence solo (tiene gente adentro): al que lo organiza se le recuerda que lo cierre. Si todavía
+          no es momento, "Sigue en pie" lo saca por 2 semanas. */}
       {sinCerrar.map((r) => (
-        <Link key={r.giftId} href={r.href}
-              className="relative block rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
-          {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
-          <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
+        <div key={r.giftId} className="relative rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink pb-1 pl-3.5 pr-12 pt-3 text-sm font-medium text-gr-bg">
+          <Link href={r.href} className="block">
+            {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
+            <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
+          </Link>
+          <form action={postponeGroupGiftReminderAction}>
+            <input type="hidden" name="giftId" value={r.giftId} />
+            <button className="min-h-11 text-xs font-bold text-gr-accent underline decoration-2 underline-offset-4">Sigue en pie: recordámelo en 2 semanas</button>
+          </form>
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
-        </Link>
+        </div>
       ))}
       {notifs.length > 0 && (
         <form action={markNotifsReadAction}>

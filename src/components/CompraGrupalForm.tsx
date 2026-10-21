@@ -15,7 +15,8 @@ const conPuntos = (v: string) => (v ? pesos(Number(v)).slice(1) : '')
  * Manda con quiénes vio la división: si mientras tanto se sumó o se bajó alguien, el servidor le pide que la revise. Si no
  * sale, el mensaje queda acá, con lo cargado.
  * Sin token ni deseo (desde Cuentas, cuando no tiene el link de la lista), solo vuelve a armar Cuentas.
- * corregir: la compra ya hecha, para cambiar el total o las partes (arranca con las de ahora).
+ * corregir: la compra ya hecha, para cambiar el total o las partes (arranca con las de ahora). Cómo salió va en la página
+ * si el formulario se va (ver fixGroupGiftAction).
  */
 export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, corregir }: {
   giftId: string
@@ -32,6 +33,8 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
     dividir(corregir.total, miembros.length).some((m, i) => m !== corregir.partes[miembros[i].userId]))
   const [partes, setPartes] = useState<Record<string, string>>(() =>
     (corregir ? Object.fromEntries(miembros.map((m) => [m.userId, String(corregir.partes[m.userId] ?? 0)])) : {}))
+  // controlada como lo demás: al terminar la acción React vuelve el formulario a lo de entrada, también si salió con error
+  const [nota, setNota] = useState(corregir?.nota ?? '')
 
   const totalN = parsePesos(total) ?? 0
   const iguales = totalN ? dividir(totalN, miembros.length) : miembros.map(() => 0)
@@ -100,7 +103,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
           : `Te pasaste ${pesos(-diferencia)} del total.`}
       </p>
 
-      <input name="nota" placeholder="¿Qué compraste? (opcional)" defaultValue={corregir?.nota ?? ''} className="gr-input shadow-none" />
+      <input name="nota" placeholder="¿Qué compraste? (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} className="gr-input shadow-none" />
       <BotonEnviar disabled={!valido} pendiente="Guardando…" className="gr-btn-primary gr-btn--sm w-full">
         {corregir ? (valido ? `Guardar · dividir ${pesos(totalN)}` : 'Guardar') : valido ? `Lo compré · dividir ${pesos(totalN)}` : 'Lo compré'}
       </BotonEnviar>

@@ -6,7 +6,7 @@ import { groupGiftMembers, groupGifts, lists } from '@/db/schema'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createItem } from '@/lib/items'
 import { getUnreadNotifications } from '@/lib/notifications'
-import { comprarRegalo, iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo } from '@/lib/regalos'
+import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, misCuentas, regalosDeItem, sacarDeRegalo, sumarseARegalo } from '@/lib/regalos'
 
 // Las acciones del regalo grupal tal cual, con la base en PGlite y la sesión de Next simulada.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db, session: null as { userId: string } | null }))
@@ -18,7 +18,10 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
 }))
 
-import { buyGroupGiftAction, fixGroupGiftAction, removeGroupGiftMemberAction } from '@/app/actions'
+import {
+  buyGroupGiftAction, fixGroupGiftAction, joinGroupGiftAction, letBackGroupGiftMemberAction, markPaidAction, postponeGroupGiftReminderAction,
+  removeGroupGiftMemberAction, settleUpAction,
+} from '@/app/actions'
 
 /** Mamá pide una bici; Rodri arma el regalo y se suman Sofi y Caro. Rodri tiene la sesión. */
 async function preparar() {
@@ -89,11 +92,66 @@ test('corregir la compra desde el formulario, y sacar a alguien: siempre como el
 
   expect(await comprarRegalo(db, giftId, rodri.id, { total: 900000, miembros: [rodri.id, sofi.id] })).toEqual({ ok: true })
   expect((await misCuentas(db, sofi.id)).debes).toBe(450000)
-  // un cero de más: lo corrige
-  expect(await fixGroupGiftAction(null, compra({ giftId, modo: 'iguales', total: '90.000', nota: 'la roja' }, [rodri.id, sofi.id]))).toBeNull()
+  // un cero de más: lo corrige (desde Cuentas, sin token: vuelve ahí con cómo salió)
+  await expect(fixGroupGiftAction(null, compra({ giftId, modo: 'iguales', total: '90.000', nota: 'la roja' }, [rodri.id, sofi.id])))
+    .rejects.toMatchObject({ url: '/cuentas?correccion=ok' })
   expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
   // Sofi no corrige lo que compró Rodri
   h.session = { userId: sofi.id }
   expect((await fixGroupGiftAction(null, compra({ giftId, modo: 'iguales', total: '10' }, [rodri.id, sofi.id])))?.error).toBeTruthy()
   expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
+})
+
+// Rodri abre "Corregir la compra" y, mientras escribe, Sofi toca "Ya le pagué": al guardar, el formulario se va (ya no se
+// puede corregir), así que el porqué va en la página.
+test('si alguien pagó mientras corregía, la página dice que no se corrigió', async () => {
+  const { db, rodri, sofi, caro, lista, bici, giftId } = await preparar()
+  const todos = [rodri.id, sofi.id, caro.id]
+  await comprarRegalo(db, giftId, rodri.id, { total: 900000, miembros: todos })
+  await marcarPagado(db, giftId, sofi.id, sofi.id)
+  await expect(fixGroupGiftAction(null, compra({ giftId, token: lista.shareToken, itemId: bici.id, modo: 'iguales', total: '90.000' }, todos)))
+    .rejects.toMatchObject({ url: `/l/${lista.shareToken}/item/${bici.id}?correccion=ya_pagaron` })
+  expect((await misCuentas(db, caro.id)).debes).toBe(300000)
+  // lo que sigue con el formulario a la vista, en el formulario
+  await marcarPagado(db, giftId, sofi.id, rodri.id, false)
+  expect(await fixGroupGiftAction(null, compra({ giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '10', [`parte:${sofi.id}`]: '', [`parte:${caro.id}`]: '' }, todos)))
+    .toEqual({ error: 'Las partes suman $10: faltan $89.990 para llegar a $90.000.' })
+})
+
+test('"Ya le pagué" y "Saldar todo" mandan lo que se veía: si cambió, no marcan nada', async () => {
+  const { db, rodri, sofi, caro, giftId } = await preparar()
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: [rodri.id, sofi.id, caro.id] })
+  h.session = { userId: sofi.id }
+  const pago = (monto: string) => compra({ giftId, deudorId: sofi.id, pagado: '1', monto }, [])
+  await markPaidAction(pago('20000'))
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+  await markPaidAction(pago('30000'))
+  expect((await misCuentas(db, sofi.id)).debes).toBe(0)
+  // el encargado, "Me pagó todo" con Caro
+  h.session = { userId: rodri.id }
+  await settleUpAction(compra({ otroId: caro.id, neto: '45000' }, []))
+  expect((await misCuentas(db, caro.id)).debes).toBe(30000)
+  await settleUpAction(compra({ otroId: caro.id, neto: '30000' }, []))
+  expect((await misCuentas(db, caro.id)).debes).toBe(0)
+})
+
+test('dejar volver a uno que sacó y posponer el recordatorio: solo el encargado de la sesión', async () => {
+  const { db, rodri, sofi, caro, giftId } = await preparar()
+  await sacarDeRegalo(db, giftId, caro.id, rodri.id)
+  h.session = { userId: caro.id }
+  await joinGroupGiftAction(compra({ giftId }, []))
+  expect(await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).toHaveLength(2)
+  // Caro (ni Sofi) no se deja volver sola
+  await letBackGroupGiftMemberAction(compra({ giftId, miembroId: caro.id }, []))
+  h.session = { userId: sofi.id }
+  await letBackGroupGiftMemberAction(compra({ giftId, miembroId: caro.id }, []))
+  await postponeGroupGiftReminderAction(compra({ giftId }, []))
+  expect((await db.select().from(groupGifts).where(eq(groupGifts.id, giftId)))[0].recordatorioAt).toBeNull()
+  h.session = { userId: rodri.id }
+  await letBackGroupGiftMemberAction(compra({ giftId, miembroId: caro.id }, []))
+  await postponeGroupGiftReminderAction(compra({ giftId }, []))
+  expect((await db.select().from(groupGifts).where(eq(groupGifts.id, giftId)))[0].recordatorioAt).not.toBeNull()
+  h.session = { userId: caro.id }
+  await joinGroupGiftAction(compra({ giftId }, []))
+  expect(await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).toHaveLength(3)
 })
