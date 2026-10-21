@@ -71,13 +71,15 @@ export function textoDueno(i: { titulo: string }, url: string) {
 
 /**
  * ¿Se puede ir a buscar esta foto desde el servidor? Solo https a un host con nombre (nada de IPs,
- * localhost ni nombres internos): las fotos las carga cualquiera y no queremos pedidos a la red interna.
+ * localhost ni nombres internos, tampoco con un punto al final): las fotos las carga cualquiera y no queremos
+ * pedidos a la red interna. Esto mira el texto; al conectarse, bajarFoto revisa además a qué IP resuelve.
  */
 export function esFotoPublica(url: string): boolean {
   let u: URL
   try { u = new URL(url) } catch { return false }
   if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
-  const h = u.hostname.toLowerCase()
+  // "localhost." y "db.internal." son los mismos nombres que sin el punto
+  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
   if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
   if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
   return true
