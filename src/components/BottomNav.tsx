@@ -22,7 +22,8 @@ function seccionDe(path: string) {
 /**
  * Píldora negra flotante. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección:
  * el círculo verde es una pieza propia que se desliza con CSS hasta el destino, desde el toque mismo.
- * En Agregar se esconde: el + gira hasta ser una × y la barra baja mientras la hoja de agregar sube.
+ * En Agregar se esconde: el + gira hasta ser una × y la barra baja mientras la hoja de agregar sube
+ * (al editar un deseo también se esconde).
  */
 export function BottomNav() {
   const path = usePathname()
@@ -32,8 +33,8 @@ export function BottomNav() {
   if (toque && toque.desde !== path) setToque(null)
   const actual = seccionDe(path)
   const marcado = toque && toque.desde === path ? toque.href : actual
-  const oculta = marcado === '/agregar'
-  // En Agregar no hay columna marcada: el círculo se queda donde estaba mientras la barra baja.
+  const oculta = marcado === '/agregar' || path.startsWith('/editar/')
+  // En Agregar (o Editar) no hay columna marcada: el círculo se queda donde estaba mientras la barra baja.
   const columna = DESTINOS.find((d) => d.href === marcado)?.columna
   const [ultima, setUltima] = useState(columna)
   if (columna !== undefined && columna !== ultima) setUltima(columna)
