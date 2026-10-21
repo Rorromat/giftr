@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, hoyLocal, miCumple, misEventos, type Evento } from '@/lib/events'
-import { AvatarStack, BottomNav, Icon, ItemPhoto, Seccion, Starburst } from '@/components/ui'
+import { AvatarStack, Icon, ItemPhoto, Seccion, Starburst } from '@/components/ui'
 
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={150} />
@@ -138,8 +138,6 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
           <span className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Cargar</span>
         </Link>
       )}
-
-      <BottomNav active="eventos" />
     </Seccion>
   )
 }

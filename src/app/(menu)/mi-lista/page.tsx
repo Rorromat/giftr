@@ -7,7 +7,7 @@ import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { Banners } from '@/components/Banners'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { BottomNav, Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
+import { Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
 
 export default async function MiLista() {
   const session = await auth()
@@ -64,8 +64,6 @@ export default async function MiLista() {
         <Icon name="chat" size={20} strokeWidth={2.4} />
         Mandala por WhatsApp
       </a>
-
-      <BottomNav active="mi-lista" />
     </Seccion>
   )
 }

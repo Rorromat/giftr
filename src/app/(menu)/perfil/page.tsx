@@ -14,7 +14,7 @@ import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
-import { BottomNav, Icon, Seccion, Starburst } from '@/components/ui'
+import { Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
@@ -125,8 +125,6 @@ export default async function Perfil() {
           <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
         </div>
       </form>
-
-      <BottomNav active="perfil" />
     </Seccion>
   )
 }
