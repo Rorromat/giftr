@@ -5,7 +5,7 @@ import { claims, codazos, lists, pushSubs } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createGuest } from '@/lib/guest'
-import { crearGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem } from '@/lib/items'
 import {
   avisar, borrarSuscripcion, clavesVapid, codazosSinVer, CODAZOS_POR_DIA, guardarSuscripcion, mandarCodazo, marcarCodazosVistos,
@@ -91,6 +91,10 @@ test('en un grupo le llega a cada dueño; un invitado también puede, y hay tope
   expect(push.enviados[0].aviso).toMatchObject({ url: `/grupos/${grupoId}`, body: 'Quiere saber qué regalarles. Cargá cosas en "Nuestra casa".' })
   expect((await codazosSinVer(db, delfina.id))[0]).toMatchObject({ deNombre: 'Tía Marta', tipo: 'grupo', listaNombre: 'Nuestra casa' })
   expect((await mandarCodazo(db, grupo.shareToken, { guestId: invitada.id }, 'Tía Marta', push.enviar)).ok).toBe(false)
+  // si Martín sale del grupo, el cartel ya no le aparece (ese grupo ya no lo carga él) y los próximos no le llegan
+  expect(await codazosSinVer(db, martin.id)).toHaveLength(1)
+  await salirDeGrupo(db, grupoId, martin.id)
+  expect(await codazosSinVer(db, martin.id)).toEqual([])
 
   for (let i = 1; i < CODAZOS_POR_DIA; i++) {
     const u = await usuario(db, `Primo${i}`)
@@ -98,6 +102,7 @@ test('en un grupo le llega a cada dueño; un invitado también puede, y hay tope
   }
   const otro = await usuario(db, 'Uno más')
   expect(await mandarCodazo(db, grupo.shareToken, { userId: otro.id }, 'Uno más', push.enviar)).toEqual({ ok: false, reason: 'muchos' })
+  expect(await db.select().from(codazos).where(eq(codazos.paraUserId, martin.id))).toHaveLength(1)
 })
 
 test('EL TEST DE ORO, codazo: el aviso no dice nada de reservas ni de qué hay en la lista', async () => {

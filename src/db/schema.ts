@@ -68,7 +68,9 @@ export const listMembers = pgTable('list_members', {
   listId: uuid('list_id').notNull().references(() => lists.id),
   userId: uuid('user_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [primaryKey({ columns: [t.listId, t.userId] }), index('list_members_user_id_idx').on(t.userId)])
+  // Cuándo salió del grupo. La fila queda: ya no edita, pero sigue sin ver la capa oculta de lo que armó (ver acceso.ts).
+  salioAt: timestamp('salio_at', { withTimezone: true }),
+},(t) => [primaryKey({ columns: [t.listId, t.userId] }), index('list_members_user_id_idx').on(t.userId)])
 
 export const items = pgTable('items', {
   id: uuid('id').defaultRandom().primaryKey(),

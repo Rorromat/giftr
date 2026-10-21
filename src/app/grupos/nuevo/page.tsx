@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { createGroupAction } from '@/app/actions'
+import { ANIO_MAXIMO, ANIO_MINIMO } from '@/lib/groups'
 import { BackLink } from '@/components/ui'
 
 export default async function NuevoGrupo() {
@@ -31,7 +32,7 @@ export default async function NuevoGrupo() {
         </label>
         <div className="flex flex-col gap-2">
           <label htmlFor="fecha" className="gr-label">¿Hay una fecha? (opcional)</label>
-          <input id="fecha" name="fecha" type="date" className="gr-input" />
+          <input id="fecha" name="fecha" type="date" min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`} className="gr-input" />
           <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
             <input type="checkbox" name="anual" defaultChecked className="size-[22px] accent-gr-ink" /> Se repite todos los años (un cumple)
           </label>

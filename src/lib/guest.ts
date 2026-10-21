@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
-import { esDuenoSql } from '@/lib/groups'
+import { esOFueDuenoSql } from '@/lib/groups'
 import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
@@ -77,7 +77,7 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
  * Entró con Google en un navegador donde era invitado y confirmó que es esa persona ("Sí, soy yo"):
  * sus reservas, comentarios, avisos y codazos pasan a la cuenta, todo junto o nada, y las listas donde reservaba
  * pasan a ser de su gente (como si las hubiera abierto con sesión).
- * Lo que hizo sobre listas de las que la cuenta es dueña o co-dueña queda a nombre del invitado: nadie puede terminar
+ * Lo que hizo sobre listas de las que la cuenta es (o fue) dueña o co-dueña queda a nombre del invitado: nadie puede terminar
  * con reservas de sus propios deseos ni enterarse por un aviso. Lo que reservó ahí sin comprar se libera: unido y sin
  * cookie, nadie más lo podría liberar ni marcar comprado, y les trabaría el deseo a los que regalan de verdad
  * (al dueño no le cambia nada de lo que ve).
@@ -93,7 +93,7 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
       .where(and(eq(guestIdentities.id, guestId), isNull(guestIdentities.promotedToUserId)))
       .returning({ id: guestIdentities.id })
     if (!g) return false
-    const propias = t.select({ id: lists.id }).from(lists).where(esDuenoSql(t, userId))
+    const propias = t.select({ id: lists.id }).from(lists).where(esOFueDuenoSql(t, userId))
     const deseosPropios = t.select({ id: items.id }).from(items).where(inArray(items.listId, propias))
     const delInvitado = and(eq(claims.claimerGuestId, guestId), notInArray(claims.itemId, deseosPropios))
 

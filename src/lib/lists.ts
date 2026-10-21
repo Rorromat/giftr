@@ -1,12 +1,12 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
-import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
+import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { duenosDeLista, juntarNombres, type Dueno } from '@/lib/groups'
+import { duenosDeLista, esDuenoSql, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
-import { asegurarListaPropia } from '@/lib/users'
+import { asegurarListaPropia, newShareToken } from '@/lib/users'
 import { accesoALista, type MotivoAnonimo } from '@/lib/acceso'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
@@ -104,12 +104,30 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
   }
 }
 
+/**
+ * Un link para regalar nuevo (de la lista personal o de un grupo, cualquiera de sus dueños): el anterior deja de andar.
+ * También se olvida quién la seguía: Tu gente y Eventos arman el link con el token de ahora, así que si no, les pasarían
+ * el nuevo a todos los que tenían el viejo. Lo reservado queda como está. Devuelve el token nuevo, o null.
+ */
+export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: string): Promise<string | null> {
+  if (!esUuid(listId)) return null
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const [list] = await t.update(lists).set({ shareToken: newShareToken() })
+      .where(and(eq(lists.id, listId), esDuenoSql(t, userId)))
+      .returning({ shareToken: lists.shareToken })
+    if (!list) return null
+    await t.delete(listFollows).where(eq(listFollows.listId, listId))
+    return list.shareToken
+  })
+}
+
 /** La lista personal (si le faltaba, se crea). Null solo si el usuario no existe. */
 export async function getOwnList(db: Db, userId: string) {
   const list = await asegurarListaPropia(db, userId)
   if (!list) return null
   const rows = await db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt))
-  return { shareToken: list.shareToken, items: rows.map(pickItemFields) }
+  return { id: list.id, shareToken: list.shareToken, items: rows.map(pickItemFields) }
 }
 
 export type ItemDetail =

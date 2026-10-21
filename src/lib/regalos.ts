@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, ne, notInArray, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { reserveItem, type ReserveResult } from '@/lib/claims'
-import { esDuenoDeLista, noEsDuenoSql } from '@/lib/groups'
+import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
 
@@ -12,7 +12,8 @@ export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
 // Regalo grupal, a lo Splitwise: un encargado reserva el deseo y los demás se suman.
 // El encargado lo compra, pone cuánto salió y lo reparte; cada uno le debe su parte hasta que le paga.
-// Regla de la sorpresa: los dueños de la lista no pueden armarlo ni sumarse, y nada de esto llega a sus vistas.
+// Regla de la sorpresa: los dueños de la lista (también uno que salió del grupo) no pueden armarlo ni sumarse, y nada de
+// esto llega a sus vistas.
 
 export const MONTO_MAXIMO = 100_000_000
 
@@ -38,13 +39,6 @@ export type RegaloView = {
   montoTotal: number | null
 }
 
-async function regaloConLista(db: Db, giftId: string) {
-  const [row] = await db.select({ gift: groupGifts, listId: items.listId })
-    .from(groupGifts).innerJoin(items, eq(groupGifts.itemId, items.id))
-    .where(eq(groupGifts.id, giftId))
-  return row ?? null
-}
-
 export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult, { ok: true }>
 
 /**
@@ -54,9 +48,10 @@ export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult
 export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string): Promise<IniciarResult> {
   return db.transaction(async (tx): Promise<IniciarResult> => {
     const t = tx as unknown as Db
-    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno }).from(items).where(eq(items.id, itemId))
+    // lock del deseo (como reserveItem): si a la vez se une al grupo, uno de los dos espera al otro
+    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno }).from(items).where(eq(items.id, itemId)).for('update')
     if (!item) return { ok: false, reason: 'no_existe' }
-    if (await esDuenoDeLista(t, item.listId, userId)) return { ok: false, reason: 'propio' }
+    if (await esOFueDuenoDeLista(t, item.listId, userId)) return { ok: false, reason: 'propio' }
     if (item.estado !== 'activo') return { ok: false, reason: 'archivado' }
     const [propia] = await t.select({ id: claims.id }).from(claims)
       .where(and(eq(claims.itemId, itemId), eq(claims.claimerUserId, userId), eq(claims.estado, 'reservado'),
@@ -76,11 +71,18 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
 }
 
 export async function sumarseARegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
-  const row = await regaloConLista(db, giftId)
-  if (!row || row.gift.estado !== 'abierto') return false
-  if (await esDuenoDeLista(db, row.listId, userId)) return false
-  await db.insert(groupGiftMembers).values({ giftId, userId }).onConflictDoNothing()
-  return true
+  if (!esUuid(giftId)) return false
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // lock del regalo: si a la vez se une al grupo (unirseAGrupo lo baja de los regalos), uno espera al otro
+    const [row] = await t.select({ estado: groupGifts.estado, listId: items.listId })
+      .from(groupGifts).innerJoin(items, eq(groupGifts.itemId, items.id))
+      .where(eq(groupGifts.id, giftId)).for('update', { of: groupGifts })
+    if (!row || row.estado !== 'abierto') return false
+    if (await esOFueDuenoDeLista(t, row.listId, userId)) return false
+    await t.insert(groupGiftMembers).values({ giftId, userId }).onConflictDoNothing()
+    return true
+  })
 }
 
 /** Bajarse mientras está abierto. El encargado no se baja: cancela. */
@@ -157,13 +159,26 @@ export async function marcarPagado(db: Db, giftId: string, deudorId: string, act
   return filas.length > 0
 }
 
-/** Saldar todo con alguien: marca pagadas las deudas pendientes entre los dos, en las dos direcciones. */
+/**
+ * Los regalos comprados que entran en Cuentas de userId (en una consulta con join a items y lists): los de listas de las
+ * que no es ni fue dueño. Si te sumaste a un grupo después, no te enterás. Saldar usa exactamente lo mismo.
+ */
+const enCuentasDe = (db: Db, userId: string) => and(eq(groupGifts.estado, 'comprado'), noEsNiFueDuenoSql(db, userId))
+
+/**
+ * Saldar todo con alguien: marca pagadas las deudas pendientes entre los dos, en las dos direcciones. Solo las que Cuentas
+ * le muestra al que toca el botón (el monto del botón): nunca una que no ve, como la de un regalo de un grupo al que se
+ * sumó después. Esa la sigue viendo el otro, que la puede saldar desde su lado.
+ */
 export async function saldarCon(db: Db, userId: string, otroId: string): Promise<number> {
   if (userId === otroId) return 0
   const deEncargado = (encargado: string) => db.select({ id: groupGifts.id }).from(groupGifts)
-    .where(and(eq(groupGifts.organizerUserId, encargado), eq(groupGifts.estado, 'comprado')))
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
+    .innerJoin(lists, eq(items.listId, lists.id))
+    .where(and(eq(groupGifts.organizerUserId, encargado), enCuentasDe(db, userId)))
   const filas = await db.update(groupGiftMembers).set({ pagado: true, pagadoAt: new Date() })
-    .where(and(eq(groupGiftMembers.pagado, false), or(
+    // las partes en 0 no se muestran (ya quedan pagas al comprar)
+    .where(and(eq(groupGiftMembers.pagado, false), gt(groupGiftMembers.monto, 0), or(
       and(eq(groupGiftMembers.userId, userId), inArray(groupGiftMembers.giftId, deEncargado(otroId))),
       and(eq(groupGiftMembers.userId, otroId), inArray(groupGiftMembers.giftId, deEncargado(userId))),
     )))
@@ -259,7 +274,7 @@ const columnasDestino = {
 
 /**
  * Todo junto: cuánto debés, cuánto te deben, el neto con cada persona y los regalos en curso.
- * Deja afuera los regalos de listas de las que sos dueño (si te sumaste a un grupo después, no te enterás).
+ * Deja afuera los regalos de listas de las que sos (o fuiste) dueño (ver enCuentasDe).
  */
 export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
   const partes = await db.select({
@@ -275,10 +290,9 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     .innerJoin(lists, eq(items.listId, lists.id))
     .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
     .where(and(
-      eq(groupGifts.estado, 'comprado'),
+      enCuentasDe(db, userId),
       ne(groupGiftMembers.userId, groupGifts.organizerUserId),
       or(eq(groupGiftMembers.userId, userId), eq(groupGifts.organizerUserId, userId)),
-      noEsDuenoSql(db, userId),
     ))
     .orderBy(desc(groupGifts.compradoAt))
 
@@ -314,7 +328,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     .innerJoin(items, eq(groupGifts.itemId, items.id))
     .innerJoin(lists, eq(items.listId, lists.id))
     .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
-    .where(and(eq(groupGiftMembers.userId, userId), eq(groupGifts.estado, 'abierto'), noEsDuenoSql(db, userId)))
+    .where(and(eq(groupGiftMembers.userId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
     .orderBy(desc(groupGifts.createdAt))
   const nombres = abiertos.length
     ? await db.select({ giftId: groupGiftMembers.giftId, nombre: users.nombre }).from(groupGiftMembers)
@@ -423,10 +437,10 @@ export async function historialDeLista(db: Db, listId: string, viewer: Viewer): 
   }
 }
 
-/** El último regalo comprado de cada lista ajena ("El último lo compró Sofi"). Ignora las listas del usuario. */
+/** El último regalo comprado de cada lista ajena ("El último lo compró Sofi"). Ignora las que son o fueron del usuario. */
 export async function ultimosRegalos(db: Db, userId: string, listIds: string[]): Promise<Map<string, EntradaHistorial>> {
   const ajenas = listIds.length
-    ? (await db.select({ id: lists.id }).from(lists).where(and(inArray(lists.id, listIds), noEsDuenoSql(db, userId)))).map((l) => l.id)
+    ? (await db.select({ id: lists.id }).from(lists).where(and(inArray(lists.id, listIds), noEsNiFueDuenoSql(db, userId)))).map((l) => l.id)
     : []
   const ultimos = new Map<string, EntradaHistorial>()
   for (const { entrada: e } of await comprasDeListas(db, ajenas)) if (!ultimos.has(e.listId)) ultimos.set(e.listId, e)

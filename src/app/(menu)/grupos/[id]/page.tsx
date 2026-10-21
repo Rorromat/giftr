@@ -2,24 +2,34 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { grupoParaDueno, juntarNombres } from '@/lib/groups'
-import { leaveGroupAction, setGroupDateAction } from '@/app/actions'
-import { diasEntre, fechaLarga, hoyLocal, proximaDeGrupo } from '@/lib/events'
+import { ANIO_MAXIMO, ANIO_MINIMO, grupoParaDueno, juntarNombres } from '@/lib/groups'
+import { leaveGroupAction, newInviteAction, newShareLinkAction, setGroupDateAction } from '@/app/actions'
+import { hoyLocal, rotuloFechaGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
+import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
-export default async function Grupo({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+// Después de cambiar un link (?nuevo=…), arriba se confirma qué pasó con el anterior.
+const AVISOS: Record<string, string> = {
+  invitacion: 'Listo: el link de invitación es nuevo. El de antes ya no sirve para sumarse.',
+  regalar: 'Listo: el link para regalar es nuevo. El de antes ya no anda: volvé a mandarlo por WhatsApp.',
+}
+
+export default async function Grupo({ params, searchParams }: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ fecha?: string; nuevo?: string }>
+}) {
+  const [{ id }, { fecha: errorFecha, nuevo }] = await Promise.all([params, searchParams])
   const session = await auth()
   if (!session?.userId) redirect('/')
   const grupo = await grupoParaDueno(db, id, session.userId)
   if (!grupo) notFound()
 
   const activos = grupo.items.filter((i) => i.estadoDueno === 'activo')
-  const hoy = hoyLocal()
-  const fecha = proximaDeGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy)
+  const fechaInvalida = errorFecha === 'invalida'
+  const aviso = nuevo && Object.hasOwn(AVISOS, nuevo) ? AVISOS[nuevo] : null
   const otros = grupo.duenos.filter((d) => d.id !== session.userId).map((d) => d.nombre)
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? ''
   const shareUrl = `${base}/l/${grupo.shareToken}`
@@ -39,13 +49,15 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
         {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
         {/* Fecha del grupo: aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
-        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}`} className="group self-start">
+        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${fechaInvalida}`} open={fechaInvalida} className="group self-start">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
-            {fecha ? `${fechaLarga(fecha)} · ${diasEntre(hoy, fecha) === 0 ? '¡hoy!' : `en ${diasEntre(hoy, fecha)} días`}` : 'Agregar una fecha'}
+            {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())}
           </summary>
           <form action={setGroupDateAction} className="mt-1 flex flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3">
             <input type="hidden" name="grupoId" value={grupo.id} />
-            <input name="fecha" type="date" required defaultValue={grupo.eventoFecha ?? ''} aria-label="Fecha del grupo" className="gr-input" />
+            {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
+            <input name="fecha" type="date" required min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`}
+                   defaultValue={grupo.eventoFecha ?? ''} aria-label="Fecha del grupo" className="gr-input" />
             <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
               <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
             </label>
@@ -66,6 +78,10 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
       </div>
 
       <Banners />
+
+      {aviso && (
+        <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">{aviso}</p>
+      )}
 
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
       <section className="gr-sticker flex flex-col gap-3 p-3.5">
@@ -88,6 +104,11 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
           Invitar por WhatsApp
         </a>
         <p className="text-xs text-gr-muted">Para los que regalan usá “Mandala por WhatsApp”: ese link no deja editar.</p>
+        {/* por si la invitación llegó a quien no tenía que llegar */}
+        <Confirmar resumen="Generar un link de invitación nuevo" boton="Sí, generar uno nuevo" action={newInviteAction}
+                   ocultos={{ grupoId: grupo.id }}>
+          El link de ahora deja de servir: quien lo tenga y todavía no se sumó ya no va a poder. Los que ya están siguen.
+        </Confirmar>
       </section>
 
       {activos.length === 0 && (
@@ -99,12 +120,20 @@ export default async function Grupo({ params }: { params: Promise<{ id: string }
 
       <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} />
 
-      {grupo.duenos.length > 1 && (
-        <form action={leaveGroupAction} className="mt-4 self-center">
-          <input type="hidden" name="grupoId" value={grupo.id} />
-          <button className="min-h-11 px-3 text-sm font-semibold text-gr-muted underline underline-offset-4">Salir del grupo</button>
-        </form>
-      )}
+      <div className="mt-4 flex flex-col gap-1">
+        <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}
+                   ocultos={{ grupoId: grupo.id }} className="items-center">
+          El link de ahora deja de andar: los que lo tienen no van a poder abrir la lista hasta que les mandes el nuevo, y
+          la lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+        </Confirmar>
+        {grupo.duenos.length > 1 && (
+          <Confirmar resumen="Salir del grupo" boton="Salir del grupo" action={leaveGroupAction} ocultos={{ grupoId: grupo.id }}
+                     className="items-center">
+            Vas a dejar de agregar y editar esta lista. Como la armaste vos también, aunque salgas no vas a ver qué
+            reservaron los demás ni vas a poder reservar en ella.
+          </Confirmar>
+        )}
+      </div>
 
       <a href={`https://wa.me/?text=${waRegalar}`} target="_blank"
          className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">

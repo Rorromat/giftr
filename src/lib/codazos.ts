@@ -3,7 +3,7 @@ import webpush from 'web-push'
 import { codazos, config, lists, pushSubs } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { duenosDeLista } from '@/lib/groups'
+import { duenosDeLista, esDuenoSql } from '@/lib/groups'
 
 // Codazo: quien regala le pide al dueño que cargue su lista. Le llega como aviso push (si lo activó)
 // y como cartel en Mi lista. No dice nada de reservas: solo quién le dio el codazo.
@@ -122,11 +122,11 @@ export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNomb
   return { ok: true, para: duenos.map((d) => d.nombre), avisados }
 }
 
-/** Los codazos que el usuario todavía no vio (para el cartel en Mi lista y en sus grupos). */
+/** Los codazos que el usuario todavía no vio (para el cartel en Mi lista y en sus grupos). Los de un grupo del que salió, no. */
 export async function codazosSinVer(db: Db, userId: string) {
   return db.select({ id: codazos.id, deNombre: codazos.deNombre, listId: codazos.listId, tipo: lists.tipo, listaNombre: lists.nombre, createdAt: codazos.createdAt })
     .from(codazos).innerJoin(lists, eq(codazos.listId, lists.id))
-    .where(and(eq(codazos.paraUserId, userId), eq(codazos.visto, false)))
+    .where(and(eq(codazos.paraUserId, userId), eq(codazos.visto, false), esDuenoSql(db, userId)))
     .orderBy(desc(codazos.createdAt))
 }
 

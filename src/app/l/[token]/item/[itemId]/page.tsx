@@ -5,7 +5,7 @@ import { getItemForViewer } from '@/lib/lists'
 import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction } from '@/app/actions'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
-import { ConfirmarLista, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
+import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, RegaloGrupal } from '@/components/RegaloGrupal'
 import { parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
@@ -91,9 +91,10 @@ export default async function DetalleItem({ params, searchParams }: {
       </article>
 
       <section className="flex flex-col gap-2.5">
-        {detalle.role === 'anonimo' && (detalle.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
-          : detalle.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
-            : <QuienSos token={token} volver={aqui} />)}
+        {detalle.role === 'anonimo' && (detalle.motivo === 'ex_dueno' ? <ExDueno />
+          : detalle.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+            : detalle.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+              : <QuienSos token={token} volver={aqui} />)}
         <CartelReserva motivo={reserva} veTodo={!!giver} conNombre={identified} />
 
         {claims.filter((c) => !c.grupal).map((c) => (

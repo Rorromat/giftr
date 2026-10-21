@@ -6,7 +6,7 @@ import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { archiveItem, createItem } from '@/lib/items'
-import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
+import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
 import {
@@ -280,4 +280,94 @@ test('EL TEST DE ORO, co-dueños: si te sumás a un grupo después de entrar al 
   // para Rodri sigue todo igual
   expect((await misCuentas(db, rodri.id)).personas[0]).toMatchObject({ nombre: 'Martín', neto: 25000 })
   expect((await misCuentas(db, rodri.id)).personas[0].lineas[0]).toMatchObject({ para: 'Nuestra casa' })
+})
+
+test('si te unís como co-dueño, lo que tenías como regalador en esa lista no queda trabado', async () => {
+  const db = await createTestDb()
+  const [delfina, martin, sofi, ana, rodri] = [
+    await usuario(db, 'Delfina'), await usuario(db, 'Martín'), await usuario(db, 'Sofi'), await usuario(db, 'Ana'), await usuario(db, 'Rodri'),
+  ]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const deseo = async (titulo: string) => (await createItem(db, delfina.id, { tipo: 'exacto', titulo }, grupoId))!
+  const [copas, vela, cafetera, tostadora, heladera] = [
+    await deseo('Copas'), await deseo('Vela'), await deseo('Cafetera'), await deseo('Tostadora'), await deseo('Heladera'),
+  ]
+
+  // Martín, todavía como regalador: reservó las copas (vencen mañana), compró la vela, organiza la cafetera (Sofi y Ana se
+  // sumaron) y la tostadora (solo), y se sumó a la heladera de Rodri
+  const copasMias = await reserveItem(db, copas.id, { userId: martin.id })
+  const velaMia = await reserveItem(db, vela.id, { userId: martin.id })
+  if (!copasMias.ok || !velaMia.ok) throw new Error('esperaba poder reservar')
+  await db.update(claims).set({ createdAt: new Date(Date.now() - 13 * 86400_000), expiresAt: new Date(Date.now() + 86400_000) })
+    .where(eq(claims.id, copasMias.claimId))
+  await markBought(db, velaMia.claimId, { userId: martin.id })
+  const [deCafetera, deTostadora, deHeladera] = [
+    await iniciarRegaloGrupal(db, cafetera.id, martin.id), await iniciarRegaloGrupal(db, tostadora.id, martin.id),
+    await iniciarRegaloGrupal(db, heladera.id, rodri.id),
+  ]
+  if (!deCafetera.ok || !deTostadora.ok || !deHeladera.ok) throw new Error('esperaba poder armar los regalos')
+  await sumarseARegalo(db, deCafetera.giftId, sofi.id)
+  await sumarseARegalo(db, deCafetera.giftId, ana.id)
+  await sumarseARegalo(db, deHeladera.giftId, martin.id)
+  expect(await getMyClaimWarnings(db, { userId: martin.id })).toHaveLength(1)
+
+  expect(await unirseAGrupo(db, grupo.inviteToken!, martin.id)).toBe(grupoId)
+
+  // las copas quedan libres para otro
+  expect(await reserveItem(db, copas.id, { userId: ana.id })).toMatchObject({ ok: true })
+  // la vela ya estaba comprada: queda como está
+  const [compra] = await db.select().from(claims).where(eq(claims.id, velaMia.claimId))
+  expect(compra).toMatchObject({ estado: 'comprado', claimerUserId: martin.id })
+  // la cafetera pasa a Sofi, la primera que se sumó, con la reserva a su nombre; y la puede comprar
+  const [regalo] = await regalosDeItem(db, cafetera.id, { userId: sofi.id })
+  expect(regalo).toMatchObject({ estado: 'abierto', soyEncargado: true, encargado: { nombre: 'Sofi' } })
+  expect(regalo.miembros.map((m) => m.nombre)).toEqual(['Sofi', 'Ana'])
+  const [reserva] = await db.select().from(claims).where(eq(claims.itemId, cafetera.id))
+  expect(reserva).toMatchObject({ claimerUserId: sofi.id, estado: 'reservado', expiresAt: null })
+  expect(await comprarRegalo(db, deCafetera.giftId, sofi.id, { total: 60000 })).toEqual({ ok: true })
+  expect((await misCuentas(db, ana.id)).personas).toEqual([expect.objectContaining({ nombre: 'Sofi', neto: -30000 })])
+  // la tostadora no tenía a nadie más: se cancela y se libera
+  expect(await regalosDeItem(db, tostadora.id, { userId: ana.id })).toEqual([])
+  expect(await reserveItem(db, tostadora.id, { userId: ana.id })).toMatchObject({ ok: true })
+  // de la heladera de Rodri se baja: no le van a cobrar una parte que no puede ver
+  const [deRodri] = await regalosDeItem(db, heladera.id, { userId: rodri.id })
+  expect(deRodri.miembros.map((m) => m.nombre)).toEqual(['Rodri'])
+  // y a él no le queda nada de eso a la vista
+  expect(await getMyClaimWarnings(db, { userId: martin.id })).toEqual([])
+  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  // ya como dueño no se vuelve a sumar ni a armar nada
+  expect(await sumarseARegalo(db, deHeladera.giftId, martin.id)).toBe(false)
+  expect(await iniciarRegaloGrupal(db, (await deseo('Mantel')).id, martin.id)).toEqual({ ok: false, reason: 'propio' })
+})
+
+test('"Saldar todo" salda solo lo que Cuentas muestra, no la deuda de un grupo al que te sumaste después', async () => {
+  const db = await createTestDb()
+  const [delfina, martin, rodri, sofi] = [await usuario(db, 'Delfina'), await usuario(db, 'Martín'), await usuario(db, 'Rodri'), await usuario(db, 'Sofi')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const comprado = async (itemId: string, encargado: string, otro: string, total: number) => {
+    const g = await iniciarRegaloGrupal(db, itemId, encargado)
+    if (!g.ok) throw new Error(g.reason)
+    await sumarseARegalo(db, g.giftId, otro)
+    expect(await comprarRegalo(db, g.giftId, encargado, { total })).toEqual({ ok: true })
+  }
+  // Martín le debe $25.000 a Rodri por la cafetera de "Nuestra casa"; Rodri le debe $10.000 + $5.000 por dos de Sofi
+  await comprado((await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Cafetera' }, grupoId))!.id, rodri.id, martin.id, 50000)
+  await comprado((await createItem(db, sofi.id, { tipo: 'exacto', titulo: 'Libro' }))!.id, martin.id, rodri.id, 20000)
+  await comprado((await createItem(db, sofi.id, { tipo: 'exacto', titulo: 'Taza' }))!.id, martin.id, rodri.id, 10000)
+  expect((await misCuentas(db, rodri.id)).personas[0]).toMatchObject({ nombre: 'Martín', neto: 10000 })
+
+  // Delfina lo invita al grupo: la cafetera le deja de aparecer y ve que Rodri le debe $15.000
+  await unirseAGrupo(db, grupo.inviteToken!, martin.id)
+  expect((await misCuentas(db, martin.id)).personas[0]).toMatchObject({ nombre: 'Rodri', neto: 15000 })
+  // "Me pagó todo ($15.000)" salda esas dos y nada más
+  expect(await saldarCon(db, martin.id, rodri.id)).toBe(2)
+  expect(await misCuentas(db, martin.id)).toMatchObject({ debes: 0, teDeben: 0, personas: [] })
+  const deRodri = await misCuentas(db, rodri.id)
+  expect(deRodri).toMatchObject({ teDeben: 25000, debes: 0 })
+  expect(deRodri.personas).toEqual([expect.objectContaining({ nombre: 'Martín', neto: 25000 })])
+  // Rodri sí la ve, y la salda desde su lado
+  expect(await saldarCon(db, rodri.id, martin.id)).toBe(1)
+  expect((await misCuentas(db, rodri.id)).personas).toEqual([])
 })

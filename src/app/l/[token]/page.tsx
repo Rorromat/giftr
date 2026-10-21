@@ -15,7 +15,7 @@ import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
-import { ConfirmarLista, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
+import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
@@ -132,9 +132,10 @@ export default async function ListaAjena({
           <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
           {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
         </p>
-      ) : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
-        : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
-          : <QuienSos token={token} volver={aqui} />}
+      ) : vista.motivo === 'ex_dueno' ? <ExDueno />
+        : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+          : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+            : <QuienSos token={token} volver={aqui} />}
 
       <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 

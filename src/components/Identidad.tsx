@@ -87,6 +87,21 @@ export function OtraCuenta({ volver }: { volver: string }) {
 }
 
 /**
+ * Con su cuenta, en un grupo del que salió: cargó esos deseos, así que la ve como el dueño (sin reservas) y no reserva.
+ * Si vuelve a sumarse con la invitación, vuelve a editarla.
+ */
+export function ExDueno() {
+  return (
+    <section aria-labelledby="ex-dueno" className="gr-sticker flex flex-col gap-1 p-3.5">
+      <h2 id="ex-dueno" className="font-display text-lg leading-tight font-extrabold">Saliste de este grupo</h2>
+      <p className="text-[13px] font-medium leading-snug">
+        Como la armabas vos también, acá no se muestra qué reservaron los demás y no podés reservar.
+      </p>
+    </section>
+  )
+}
+
+/**
  * "¿No sos X?": en un dispositivo compartido, para dejar de ser el último que se anotó (o cerrar la sesión de otro).
  * A un invitado se le pide confirmarlo: su cookie es lo único que lo identifica, y lo que reservó queda a su nombre sin
  * que nadie lo pueda manejar desde acá. Primero se le ofrece entrar con Google, que lo pasa a su cuenta.

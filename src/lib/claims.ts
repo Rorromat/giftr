@@ -28,10 +28,10 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: 
       .for('update', { of: items })
     if (!row) return { ok: false, reason: 'no_existe' }
     const t = tx as unknown as Db
-    // Ningún dueño (tampoco un co-dueño del grupo) reserva en su propia lista. Un invitado tampoco en las de una cuenta
-    // que tuvo sesión en este navegador: puede ser ese dueño sin su sesión (ver accesoALista).
+    // Ningún dueño (tampoco un co-dueño del grupo, ni uno que salió) reserva en su propia lista. Un invitado tampoco en las
+    // de una cuenta que tuvo sesión en este navegador: puede ser ese dueño sin su sesión (ver accesoALista).
     const acceso = await accesoALista(t, row.listId, viewer)
-    if (acceso === 'dueno' || acceso === 'otra_cuenta') return { ok: false, reason: 'propio' }
+    if (acceso === 'dueno' || acceso === 'ex_dueno' || acceso === 'otra_cuenta') return { ok: false, reason: 'propio' }
     // reservar es decir que la lista no es suya: desde ahora ve lo que reservaron los demás (también si no sale)
     if (viewer.guestId) await abrirListaAInvitado(t, viewer.guestId, row.listId)
     if (row.item.estadoDueno !== 'activo') return { ok: false, reason: 'archivado' }

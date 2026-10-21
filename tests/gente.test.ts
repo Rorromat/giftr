@@ -4,7 +4,7 @@ import { createTestDb } from './helpers'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, misEventos, seguirLista } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 
@@ -57,6 +57,21 @@ test('una lista de la que sos co-dueño no es tu gente, aunque la hayas abierto 
   const [{ inviteToken }] = await db.select({ inviteToken: lists.inviteToken }).from(lists).where(eq(lists.id, mellizos))
   await unirseAGrupo(db, inviteToken!, sofi.id)
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Euge Mateus', 'rodri'])
+  // si sale del grupo tampoco vuelve: lo armó ella, así que no ve qué le regalan (ni en Tu gente ni en Eventos)
+  expect(await salirDeGrupo(db, mellizos, sofi.id)).toBe(true)
+  expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Euge Mateus', 'rodri'])
+  expect((await misEventos(db, sofi.id, HOY)).map((e) => e.titulo)).toEqual(['Cumple de Euge'])
+})
+
+test('para quien sigue un grupo, sus dueños son los que están: el que salió ya no figura', async () => {
+  const { db, euge, sofi, mellizos } = await setup()
+  const [{ inviteToken }] = await db.select({ inviteToken: lists.inviteToken }).from(lists).where(eq(lists.id, mellizos))
+  await unirseAGrupo(db, inviteToken!, euge.id)
+  const grupo = async () => (await miGente(db, sofi.id, HOY)).find((c) => c.listId === mellizos)!
+  expect((await grupo()).duenos.map((d) => d.nombre)).toEqual(['Caro', 'Euge Mateus'])
+  await salirDeGrupo(db, mellizos, euge.id)
+  expect((await grupo()).duenos.map((d) => d.nombre)).toEqual(['Caro'])
+  expect((await misEventos(db, sofi.id, HOY)).find((e) => e.listId === mellizos)!.personas).toEqual(['Caro'])
 })
 
 test('dejar de seguir la saca de tu gente y de Eventos; si la volvés a abrir, vuelve', async () => {

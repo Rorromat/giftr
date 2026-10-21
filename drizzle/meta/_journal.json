@@ -64,6 +64,13 @@
       "when": 1792580204429,
       "tag": "0008_listas_de_invitado",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792582865029,
+      "tag": "0009_ex_miembros_de_grupo",
+      "breakpoints": true
     }
   ]
 }

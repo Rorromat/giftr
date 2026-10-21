@@ -26,6 +26,11 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       <p className="mt-1 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-4 py-3 text-sm font-medium leading-snug">
         Vas a poder agregar y editar deseos de esta lista. Como es tuya también, no vas a ver quién regala qué.
       </p>
+      {/* lo mismo para todos: unirseAGrupo lo resuelve en el servidor */}
+      <p className="text-[13px] font-medium leading-snug text-gr-muted">
+        Si reservaste algo de esta lista, se libera. De los regalos grupales abiertos te bajás (si organizabas uno, pasa al
+        primero que se sumó). Lo que ya compraste queda como está.
+      </p>
       {session?.userId ? (
         <form action={joinGroupAction} className="mt-2 w-full">
           <input type="hidden" name="invite" value={token} />

@@ -18,7 +18,9 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, esUuid, fechaDeGrupoValida, nuevaInvitacion, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { asegurarListaPropia } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
@@ -140,22 +142,30 @@ export async function createGroupAction(formData: FormData) {
   if (!session?.userId) redirect('/')
   const nombre = str(formData, 'nombre')
   if (!nombre) redirect('/grupos/nuevo')
-  const id = await crearGrupo(db, session.userId, { nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120) })
   const fecha = str(formData, 'fecha')
-  if (fecha) await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
+  // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
+  // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
+  const id = await crearGrupo(db, session.userId, {
+    nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120),
+    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on',
+  })
   revalidatePath('/mi-lista')
   revalidatePath('/eventos')
-  redirect(`/grupos/${id}`)
+  redirect(fecha && !fechaDeGrupoValida(fecha) ? `/grupos/${id}?fecha=invalida` : `/grupos/${id}`)
 }
 
 export async function setGroupDateAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const id = str(formData, 'grupoId') ?? ''
+  if (!esUuid(id)) return
   const fecha = formData.get('quitar') ? null : str(formData, 'fecha') ?? null
+  if (fecha !== null && !fechaDeGrupoValida(fecha)) redirect(`/grupos/${id}?fecha=invalida`)
   await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
   revalidatePath(`/grupos/${id}`)
   revalidatePath('/eventos')
+  // sin el aviso de una fecha inválida anterior, si quedó en la dirección
+  redirect(`/grupos/${id}`)
 }
 
 const numero = (fd: FormData, k: string) => { const v = Number(str(fd, k)); return Number.isInteger(v) && v > 0 ? v : null }
@@ -200,6 +210,33 @@ export async function leaveGroupAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect('/mi-lista')
+}
+
+/** "Generar un link de invitación nuevo": el anterior deja de servir para sumarse al grupo. */
+export async function newInviteAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const nuevo = await nuevaInvitacion(db, id, session.userId)
+  revalidatePath(`/grupos/${id}`)
+  if (nuevo) redirect(`/grupos/${id}?nuevo=invitacion`)
+}
+
+/**
+ * "Cambiar el link para regalar" de la lista personal (desde Perfil) o de un grupo (con grupoId): el anterior deja de
+ * andar y hay que volver a compartirlo.
+ */
+export async function newShareLinkAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const grupoId = str(formData, 'grupoId')
+  const listId = grupoId ?? (await asegurarListaPropia(db, session.userId))?.id
+  const nuevo = listId ? await cambiarLinkParaRegalar(db, listId, session.userId) : null
+  revalidatePath('/mi-lista')
+  revalidatePath('/perfil')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+  if (nuevo) redirect(grupoId ? `/grupos/${grupoId}?nuevo=regalar` : '/perfil?nuevo=regalar')
 }
 
 /** Saca una lista de Tu gente (y su cumple o fecha de Eventos). */

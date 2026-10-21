@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, notInArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { claims, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { esDuenoSql, esUuid } from '@/lib/groups'
+import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib/groups'
 import { expireStaleClaims } from '@/lib/claims'
 import { ultimosRegalos } from '@/lib/regalos'
 
@@ -51,6 +51,21 @@ export function proximaDeGrupo(eventoFecha: string | null, anual: boolean, hoy: 
   return unica >= hoy ? unica : null
 }
 
+/**
+ * La fecha en la pantalla del grupo: la próxima ("Sábado 22 de agosto · en 10 días"), una única que ya pasó (sigue
+ * guardada: "Fue el 1 de marzo de 2026 · cambiar") o ninguna ("Agregar una fecha").
+ */
+export function rotuloFechaGrupo(eventoFecha: string | null, anual: boolean, hoy: Date): string {
+  const fecha = proximaDeGrupo(eventoFecha, anual, hoy)
+  if (fecha) {
+    const dias = diasEntre(hoy, fecha)
+    return `${fechaLarga(fecha)} · ${dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : `en ${dias} días`}`
+  }
+  if (!eventoFecha) return 'Agregar una fecha'
+  const [y, m, d] = eventoFecha.split('-').map(Number)
+  return `Fue el ${d} de ${MESES[m - 1]} de ${y} · cambiar`
+}
+
 const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0]
 
 export type Evento = {
@@ -77,12 +92,10 @@ const PESO = { mucho: 0, gustaria: 1, suelta: 2 } as const
 /** Los eventos del usuario ordenados por cercanía: los suyos y los de las listas que sigue. */
 export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Promise<Evento[]> {
   const propias = await db.select().from(lists).where(esDuenoSql(db, userId))
-  const propiasIds = propias.map((l) => l.id)
+  // de las que sigue, ni las suyas ni las de un grupo del que salió: de esas no ve reservas ni regalos (ver acceso.ts)
   const seguidas = await db.select({ list: lists }).from(listFollows)
     .innerJoin(lists, eq(listFollows.listId, lists.id))
-    .where(propiasIds.length
-      ? and(eq(listFollows.userId, userId), notInArray(lists.id, propiasIds))
-      : eq(listFollows.userId, userId))
+    .where(and(eq(listFollows.userId, userId), noEsNiFueDuenoSql(db, userId)))
     .then((rows) => rows.map((r) => r.list))
 
   const todas: { list: ListaRow; propio: boolean }[] = [
@@ -99,7 +112,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
     grupoIds.length
       ? db.select({ listId: listMembers.listId, nombre: users.nombre })
         .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
-        .where(inArray(listMembers.listId, grupoIds)).orderBy(asc(listMembers.createdAt))
+        .where(and(inArray(listMembers.listId, grupoIds), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
       : [],
   ])
 
@@ -196,10 +209,10 @@ export async function guardarCumple(db: Db, userId: string, dia: number | null, 
   return true
 }
 
-/** Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. */
+/** Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. Una que no existe, no. */
 export async function guardarFechaGrupo(db: Db, listId: string, userId: string, fecha: string | null, anual: boolean): Promise<boolean> {
   if (!esUuid(listId)) return false
-  if (fecha !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha)))) return false
+  if (fecha !== null && !fechaDeGrupoValida(fecha)) return false
   const updated = await db.update(lists).set({ eventoFecha: fecha, eventoAnual: anual })
     .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId)))
     .returning({ id: lists.id })

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { salirAction, saveBirthdayAction } from '@/app/actions'
+import { newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
@@ -13,6 +13,7 @@ import { ActivarAvisos } from '@/components/ActivarAvisos'
 import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
+import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { UnirInvitado } from '@/components/Identidad'
 import { invitadoDeEsteNavegador } from '@/lib/viewer'
@@ -20,7 +21,8 @@ import { Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
-export default async function Perfil() {
+export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string }> }) {
+  const { nuevo } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, cuentas, gustos] = await Promise.all([
@@ -70,6 +72,17 @@ export default async function Perfil() {
         </div>
         <CopyLinkButton url={shareUrl} />
       </div>
+      {nuevo === 'regalar' && (
+        <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">
+          Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
+        </p>
+      )}
+      {/* por si el link llegó a quien no tenía que llegar */}
+      <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
+                 className="-mt-1.5 items-end">
+        El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
+        tu lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+      </Confirmar>
 
       {/* Tus gustos: los ve tu gente arriba de tu lista */}
       <Link href="/bienvenida?editar=1" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">

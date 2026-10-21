@@ -4,10 +4,10 @@ import { createTestDb } from './helpers'
 import { claims, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo } from '@/lib/groups'
+import { crearGrupo, fechaDeGrupoValida } from '@/lib/groups'
 import {
   calendarioDelAnio, diasEntre, eventoDeLista, fechaCorta, fechaLarga, guardarCumple, guardarFechaGrupo,
-  hoyLocal, misEventos, proximaDeGrupo, proximaFecha, seguirLista,
+  hoyLocal, misEventos, proximaDeGrupo, proximaFecha, rotuloFechaGrupo, seguirLista,
 } from '@/lib/events'
 
 const HOY = new Date(Date.UTC(2026, 7, 8)) // sábado 8 de agosto de 2026
@@ -112,6 +112,34 @@ test('validaciones: cumple y fecha del grupo', async () => {
   expect(await guardarFechaGrupo(db, mellizos, sofi.id, '2026-10-12', true)).toBe(false) // no es dueña
   expect(await guardarFechaGrupo(db, mellizos, euge.id, 'mañana', true)).toBe(false)
   expect(await guardarFechaGrupo(db, 'no-es-uuid', euge.id, '2026-10-12', true)).toBe(false)
+})
+
+test('fecha del grupo: tiene que existir y tener un año razonable (nunca un error de la base)', async () => {
+  for (const f of ['2026-10-12', '2028-02-29', '1900-01-01', '2100-12-31', '2026-04-30']) expect(fechaDeGrupoValida(f)).toBe(true)
+  for (const f of ['2026-02-30', '2026-02-29', '2026-04-31', '2026-13-01', '2026-00-10', '0000-01-01', '0099-05-01',
+    '1899-12-31', '2101-01-01', '9999-12-31', '2026-1-5', '12/10/2026', '', 'mañana']) expect(fechaDeGrupoValida(f)).toBe(false)
+
+  const { db, caro, mellizos } = await setup()
+  // antes Date.parse las dejaba pasar y Postgres las rechazaba con un error 500
+  for (const f of ['2026-02-30', '2026-02-29', '0000-01-01', '9999-12-31']) {
+    expect(await guardarFechaGrupo(db, mellizos, caro.id, f, false)).toBe(false)
+  }
+  expect(await guardarFechaGrupo(db, mellizos, caro.id, '2028-02-29', false)).toBe(true)
+
+  // al crear, la fecha va en el mismo alta; una que no existe no se guarda y el grupo se crea igual
+  const conFecha = await crearGrupo(db, caro.id, { nombre: 'Casamiento', eventoFecha: '2027-03-06', eventoAnual: false })
+  const sinFecha = await crearGrupo(db, caro.id, { nombre: 'Mudanza', eventoFecha: '2026-02-30', eventoAnual: false })
+  const fechas = await db.select({ id: lists.id, f: lists.eventoFecha, anual: lists.eventoAnual }).from(lists)
+  expect(fechas.find((l) => l.id === conFecha)).toMatchObject({ f: '2027-03-06', anual: false })
+  expect(fechas.find((l) => l.id === sinFecha)).toMatchObject({ f: null })
+})
+
+test('la fecha en la pantalla del grupo: la próxima, una única que ya pasó (sigue guardada) o ninguna', () => {
+  expect(rotuloFechaGrupo('2026-08-22', false, HOY)).toBe('Sábado 22 de agosto · en 14 días')
+  expect(rotuloFechaGrupo('2020-08-08', true, HOY)).toBe('Sábado 8 de agosto · ¡hoy!')
+  expect(rotuloFechaGrupo('2020-08-09', true, HOY)).toBe('Domingo 9 de agosto · mañana')
+  expect(rotuloFechaGrupo('2026-03-01', false, HOY)).toBe('Fue el 1 de marzo de 2026 · cambiar')
+  expect(rotuloFechaGrupo(null, true, HOY)).toBe('Agregar una fecha')
 })
 
 test('cuenta regresiva de una lista: cumple del dueño o fecha del grupo', async () => {
