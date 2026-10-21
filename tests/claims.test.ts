@@ -12,6 +12,7 @@ import { archiveItem } from '@/lib/items'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer } from '@/lib/lists'
 import { createGuest } from '@/lib/guest'
 import { comprarRegalo, historialDeLista, iniciarRegaloGrupal } from '@/lib/regalos'
+import { RESERVAS_POR_LISTA } from '@/lib/types'
 
 async function setup(extra: Partial<typeof items.$inferInsert> = {}) {
   const db = await createTestDb()
@@ -433,4 +434,50 @@ test('deshacer una compra de antes de que cambiaran el link para regalar no le p
   const [c] = await db.select().from(claims)
   expect(c.createdAt.getTime()).toBeLessThan(Date.now() - 19 * DIA)
   expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([expect.objectContaining({ claimId: r.claimId, href: null })])
+})
+
+test('una persona no deja tomada la lista entera: como mucho 10 reservas sin comprar por lista', async () => {
+  const { db, list, owner, giver } = await setup()
+  const deseos = await db.insert(items).values(Array.from({ length: RESERVAS_POR_LISTA + 3 }, (_, n) => ({
+    listId: list.id, tipo: 'exacto' as const, titulo: `Deseo ${n}`,
+  }))).returning()
+  const pepe = await createGuest(db, 'Pepe')
+  const reservar = (n: number, viewer: { guestId?: string; userId?: string } = { guestId: pepe.id }) => reserveItem(db, deseos[n].id, viewer)
+  for (let n = 0; n < RESERVAS_POR_LISTA; n++) expect((await reservar(n)).ok, String(n)).toBe(true)
+  expect(await reservar(RESERVAS_POR_LISTA)).toEqual({ ok: false, reason: 'muchas' })
+  // un doble toque sobre una que ya tiene sigue devolviendo la suya
+  expect((await reservar(0)).ok).toBe(true)
+  // los demás reservan lo que quedó libre
+  expect((await reservar(RESERVAS_POR_LISTA, { userId: giver.id })).ok).toBe(true)
+
+  // lo comprado no cuenta: marca una y puede reservar otra
+  const [primera] = await db.select().from(claims).where(eq(claims.itemId, deseos[0].id))
+  expect(await markBought(db, primera.id, { guestId: pepe.id })).toEqual({ ok: true })
+  expect((await reservar(RESERVAS_POR_LISTA + 1)).ok).toBe(true)
+  expect(await reservar(RESERVAS_POR_LISTA + 2)).toEqual({ ok: false, reason: 'muchas' })
+  // soltar una, o que venza, también deja lugar
+  const [segunda] = await db.select().from(claims).where(eq(claims.itemId, deseos[1].id))
+  expect(await releaseClaim(db, segunda.id, { guestId: pepe.id })).toBe(true)
+  expect((await reservar(RESERVAS_POR_LISTA + 2)).ok).toBe(true)
+  const [tercera] = await db.select().from(claims).where(eq(claims.itemId, deseos[2].id))
+  await db.update(claims).set({ expiresAt: new Date(Date.now() - DIA) }).where(eq(claims.id, tercera.id))
+  expect((await reservar(1)).ok).toBe(true)
+
+  // es por lista: en otra lista reserva aparte
+  const [otraLista] = await db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' }).returning()
+  const [deRodri] = await db.insert(items).values({ listId: otraLista.id, tipo: 'exacto', titulo: 'Taza' }).returning()
+  expect((await reserveItem(db, deRodri.id, { guestId: pepe.id })).ok).toBe(true)
+  // "Ya lo compré" sobre la vencida no queda tomada: no lo frena el tope
+  expect(await markBought(db, tercera.id, { guestId: pepe.id }, undefined, deseos[2].id)).toEqual({ ok: true })
+  // y un regalo grupal no es una reserva suelta: se puede armar igual
+  const [caro] = await db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
+  const [grande] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Bici' }).returning()
+  const deCaro = await db.insert(items).values(Array.from({ length: RESERVAS_POR_LISTA }, (_, n) => ({
+    listId: list.id, tipo: 'exacto' as const, titulo: `Para Caro ${n}`,
+  }))).returning()
+  for (const d of deCaro) expect((await reserveItem(db, d.id, { userId: caro.id })).ok).toBe(true)
+  expect(await reserveItem(db, grande.id, { userId: caro.id })).toEqual({ ok: false, reason: 'muchas' })
+  expect((await iniciarRegaloGrupal(db, grande.id, caro.id)).ok).toBe(true)
+  // a la dueña no le cambia nada (no reserva en su lista, con o sin tope)
+  expect(await reserveItem(db, grande.id, { userId: owner.id })).toEqual({ ok: false, reason: 'propio' })
 })

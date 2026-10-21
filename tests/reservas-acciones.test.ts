@@ -1,4 +1,6 @@
 import { expect, test, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
@@ -19,7 +21,9 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
 }))
 
-import { addItemAction, archiveItemAction, boughtAction, restoreItemAction, unboughtAction } from '@/app/actions'
+import { addItemAction, archiveItemAction, boughtAction, reserveAction, restoreItemAction, unboughtAction } from '@/app/actions'
+import { CartelReserva } from '@/components/GuestGate'
+import { RESERVAS_POR_LISTA } from '@/lib/types'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -109,4 +113,23 @@ test('"Ya lo compré" sobre una vencida con el link de antes no reserva de nuevo
   await boughtAction(form({ token: nuevo!, itemId: item.id, claimId: vieja.id }))
   expect((await h.db.select().from(claims)).map((c) => c.estado).sort()).toEqual(['comprado', 'expirado'])
   expect(await markBought(h.db, vieja.id, { userId: giver.id })).toEqual({ ok: false, reason: 'no_permitido' })
+})
+
+test('con 10 reservas sin comprar en la lista, reservar otra vuelve a la misma página y explica qué hacer', async () => {
+  const { giver, list } = await preparar()
+  const deseos = await h.db.insert(items).values(Array.from({ length: RESERVAS_POR_LISTA + 1 }, (_, n) => ({
+    listId: list.id, tipo: 'exacto' as const, titulo: `Deseo ${n}`,
+  }))).returning()
+  for (const d of deseos.slice(0, RESERVAS_POR_LISTA)) expect((await reserveItem(h.db, d.id, { userId: giver.id })).ok).toBe(true)
+  h.session = { userId: giver.id }
+  const otro = deseos[RESERVAS_POR_LISTA]
+  // desde el detalle se queda en el detalle (el deseo sigue ahí), desde la lista en la lista con sus filtros
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: otro.id, volver: `/l/tok-euge/item/${otro.id}` }))))
+    .toBe(`/l/tok-euge/item/${otro.id}?reserva=muchas`)
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: otro.id, volver: '/l/tok-euge?disp=1' }))))
+    .toBe('/l/tok-euge?disp=1&reserva=muchas')
+  const cartel = renderToStaticMarkup(createElement(CartelReserva, { motivo: 'muchas', veTodo: true, conNombre: true }))
+  expect(cartel).toContain(`Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista`)
+  // el link con ?reserva=muchas abierto por la dueña sin su sesión no muestra nada
+  expect(renderToStaticMarkup(createElement(CartelReserva, { motivo: 'muchas', veTodo: false, conNombre: false }))).toBe('')
 })

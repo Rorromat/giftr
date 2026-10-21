@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
-import type { Viewer } from '@/lib/types'
+import { RESERVAS_POR_LISTA, type Viewer } from '@/lib/types'
 import { abrirListaAInvitado, accesoALista, listasAjenasSql } from '@/lib/acceso'
 import { esRepetible } from '@/lib/serialize'
 import { esUuid } from '@/lib/groups'
@@ -64,10 +64,13 @@ export async function loQueYaTiene(db: Db, deseo: Deseo, viewer: Viewer) {
 
 export type ReserveResult =
   | { ok: true; claimId: string }
-  | { ok: false; reason: 'propio' | 'sin_stock' | 'archivado' | 'no_existe' | 'sin_identidad' }
+  | { ok: false; reason: 'propio' | 'sin_stock' | 'archivado' | 'no_existe' | 'sin_identidad' | 'muchas' }
 
-// sinVencimiento: la reserva de un regalo grupal no vence (la maneja el encargado).
-export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: { sinVencimiento?: boolean } = {}): Promise<ReserveResult> {
+// sinVencimiento: la reserva de un regalo grupal no vence (la maneja el encargado). comprada: se marca comprada enseguida
+// (una vencida que ya había comprado). Ninguna de las dos es una reserva suelta que queda tomada: no cuentan para el tope.
+export async function reserveItem(
+  db: Db, itemId: string, viewer: Viewer, opts: { sinVencimiento?: boolean; comprada?: boolean } = {},
+): Promise<ReserveResult> {
   if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
   if (!esUuid(itemId)) return { ok: false, reason: 'no_existe' }
   return await db.transaction(async (tx): Promise<ReserveResult> => {
@@ -98,6 +101,16 @@ export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: 
       const [{ n }] = await tx.select({ n: count() }).from(claims)
         .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado'])))
       if (n >= row.item.cantidad) return { ok: false, reason: 'sin_stock' }
+    }
+
+    // Nadie más puede soltar una reserva ajena: sin tope, una sola persona dejaba la lista entera tomada (ver RESERVAS_POR_LISTA)
+    if (!opts.sinVencimiento && !opts.comprada) {
+      const [{ tomadas }] = await tx.select({ tomadas: count() }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
+        .where(and(
+          eq(items.listId, row.listId), claimEsDe(viewer), eq(claims.estado, 'reservado'), noEsDeRegaloGrupal(),
+          or(isNull(claims.expiresAt), gt(claims.expiresAt, new Date())),
+        ))
+      if (tomadas >= RESERVAS_POR_LISTA) return { ok: false, reason: 'muchas' }
     }
 
     const [claim] = await tx.insert(claims).values({
@@ -164,7 +177,7 @@ export async function markBought(db: Db, claimId: string, viewer: Viewer, notaQu
     }
     const hace = c.expiresAt ? Date.now() - c.expiresAt.getTime() : Infinity
     if (c.estado !== 'expirado' || conLink !== antes.itemId || hace > VENCIDA_VISIBLE_DIAS * DIA) return no
-    const r = await reserveItem(t, antes.itemId, viewer)
+    const r = await reserveItem(t, antes.itemId, viewer, { comprada: true })
     if (!r.ok) return r.reason === 'sin_stock' ? { ok: false, reason: 'sin_lugar' } : no
     // una nueva, o la que ya tenía: la volvió a reservar, o ya la marcó (un doble toque sobre la vencida)
     const [nueva] = await t.select({ estado: claims.estado }).from(claims).where(and(eq(claims.id, r.claimId), noEsDeRegaloGrupal()))

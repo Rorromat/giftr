@@ -2,7 +2,7 @@
 
 import { useActionState, useRef } from 'react'
 import { reserveAction } from '@/app/actions'
-import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
+import { NOMBRE_INVITADO_MAXIMO, RESERVAS_POR_LISTA } from '@/lib/types'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
 const BUTTON = {
@@ -17,6 +17,7 @@ const MOTIVOS: Record<string, string> = {
   no_existe: 'Ese deseo ya no está en la lista.',
   propio: 'En tu propia lista no podés reservar.',
   sin_identidad: 'Para reservar, decinos quién sos.',
+  muchas: `Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista. Marcá las que ya compraste o soltá alguna para reservar otra.`,
   // "Ya lo compré" sobre una reserva que había vencido, cuando el lugar ya lo tomó otro
   vencida: 'Tu reserva ya había vencido y ahora no queda lugar. Si lo habías comprado, contalo en el hilo de abajo.',
 }

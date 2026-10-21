@@ -313,7 +313,7 @@ export async function reserveAction(_: EstadoForm, formData: FormData): Promise<
   // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
   // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
   // Se vuelve a la misma página, con sus filtros; del detalle, a la lista si el deseo ya no está.
-  const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad'
+  const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad' || r.reason === 'muchas'
   redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', r.reason))
 }
 
