@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { duenosDeLista, juntarNombres } from '@/lib/groups'
+import { duenosDeLista, esUuid, juntarNombres } from '@/lib/groups'
 
 // Lo que se muestra al compartir un link (vista previa de WhatsApp, imagen Open Graph).
 // Es lo mismo que ve cualquiera con el link, y NUNCA incluye reservas, compras ni comentarios:
@@ -35,6 +35,7 @@ async function listaPorToken(db: Db, token: string) {
 
 /** El deseo tal como se ve al compartirlo. Null si no existe, no es de esa lista o ya no está activo. */
 export async function itemParaCompartir(db: Db, token: string, itemId: string): Promise<ItemCompartido | null> {
+  if (!esUuid(itemId)) return null
   const l = await listaPorToken(db, token)
   if (!l) return null
   const [i] = await db.select({

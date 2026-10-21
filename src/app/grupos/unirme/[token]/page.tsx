@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { grupoPorInvitacion, juntarNombres } from '@/lib/groups'
 import { joinGroupAction } from '@/app/actions'
 import { AvatarStack } from '@/components/ui'
+import { BotonEnviar } from '@/components/BotonEnviar'
 
 // Unirse pide un toque (POST): WhatsApp abre los links solo para armar la vista previa,
 // y eso no tiene que sumar a nadie como dueño.
@@ -36,7 +37,7 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       {session?.userId ? (
         <form action={joinGroupAction} className="mt-2 w-full">
           <input type="hidden" name="invite" value={token} />
-          <button className="gr-btn-primary h-[58px] w-full rounded-[18px] border-[3px]">Unirme al grupo</button>
+          <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-[58px] w-full rounded-[18px] border-[3px]">Unirme al grupo</BotonEnviar>
         </form>
       ) : (
         <form action={async () => { 'use server'; await signIn('google', { redirectTo: `/grupos/unirme/${token}` }) }} className="mt-2 w-full">

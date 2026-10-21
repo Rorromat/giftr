@@ -59,6 +59,7 @@ export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult
  * Si ya está en un regalo abierto de este deseo (un doble toque, la lista y el detalle abiertos a la vez), es ese.
  */
 export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string): Promise<IniciarResult> {
+  if (!esUuid(itemId)) return { ok: false, reason: 'no_existe' }
   return db.transaction(async (tx): Promise<IniciarResult> => {
     const t = tx as unknown as Db
     // lock del deseo (como reserveItem): si a la vez se une al grupo, uno de los dos espera al otro

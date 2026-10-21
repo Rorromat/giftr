@@ -1,5 +1,6 @@
 import { codazoAction } from '@/app/actions'
 import { Icon } from '@/components/ui'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
 
 const RESULTADOS: Record<string, (para: string) => string> = {
@@ -22,7 +23,8 @@ export function Codazo({ token, para, plural, identified, resultado }: {
   identified: boolean
   resultado?: string
 }) {
-  const mensaje = resultado && RESULTADOS[resultado]?.(para)
+  // solo las claves propias: con ?codazo=__proto__ o valueOf la lista entera daba error
+  const mensaje = resultado && Object.hasOwn(RESULTADOS, resultado) ? RESULTADOS[resultado](para) : null
   const wa = encodeURIComponent(`👉 ¡Codazo! Cargá lo que querés en GiftR así sé qué regalarte: ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/mi-lista`)
   return (
     <section id="codazo" className="flex scroll-mt-6 flex-col gap-2.5">
@@ -41,7 +43,7 @@ export function Codazo({ token, para, plural, identified, resultado }: {
           </p>
         </div>
         {!identified && <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" className="gr-input shadow-none" />}
-        <button className="gr-btn-primary gr-btn--sm w-full">👉 Mandar un codazo</button>
+        <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">👉 Mandar un codazo</BotonEnviar>
       </form>
     </section>
   )

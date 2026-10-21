@@ -69,6 +69,7 @@ export type ReserveResult =
 // sinVencimiento: la reserva de un regalo grupal no vence (la maneja el encargado).
 export async function reserveItem(db: Db, itemId: string, viewer: Viewer, opts: { sinVencimiento?: boolean } = {}): Promise<ReserveResult> {
   if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
+  if (!esUuid(itemId)) return { ok: false, reason: 'no_existe' }
   return await db.transaction(async (tx): Promise<ReserveResult> => {
     // lock del item: serializa reservas concurrentes sobre el mismo item
     const [row] = await tx.select({ item: items, listId: lists.id })
@@ -203,6 +204,7 @@ export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer)
 }
 
 export async function releaseClaim(db: Db, claimId: string, viewer: Viewer): Promise<boolean> {
+  if (!esUuid(claimId)) return false
   const updated = await db.update(claims)
     .set({ estado: 'liberado', updatedAt: new Date() })
     .where(and(eq(claims.id, claimId), eq(claims.estado, 'reservado'), claimEsDe(viewer), noEsDeRegaloGrupal()))

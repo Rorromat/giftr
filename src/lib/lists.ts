@@ -153,6 +153,8 @@ export type ItemDetail =
   | ({ role: 'anonimo'; motivo: MotivoAnonimo; item: OwnerItemView } & ListaRegalador)
 
 export async function getItemForViewer(db: Db, shareToken: string, itemId: string, viewer: Viewer): Promise<ItemDetail | null> {
+  // un link cortado (/l/tok/item/3f2a1c) no es de ningún deseo: 404, no un error de la base
+  if (!esUuid(itemId)) return null
   const [row] = await db.select({ item: items, list: lists })
     .from(items)
     .innerJoin(lists, eq(items.listId, lists.id))

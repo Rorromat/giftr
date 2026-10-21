@@ -30,7 +30,7 @@ function Linea({ l }: { l: LineaCuenta }) {
         <input type="hidden" name="pagado" value="1" />
         {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
         <input type="hidden" name="monto" value={l.monto} />
-        <button className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</button>
+        <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</BotonEnviar>
       </form>
     </li>
   )
@@ -56,9 +56,9 @@ function Persona({ p }: { p: CuentaPersona }) {
           <input type="hidden" name="otroId" value={p.id} />
           {/* lo que dice el botón: si cambió mientras tanto, no salda nada */}
           <input type="hidden" name="neto" value={p.neto} />
-          <button className={`${leDebo ? 'gr-btn-primary' : 'gr-btn font-sans font-bold'} gr-btn--sm mt-1 w-full`}>
+          <BotonEnviar className={`${leDebo ? 'gr-btn-primary' : 'gr-btn font-sans font-bold'} gr-btn--sm mt-1 w-full`}>
             {p.neto === 0 ? 'Marcar todo como saldado' : leDebo ? `Ya le pagué todo (${pesos(-p.neto)})` : `Me pagó todo (${pesos(p.neto)})`}
-          </button>
+          </BotonEnviar>
         </form>
       )}
     </li>

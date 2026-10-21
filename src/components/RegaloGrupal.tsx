@@ -263,10 +263,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                       <input type="hidden" name="pagado" value={m.pagado ? '0' : '1'} />
                       {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
                       <input type="hidden" name="monto" value={m.monto ?? 0} />
-                      <button className={m.pagado ? 'min-h-11 px-1 text-xs font-bold underline underline-offset-2'
+                      <BotonEnviar className={m.pagado ? 'min-h-11 px-1 text-xs font-bold underline underline-offset-2'
                         : 'gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold'}>
                         {m.pagado ? 'Deshacer' : m.esYo ? 'Ya le pagué' : 'Me pagó'}
-                      </button>
+                      </BotonEnviar>
                     </form>
                   )}
                 </li>

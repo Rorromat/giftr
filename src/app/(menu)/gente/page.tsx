@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
@@ -50,7 +51,7 @@ function Persona({ c, hoy }: { c: Contacto; hoy: Date }) {
               className="absolute right-0 top-full z-20 mt-1 flex w-60 flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3 shadow-sticker-sm">
           <input type="hidden" name="listId" value={c.listId} />
           <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
-          <button className="gr-btn gr-btn--sm min-h-11 font-sans text-sm font-bold">Quitar de tu gente</button>
+          <BotonEnviar className="gr-btn gr-btn--sm min-h-11 font-sans text-sm font-bold">Quitar de tu gente</BotonEnviar>
         </form>
       </details>
     </li>

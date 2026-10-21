@@ -9,6 +9,7 @@ import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
 import { Icon, Starburst } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
+import { BotonEnviar } from '@/components/BotonEnviar'
 
 /** Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link. */
 function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
@@ -50,7 +51,7 @@ export async function Banners() {
               Agregar algo
             </Link>
             <form action={vistoCodazosAction}>
-              <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Listo</button>
+              <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Listo</BotonEnviar>
             </form>
           </div>
           {!avisos && <p className="text-xs font-semibold">Activá los avisos en Perfil para enterarte al toque.</p>}
@@ -85,14 +86,14 @@ export async function Banners() {
           </Link>
           <form action={postponeGroupGiftReminderAction}>
             <input type="hidden" name="giftId" value={r.giftId} />
-            <button className="min-h-11 text-xs font-bold text-gr-accent underline decoration-2 underline-offset-4">Sigue en pie: recordámelo en 2 semanas</button>
+            <BotonEnviar className="min-h-11 text-xs font-bold text-gr-accent underline decoration-2 underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
           </form>
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </div>
       ))}
       {notifs.length > 0 && (
         <form action={markNotifsReadAction}>
-          <button className="min-h-11 text-xs font-bold underline decoration-2 underline-offset-4">Marcar como leídas</button>
+          <BotonEnviar className="min-h-11 text-xs font-bold underline decoration-2 underline-offset-4">Marcar como leídas</BotonEnviar>
         </form>
       )}
     </div>

@@ -55,8 +55,9 @@ async function listaDeToken(token: string): Promise<string | null> {
   return row?.id ?? null
 }
 
-/** La lista del deseo, si el deseo es de la lista de ese token. */
+/** La lista del deseo, si el deseo es de la lista de ese token. Un id que no es de un deseo no es de ninguna. */
 async function listaDelItem(itemId: string, token: string): Promise<string | null> {
+  if (!esUuid(itemId)) return null
   const [row] = await db.select({ id: lists.id }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, token)))

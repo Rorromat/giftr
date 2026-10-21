@@ -10,6 +10,7 @@ import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
+import { BotonEnviar } from '@/components/BotonEnviar'
 
 // Después de cambiar un link o sacar a alguien (?nuevo=…), arriba se confirma qué pasó.
 const AVISOS: Record<string, string> = {
@@ -63,9 +64,9 @@ export default async function Grupo({ params, searchParams }: {
               <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
             </label>
             <div className="flex gap-2">
-              <button className="gr-btn-primary gr-btn--sm flex-1 rounded-[14px]">Guardar</button>
+              <BotonEnviar className="gr-btn-primary gr-btn--sm flex-1 rounded-[14px]">Guardar</BotonEnviar>
               {grupo.eventoFecha && (
-                <button name="quitar" value="1" formNoValidate className="gr-btn gr-btn--sm flex-none rounded-[14px] font-sans text-sm font-bold">Quitar</button>
+                <BotonEnviar name="quitar" value="1" formNoValidate className="gr-btn gr-btn--sm flex-none rounded-[14px] font-sans text-sm font-bold">Quitar</BotonEnviar>
               )}
             </div>
           </form>
