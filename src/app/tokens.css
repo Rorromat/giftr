@@ -263,7 +263,11 @@
     align-items: center;
     padding: 0 6px;
     container-type: inline-size; /* para ubicar el círculo verde en columnas (100cqw) */
+    transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1);
   }
+  /* En Agregar la barra se esconde: primero el + gira hasta ser una × y enseguida la barra baja.
+     Al salir de Agregar vuelve a subir, sin esperar. */
+  .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
   .gr-nav a {
     position: relative; z-index: 1; /* arriba del círculo verde */
     display: flex; justify-content: center; align-items: center; height: 48px;
@@ -287,7 +291,10 @@
     width: 50px; height: 50px; border-radius: 16px;
     border: 2.5px solid var(--gr-bg); background: var(--gr-accent); color: var(--gr-ink);
     transform: rotate(-6deg);
+    transition: transform 240ms cubic-bezier(0.34, 1.4, 0.5, 1);
   }
+  .gr-nav a:active > .gr-nav__add { transform: rotate(-6deg) scale(0.88); } /* se hunde al apretarlo */
+  .gr-nav[data-oculta] a > .gr-nav__add { transform: rotate(39deg) scale(0.92); }
 
   /* Rotaciones decorativas */
   .gr-tilt-l { transform: rotate(-1.2deg); }
@@ -298,8 +305,11 @@
    opacidad: un transform haría que los botones fijos de la página (como "Mandala por WhatsApp") se corran. */
 .gr-seccion { animation: gr-aparece 180ms ease-out; }
 @keyframes gr-aparece { from { opacity: 0; } }
+/* Agregar sube como una hoja desde abajo, desde donde estaba el +, mientras la barra se esconde. */
+.gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .gr-btn, .gr-btn-primary, .gr-nav a, .gr-nav__marca { transition: none; }
-  .gr-seccion { animation: none; }
+  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav__marca, .gr-nav a > .gr-nav__add { transition: none; }
+  .gr-seccion, .gr-hoja { animation: none; }
 }
