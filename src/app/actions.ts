@@ -11,9 +11,11 @@ import {
   anotarCuenta, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
-import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
+import {
+  CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, restoreItem, updateItem, type CambiosDeseo, type NewItemData,
+} from '@/lib/items'
 import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
-import { markBought, releaseClaim, reserveItem, tieneReservaActiva } from '@/lib/claims'
+import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
@@ -70,8 +72,9 @@ function deseoDelForm(formData: FormData): NewItemData | null {
   const p = str(formData, 'prioridad')
   const cant = Math.trunc(Number(str(formData, 'cantidad') ?? '1'))
   const foto = str(formData, 'fotoUrl')
+  const tipo = str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto'
   return {
-    tipo: str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto',
+    tipo,
     titulo,
     notas: str(formData, 'notas'),
     precio: str(formData, 'precio'),
@@ -79,7 +82,8 @@ function deseoDelForm(formData: FormData): NewItemData | null {
     categoria: str(formData, 'categoria'),
     prioridad: p === 'mucho' || p === 'suelta' ? p : 'gustaria',
     cantidad: Number.isFinite(cant) && cant >= 1 ? cant : 1,
-    repetible: formData.get('repetible') === 'on',
+    // solo las ideas se repiten (en "Quiero ESTO" el casillero se esconde, pero puede venir tildado de antes)
+    repetible: tipo === 'idea' && formData.get('repetible') === 'on',
     linkTienda: httpUrl(str(formData, 'linkTienda')),
     // un link de foto o una foto subida desde el teléfono (/foto/deseo/:id)
     fotoUrl: httpUrl(foto) ?? (foto && esUrlFotoDeseo(foto) ? foto : undefined),
@@ -122,9 +126,20 @@ export async function archiveItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const estado = str(formData, 'estado') === 'no_lo_quiero' ? 'no_lo_quiero' : 'lo_tengo'
-  await archiveItem(db, str(formData, 'itemId')!, session.userId, estado)
+  await archiveItem(db, str(formData, 'itemId') ?? '', session.userId, estado)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+}
+
+/** "Volver a mi lista" desde Archivados. */
+export async function restoreItemAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await restoreItem(db, str(formData, 'itemId') ?? '', session.userId)
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
 }
 
 export async function updatePriorityAction(formData: FormData) {
@@ -288,8 +303,8 @@ export async function reserveAction(_: EstadoForm, formData: FormData): Promise<
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
   const volver = volverALista(formData, token)
-  // Un doble toque manda el segundo envío con la reserva del primero ya hecha: no hay que decirle que lo agarró otro.
-  if (r.ok || (r.reason === 'sin_stock' && await tieneReservaActiva(db, itemId, quien.viewer))) {
+  // Un doble toque manda el segundo envío con la reserva del primero ya hecha: reserveItem le devuelve esa.
+  if (r.ok) {
     // si arriba quedó el cartel de una reserva anterior que no salió (?reserva=), se va
     if (str(formData, 'conCartel')) redirect(volver)
     return null
@@ -376,8 +391,19 @@ export async function noSoyElInvitadoAction() {
 
 export async function boughtAction(formData: FormData) {
   const viewer = await getViewer()
-  const token = str(formData, 'token')!
-  await markBought(db, str(formData, 'claimId')!, viewer, str(formData, 'nota'))
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  const ok = await markBought(db, str(formData, 'claimId') ?? '', viewer, str(formData, 'nota'))
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  // casi siempre: la reserva había vencido y el lugar ya lo tomó otro. Que se entere, en vez de que no pase nada.
+  if (!ok && esUuid(itemId) && (await listaDelItem(itemId, token))) redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
+}
+
+/** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva. */
+export async function unboughtAction(formData: FormData) {
+  const viewer = await getViewer()
+  const token = str(formData, 'token') ?? ''
+  await desmarcarComprado(db, str(formData, 'claimId') ?? '', viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${str(formData, 'itemId')}`)
 }

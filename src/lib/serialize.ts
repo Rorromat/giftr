@@ -25,6 +25,8 @@ export type ClaimView = {
   estado: 'reservado' | 'comprado'
   claimerNombre: string
   esMia: boolean
+  /** Solo en la reserva propia sin comprar: hasta cuándo dura. */
+  vence: Date | null
   notaQueCompre: string | null
   /** Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. */
   grupal: { giftId: string; personas: string[]; soyParte: boolean } | null
@@ -32,15 +34,19 @@ export type ClaimView = {
 
 export type GiverItemView = OwnerItemView & {
   disponible: boolean
-  quedan: number
+  /** Null en una idea que se puede repetir: no tiene cupo. */
+  quedan: number | null
   claims: ClaimView[]
 }
+
+/** "Se puede repetir" es solo de las ideas: un "Quiero ESTO" con la marca (de antes de que se forzara) tiene cupo. */
+export const esRepetible = (i: { tipo: 'exacto' | 'idea'; repetible: boolean }) => i.tipo === 'idea' && i.repetible
 
 export function pickItemFields(i: ItemRow): OwnerItemView {
   return {
     id: i.id, tipo: i.tipo, titulo: i.titulo, notas: i.notas, fotoUrl: i.fotoUrl,
     precio: i.precio, rangoPrecio: i.rangoPrecio, categoria: i.categoria,
-    prioridad: i.prioridad, cantidad: i.cantidad, repetible: i.repetible,
+    prioridad: i.prioridad, cantidad: i.cantidad, repetible: esRepetible(i),
     estadoDueno: i.estadoDueno, linkTienda: i.linkTienda,
   }
 }

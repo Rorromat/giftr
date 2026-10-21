@@ -17,6 +17,16 @@ export function hoyLocal(ahora = new Date()): Date {
   return new Date(Date.UTC(y, m - 1, d))
 }
 
+/** El momento en que empieza, en la zona de la app, un día de los de acá (Date UTC a medianoche). */
+export function inicioDelDia(dia: Date): Date {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: ZONA_HORARIA, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+  }).formatToParts(dia).map((x) => [x.type, Number(x.value)]))
+  // cuánto le lleva la zona a UTC en ese momento (Argentina: 3 horas)
+  const diferencia = dia.getTime() - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute)
+  return new Date(dia.getTime() + diferencia)
+}
+
 const esBisiesto = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
 
 /** El día/mes en un año dado; el 29/2 cae el 28/2 en los años que no son bisiestos. */

@@ -1,8 +1,10 @@
-import { and, eq, inArray } from 'drizzle-orm'
-import { claims, items, lists, notifications } from '@/db/schema'
+import { and, eq, inArray, ne } from 'drizzle-orm'
+import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { pickItemFields, type OwnerItemView } from '@/lib/serialize'
+import { esRepetible, pickItemFields, type OwnerItemView } from '@/lib/serialize'
 import { esDuenoSql, esUuid } from '@/lib/groups'
+import { noEsDeRegaloGrupal } from '@/lib/claims'
+import { dejarAviso } from '@/lib/notifications'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -20,28 +22,13 @@ export type NewItemData = {
 
 /** Agrega a la lista personal del usuario o, con listId, a un grupo del que es dueño. */
 export async function createItem(db: Db, userId: string, data: NewItemData, listId?: string): Promise<OwnerItemView | null> {
-  try {
-    if (listId !== undefined && !esUuid(listId)) return null
-    const [list] = await db.select().from(lists)
-      .where(listId ? and(eq(lists.id, listId), esDuenoSql(db, userId)) : eq(lists.ownerId, userId))
-    if (!list) return null
-    const [item] = await db.insert(items).values({ ...data, listId: list.id }).returning()
-    return pickItemFields(item)
-  } catch (e: any) {
-    // Check for PostgreSQL UUID validation error (code 22P02: invalid input syntax for type uuid)
-    // Try multiple possible locations for the error code
-    if (
-      e?.code === '22P02' ||
-      e?.cause?.code === '22P02' ||
-      e?.originalError?.code === '22P02'
-    ) return null
-
-    // Also check error message
-    const msg = (e?.message || e?.toString?.() || String(e)).toLowerCase()
-    if (msg.includes('invalid input syntax') && msg.includes('uuid')) return null
-
-    throw e
-  }
+  // un id que no es UUID no es de nadie (y la base lo rechazaría con un error)
+  if (!esUuid(userId) || (listId !== undefined && !esUuid(listId))) return null
+  const [list] = await db.select().from(lists)
+    .where(listId ? and(eq(lists.id, listId), esDuenoSql(db, userId)) : eq(lists.ownerId, userId))
+  if (!list) return null
+  const [item] = await db.insert(items).values({ ...soloIdeasSeRepiten(data), listId: list.id }).returning()
+  return pickItemFields(item)
 }
 
 async function itemDelDueno(db: Db, itemId: string, userId: string) {
@@ -52,14 +39,19 @@ async function itemDelDueno(db: Db, itemId: string, userId: string) {
   return !!row
 }
 
-async function notifyActiveClaimers(db: Db, itemId: string, tipo: 'item_baja' | 'item_editado') {
-  const activos = await db.select().from(claims)
+/** "Se puede repetir" es de las ideas: en un "Quiero ESTO" no vale (si no, cualquiera lo reserva sin tope). */
+function soloIdeasSeRepiten<T extends { tipo?: 'exacto' | 'idea'; repetible?: boolean }>(data: T, tipoAntes?: 'exacto' | 'idea'): T {
+  return (data.tipo ?? tipoAntes) === 'exacto' ? { ...data, repetible: false } : data
+}
+
+/** Los que regalan este deseo: lo reservaron o compraron, o están en un regalo grupal vigente (no solo el encargado). */
+async function genteDelDeseo(db: Db, itemId: string) {
+  const reservas = await db.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId }).from(claims)
     .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado'])))
-  if (activos.length) {
-    await db.insert(notifications).values(activos.map((c) => ({
-      userId: c.claimerUserId, guestId: c.claimerGuestId, tipo, itemId,
-    })))
-  }
+  const miembros = await db.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
+    .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
+    .where(and(eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado'])))
+  return [...reservas, ...miembros.map((m) => ({ userId: m.userId, guestId: null }))]
 }
 
 /** Lo que se puede cambiar de un deseo; null borra un campo opcional (las notas, el precio, la foto…). */
@@ -67,16 +59,25 @@ export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', '
 type Opcional = (typeof CAMPOS_OPCIONALES)[number]
 export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null }
 
+/** Lo que le importa a quien regala (qué comprar). La prioridad y la categoría no le cambian el regalo: no le avisan. */
+const AVISAN: (keyof CambiosDeseo)[] = ['titulo', 'notas', 'fotoUrl', 'linkTienda', 'precio', 'rangoPrecio', 'cantidad', 'tipo', 'repetible']
+
 export async function updateItem(db: Db, itemId: string, userId: string, data: CambiosDeseo): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
   const [antes] = await db.select().from(items).where(eq(items.id, itemId))
+  // Uno archivado no se edita (una pantalla vieja, la prioridad desde Mi lista): avisaría de algo que ya no está.
+  if (antes.estadoDueno !== 'activo') return false
   // Solo lo que cambió: guardar sin tocar nada no les manda un aviso a los que lo reservaron.
   const cambios = Object.fromEntries(
-    Object.entries(data).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
+    Object.entries(soloIdeasSeRepiten(data, antes.tipo)).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
   ) as CambiosDeseo
   if (!Object.keys(cambios).length) return true
   await db.update(items).set(cambios).where(eq(items.id, itemId))
-  await notifyActiveClaimers(db, itemId, 'item_editado')
+  // Bajar la cantidad por debajo de lo reservado también llega así (sin nada distinto para el dueño, que no lo sabe).
+  // La marca de repetible, solo si cambia de verdad: un "Quiero ESTO" de antes que la tenía no se repetía igual.
+  const despues = { ...antes, ...cambios }
+  const avisar = AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
+  if (avisar) await dejarAviso(db, itemId, 'item_editado', await genteDelDeseo(db, itemId))
   return true
 }
 
@@ -93,9 +94,52 @@ export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
   }
 }
 
+/**
+ * "Ya lo tengo" / "Ya no lo quiero": sale de la lista. Solo si estaba activo: un doble toque o una pantalla vieja no
+ * vuelve a avisar ni cambia el motivo. Devuelve si lo archivó ahora. En la misma transacción, lo de los que regalan, así
+ * nada les queda trabado sobre un deseo que ya no pueden abrir:
+ * - Las reservas sin comprar se liberan y a cada uno se le avisa que elija otro.
+ * - Los regalos grupales abiertos se cancelan (se libera su reserva) y se les avisa a todos los que estaban.
+ * - Lo comprado queda como está. Con "Ya lo tengo" no se avisa (seguramente ya se lo dieron); con "Ya no lo quiero",
+ *   sí, para que lo cambie si puede.
+ * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
+ */
 export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero'): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
-  await db.update(items).set({ estadoDueno: estado }).where(eq(items.id, itemId))
-  await notifyActiveClaimers(db, itemId, 'item_baja')
-  return true
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // el update bloquea el deseo, como reserveItem: una reserva que llega a la vez espera y lo encuentra archivado
+    const [archivado] = await t.update(items).set({ estadoDueno: estado })
+      .where(and(eq(items.id, itemId), eq(items.estadoDueno, 'activo')))
+      .returning({ id: items.id })
+    if (!archivado) return false
+    const ahora = new Date()
+
+    const liberadas = await t.update(claims).set({ estado: 'liberado', updatedAt: ahora })
+      .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'reservado'), noEsDeRegaloGrupal()))
+      .returning({ userId: claims.claimerUserId, guestId: claims.claimerGuestId })
+    await dejarAviso(t, itemId, 'item_baja', liberadas)
+
+    const cancelados = await t.update(groupGifts).set({ estado: 'cancelado' })
+      .where(and(eq(groupGifts.itemId, itemId), eq(groupGifts.estado, 'abierto')))
+      .returning({ id: groupGifts.id, claimId: groupGifts.claimId })
+    if (cancelados.length) {
+      await t.update(claims).set({ estado: 'liberado', updatedAt: ahora }).where(inArray(claims.id, cancelados.map((g) => g.claimId)))
+      const estaban = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
+        .where(inArray(groupGiftMembers.giftId, cancelados.map((g) => g.id)))
+      await dejarAviso(t, itemId, 'regalo_baja', estaban.map((m) => ({ userId: m.userId, guestId: null })))
+    }
+
+    if (estado === 'no_lo_quiero') await dejarAviso(t, itemId, 'item_baja_comprado', await genteDelDeseo(t, itemId))
+    return true
+  })
+}
+
+/** "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre). */
+export async function restoreItem(db: Db, itemId: string, userId: string): Promise<boolean> {
+  if (!(await itemDelDueno(db, itemId, userId))) return false
+  const filas = await db.update(items).set({ estadoDueno: 'activo' })
+    .where(and(eq(items.id, itemId), ne(items.estadoDueno, 'activo')))
+    .returning({ id: items.id })
+  return filas.length > 0
 }

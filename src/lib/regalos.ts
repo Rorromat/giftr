@@ -7,6 +7,7 @@ import { reserveItem, type ReserveResult } from '@/lib/claims'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
 import { accesoALista } from '@/lib/acceso'
+import { dejarAviso } from '@/lib/notifications'
 
 export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
@@ -39,11 +40,12 @@ export type RegaloView = {
   montoTotal: number | null
 }
 
-export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult, { ok: true }>
+export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult, { ok: true }> | { ok: false; reason: 'ya_comprado' }
 
 /**
  * Arma un regalo grupal sobre un deseo: el usuario queda de encargado.
  * Si ya lo tenía reservado solo, convierte esa reserva (y deja de vencer); si no, lo reserva.
+ * Si ya está en un regalo abierto de este deseo (un doble toque, la lista y el detalle abiertos a la vez), es ese.
  */
 export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string): Promise<IniciarResult> {
   return db.transaction(async (tx): Promise<IniciarResult> => {
@@ -53,9 +55,18 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
     if (!item) return { ok: false, reason: 'no_existe' }
     if (await esOFueDuenoDeLista(t, item.listId, userId)) return { ok: false, reason: 'propio' }
     if (item.estado !== 'activo') return { ok: false, reason: 'archivado' }
-    const [propia] = await t.select({ id: claims.id }).from(claims)
-      .where(and(eq(claims.itemId, itemId), eq(claims.claimerUserId, userId), eq(claims.estado, 'reservado'),
-        notInArray(claims.id, t.select({ id: groupGifts.claimId }).from(groupGifts))))
+    const [abierto] = await t.select({ id: groupGifts.id }).from(groupGifts)
+      .where(and(eq(groupGifts.itemId, itemId), eq(groupGifts.estado, 'abierto'), or(
+        eq(groupGifts.organizerUserId, userId),
+        inArray(groupGifts.id, t.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers).where(eq(groupGiftMembers.userId, userId))),
+      )))
+    if (abierto) return { ok: true, giftId: abierto.id }
+    const suyas = await t.select({ id: claims.id, estado: claims.estado, regalo: groupGifts.id }).from(claims)
+      .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
+      .where(and(eq(claims.itemId, itemId), eq(claims.claimerUserId, userId), inArray(claims.estado, ['reservado', 'comprado'])))
+    const propia = suyas.find((c) => c.estado === 'reservado' && !c.regalo)
+    // Una persona, una reserva por deseo: si ya lo compró (suelto o en otro regalo), no arma otro encima.
+    if (suyas.some((c) => c !== propia)) return { ok: false, reason: 'ya_comprado' }
     let claimId = propia?.id
     if (claimId) {
       await t.update(claims).set({ expiresAt: null, updatedAt: new Date() }).where(eq(claims.id, claimId))
@@ -105,14 +116,22 @@ export async function salirDeRegalo(db: Db, giftId: string, userId: string): Pro
   })
 }
 
-/** Solo el encargado y mientras está abierto: libera el deseo para que lo reserve otro. */
+/**
+ * Solo el encargado y mientras está abierto: libera el deseo para que lo reserve otro (también si antes era su reserva).
+ * A los que se habían sumado se les avisa: si no, el regalo les desaparece de "En curso" sin explicación.
+ */
 export async function cancelarRegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
+  if (!esUuid(giftId)) return false
   return db.transaction(async (tx) => {
-    const [g] = await tx.update(groupGifts).set({ estado: 'cancelado' })
+    const t = tx as unknown as Db
+    const [g] = await t.update(groupGifts).set({ estado: 'cancelado' })
       .where(and(eq(groupGifts.id, giftId), eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'abierto')))
-      .returning({ claimId: groupGifts.claimId })
+      .returning({ claimId: groupGifts.claimId, itemId: groupGifts.itemId })
     if (!g) return false
-    await tx.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, g.claimId))
+    await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, g.claimId))
+    const estaban = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
+      .where(and(eq(groupGiftMembers.giftId, giftId), ne(groupGiftMembers.userId, userId)))
+    await dejarAviso(t, g.itemId, 'regalo_cancelado', estaban.map((m) => ({ userId: m.userId, guestId: null })))
     return true
   })
 }

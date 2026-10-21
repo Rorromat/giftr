@@ -23,16 +23,33 @@ import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag 
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
 
 function estadoNoDisponible(item: Tarjeta) {
-  if (item.claims.some((c) => c.estado === 'comprado')) return '✓ Comprado'
-  const grupal = item.claims.find((c) => c.grupal)?.grupal
-  if (grupal) return grupal.soyParte ? 'Estás en el regalo grupal' : `Regalo grupal de ${grupal.personas.length} · sumate`
-  return `Reservado por ${item.claims[0]?.claimerNombre ?? 'alguien'}`
+  // comprado solo si ya se compró todo; si no, quién se ocupa (sin esconder a los demás detrás del primero)
+  if (item.claims.length && item.claims.every((c) => c.estado === 'comprado')) return '✓ Comprado'
+  const grupal = item.claims.find((c) => c.grupal && c.estado === 'reservado')?.grupal
+  if (grupal && item.claims.length === 1) return grupal.soyParte ? 'Estás en el regalo grupal' : `Regalo grupal de ${grupal.personas.length} · sumate`
+  const primero = item.claims.find((c) => c.esMia) ?? item.claims[0]
+  const otros = item.claims.length - 1
+  return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`
 }
 
-function YaLoReservaste({ grupal = false }: { grupal?: boolean }) {
+/**
+ * Cuántas quedan de un deseo de varias unidades. Si el dueño bajó la cantidad por debajo de lo reservado, lo dice (en vez
+ * de "quedan 0 de 2"), para que se acomoden entre ellos. Una idea que se puede repetir no tiene cupo.
+ */
+function cupo(item: Tarjeta) {
+  if (item.quedan === null) return null
+  const ocupados = item.claims.length
+  if (ocupados > item.cantidad) return `Pide ${item.cantidad} y hay ${ocupados} reservas: arréglenlo en el deseo`
+  return item.cantidad > 1 ? `quedan ${item.quedan} de ${item.cantidad}` : null
+}
+
+function YaLoReservaste({ item }: { item: Tarjeta }) {
+  const grupal = item.claims.some((c) => c.grupal?.soyParte)
+  const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
   return (
     <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-gr-ink px-3 text-[13px] font-bold text-gr-accent">
-      <Icon name={grupal ? 'users' : 'lock'} size={14} strokeWidth={2.6} />{grupal ? 'En el regalo grupal' : 'Ya lo reservaste'}
+      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.6} />
+      {grupal ? 'En el regalo grupal' : compraste ? 'Ya lo compraste' : 'Ya lo reservaste'}
     </span>
   )
 }
@@ -99,8 +116,9 @@ export default async function ListaAjena({
     : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
 
   const heroAccion = hero && (hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
-    ? <YaLoReservaste grupal={hero.claims.some((c) => c.grupal?.soyParte)} />
+    ? <YaLoReservaste item={hero} />
     : reservar(hero.id, 'primary'))
+  const heroCupo = hero && cupo(hero)
 
   return (
     <main className="flex flex-col gap-3 pb-32 pt-[52px]">
@@ -178,7 +196,7 @@ export default async function ListaAjena({
                 {hero.titulo}
               </Link>
               {hero.notas && <p className="text-sm leading-snug">{hero.notas}</p>}
-              {hero.cantidad > 1 && hero.quedan !== null && <p className="text-xs font-semibold text-gr-muted">quedan {hero.quedan} de {hero.cantidad}</p>}
+              {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
             </div>
             <div className="flex items-center gap-2">
               {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
@@ -192,6 +210,7 @@ export default async function ListaAjena({
         <ul className="mt-1.5 grid grid-cols-2 items-start gap-3.5 pr-[5px]">
           {resto.map((item, i) => {
             const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
+            const cuantas = cupo(item)
             return (
               <li key={item.id} className="gr-sticker relative rounded-[20px] shadow-[4px_4px_0_var(--gr-ink)]"
                   style={{ transform: `rotate(${i % 2 ? 1 : -1}deg)` }}>
@@ -210,11 +229,9 @@ export default async function ListaAjena({
                     {item.titulo}
                   </Link>
                   {(item.precio ?? item.rangoPrecio) && <p className="text-xs font-semibold">{item.precio ?? item.rangoPrecio}</p>}
-                  {item.cantidad > 1 && item.quedan !== null && <p className="text-xs text-gr-muted">quedan {item.quedan} de {item.cantidad}</p>}
+                  {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
                   <div className="mt-1 flex flex-col items-start gap-0.5">
-                    {item.disponible && (yaEsMio
-                      ? <YaLoReservaste grupal={item.claims.some((c) => c.grupal?.soyParte)} />
-                      : reservar(item.id))}
+                    {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
                     <Link href={`/l/${token}/item/${item.id}`}
                           className="inline-flex min-h-11 items-center text-[13px] font-bold underline decoration-2 underline-offset-4">
                       Ver más

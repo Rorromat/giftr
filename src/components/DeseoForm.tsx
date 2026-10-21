@@ -1,3 +1,4 @@
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoField } from '@/components/FotoField'
 import { Hearts, PRIORIDADES } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
@@ -14,7 +15,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
   boton: string
 }) {
   return (
-    <form action={action} className="mt-3.5 flex flex-col gap-4">
+    <form action={action} className="group/deseo mt-3.5 flex flex-col gap-4">
       {deseo && <input type="hidden" name="itemId" value={deseo.id} />}
       {grupos.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -81,12 +82,14 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
       </div>
 
       <textarea name="notas" placeholder="Notas (talle, color…)" defaultValue={deseo?.notas ?? ''} className="gr-input min-h-24" />
-      <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
-        <input type="checkbox" name="repetible" defaultChecked={deseo?.repetible} className="size-[22px] accent-gr-ink" /> Se puede repetir (para ideas)
+      {/* solo para "Algo así": un "Quiero ESTO" no se repite (el servidor lo guarda sin la marca aunque venga tildado) */}
+      <label className="hidden min-h-11 items-center gap-3 text-sm font-semibold group-has-[input[name=tipo][value=idea]:checked]/deseo:flex">
+        <input type="checkbox" name="repetible" defaultChecked={deseo?.repetible} className="size-[22px] accent-gr-ink" />
+        Se puede repetir (varios pueden regalarte algo así)
       </label>
 
       <div className="sticky bottom-[26px] z-10 mt-2">
-        <button className="gr-btn-primary h-[60px] w-full rounded-[20px] border-[3px] text-[21px]">{boton}</button>
+        <BotonEnviar pendiente="Guardando…" className="gr-btn-primary h-[60px] w-full rounded-[20px] border-[3px] text-[21px]">{boton}</BotonEnviar>
       </div>
     </form>
   )

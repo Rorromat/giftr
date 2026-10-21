@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { misCuentas, pesos, type CuentaPersona, type LineaCuenta, type RegaloEnCurso } from '@/lib/regalos'
 import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { ERRORES_COMPRA } from '@/components/RegaloGrupal'
 import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
@@ -64,7 +65,16 @@ function CancelarRegalo({ giftId }: { giftId: string }) {
   return (
     <form action={cancelGroupGiftAction}>
       <input type="hidden" name="giftId" value={giftId} />
-      <button className={linkSubrayado}>Cancelar el regalo</button>
+      <BotonEnviar className={linkSubrayado}>Cancelar el regalo</BotonEnviar>
+    </form>
+  )
+}
+
+function MeBajo({ giftId }: { giftId: string }) {
+  return (
+    <form action={leaveGroupGiftAction}>
+      <input type="hidden" name="giftId" value={giftId} />
+      <BotonEnviar className={linkSubrayado}>Me bajo</BotonEnviar>
     </form>
   )
 }
@@ -95,10 +105,7 @@ function SinLink({ r, error }: { r: RegaloEnCurso; error?: string }) {
   return (
     <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
       <span className="flex-1">Ya no tenés el link de esta lista. Si no vas a poner, bajate desde acá.</span>
-      <form action={leaveGroupGiftAction}>
-        <input type="hidden" name="giftId" value={r.giftId} />
-        <button className={linkSubrayado}>Me bajo</button>
-      </form>
+      <MeBajo giftId={r.giftId} />
     </div>
   )
 }
@@ -163,10 +170,11 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
                   </span>
                   {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
                 </QuizasLink>
+                {/* de antes: ahora sacar un deseo de la lista cancela sus regalos abiertos (y les avisa) */}
                 {!r.sigueEnLaLista ? (
                   <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
                     <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>
-                    {r.soyEncargado && <CancelarRegalo giftId={r.giftId} />}
+                    {r.soyEncargado ? <CancelarRegalo giftId={r.giftId} /> : <MeBajo giftId={r.giftId} />}
                   </div>
                 ) : !r.href && <SinLink r={r} error={errorDe(r.giftId)} />}
               </li>

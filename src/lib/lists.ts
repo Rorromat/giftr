@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { expireStaleClaims } from '@/lib/claims'
+import { expireStaleClaims, miReservaVencida } from '@/lib/claims'
 import { pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { duenosDeLista, esDuenoSql, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
@@ -27,7 +27,7 @@ async function loadClaimViews(db: Db, itemIds: string[], viewer: Viewer) {
   if (!itemIds.length) return new Map<string, ClaimView[]>()
   const rows = await db.select({
     id: claims.id, itemId: claims.itemId, estado: claims.estado,
-    notaQueCompre: claims.notaQueCompre,
+    notaQueCompre: claims.notaQueCompre, expiresAt: claims.expiresAt,
     claimerUserId: claims.claimerUserId, claimerGuestId: claims.claimerGuestId,
     userNombre: users.nombre, guestNombre: guestIdentities.nombre,
   }).from(claims)
@@ -49,12 +49,15 @@ async function loadClaimViews(db: Db, itemIds: string[], viewer: Viewer) {
   for (const r of rows) {
     const gente = grupales.filter((g) => g.claimId === r.id)
       .sort((a, b) => Number(b.userId === b.encargado) - Number(a.userId === a.encargado))
+    const esMia = (!!viewer.userId && r.claimerUserId === viewer.userId) ||
+                  (!!viewer.guestId && r.claimerGuestId === viewer.guestId)
     const view: ClaimView = {
       id: r.id,
       estado: r.estado as 'reservado' | 'comprado',
       claimerNombre: r.userNombre ?? r.guestNombre ?? 'Alguien',
-      esMia: (!!viewer.userId && r.claimerUserId === viewer.userId) ||
-             (!!viewer.guestId && r.claimerGuestId === viewer.guestId),
+      esMia,
+      // cuándo vence una reserva es cosa de quien la hizo
+      vence: esMia && r.estado === 'reservado' ? r.expiresAt : null,
       notaQueCompre: r.notaQueCompre,
       grupal: gente.length
         ? { giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId) }
@@ -66,9 +69,10 @@ async function loadClaimViews(db: Db, itemIds: string[], viewer: Viewer) {
 }
 
 function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimView[]): GiverItemView {
-  const ocupados = itemClaims.length
-  const quedan = Math.max(0, row.cantidad - ocupados)
-  return { ...row, claims: itemClaims, quedan, disponible: row.repetible || quedan > 0 }
+  // una idea que se puede repetir no tiene cupo: la reservan todos los que quieran (como en reserveItem)
+  if (row.repetible) return { ...row, claims: itemClaims, quedan: null, disponible: true }
+  const quedan = Math.max(0, row.cantidad - itemClaims.length)
+  return { ...row, claims: itemClaims, quedan, disponible: quedan > 0 }
 }
 
 function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaRegalador {
@@ -134,7 +138,11 @@ export async function getOwnList(db: Db, userId: string) {
 
 export type ItemDetail =
   | ({ role: 'owner'; item: OwnerItemView } & ListaDueno)
-  | ({ role: 'giver'; item: GiverItemView; comments: CommentView[]; regalos: RegaloView[] } & ListaRegalador)
+  | ({
+    role: 'giver'; item: GiverItemView; comments: CommentView[]; regalos: RegaloView[]
+    /** Su reserva de este deseo venció hace poco y no tiene otra: para marcarlo comprado o reservarlo de nuevo. */
+    miVencida: { claimId: string; vencio: Date } | null
+  } & ListaRegalador)
   | ({ role: 'anonimo'; motivo: MotivoAnonimo; item: OwnerItemView } & ListaRegalador)
 
 export async function getItemForViewer(db: Db, shareToken: string, itemId: string, viewer: Viewer): Promise<ItemDetail | null> {
@@ -153,7 +161,10 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
   if (acceso !== 'regalador') return { role: 'anonimo', motivo: acceso, ...paraRegalador(row.list, duenos), item: pickItemFields(row.item) }
 
   await expireStaleClaims(db, itemId)
-  const [claimMap, regalos] = await Promise.all([loadClaimViews(db, [itemId], viewer), regalosDeItem(db, itemId, viewer)])
+  const [claimMap, regalos, vencida] = await Promise.all([
+    loadClaimViews(db, [itemId], viewer), regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
+  ])
+  const itemClaims = claimMap.get(itemId) ?? []
   const commentRows = await db.select({
     id: comments.id, texto: comments.texto, createdAt: comments.createdAt,
     userNombre: users.nombre, guestNombre: guestIdentities.nombre,
@@ -165,8 +176,9 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
 
   return {
     role: 'giver', ...paraRegalador(row.list, duenos),
-    item: toGiverView(pickItemFields(row.item), claimMap.get(itemId) ?? []),
+    item: toGiverView(pickItemFields(row.item), itemClaims),
     regalos,
+    miVencida: itemClaims.some((c) => c.esMia) || regalos.some((r) => r.soyParte) ? null : vencida,
     comments: commentRows.map((c) => ({
       id: c.id, texto: c.texto, createdAt: c.createdAt,
       autorNombre: c.userNombre ?? c.guestNombre ?? 'Alguien',

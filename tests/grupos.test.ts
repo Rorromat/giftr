@@ -197,8 +197,9 @@ test('un co-dueño, y después ex, no recibe avisos de lo que compró como regal
   await salirDeGrupo(db, grupo.id, intruso.id)
   await updateItem(db, vela.id, delfina.id, { notas: 'la del frasco' })
   expect(await getUnreadNotifications(db, { userId: intruso.id })).toEqual([])
-  // los avisos están (la compra sigue a su nombre), pero nunca se le muestran: le dirían que lo editaron porque alguien lo compró
-  expect(await db.select().from(notifications).where(eq(notifications.userId, intruso.id))).toHaveLength(2)
+  // el aviso está (la compra sigue a su nombre), pero nunca se le muestra: le diría que lo editaron porque alguien lo compró.
+  // Uno solo: la segunda edición sube el que seguía sin leer en vez de sumar otro igual.
+  expect(await db.select().from(notifications).where(eq(notifications.userId, intruso.id))).toHaveLength(1)
 })
 
 test('sacar a quien se sumó por error: deja de editar, sigue ciego como uno que sale, y la invitación cambia', async () => {

@@ -8,7 +8,7 @@ import { hoyLocal, rotuloFechaGrupo } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
-import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
+import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
 // Después de cambiar un link o sacar a alguien (?nuevo=…), arriba se confirma qué pasó.
@@ -137,6 +137,7 @@ export default async function Grupo({ params, searchParams }: {
       )}
 
       <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} />
+      <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
 
       <div className="mt-4 flex flex-col gap-1">
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}

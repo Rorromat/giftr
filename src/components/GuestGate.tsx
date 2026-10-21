@@ -3,6 +3,7 @@
 import { useActionState, useRef } from 'react'
 import { reserveAction } from '@/app/actions'
 import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
+import { BotonEnviar } from '@/components/BotonEnviar'
 
 const BUTTON = {
   primary: 'gr-btn-primary gr-btn--sm w-full',
@@ -16,6 +17,8 @@ const MOTIVOS: Record<string, string> = {
   no_existe: 'Ese deseo ya no está en la lista.',
   propio: 'En tu propia lista no podés reservar.',
   sin_identidad: 'Para reservar, decinos quién sos.',
+  // "Ya lo compré" sobre una reserva que había vencido, cuando el lugar ya lo tomó otro
+  vencida: 'Tu reserva ya había vencido y ahora no queda lugar. Si lo habías comprado, contalo en el hilo de abajo.',
 }
 
 /**
@@ -32,11 +35,12 @@ export function CartelReserva({ motivo, veTodo, conNombre }: { motivo?: string; 
   )
 }
 
-export function GuestGate({ token, itemId, identified, variant = 'secondary', volver, conCartel = false }: {
+export function GuestGate({ token, itemId, identified, variant = 'secondary', volver, conCartel = false, texto = 'Reservar' }: {
   token: string
   itemId: string
   identified: boolean
   variant?: keyof typeof BUTTON
+  texto?: string
   /** La página donde está el botón, con sus filtros: si la reserva no sale, se vuelve ahí con el motivo. */
   volver: string
   /** Si la página muestra el cartel de una reserva que no salió: cuando esta sale, se vuelve sin él. */
@@ -53,7 +57,7 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', vo
         <input type="hidden" name="itemId" value={itemId} />
         <input type="hidden" name="volver" value={volver} />
         {conCartel && <input type="hidden" name="conCartel" value="1" />}
-        <button className={BUTTON[variant]}>Reservar</button>
+        <BotonEnviar pendiente="Reservando…" className={BUTTON[variant]}>{texto}</BotonEnviar>
         {error}
       </form>
     )
@@ -62,7 +66,7 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', vo
   return (
     <>
       <button onClick={() => dialogRef.current?.showModal()} className={BUTTON[variant]}>
-        Reservar
+        {texto}
       </button>
       <dialog ref={dialogRef}
               className="gr-sticker m-auto w-[min(22rem,calc(100%-36px))] p-5 text-gr-ink backdrop:bg-gr-ink/60">
@@ -76,7 +80,7 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', vo
           {conCartel && <input type="hidden" name="conCartel" value="1" />}
           <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" className="gr-input" />
           {error}
-          <button className="gr-btn-primary mt-1 w-full">Reservar</button>
+          <BotonEnviar pendiente="Reservando…" className="gr-btn-primary mt-1 w-full">Reservar</BotonEnviar>
           <button type="button" onClick={() => dialogRef.current?.close()}
                   className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">
             Cancelar

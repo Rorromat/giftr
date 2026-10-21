@@ -1,10 +1,13 @@
 import { expect, test } from 'vitest'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
-import { comments, items, notifications } from '@/db/schema'
-import { reserveItem } from '@/lib/claims'
-import { archiveItem, createItem, updateItem } from '@/lib/items'
-import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
+import { eq } from 'drizzle-orm'
+import { claims, comments, notifications, users } from '@/db/schema'
+import { getMyClaimWarnings, markBought, reserveItem } from '@/lib/claims'
+import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
+import { getUnreadNotifications, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { addComment } from '@/lib/comments'
+import { createGuest } from '@/lib/guest'
+import { getListForViewer, getOwnList } from '@/lib/lists'
 
 async function setup() {
   const db = await createTestDb()
@@ -56,4 +59,81 @@ test('el dueño no puede comentar en sus items; el regalador y el guest sí', as
   expect(await addComment(db, item!.id, {}, 'anónimo')).toBe(false)
   expect(await addComment(db, item!.id, { userId: giver.id }, '¿talle?')).toBe(true)
   expect(await db.select().from(comments)).toHaveLength(1)
+})
+
+const DIA = 86400_000
+
+/** Copas x3 de Euge: Rodri reservó una hace 10 días (le quedan 4), Caro compró otra y la abuela (invitada) reservó la tercera. */
+async function conCopas() {
+  const s = await setup()
+  const [caro] = await s.db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
+  const abuela = await createGuest(s.db, 'Abuela')
+  const copas = (await createItem(s.db, s.owner.id, { tipo: 'exacto', titulo: 'Copas', cantidad: 3 }))!
+  await reserveItem(s.db, copas.id, { userId: s.giver.id })
+  await s.db.update(claims).set({ createdAt: new Date(Date.now() - 10 * DIA), expiresAt: new Date(Date.now() + 4 * DIA) })
+  const deCaro = await reserveItem(s.db, copas.id, { userId: caro.id })
+  if (!deCaro.ok) throw new Error(deCaro.reason)
+  await markBought(s.db, deCaro.claimId, { userId: caro.id })
+  await reserveItem(s.db, copas.id, { guestId: abuela.id })
+  return { ...s, caro, abuela, copas }
+}
+
+const estados = async (db: Awaited<ReturnType<typeof setup>>['db']) =>
+  Object.fromEntries((await db.select().from(claims)).map((c) => [c.claimerUserId ?? c.claimerGuestId, c.estado]))
+
+test('archivar: lo reservado sin comprar se libera y se avisa; lo comprado queda y con "Ya lo tengo" no se avisa', async () => {
+  const { db, owner, giver, caro, abuela, copas } = await conCopas()
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toHaveLength(1)
+  expect(await archiveItem(db, copas.id, owner.id, 'lo_tengo')).toBe(true)
+  expect(await estados(db)).toEqual({ [giver.id]: 'liberado', [abuela.id]: 'liberado', [caro.id]: 'comprado' })
+  expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => n.tipo)).toEqual(['item_baja'])
+  expect((await getUnreadNotifications(db, { guestId: abuela.id })).map((n) => n.tipo)).toEqual(['item_baja'])
+  expect(await getUnreadNotifications(db, { userId: caro.id })).toEqual([])
+  // ya no le pregunta "¿Conseguiste…?" por algo que no puede abrir
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([])
+  expect(await db.select().from(notifications).where(eq(notifications.userId, owner.id))).toEqual([])
+})
+
+test('"Ya no lo quiero" le avisa a quien ya lo compró, con su propio texto', async () => {
+  const { db, owner, giver, caro, copas } = await conCopas()
+  await archiveItem(db, copas.id, owner.id, 'no_lo_quiero')
+  expect((await getUnreadNotifications(db, { userId: caro.id })).map((n) => n.tipo)).toEqual(['item_baja_comprado'])
+  expect(textoDeAviso('item_baja_comprado', 'Copas')).toContain('ya no lo quiere')
+  expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => n.tipo)).toEqual(['item_baja'])
+})
+
+test('archivar dos veces (un doble toque, una pantalla vieja) no repite avisos ni cambia el motivo', async () => {
+  const { db, owner, giver, copas } = await conCopas()
+  expect(await archiveItem(db, copas.id, owner.id, 'lo_tengo')).toBe(true)
+  expect(await archiveItem(db, copas.id, owner.id, 'no_lo_quiero')).toBe(false)
+  expect((await getOwnList(db, owner.id))!.items[0].estadoDueno).toBe('lo_tengo')
+  expect(await getUnreadNotifications(db, { userId: giver.id })).toHaveLength(1)
+})
+
+test('"Volver a mi lista": vuelve con lo que tenía (lo comprado sigue a su nombre), y solo lo hace un dueño', async () => {
+  const { db, owner, giver, caro, copas } = await conCopas()
+  await archiveItem(db, copas.id, owner.id, 'lo_tengo')
+  expect(await restoreItem(db, copas.id, giver.id)).toBe(false)
+  expect(await restoreItem(db, 'no-es-uuid', owner.id)).toBe(false)
+  expect(await restoreItem(db, copas.id, owner.id)).toBe(true)
+  expect(await restoreItem(db, copas.id, owner.id)).toBe(false)
+  const vista = await getListForViewer(db, 'tok-euge', { userId: giver.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items[0]).toMatchObject({ estadoDueno: 'activo', quedan: 2, disponible: true })
+  expect(vista.items[0].claims).toEqual([expect.objectContaining({ claimerNombre: 'Caro', estado: 'comprado' })])
+  expect(await getUnreadNotifications(db, { userId: caro.id })).toEqual([])
+})
+
+test('REGLA DE LA SORPRESA: archivar y volver a poner le responden igual al dueño, haya o no reservas', async () => {
+  const { db, owner, copas } = await conCopas()
+  const libro = (await createItem(db, owner.id, { tipo: 'exacto', titulo: 'Libro' }))!
+  for (const deseo of [copas, libro]) {
+    expect(await archiveItem(db, deseo.id, owner.id, 'no_lo_quiero')).toBe(true)
+    expect(await archiveItem(db, deseo.id, owner.id, 'no_lo_quiero')).toBe(false)
+  }
+  const archivados = (await getOwnList(db, owner.id))!.items
+  expect(JSON.stringify(archivados).toLowerCase()).not.toMatch(/claim|reserv|compr|caro|rodri|abuela/)
+  for (const deseo of [copas, libro]) expect(await restoreItem(db, deseo.id, owner.id)).toBe(true)
+  expect(await getUnreadNotifications(db, { userId: owner.id })).toEqual([])
+  expect(await db.select().from(notifications).where(eq(notifications.userId, owner.id))).toEqual([])
 })

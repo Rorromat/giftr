@@ -7,6 +7,8 @@ import { juntarNombres } from '@/lib/groups'
 import { pesos } from '@/lib/pesos'
 import type { RegaloView } from '@/lib/regalos'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { BotonEnviar } from '@/components/BotonEnviar'
+import { Confirmar } from '@/components/Confirmar'
 import { AvatarStack, Icon } from '@/components/ui'
 
 type Ctx = { token: string; itemId: string }
@@ -39,9 +41,9 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
       {logueado ? (
         <form action={startGroupGiftAction}>
           <Ocultos token={token} itemId={itemId} />
-          <button className="gr-btn w-full min-h-11 gap-2 px-3.5 font-sans text-[15px] font-bold">
+          <BotonEnviar className="gr-btn w-full min-h-11 gap-2 px-3.5 font-sans text-[15px] font-bold">
             <Icon name="users" size={18} strokeWidth={2.4} />{texto}
-          </button>
+          </BotonEnviar>
         </form>
       ) : <EntrarParaSumarte token={token} itemId={itemId} texto={texto} />}
       <p className="text-xs leading-snug text-gr-muted">Lo comprás vos, los demás se suman y te pagan su parte. Queda todo anotado en Cuentas.</p>
@@ -108,7 +110,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
           {!regalo.soyParte && (logueado ? (
             <form action={joinGroupGiftAction}>
               <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
-              <button className="gr-btn-primary gr-btn--sm w-full">Me sumo</button>
+              <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Me sumo</BotonEnviar>
             </form>
           ) : <EntrarParaSumarte token={token} itemId={itemId} texto="Me sumo" />)}
 
@@ -119,7 +121,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               </p>
               <form action={leaveGroupGiftAction}>
                 <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
-                <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Me bajo</button>
+                <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Me bajo</BotonEnviar>
               </form>
             </>
           )}
@@ -140,10 +142,12 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
               </details>
-              <form action={cancelGroupGiftAction}>
-                <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
-                <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Cancelar el regalo grupal</button>
-              </form>
+              {/* cancelarlo suelta el deseo (también si antes era una reserva suya): que no lo descubra después */}
+              <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction}
+                         ocultos={{ token, itemId, giftId: regalo.id }}>
+                El deseo vuelve a quedar libre para cualquiera{n > 1 ? ' y les avisamos a los que se sumaron' : ''}. Si lo
+                querés regalar solo, después lo reservás de nuevo.
+              </Confirmar>
             </>
           )}
         </>

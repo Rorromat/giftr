@@ -6,8 +6,13 @@ import { markNotifsReadAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
-import { Starburst } from '@/components/ui'
+import { Icon, Starburst } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
+
+/** Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link. */
+function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
+  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
+}
 
 export async function Banners() {
   const viewer = await getViewer()
@@ -20,7 +25,7 @@ export async function Banners() {
   ])
   const notifs = todas.flatMap((n) => {
     const texto = textoDeAviso(n.tipo, n.itemTitulo)
-    return texto ? [{ id: n.id, texto }] : []
+    return texto ? [{ id: n.id, texto, href: n.href }] : []
   })
   if (!notifs.length && !warnings.length && !codazos.length && !invitado) return null
   // Codazos: quiénes (sin repetir) y, si todos son para el mismo grupo, agregar directo ahí.
@@ -50,17 +55,22 @@ export async function Banners() {
         </div>
       )}
       {notifs.map((n) => (
-        <div key={n.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5 py-3 text-sm font-medium shadow-sticker-sm">
-          {n.texto}
-        </div>
+        <QuizasLink key={n.id} href={n.href}
+                    className="flex items-center gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5 py-3 text-sm font-medium shadow-sticker-sm">
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{n.texto}</span>
+          {n.href && <Icon name="chevron" size={18} strokeWidth={2.6} className="flex-none" />}
+        </QuizasLink>
       ))}
       {warnings.map((w) => (
-        <div key={w.claimId} className="relative rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
+        <QuizasLink key={w.claimId} href={w.href}
+                    className="relative block rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
           {`¿Conseguiste "${w.itemTitulo}"? Te quedan `}
           <span className="font-bold text-gr-accent">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
           {' de reserva.'}
+          {/* en el deseo se marca comprado o se libera */}
+          {w.href && <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Marcalo o liberalo</span>}
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
-        </div>
+        </QuizasLink>
       ))}
       {notifs.length > 0 && (
         <form action={markNotifsReadAction}>

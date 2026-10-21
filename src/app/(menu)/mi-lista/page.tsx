@@ -6,7 +6,7 @@ import { getOwnList } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { Banners } from '@/components/Banners'
-import { OwnerItemsGrid } from '@/components/OwnerItemsGrid'
+import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
 
 export default async function MiLista() {
@@ -58,6 +58,7 @@ export default async function MiLista() {
       )}
 
       <OwnerItemsGrid items={activos} shareToken={lista.shareToken} />
+      <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
 
       <a href={`https://wa.me/?text=${waText}`} target="_blank"
          className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">
