@@ -26,10 +26,12 @@ function seccionDe(path: string) {
  */
 export function BottomNav() {
   const path = usePathname()
-  // El destino tocado, mientras la navegación todavía no cambió la URL.
+  // El destino tocado, mientras la navegación todavía no cambió la URL. Apenas cambia se olvida: si no,
+  // al volver atrás a la pantalla de origen el toque viejo revivía (la barra quedaba escondida).
   const [toque, setToque] = useState<{ href: string; desde: string } | null>(null)
+  if (toque && toque.desde !== path) setToque(null)
   const actual = seccionDe(path)
-  const marcado = toque?.desde === path ? toque.href : actual
+  const marcado = toque && toque.desde === path ? toque.href : actual
   const oculta = marcado === '/agregar'
   // En Agregar no hay columna marcada: el círculo se queda donde estaba mientras la barra baja.
   const columna = DESTINOS.find((d) => d.href === marcado)?.columna
