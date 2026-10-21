@@ -16,7 +16,7 @@ export default async function Agregar({ searchParams }: { searchParams: Promise<
   const desdeGrupo = grupos.find((g) => g.id === lista)
 
   return (
-    <main className="pb-8 pt-[52px]">
+    <main className="gr-hoja pb-8 pt-[52px]">
       <div className="flex items-center gap-3.5">
         <BackLink href={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'} label={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
         <div className="flex flex-col gap-0.5">
