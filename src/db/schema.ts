@@ -56,6 +56,9 @@ export const lists = pgTable('lists', {
   // Fecha del grupo ("cumplen el 12/10"); anual se repite todos los años, si no es una sola vez.
   eventoFecha: date('evento_fecha'),
   eventoAnual: boolean('evento_anual').notNull().default(true),
+  // Al cambiar o quitar la fecha del grupo, desde cuándo lo comprado era para el evento que venía (vacío: sin corte): lo
+  // de antes es del que ya pasó aunque la fecha nueva no lo encuentre (ver desdeElUltimoEvento).
+  corteEvento: timestamp('corte_evento', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

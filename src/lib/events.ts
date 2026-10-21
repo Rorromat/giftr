@@ -47,10 +47,24 @@ export const diasEntre = (desde: Date, hasta: Date) => Math.round((hasta.getTime
 const SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-/** "Sábado 22 de agosto" */
-export const fechaLarga = (f: Date) => `${SEMANA[f.getUTCDay()]} ${f.getUTCDate()} de ${MESES[f.getUTCMonth()]}`
-/** "22 ago" */
-export const fechaCorta = (f: Date) => `${f.getUTCDate()} ${MESES[f.getUTCMonth()].slice(0, 3)}`
+/**
+ * El año de una fecha que no es la próxima vez que cae ese día (está a más de un año, como un casamiento a 13 meses), o
+ * null: sin el año, "20 de noviembre" se lee como el que viene.
+ */
+export function anioSiEstaLejos(f: Date, hoy: Date): number | null {
+  return f.getTime() === proximaFecha(f.getUTCDate(), f.getUTCMonth() + 1, hoy).getTime() ? null : f.getUTCFullYear()
+}
+
+/** "Sábado 22 de agosto"; con hoy, "Sábado 20 de noviembre de 2027" si está a más de un año. */
+export function fechaLarga(f: Date, hoy?: Date) {
+  const anio = hoy && anioSiEstaLejos(f, hoy)
+  return `${SEMANA[f.getUTCDay()]} ${f.getUTCDate()} de ${MESES[f.getUTCMonth()]}${anio ? ` de ${anio}` : ''}`
+}
+/** "22 ago"; con hoy, "20 nov 2027" si está a más de un año. */
+export function fechaCorta(f: Date, hoy?: Date) {
+  const anio = hoy && anioSiEstaLejos(f, hoy)
+  return `${f.getUTCDate()} ${MESES[f.getUTCMonth()].slice(0, 3)}${anio ? ` ${anio}` : ''}`
+}
 /** "12/10" */
 export const diaMes = (f: Date) => `${f.getUTCDate()}/${f.getUTCMonth() + 1}`
 
@@ -99,7 +113,7 @@ export function rotuloFechaGrupo(eventoFecha: string | null, anual: boolean, hoy
   const fecha = proximaDeGrupo(eventoFecha, anual, hoy)
   if (fecha) {
     const dias = diasEntre(hoy, fecha)
-    return `${fechaLarga(fecha)} · ${dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : `en ${dias} días`}`
+    return `${fechaLarga(fecha, hoy)} · ${dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : `en ${dias} días`}`
   }
   if (!eventoFecha) return 'Agregar una fecha'
   const [y, m, d] = eventoFecha.split('-').map(Number)
@@ -223,6 +237,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   ])
   const porDeseo = new Map<string, number>()
   for (const c of ocupados) porDeseo.set(c.itemId, (porDeseo.get(c.itemId) ?? 0) + 1)
+  const cortes = new Map(todas.map(({ list }) => [list.id, list.corteEvento]))
 
   return conFecha.map((e) => {
     // para el regalador, como en su lista: lo que ya no tiene lugar no se muestra (una idea que se puede repetir, sí)
@@ -236,7 +251,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
     // Un regalo grupal abierto cuenta mientras siga abierto, aunque lo hayan armado para el anterior: hasta que lo
     // cierren es lo pendiente de este, como en la lista ("Estás en el regalo grupal", el deseo sigue ocupado y
     // reserveItem devuelve ese). Al encargado se le recuerda que lo cierre (ver regalosParaCerrar).
-    const desde = desdeDe(e.cae, hoy, inicioDelDia(hoy))
+    const desde = desdeDe(e.cae, cortes.get(e.listId) ?? null, hoy, inicioDelDia(hoy))
     const suyos = ocupados.filter((c) => c.listId === e.listId && (c.claimerUserId === userId || enGrupales.has(c.id)) &&
       (c.estado === 'reservado' || c.updatedAt >= desde))
     const grupales = new Set(suyos.filter((c) => enGrupales.has(c.id)).map((c) => c.itemId))
@@ -268,40 +283,47 @@ export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
   await db.delete(listFollows).where(and(eq(listFollows.userId, userId), eq(listFollows.listId, listId)))
 }
 
-/** La fecha de una lista: el cumple del dueño (todos los años) o la del grupo. */
-async function fechaDeLista(db: Db, listId: string): Promise<(FechaEvento & { esCumple: boolean }) | null> {
-  if (!esUuid(listId)) return null
+/** La fecha de una lista (el cumple del dueño, todos los años, o la del grupo; null si no tiene) y su corteEvento. */
+async function fechaDeLista(db: Db, listId: string): Promise<{ f: (FechaEvento & { esCumple: boolean }) | null; corte: Date | null }> {
+  if (!esUuid(listId)) return { f: null, corte: null }
   const [row] = await db.select({ list: lists, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes })
     .from(lists).leftJoin(users, eq(lists.ownerId, users.id)).where(eq(lists.id, listId))
-  if (!row) return null
+  if (!row) return { f: null, corte: null }
+  const corte = row.list.corteEvento
   if (row.list.tipo === 'personal') {
-    return row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null
+    return { corte, f: row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null }
   }
-  if (!row.list.eventoFecha) return null
-  return { esCumple: false, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) }
+  return { corte, f: row.list.eventoFecha ? { esCumple: false, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) } : null }
 }
 
 /** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
 export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
-  const f = await fechaDeLista(db, listId)
+  const { f } = await fechaDeLista(db, listId)
   const fecha = f && proximaVez(f, hoy)
   if (!f || !fecha) return null
   return { esCumple: f.esCumple, fecha, dias: diasEntre(hoy, fecha) }
 }
 
-/** desdeElUltimoEvento con la fecha ya leída (null: la lista no tiene). */
-function desdeDe(f: FechaEvento | null, hoy: Date, ahora: Date): Date {
+/**
+ * desdeElUltimoEvento con la fecha (null: la lista no tiene) y el corteEvento ya leídos. El corte es del momento en que
+ * cambiaron la fecha: mirado desde antes (ver cuandoRecordar), todavía no valía.
+ */
+function desdeDe(f: FechaEvento | null, corte: Date | null, hoy: Date, ahora: Date): Date {
   const anterior = f && vezAnterior(f, hoy)
-  return anterior ? inicioDelDia(new Date(anterior.getTime() + DIA)) : new Date(ahora.getTime() - 365 * DIA)
+  // una fecha que todavía no cayó nunca: todo lo comprado es para esa, aunque falte más de un año (el casamiento a 13 meses)
+  const deLaFecha = anterior ? inicioDelDia(new Date(anterior.getTime() + DIA)) : f ? new Date(0) : new Date(ahora.getTime() - 365 * DIA)
+  return corte && corte <= ahora && corte > deLaFecha ? corte : deLaFecha
 }
 
 /**
  * Desde cuándo algo es "para el evento que viene" en una lista: desde el día siguiente al último que ya pasó (el cumple
- * del dueño o la fecha del grupo; el día del evento todavía es de ese). Sin uno anterior (sin fecha, o una que todavía
- * no cayó nunca), un año para atrás. Lo de antes ya se regaló: es historial.
+ * del dueño o la fecha del grupo; el día del evento todavía es de ese). Con una fecha que todavía no cayó nunca, todo; sin
+ * fecha, un año para atrás. Si le cambiaron la fecha, nunca antes que con la que tenía (corteEvento, ver
+ * guardarFechaGrupo). Lo de antes ya se regaló: es historial.
  */
 export async function desdeElUltimoEvento(db: Db, listId: string, ahora = new Date()): Promise<Date> {
-  return desdeDe(await fechaDeLista(db, listId), hoyLocal(ahora), ahora)
+  const { f, corte } = await fechaDeLista(db, listId)
+  return desdeDe(f, corte, hoyLocal(ahora), ahora)
 }
 
 export async function miCumple(db: Db, userId: string): Promise<{ dia: number; mes: number } | null> {
@@ -318,15 +340,6 @@ export async function guardarCumple(db: Db, userId: string, dia: number | null, 
   return true
 }
 
-/** Una fecha anual ('YYYY-MM-DD') que ya cayó alguna vez: tal cual, o con el último año en que cayó (el 29/2, el último bisiesto). */
-function conUnaVezQueYaCayo(fecha: string, hoy: Date): string {
-  const f = fechaDeGrupo(fecha, true)
-  if (vezAnterior(f, hoy)) return fecha
-  let anio = hoy.getUTCFullYear()
-  while ((f.mes === 2 && f.dia === 29 && !esBisiesto(anio)) || new Date(Date.UTC(anio, f.mes - 1, f.dia)) >= hoy) anio--
-  return `${anio}${fecha.slice(4)}`
-}
-
 /** La fecha de un grupo para el formulario: si es anual, la próxima vez (el año guardado es el de la primera). */
 export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy: Date): string {
   const proxima = anual ? proximaDeGrupo(eventoFecha, true, hoy) : null
@@ -335,23 +348,30 @@ export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy:
 
 /**
  * Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. Una que no existe, no.
- * Un grupo que ya tuvo su evento no vuelve a empezar: una anual que todavía no cayó nunca (le corrigen el día poniendo el
- * del año que viene) se guarda con el último año en que ya cayó. Si no, vezAnterior no lo encontraría y lo comprado para
- * el que pasó volvería a ser de este (ver desdeElUltimoEvento). Sin uno que ya pasó (el casamiento a futuro), tal cual.
+ * Se guarda como la cargaron: en una anual, el año es el de la primera vez (un casamiento a más de un año no es este
+ * noviembre). Lo del evento que ya pasó no vuelve a ser de este: en corteEvento queda desde cuándo lo comprado era para
+ * el que venía con la fecha de antes (ver desdeElUltimoEvento), aunque la nueva no lo encuentre (una única que ya fue y
+ * se cambia por otra, una anual que pasa a única o cambia de día, quitarla y volver a ponerla).
+ * La próxima vez de la anual que ya tenía (la que muestra el formulario, ver fechaParaEditar) no la cambia: guardar sin
+ * tocar la fecha no corre la primera vez.
  */
 export async function guardarFechaGrupo(
-  db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, hoy = hoyLocal(),
+  db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, ahora = new Date(),
 ): Promise<boolean> {
   if (!esUuid(listId)) return false
   if (fecha !== null && !fechaDeGrupoValida(fecha)) return false
+  const hoy = hoyLocal(ahora)
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
-    const [antes] = await t.select({ eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual }).from(lists)
-      .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(t, userId))).for('update')
+    const [antes] = await t.select({ eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual, corte: lists.corteEvento })
+      .from(lists).where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(t, userId))).for('update')
     if (!antes) return false
-    const yaFue = antes.eventoFecha && vezAnterior(fechaDeGrupo(antes.eventoFecha, antes.eventoAnual), hoy)
-    await t.update(lists).set({ eventoFecha: fecha && anual && yaFue ? conUnaVezQueYaCayo(fecha, hoy) : fecha, eventoAnual: anual })
-      .where(eq(lists.id, listId))
+    const sigueIgual = !!antes.eventoFecha && antes.eventoAnual && anual && fecha === fechaParaEditar(antes.eventoFecha, true, hoy)
+    const corte = desdeDe(antes.eventoFecha ? fechaDeGrupo(antes.eventoFecha, antes.eventoAnual) : null, antes.corte, hoy, ahora)
+    await t.update(lists).set({
+      eventoFecha: sigueIgual ? antes.eventoFecha : fecha, eventoAnual: anual,
+      corteEvento: corte.getTime() > 0 ? corte : null, // la de antes todavía no había caído nunca: no hay corte
+    }).where(eq(lists.id, listId))
     return true
   })
 }

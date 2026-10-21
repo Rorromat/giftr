@@ -101,7 +101,11 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() })
       .where(and(eq(claims.claimerGuestId, guestId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseosPropios)))
 
-    // si después cambiaron el link para regalar, lo reservado antes no le pasa el nuevo: puede ser justo a quien se lo sacaron
+    // si después cambiaron el link para regalar, lo reservado antes no le pasa el nuevo: puede ser justo a quien se lo sacaron.
+    // Esas listas, FOR SHARE antes de leer cuándo lo cambiaron (como en seguirLista): un cambio en curso termina antes y
+    // esto ve la hora nueva, o espera a que esto termine y su DELETE también se lleva lo que se anota acá.
+    const listasDelInvitado = t.select({ id: items.listId }).from(claims).innerJoin(items, eq(claims.itemId, items.id)).where(delInvitado)
+    await t.select({ id: lists.id }).from(lists).where(inArray(lists.id, listasDelInvitado)).for('share')
     const dondeReservaba = await t.selectDistinct({ listId: items.listId }).from(claims)
       .innerJoin(items, eq(claims.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
       .where(and(delInvitado, or(isNull(lists.shareTokenAt), gt(claims.createdAt, lists.shareTokenAt))))

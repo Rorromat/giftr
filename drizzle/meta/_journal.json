@@ -99,6 +99,13 @@
       "when": 1792601983248,
       "tag": "0013_regalo_sacados_y_recordatorio",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792610629875,
+      "tag": "0014_corte_del_evento",
+      "breakpoints": true
     }
   ]
 }

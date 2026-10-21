@@ -42,7 +42,7 @@ function Estado({ e }: { e: Evento }) {
   )
 }
 
-function Proximos({ eventos }: { eventos: Evento[] }) {
+function Proximos({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
   return (
     <ul className="flex flex-col gap-5">
       {eventos.map((e, i) => (
@@ -57,7 +57,7 @@ function Proximos({ eventos }: { eventos: Evento[] }) {
             <div className="flex items-center gap-3 px-4 py-3.5">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <h2 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{e.titulo}</h2>
-                <p className="text-sm font-medium">{[fechaLarga(e.fecha), e.contexto].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm font-medium">{[fechaLarga(e.fecha, hoy), e.contexto].filter(Boolean).join(' · ')}</p>
                 <Estado e={e} />
               </div>
               <AvatarStack nombres={e.personas.slice(0, 3)} />
@@ -94,7 +94,7 @@ function TodoElAnio({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
         {eventos.map((e) => (
           <li key={e.listId}>
             <Link href={e.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2">
-              <span className="flex-none rounded-xl bg-gr-ink px-2.5 py-1 font-display text-[15px] font-extrabold text-gr-bg">{fechaCorta(e.fecha)}</span>
+              <span className="flex-none rounded-xl bg-gr-ink px-2.5 py-1 font-display text-[15px] font-extrabold text-gr-bg">{fechaCorta(e.fecha, hoy)}</span>
               <span className="min-w-0 font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">{e.titulo}</span>
             </Link>
           </li>
@@ -144,7 +144,7 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
           <p>Acá aparecen los cumples de la gente cuyas listas abrís y las fechas de tus grupos.</p>
           <p>Pediles el link de su lista y abrilo con tu cuenta.</p>
         </div>
-      ) : anio ? <TodoElAnio eventos={eventos} hoy={hoy} /> : <Proximos eventos={eventos} />}
+      ) : anio ? <TodoElAnio eventos={eventos} hoy={hoy} /> : <Proximos eventos={eventos} hoy={hoy} />}
 
       {!cumple && (
         <Link href="/perfil#cumple" className="gr-sticker flex items-center justify-between gap-3 px-4 py-3">
