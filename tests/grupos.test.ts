@@ -201,38 +201,48 @@ test('un co-dueño, y después ex, no recibe avisos de lo que compró como regal
   expect(await db.select().from(notifications).where(eq(notifications.userId, intruso.id))).toHaveLength(2)
 })
 
-test('sacar a quien se sumó por error: vuelve a regalar, y solo lo saca alguien que ya estaba', async () => {
-  const { db, delfina, martin, rodri, intruso, grupo } = await setup()
+test('sacar a quien se sumó por error: deja de editar, sigue ciego como uno que sale, y la invitación cambia', async () => {
+  const { db, delfina, martin, rodri, intruso, grupo, item } = await setup()
   const [tio, tia] = [await usuario(db, 'Tío'), await usuario(db, 'Tía')]
-  const vela = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Vela' }, grupo.id))!
-  // a Martín se le escapó la invitación en el grupo de la familia: el tío se sumó, y la tía se sumó y salió
+  // a Martín se le escapó la invitación en el grupo de la familia: el tío se sumó y cargó una vela, y la tía se sumó y salió
   await unirseAGrupo(db, grupo.inviteToken!, tio.id)
+  const vela = (await createItem(db, tio.id, { tipo: 'exacto', titulo: 'Vela' }, grupo.id))!
   await unirseAGrupo(db, grupo.inviteToken!, tia.id)
   await salirDeGrupo(db, grupo.id, tia.id)
-  expect(await reserveItem(db, vela.id, { userId: tia.id })).toEqual({ ok: false, reason: 'propio' })
-  expect((await grupoParaDueno(db, grupo.id, martin.id))!.sacables).toEqual([
-    { id: tio.id, nombre: 'Tío', salio: false }, { id: tia.id, nombre: 'Tía', salio: true },
-  ])
-  expect((await grupoParaDueno(db, grupo.id, tio.id))!.sacables).toEqual([{ id: tia.id, nombre: 'Tía', salio: true }])
+  expect(await reserveItem(db, vela.id, { userId: rodri.id })).toMatchObject({ ok: true })
+  // solo los que siguen y llegaron después: a la tía, que ya salió, no hay nada que sacarle
+  expect((await grupoParaDueno(db, grupo.id, martin.id))!.sacables).toEqual([{ id: tio.id, nombre: 'Tío' }])
+  expect((await grupoParaDueno(db, grupo.id, tio.id))!.sacables).toEqual([])
 
-  // el que llegó después no saca a los que armaron la lista; tampoco uno de afuera ni uno que ya salió
+  // el que llegó después no saca a los que armaron la lista; tampoco saca uno de afuera ni uno que ya salió, y a la tía
+  // (ya salió) no se la saca de nuevo
   expect(await sacarDelGrupo(db, grupo.id, tio.id, martin.id)).toBe(false)
   expect(await sacarDelGrupo(db, grupo.id, intruso.id, tio.id)).toBe(false)
   expect(await sacarDelGrupo(db, grupo.id, tia.id, tio.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupo.id, delfina.id, tia.id)).toBe(false)
   expect(await sacarDelGrupo(db, grupo.id, martin.id, martin.id)).toBe(false)
   expect(await sacarDelGrupo(db, 'no-es-un-uuid', martin.id, tio.id)).toBe(false)
   expect(await sacarDelGrupo(db, grupo.id, martin.id, 'no-es-un-uuid')).toBe(false)
+  expect((await db.select().from(lists).where(eq(lists.id, grupo.id)))[0].inviteToken).toBe(grupo.inviteToken)
 
   expect(await sacarDelGrupo(db, grupo.id, martin.id, tio.id)).toBe(true)
-  expect(await sacarDelGrupo(db, grupo.id, delfina.id, tia.id)).toBe(true)
-  for (const quien of [tio, tia]) {
-    expect((await getListForViewer(db, grupo.shareToken, { userId: quien.id }))?.role).toBe('giver')
-    expect(await grupoParaDueno(db, grupo.id, quien.id)).toBeNull()
-  }
-  expect(await reserveItem(db, vela.id, { userId: tia.id })).toMatchObject({ ok: true })
+  // ya no edita ni figura como dueño, pero no vuelve a regalar: pudo haber cargado deseos (la vela) y vería quién los reservó
+  expect(await grupoParaDueno(db, grupo.id, tio.id)).toBeNull()
+  expect(await updateItem(db, vela.id, tio.id, { titulo: 'Vela de soja' })).toBe(false)
+  expect(await getListForViewer(db, grupo.shareToken, { userId: tio.id })).toMatchObject({ role: 'anonimo', motivo: 'ex_dueno' })
+  expect(await getItemForViewer(db, grupo.shareToken, item.id, { userId: tio.id })).toMatchObject({ role: 'anonimo' })
+  expect(await reserveItem(db, item.id, { userId: tio.id })).toEqual({ ok: false, reason: 'propio' })
   expect(await getListForViewer(db, grupo.shareToken, { userId: rodri.id })).toMatchObject({ duenos: ['Delfina', 'Martín'] })
   expect((await grupoParaDueno(db, grupo.id, martin.id))!.sacables).toEqual([])
   expect(await sacarDelGrupo(db, grupo.id, martin.id, tio.id)).toBe(false)
+
+  // con la invitación de antes no vuelve; con la nueva sí, y sigue después de los que ya estaban
+  const [{ inviteToken: nueva }] = await db.select({ inviteToken: lists.inviteToken }).from(lists).where(eq(lists.id, grupo.id))
+  expect(nueva).not.toBe(grupo.inviteToken)
+  expect(await unirseAGrupo(db, grupo.inviteToken!, tio.id)).toBeNull()
+  expect(await unirseAGrupo(db, nueva!, tio.id)).toBe(grupo.id)
+  expect((await grupoParaDueno(db, grupo.id, tio.id))!.sacables).toEqual([])
+  expect((await grupoParaDueno(db, grupo.id, delfina.id))!.sacables).toEqual([{ id: martin.id, nombre: 'Martín' }, { id: tio.id, nombre: 'Tío' }])
 })
 
 test('generar una invitación nueva: la anterior deja de servir, y solo la genera un dueño', async () => {

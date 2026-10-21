@@ -25,7 +25,8 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
       <p className="mt-1 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-4 py-3 text-sm font-medium leading-snug">
         Vas a poder agregar y editar deseos de esta lista. Como es tuya también, no vas a ver quién regala qué, y aunque
-        después salgas del grupo no vas a poder reservar en ella. Si te llegó para regalar, no te sumes: pedí el link para regalar.
+        después salgas (o te saquen) del grupo no vas a poder reservar en ella. Si te llegó para regalar, no te sumes:
+        pedí el link para regalar.
       </p>
       {/* lo mismo para todos: unirseAGrupo lo resuelve en el servidor */}
       <p className="text-[13px] font-medium leading-snug text-gr-muted">

@@ -1,10 +1,13 @@
 import { expect, test, vi } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { createTestDb } from './helpers'
 import type { Db } from '@/db/types'
 import { listMembers, lists } from '@/db/schema'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
+import { createItem } from '@/lib/items'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { iniciarRegaloGrupal, misCuentas, sumarseARegalo } from '@/lib/regalos'
 
 // Las acciones de los grupos y los links tal cual, con la base en PGlite y la sesión y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db, session: null as { userId: string } | null }))
@@ -16,7 +19,9 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
 }))
 
-import { createGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction } from '@/app/actions'
+import {
+  buyGroupGiftAction, createGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction,
+} from '@/app/actions'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -88,14 +93,40 @@ test('sacar a quien se sumó por error vuelve al grupo con el aviso; si no se pu
   const { db, caro } = await preparar()
   const id = await crearGrupo(db, caro.id, { nombre: 'Mellizos' })
   const tio = await upsertUserFromGoogle(db, { googleId: 'g-tio', email: 'tio@test.com', nombre: 'Tío' })
-  await unirseAGrupo(db, (await grupo(db, id)).inviteToken!, tio.id)
-  const miembros = () => db.select({ userId: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, id))
+  const invitacion = (await grupo(db, id)).inviteToken
+  await unirseAGrupo(db, invitacion!, tio.id)
+  const activos = () => db.select({ userId: listMembers.userId }).from(listMembers)
+    .where(and(eq(listMembers.listId, id), isNull(listMembers.salioAt)))
 
   // el tío no puede sacar a Caro, que la armó
   h.session = { userId: tio.id }
   await removeMemberAction(form({ grupoId: id, userId: caro.id }))
-  expect(await miembros()).toHaveLength(2)
+  expect(await activos()).toHaveLength(2)
+  expect((await grupo(db, id)).inviteToken).toBe(invitacion)
   h.session = { userId: caro.id }
   expect(await redirigeA(removeMemberAction(form({ grupoId: id, userId: tio.id })))).toBe(`/grupos/${id}?nuevo=sacado`)
-  expect(await miembros()).toEqual([{ userId: caro.id }])
+  // queda como ex (la fila sigue: no ve lo reservado) y la invitación ya es otra
+  expect(await activos()).toEqual([{ userId: caro.id }])
+  expect(await db.select({ userId: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, id))).toHaveLength(2)
+  expect((await grupo(db, id)).inviteToken).not.toBe(invitacion)
+})
+
+test('el encargado que ya no tiene el link compra el regalo desde Cuentas y vuelve ahí (también con un error)', async () => {
+  const { db, caro } = await preparar()
+  const [rodri, sofi] = [
+    await upsertUserFromGoogle(db, { googleId: 'g-rodri', email: 'rodri@test.com', nombre: 'Rodri' }),
+    await upsertUserFromGoogle(db, { googleId: 'g-sofi', email: 'sofi@test.com', nombre: 'Sofi' }),
+  ]
+  const [lista] = await db.select().from(lists).where(eq(lists.ownerId, caro.id))
+  const bici = (await createItem(db, caro.id, { tipo: 'exacto', titulo: 'Bici' }))!
+  const g = await iniciarRegaloGrupal(db, bici.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  await cambiarLinkParaRegalar(db, lista.id, caro.id)
+
+  h.session = { userId: rodri.id }
+  const mal = form({ giftId: g.giftId, total: '90.000', modo: 'manual', [`parte:${rodri.id}`]: '50.000', [`parte:${sofi.id}`]: '30.000' })
+  expect(await redirigeA(buyGroupGiftAction(mal))).toBe(`/cuentas?error=no_suma&regalo=${g.giftId}`)
+  expect(await redirigeA(buyGroupGiftAction(form({ giftId: g.giftId, total: '90.000', modo: 'iguales' })))).toBe('/cuentas')
+  expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
 })

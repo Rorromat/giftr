@@ -4,6 +4,21 @@ import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { listasAjenasSql } from '@/lib/acceso'
 
+const TEXTOS = {
+  item_baja: (t: string) => `"${t}" fue dado de baja por su dueño — te conviene elegir otro regalo.`,
+  item_editado: (t: string) => `"${t}" fue editado por su dueño — revisá los detalles.`,
+  regalo_encargo: (t: string) => `Ahora organizás vos el regalo grupal de "${t}" — cuando lo compres, dividí lo que salió (o cancelalo si ya no va).`,
+  regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
+} as const
+
+/**
+ * El texto del cartel de un aviso. Null si esta versión no conoce el tipo (lo escribió una más nueva y se volvió atrás el
+ * deploy): ese no se muestra, en vez de tirar abajo la página donde está el botón para marcarlos como leídos.
+ */
+export function textoDeAviso(tipo: string, itemTitulo: string): string | null {
+  return Object.hasOwn(TEXTOS, tipo) ? TEXTOS[tipo as keyof typeof TEXTOS](itemTitulo) : null
+}
+
 function notifDe(viewer: Viewer) {
   return viewer.userId
     ? eq(notifications.userId, viewer.userId)

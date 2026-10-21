@@ -1,10 +1,14 @@
 -- Datos de antes de los arreglos de grupos (0009). Se puede volver a correr: lo que ya está bien no cambia.
+-- Corre en el build, mientras todavía sirve el código de antes: no inserta avisos de tipos que ese código no conoce
+-- (se le caerían las páginas a quien los tenga). Los cambios de abajo no avisan; al unirse de ahora en más, sí.
 --
 -- 1. Los co-dueños que salieron antes de que existiera salio_at no quedaron anotados: la fila se borraba. Lo único que
 --    queda de ellos es un codazo de ese grupo (solo les llega a los dueños). Se anotan como ex, así siguen sin ver lo
 --    reservado. Los que salieron sin haber recibido ninguno no se pueden reconstruir.
-INSERT INTO "list_members" ("list_id", "user_id", "salio_at")
-SELECT DISTINCT c."list_id", c."para_user_id", now()
+--    No se sabe cuándo se sumaron: quedan con la fecha del grupo, como los que lo armaron, así nadie que llegó después
+--    los puede sacar (ver sacarDelGrupo).
+INSERT INTO "list_members" ("list_id", "user_id", "created_at", "salio_at")
+SELECT DISTINCT c."list_id", c."para_user_id", l."created_at", now()
 FROM "codazos" c JOIN "lists" l ON l."id" = c."list_id"
 WHERE l."tipo" = 'grupo'
 ON CONFLICT DO NOTHING;
@@ -25,7 +29,7 @@ WHERE g."id" = m."gift_id" AND i."id" = g."item_id" AND lm."list_id" = i."list_i
   AND g."estado" = 'abierto';
 --> statement-breakpoint
 -- 4. Si lo organizaba, el encargo (y la reserva) pasa al que se sumó primero de los que quedan, salvo uno que ya tiene su
---    propia reserva o compra de ese deseo, y se le avisa.
+--    propia reserva o compra de ese deseo. Lo ve en Cuentas, en "En curso".
 WITH "trabados" AS (
   SELECT g."id", g."item_id"
   FROM "group_gifts" g JOIN "items" i ON i."id" = g."item_id"
@@ -42,25 +46,18 @@ WITH "trabados" AS (
 ), "pasados" AS (
   UPDATE "group_gifts" g SET "organizer_user_id" = s."user_id"
   FROM "siguientes" s WHERE g."id" = s."gift_id"
-  RETURNING g."claim_id", g."organizer_user_id", g."item_id"
-), "reservas" AS (
-  UPDATE "claims" c SET "claimer_user_id" = p."organizer_user_id", "updated_at" = now()
-  FROM "pasados" p WHERE c."id" = p."claim_id"
+  RETURNING g."claim_id", g."organizer_user_id"
 )
-INSERT INTO "notifications" ("user_id", "tipo", "item_id")
-SELECT "organizer_user_id", 'regalo_encargo', "item_id" FROM "pasados";
+UPDATE "claims" c SET "claimer_user_id" = p."organizer_user_id", "updated_at" = now()
+FROM "pasados" p WHERE c."id" = p."claim_id";
 --> statement-breakpoint
--- 5. Si no quedaba nadie para organizarlo, se cancela, el deseo se libera y se les avisa a los que estaban.
+-- 5. Si no quedaba nadie para organizarlo, se cancela y el deseo se libera.
 WITH "cancelados" AS (
   UPDATE "group_gifts" g SET "estado" = 'cancelado'
   FROM "items" i
   WHERE i."id" = g."item_id" AND g."estado" = 'abierto'
     AND EXISTS (SELECT 1 FROM "list_members" lm WHERE lm."list_id" = i."list_id" AND lm."user_id" = g."organizer_user_id")
-  RETURNING g."id", g."claim_id", g."item_id"
-), "liberadas" AS (
-  UPDATE "claims" c SET "estado" = 'liberado', "updated_at" = now()
-  FROM "cancelados" x WHERE c."id" = x."claim_id"
+  RETURNING g."claim_id"
 )
-INSERT INTO "notifications" ("user_id", "tipo", "item_id")
-SELECT m."user_id", 'regalo_cancelado', x."item_id"
-FROM "cancelados" x JOIN "group_gift_members" m ON m."gift_id" = x."id";
+UPDATE "claims" c SET "estado" = 'liberado', "updated_at" = now()
+FROM "cancelados" x WHERE c."id" = x."claim_id";

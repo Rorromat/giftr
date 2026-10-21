@@ -93,9 +93,10 @@ export function OtraCuenta({ volver }: { volver: string }) {
 export function ExDueno() {
   return (
     <section aria-labelledby="ex-dueno" className="gr-sticker flex flex-col gap-1 p-3.5">
-      <h2 id="ex-dueno" className="font-display text-lg leading-tight font-extrabold">Saliste de este grupo</h2>
+      <h2 id="ex-dueno" className="font-display text-lg leading-tight font-extrabold">Ya no sos parte de este grupo</h2>
       <p className="text-[13px] font-medium leading-snug">
-        Como la armabas vos también, acá no se muestra qué reservaron los demás y no podés reservar.
+        Como la armabas vos también, acá no se muestra qué reservaron los demás y no podés reservar. Si tenías algo
+        reservado de esta lista, se liberó.
       </p>
     </section>
   )

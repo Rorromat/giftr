@@ -381,9 +381,17 @@ test('si la dueña cambia el link para regalar, Cuentas no se lo pasa a quien so
   const deRodri = await misCuentas(db, rodri.id)
   expect((await misCuentas(db, ana.id)).personas[0].lineas[0].href).toBeNull()
   expect(deRodri.personas.flatMap((x) => x.lineas).map((l) => l.href)).toEqual([null, null])
-  // del perfume: Rodri, que solo se sumó, tampoco; Sofi, que lo organiza, sí: es donde lo compra o lo cancela
-  expect(deRodri.enCurso[0]).toMatchObject({ itemTitulo: 'Perfume', href: null })
-  expect((await misCuentas(db, sofi.id)).enCurso[0].href).toBe(`/l/${nuevo}/item/${perfume.id}`)
+  // del perfume tampoco, ni a Rodri, que solo se sumó, ni a Sofi, que lo organiza: con el link nuevo volvería a abrir
+  // (y a seguir) la lista. Sofi lo compra y lo divide desde Cuentas, con los mismos que vería en el deseo
+  expect(deRodri.enCurso[0]).toMatchObject({ itemTitulo: 'Perfume', href: null, dividirCon: null })
+  const deSofi = (await misCuentas(db, sofi.id)).enCurso[0]
+  expect(deSofi).toMatchObject({ itemTitulo: 'Perfume', href: null, soyEncargado: true })
+  expect(deSofi.dividirCon).toEqual([
+    { userId: sofi.id, nombre: 'Sofi', esYo: true }, { userId: rodri.id, nombre: 'Rodri', esYo: false },
+  ])
+  expect(JSON.stringify(await misCuentas(db, sofi.id))).not.toContain(nuevo!)
+  expect(await comprarRegalo(db, p.giftId, sofi.id, { total: 50000 })).toEqual({ ok: true })
+  expect((await misCuentas(db, rodri.id)).debes).toBe(25000)
   // cuando abre el link nuevo (y la sigue), vuelve a tenerlo
   await seguirLista(db, ana.id, lista.id)
   expect((await misCuentas(db, ana.id)).personas[0].lineas[0].href).toBe(`/l/${nuevo}/item/${bici.id}`)

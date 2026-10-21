@@ -11,11 +11,12 @@ const conPuntos = (v: string) => (v ? pesos(Number(v)).slice(1) : '')
 /**
  * "Lo compré": el encargado pone cuánto salió y cómo se divide.
  * Partes iguales por defecto (se ve en vivo cuánto pone cada uno); "A mano" para repartir distinto.
+ * Sin token ni deseo (desde Cuentas, cuando no tiene el link de la lista), vuelve a Cuentas.
  */
 export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido }: {
   giftId: string
-  token: string
-  itemId: string
+  token?: string
+  itemId?: string
   miembros: { userId: string; nombre: string; esYo: boolean }[]
   sugerido: number | null
 }) {
@@ -39,8 +40,12 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido }: 
   return (
     <form action={buyGroupGiftAction} className="flex flex-col gap-3">
       <input type="hidden" name="giftId" value={giftId} />
-      <input type="hidden" name="token" value={token} />
-      <input type="hidden" name="itemId" value={itemId} />
+      {token && itemId && (
+        <>
+          <input type="hidden" name="token" value={token} />
+          <input type="hidden" name="itemId" value={itemId} />
+        </>
+      )}
       <input type="hidden" name="modo" value={manual ? 'manual' : 'iguales'} />
 
       <label className="flex flex-col gap-1.5">

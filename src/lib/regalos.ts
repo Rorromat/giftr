@@ -257,6 +257,11 @@ export type RegaloEnCurso = {
   giftId: string; itemTitulo: string; para: string; href: string | null; encargado: string; soyEncargado: boolean; personas: string[]
   /** false si el dueño lo sacó de su lista: el encargado lo cancela desde Cuentas. */
   sigueEnLaLista: boolean
+  /**
+   * Solo para el encargado que no tiene el link de la lista (lo cambiaron): con quiénes dividir la compra, que hace desde
+   * Cuentas. El encargado primero y después por orden de llegada, como en comprarRegalo.
+   */
+  dividirCon: { userId: string; nombre: string; esYo: boolean }[] | null
 }
 
 export type Cuentas = {
@@ -353,7 +358,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     .where(and(eq(groupGiftMembers.userId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
     .orderBy(desc(groupGifts.createdAt))
   const nombres = abiertos.length
-    ? await db.select({ giftId: groupGiftMembers.giftId, nombre: users.nombre }).from(groupGiftMembers)
+    ? await db.select({ giftId: groupGiftMembers.giftId, userId: users.id, nombre: users.nombre }).from(groupGiftMembers)
       .innerJoin(users, eq(groupGiftMembers.userId, users.id))
       .where(inArray(groupGiftMembers.giftId, abiertos.map((a) => a.giftId)))
       .orderBy(asc(groupGiftMembers.createdAt))
@@ -363,12 +368,21 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     debes, teDeben,
     // primero a quien más le debés, después quien más te debe
     personas: [...porPersona.values()].sort((a, b) => a.neto - b.neto),
-    enCurso: abiertos.map((a) => ({
-      // el encargado siempre llega al deseo: es donde se compra o se cancela, y si no el regalo quedaría trabado
-      giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a, a.tieneElLink || a.encargadoId === userId),
-      encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
-      personas: nombres.filter((n) => n.giftId === a.giftId).map((n) => n.nombre),
-    })),
+    enCurso: abiertos.map((a) => {
+      const miembros = nombres.filter((n) => n.giftId === a.giftId)
+      // Sin el link tampoco para el encargado: con el nuevo volvería a abrir (y seguir) la lista que le quisieron cerrar.
+      // Lo compra o lo cancela desde Cuentas, así el regalo no queda trabado.
+      const sinLink = a.encargadoId === userId && a.activo && !a.tieneElLink
+      return {
+        giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a),
+        encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
+        personas: miembros.map((n) => n.nombre),
+        dividirCon: sinLink
+          ? [...miembros.filter((m) => m.userId === userId), ...miembros.filter((m) => m.userId !== userId)]
+            .map((m) => ({ userId: m.userId, nombre: m.nombre, esYo: m.userId === userId }))
+          : null,
+      }
+    }),
     saldadas: saldadas.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 10),
   }
 }

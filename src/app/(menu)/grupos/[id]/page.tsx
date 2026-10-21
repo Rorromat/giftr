@@ -15,7 +15,7 @@ import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui
 const AVISOS: Record<string, string> = {
   invitacion: 'Listo: el link de invitación es nuevo. El de antes ya no sirve para sumarse.',
   regalar: 'Listo: el link para regalar es nuevo. El de antes ya no anda: volvé a mandarlo por WhatsApp.',
-  sacado: 'Listo: ya no es parte del grupo. Si el link de invitación sigue dando vueltas, generá uno nuevo para que no vuelva a sumarse.',
+  sacado: 'Listo: ya no es parte del grupo. El link de invitación cambió para que no vuelva a sumarse: si falta alguien, mandale el nuevo.',
 }
 
 export default async function Grupo({ params, searchParams }: {
@@ -110,7 +110,7 @@ export default async function Grupo({ params, searchParams }: {
                    ocultos={{ grupoId: grupo.id }}>
           El link de ahora deja de servir: quien lo tenga y todavía no se sumó ya no va a poder. Los que ya están siguen.
         </Confirmar>
-        {/* el que entró por error queda como dueño (o, si sale, sin poder reservar): lo saca uno que ya estaba */}
+        {/* el que entró por error deja de editar: lo saca uno que ya estaba, y sigue sin ver lo reservado (como uno que sale) */}
         {grupo.sacables.length > 0 && (
           <details className="group flex flex-col">
             <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
@@ -118,11 +118,11 @@ export default async function Grupo({ params, searchParams }: {
             </summary>
             <p className="text-[13px] font-medium leading-snug">Podés sacar a quien se sumó después que vos.</p>
             {grupo.sacables.map((m) => (
-              <Confirmar key={m.id} resumen={`Sacar a ${m.nombre}${m.salio ? ' (ya salió)' : ''}`} boton={`Sí, sacar a ${m.nombre}`}
+              <Confirmar key={m.id} resumen={`Sacar a ${m.nombre}`} boton={`Sí, sacar a ${m.nombre}`}
                          action={removeMemberAction} ocultos={{ grupoId: grupo.id, userId: m.id }}>
-                {m.nombre} vuelve a ser alguien que regala: {m.salio ? '' : 'deja de agregar y editar esta lista, '}va a poder
-                reservar y va a ver lo que reservaron los demás. Hacelo solo si se sumó por error: si armó la lista con ustedes,
-                se entera de qué les regalan.
+                {m.nombre} deja de agregar y editar esta lista, y el link de invitación cambia para que no vuelva a sumarse con el
+                de antes. Igual que alguien que sale del grupo, sigue sin ver qué reservaron y sin poder reservar en ella: pudo
+                haber cargado deseos.
               </Confirmar>
             ))}
           </details>
@@ -148,8 +148,7 @@ export default async function Grupo({ params, searchParams }: {
           <Confirmar resumen="Salir del grupo" boton="Salir del grupo" action={leaveGroupAction} ocultos={{ grupoId: grupo.id }}
                      className="items-center">
             Vas a dejar de agregar y editar esta lista. Como la armaste vos también, aunque salgas no vas a ver qué
-            reservaron los demás ni vas a poder reservar en ella. Si te sumaste por error, pedile a quien te invitó que te
-            saque del grupo: así sí volvés a regalar.
+            reservaron los demás ni vas a poder reservar en ella.
           </Confirmar>
         )}
       </div>

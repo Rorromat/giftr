@@ -1,6 +1,6 @@
 import { db } from '@/db'
 import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
-import { getUnreadNotifications } from '@/lib/notifications'
+import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getMyClaimWarnings } from '@/lib/claims'
 import { markNotifsReadAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
@@ -9,22 +9,19 @@ import Link from 'next/link'
 import { Starburst } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
 
-const COPY = {
-  item_baja: (t: string) => `"${t}" fue dado de baja por su dueño — te conviene elegir otro regalo.`,
-  item_editado: (t: string) => `"${t}" fue editado por su dueño — revisá los detalles.`,
-  regalo_encargo: (t: string) => `Ahora organizás vos el regalo grupal de "${t}" — cuando lo compres, dividí lo que salió (o cancelalo si ya no va).`,
-  regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
-} as const
-
 export async function Banners() {
   const viewer = await getViewer()
-  const [notifs, warnings, codazos, avisos, invitado] = await Promise.all([
+  const [todas, warnings, codazos, avisos, invitado] = await Promise.all([
     getUnreadNotifications(db, viewer),
     getMyClaimWarnings(db, viewer),
     viewer.userId ? codazosSinVer(db, viewer.userId) : [],
     viewer.userId ? tieneAvisos(db, viewer.userId) : false,
     viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
   ])
+  const notifs = todas.flatMap((n) => {
+    const texto = textoDeAviso(n.tipo, n.itemTitulo)
+    return texto ? [{ id: n.id, texto }] : []
+  })
   if (!notifs.length && !warnings.length && !codazos.length && !invitado) return null
   // Codazos: quiénes (sin repetir) y, si todos son para el mismo grupo, agregar directo ahí.
   const quienes = [...new Set(codazos.map((c) => c.deNombre.split(' ')[0]))]
@@ -54,7 +51,7 @@ export async function Banners() {
       )}
       {notifs.map((n) => (
         <div key={n.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5 py-3 text-sm font-medium shadow-sticker-sm">
-          {COPY[n.tipo](n.itemTitulo)}
+          {n.texto}
         </div>
       ))}
       {warnings.map((w) => (

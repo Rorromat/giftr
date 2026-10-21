@@ -5,11 +5,11 @@ import { createTestDb } from './helpers'
 import { claims, codazos, listMembers, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo } from '@/lib/groups'
+import { crearGrupo, grupoParaDueno, sacarDelGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem } from '@/lib/items'
 import { reserveItem } from '@/lib/claims'
 import { getListForViewer } from '@/lib/lists'
-import { getUnreadNotifications } from '@/lib/notifications'
+import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo } from '@/lib/regalos'
 
 // Lo que quedó en la base de antes de los arreglos de grupos: la migración 0011 lo destraba.
@@ -53,6 +53,9 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   // después reservó las plantas como cualquier regalador
   await db.insert(codazos).values({ listId: grupoId, paraUserId: rodri.id, deNombre: 'Tía Marta' })
   expect(await reserveItem(db, plantas.id, { userId: rodri.id })).toMatchObject({ ok: true })
+  // y el tío se sumó después de que Rodri salió
+  const tio = await usuario(db, 'Tío')
+  await db.insert(listMembers).values({ listId: grupoId, userId: tio.id })
 
   // trabado: la heladera no la puede comprar nadie y Martín ya no la ve
   expect(await reserveItem(db, heladera.id, { userId: ana.id })).toEqual({ ok: false, reason: 'sin_stock' })
@@ -63,16 +66,18 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
 
   // las copas quedan libres
   expect(await reserveItem(db, copas.id, { userId: ana.id })).toMatchObject({ ok: true })
-  // la heladera pasa a Sofi, con la reserva a su nombre, y se le avisa
+  // la heladera pasa a Sofi, con la reserva a su nombre. Sin aviso: la migración corre en el build, mientras todavía sirve
+  // el código de antes, que no conoce ese tipo de aviso y se caería
   const [regalo] = await regalosDeItem(db, heladera.id, { userId: sofi.id })
   expect(regalo).toMatchObject({ estado: 'abierto', soyEncargado: true, encargado: { nombre: 'Sofi' } })
   expect(regalo.miembros.map((m) => m.nombre)).toEqual(['Sofi'])
   const [reserva] = await db.select().from(claims).where(eq(claims.itemId, heladera.id))
   expect(reserva).toMatchObject({ claimerUserId: sofi.id, estado: 'reservado' })
-  expect(await getUnreadNotifications(db, { userId: sofi.id })).toEqual([expect.objectContaining({ tipo: 'regalo_encargo', itemTitulo: 'Heladera' })])
-  // la tostadora no tenía a quién pasar (Ana ya tiene su propia reserva): se cancela, se libera y Ana se entera
+  expect(await getUnreadNotifications(db, { userId: sofi.id })).toEqual([])
+  expect((await misCuentas(db, sofi.id)).enCurso).toEqual([expect.objectContaining({ itemTitulo: 'Heladera', soyEncargado: true })])
+  // la tostadora no tenía a quién pasar (Ana ya tiene su propia reserva): se cancela y se libera
   expect(await regalosDeItem(db, tostadora.id, { userId: ana.id })).toEqual([])
-  expect(await getUnreadNotifications(db, { userId: ana.id })).toEqual([expect.objectContaining({ tipo: 'regalo_cancelado', itemTitulo: 'Tostadora' })])
+  expect(await db.select().from(notifications)).toEqual([])
   // su reserva suelta sigue, y la otra tostadora queda libre
   expect(await db.select({ estado: claims.estado }).from(claims).where(and(eq(claims.itemId, tostadora.id), eq(claims.claimerUserId, ana.id))))
     .toEqual([{ estado: 'reservado' }])
@@ -84,11 +89,27 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   expect(await getListForViewer(db, grupo.shareToken, { userId: rodri.id })).toMatchObject({ role: 'anonimo', motivo: 'ex_dueno' })
   expect(await reserveItem(db, plantas.id, { userId: rodri.id })).toEqual({ ok: false, reason: 'propio' })
   expect(await db.select({ estado: claims.estado }).from(claims).where(eq(claims.itemId, plantas.id))).toEqual([{ estado: 'liberado' }])
-  expect(await getListForViewer(db, grupo.shareToken, { userId: ana.id })).toMatchObject({ duenos: ['Delfina', 'Martín'] })
+  expect(await getListForViewer(db, grupo.shareToken, { userId: ana.id })).toMatchObject({ duenos: ['Delfina', 'Martín', 'Tío'] })
 
   // volver a correrla no cambia nada
-  const avisos = await db.select().from(notifications)
+  const [miembros, reservas] = [await db.select().from(listMembers), await db.select().from(claims)]
   await destrabar(db)
-  expect(await db.select().from(notifications)).toEqual(avisos)
+  expect(await db.select().from(listMembers)).toEqual(miembros)
+  expect(await db.select().from(claims)).toEqual(reservas)
   expect((await regalosDeItem(db, heladera.id, { userId: sofi.id }))[0]).toMatchObject({ estado: 'abierto', soyEncargado: true })
+
+  // Rodri queda con la fecha del grupo, como los que lo armaron: no parece recién llegado. El tío, que se sumó después,
+  // no lo puede sacar ni cuando vuelve con la invitación (y Rodri a él sí)
+  expect(await unirseAGrupo(db, grupo.inviteToken!, rodri.id)).toBe(grupoId)
+  expect((await grupoParaDueno(db, grupoId, tio.id))!.sacables).toEqual([])
+  expect(await sacarDelGrupo(db, grupoId, tio.id, rodri.id)).toBe(false)
+  expect((await grupoParaDueno(db, grupoId, rodri.id))!.sacables.map((m) => m.nombre)).toEqual(['Martín', 'Tío'])
+})
+
+test('un aviso de un tipo que esta versión no conoce no se muestra (si se vuelve atrás un deploy, no se cae la página)', () => {
+  expect(textoDeAviso('regalo_encargo', 'Heladera')).toContain('"Heladera"')
+  expect(textoDeAviso('item_baja', 'Copas')).toContain('"Copas"')
+  expect(textoDeAviso('uno_que_todavia_no_existe', 'Copas')).toBeNull()
+  expect(textoDeAviso('__proto__', 'Copas')).toBeNull()
+  expect(textoDeAviso('toString', 'Copas')).toBeNull()
 })

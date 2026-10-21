@@ -212,7 +212,7 @@ export async function leaveGroupAction(formData: FormData) {
   redirect('/mi-lista')
 }
 
-/** "Se sumó por error": un dueño saca a alguien que se sumó después que él y lo devuelve a regalador. */
+/** "Se sumó por error": un dueño saca a alguien que se sumó después que él (deja de editar y sigue ciego) y cambia la invitación. */
 export async function removeMemberAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
@@ -451,7 +451,9 @@ const parte = (v: string) => (/^\D*0+\D*$/.test(v) ? 0 : parsePesos(v) ?? Number
 
 export async function buyGroupGiftAction(formData: FormData) {
   const userId = await usuarioRegalador()
-  const volver = `/l/${str(formData, 'token')}/item/${str(formData, 'itemId')}`
+  const [token, itemId, giftId] = [str(formData, 'token'), str(formData, 'itemId'), str(formData, 'giftId') ?? '']
+  // desde Cuentas (sin el link de la lista) vuelve ahí, con el error en el regalo que lo tuvo
+  const enDeseo = token && itemId ? `/l/${token}/item/${itemId}` : null
   let partes: Record<string, number> | undefined
   if (str(formData, 'modo') === 'manual') {
     partes = {}
@@ -459,11 +461,12 @@ export async function buyGroupGiftAction(formData: FormData) {
       if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = parte(v)
     }
   }
-  const r = await comprarRegalo(db, str(formData, 'giftId') ?? '', userId, {
+  const r = await comprarRegalo(db, giftId, userId, {
     total: parsePesos(str(formData, 'total')) ?? 0, partes, nota: str(formData, 'nota'),
   })
   revalidarRegalo(formData)
-  redirect(r.ok ? volver : `${volver}?error=${r.reason}`)
+  if (r.ok) redirect(enDeseo ?? '/cuentas')
+  redirect(enDeseo ? `${enDeseo}?error=${r.reason}` : `/cuentas?error=${r.reason}&regalo=${encodeURIComponent(giftId)}`)
 }
 
 export async function markPaidAction(formData: FormData) {

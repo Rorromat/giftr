@@ -2,8 +2,10 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/regalos'
-import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
+import { misCuentas, pesos, type CuentaPersona, type LineaCuenta, type RegaloEnCurso } from '@/lib/regalos'
+import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
+import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { ERRORES_COMPRA } from '@/components/RegaloGrupal'
 import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
 
 /** Un link si lo hay; si no (cambiaron el link para regalar y no lo tiene), lo mismo sin link. */
@@ -56,10 +58,57 @@ function Persona({ p }: { p: CuentaPersona }) {
   )
 }
 
-export default async function Cuentas() {
+const linkSubrayado = 'min-h-11 font-bold underline decoration-2 underline-offset-4'
+
+function CancelarRegalo({ giftId }: { giftId: string }) {
+  return (
+    <form action={cancelGroupGiftAction}>
+      <input type="hidden" name="giftId" value={giftId} />
+      <button className={linkSubrayado}>Cancelar el regalo</button>
+    </form>
+  )
+}
+
+/**
+ * Un regalo abierto de una lista cuyo link no tiene (lo cambiaron): lo que haría en el deseo lo hace desde acá, sin pasar
+ * por la lista. El encargado lo compra o lo cancela; los demás se pueden bajar.
+ */
+function SinLink({ r, error }: { r: RegaloEnCurso; error?: string }) {
+  if (r.dividirCon) {
+    return (
+      <div className="mt-1.5 flex flex-col gap-2 px-1 text-xs font-semibold">
+        <span>Ya no tenés el link de esta lista: el regalo lo terminás desde acá.</span>
+        <details className="group flex flex-col" open={!!error}>
+          <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            Ya lo compré: dividir
+          </summary>
+          <div className="mt-3 flex flex-col gap-2">
+            {error && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{ERRORES_COMPRA[error]}</p>}
+            <CompraGrupalForm giftId={r.giftId} miembros={r.dividirCon} sugerido={null} />
+          </div>
+        </details>
+        <CancelarRegalo giftId={r.giftId} />
+      </div>
+    )
+  }
+  if (r.soyEncargado) return null
+  return (
+    <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
+      <span className="flex-1">Ya no tenés el link de esta lista. Si no vas a poner, bajate desde acá.</span>
+      <form action={leaveGroupGiftAction}>
+        <input type="hidden" name="giftId" value={r.giftId} />
+        <button className={linkSubrayado}>Me bajo</button>
+      </form>
+    </div>
+  )
+}
+
+export default async function Cuentas({ searchParams }: { searchParams: Promise<{ error?: string; regalo?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const c = await misCuentas(db, session.userId)
+  const [c, { error, regalo }] = await Promise.all([misCuentas(db, session.userId), searchParams])
+  // el error de "Ya lo compré" hecho desde acá, en el regalo que lo tuvo
+  const errorDe = (giftId: string) => (regalo === giftId && error && Object.hasOwn(ERRORES_COMPRA, error) ? error : undefined)
   const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length
 
   return (
@@ -114,17 +163,12 @@ export default async function Cuentas() {
                   </span>
                   {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
                 </QuizasLink>
-                {!r.sigueEnLaLista && (
+                {!r.sigueEnLaLista ? (
                   <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
                     <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>
-                    {r.soyEncargado && (
-                      <form action={cancelGroupGiftAction}>
-                        <input type="hidden" name="giftId" value={r.giftId} />
-                        <button className="min-h-11 font-bold underline decoration-2 underline-offset-4">Cancelar el regalo</button>
-                      </form>
-                    )}
+                    {r.soyEncargado && <CancelarRegalo giftId={r.giftId} />}
                   </div>
-                )}
+                ) : !r.href && <SinLink r={r} error={errorDe(r.giftId)} />}
               </li>
             ))}
           </ul>

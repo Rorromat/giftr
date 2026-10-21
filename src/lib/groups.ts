@@ -28,8 +28,9 @@ export function juntarNombres(nombres: string[]): string {
 // Ser dueño de una lista son dos preguntas distintas:
 // - esDuenoSql: dueño hoy (el de la lista personal o un co-dueño activo del grupo). Para editar, ver el grupo y figurar
 //   como dueño ante los que regalan.
-// - esOFueDuenoSql: también el que salió del grupo. Para la sorpresa: cargó esos deseos, así que sigue sin ver quién regala
-//   qué, sin reservar, comentar ni sumarse a un regalo grupal. Si no, salir, mirar y volver con la invitación la arruinaría.
+// - esOFueDuenoSql: también el que salió del grupo (o lo sacaron). Para la sorpresa: cargó esos deseos, así que sigue sin
+//   ver quién regala qué, sin reservar, comentar ni sumarse a un regalo grupal. Si no, salir, mirar y volver con la
+//   invitación la arruinaría. No hay vuelta atrás a regalador: nadie sabe si la lista también era suya.
 
 const gruposDe = (db: Db, userId: string, soloActivos: boolean) => db.select({ id: listMembers.listId }).from(listMembers)
   .where(soloActivos ? and(eq(listMembers.userId, userId), isNull(listMembers.salioAt)) : eq(listMembers.userId, userId))
@@ -122,9 +123,9 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
   const [duenos, rows, despues] = await Promise.all([
     duenosDeLista(db, list),
     db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt)),
-    // los que se sumaron después que él, también los que ya salieron: a esos los puede sacar (ver sacarDelGrupo)
-    db.select({ id: users.id, nombre: users.nombre, salioAt: otros.salioAt }).from(listMembers)
-      .innerJoin(otros, and(eq(otros.listId, listMembers.listId), gt(otros.createdAt, listMembers.createdAt)))
+    // los que siguen en el grupo y se sumaron después que él: a esos los puede sacar (ver sacarDelGrupo)
+    db.select({ id: users.id, nombre: users.nombre }).from(listMembers)
+      .innerJoin(otros, and(eq(otros.listId, listMembers.listId), gt(otros.createdAt, listMembers.createdAt), isNull(otros.salioAt)))
       .innerJoin(users, eq(otros.userId, users.id))
       .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId)))
       .orderBy(asc(otros.createdAt)),
@@ -138,7 +139,7 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
     shareToken: list.shareToken,
     inviteToken: list.inviteToken!,
     duenos,
-    sacables: despues.map((m) => ({ id: m.id, nombre: m.nombre, salio: !!m.salioAt })),
+    sacables: despues,
     items: rows.map(pickItemFields),
   }
 }
@@ -248,10 +249,11 @@ export async function salirDeGrupo(db: Db, listId: string, userId: string): Prom
 }
 
 /**
- * "Se sumó por error": un dueño saca a alguien que se sumó después que él (siga o ya haya salido) y lo devuelve a
- * regalador. A diferencia de salir, la fila se borra: vuelve a reservar y a ver lo reservado, así que es solo para quien
- * no armó la lista (la pantalla lo avisa). Solo a los que llegaron después: el que entró con una invitación que circuló
- * de más no puede sacar a los que la armaron. Lo que tenía reservado se liberó al unirse y no vuelve.
+ * "Se sumó por error" (o con una invitación que circuló de más): un dueño saca a alguien que se sumó después que él.
+ * Queda como uno que salió (salio_at): deja de editar y sigue sin ver la capa oculta, porque no hay forma de saber si
+ * cargó deseos o si la lista también es suya. Devolverlo a regalador sería otro camino para mirar lo reservado.
+ * La invitación cambia en el mismo paso, así no vuelve a sumarse con la de antes. Solo a los que llegaron después: el
+ * que entró con una invitación que circuló de más no puede sacar a los que armaron la lista.
  */
 export async function sacarDelGrupo(db: Db, listId: string, actorId: string, userId: string): Promise<boolean> {
   if (!esUuid(listId) || !esUuid(userId) || actorId === userId) return false
@@ -260,11 +262,14 @@ export async function sacarDelGrupo(db: Db, listId: string, actorId: string, use
     const otro = alias(listMembers, 'otro')
     // bloquea las dos filas: si a la vez el otro sale o vuelve con la invitación, uno espera al otro
     const [fila] = await t.select({ id: otro.userId }).from(listMembers)
-      .innerJoin(otro, and(eq(otro.listId, listMembers.listId), eq(otro.userId, userId), gt(otro.createdAt, listMembers.createdAt)))
+      .innerJoin(otro, and(eq(otro.listId, listMembers.listId), eq(otro.userId, userId), gt(otro.createdAt, listMembers.createdAt),
+        isNull(otro.salioAt)))
       .where(and(eq(listMembers.listId, listId), eq(listMembers.userId, actorId), isNull(listMembers.salioAt)))
       .for('update')
     if (!fila) return false
-    await t.delete(listMembers).where(and(eq(listMembers.listId, listId), eq(listMembers.userId, userId)))
+    await t.update(listMembers).set({ salioAt: new Date() })
+      .where(and(eq(listMembers.listId, listId), eq(listMembers.userId, userId)))
+    await t.update(lists).set({ inviteToken: newInviteToken() }).where(eq(lists.id, listId))
     return true
   })
 }

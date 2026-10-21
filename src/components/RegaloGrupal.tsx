@@ -49,7 +49,8 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
   )
 }
 
-const ERRORES: Record<string, string> = {
+// también en Cuentas, para el encargado que lo compra desde ahí
+export const ERRORES_COMPRA: Record<string, string> = {
   no_suma: 'Las partes no suman el total. Revisalas y probá de nuevo.',
   monto_invalido: 'Revisá el monto: tiene que ser un número de pesos.',
   no_permitido: 'No se pudo: puede que alguien se haya sumado o bajado recién. Probá de nuevo.',
@@ -134,7 +135,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                   Ya lo compré: dividir
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
-                  {error && ERRORES[error] && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{ERRORES[error]}</p>}
+                  {error && Object.hasOwn(ERRORES_COMPRA, error) && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{ERRORES_COMPRA[error]}</p>}
                   <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={precio}
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
