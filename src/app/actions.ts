@@ -491,7 +491,12 @@ export async function startGroupGiftAction(formData: FormData) {
 }
 
 export async function joinGroupGiftAction(formData: FormData) {
-  await sumarseARegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  const userId = await usuarioRegalador()
+  // Pide lo mismo que armar uno: el deseo, con el link para regalar de ahora (y el regalo, de ese deseo). Si no, a quien le
+  // cambiaron el link para sacarle la lista se sumaría desde la página que le quedó abierta.
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await listaDelItem(itemId, str(formData, 'token') ?? ''))) return
+  await sumarseARegalo(db, str(formData, 'giftId') ?? '', userId, itemId)
   revalidarRegalo(formData)
 }
 

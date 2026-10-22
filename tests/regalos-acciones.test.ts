@@ -9,6 +9,7 @@ import { upsertUserFromGoogle } from '@/lib/users'
 import { archiveItem, createItem } from '@/lib/items'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { getUnreadNotifications } from '@/lib/notifications'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, misCuentas, regalosDeItem, sacarDeRegalo, sumarseARegalo } from '@/lib/regalos'
 
 // Las acciones del regalo grupal tal cual, con la base en PGlite y la sesión de Next simulada.
@@ -145,10 +146,11 @@ test('"Ya le pagué" y "Saldar todo" mandan lo que se veía: si cambió, no marc
 })
 
 test('dejar volver a uno que sacó y posponer el recordatorio: solo el encargado de la sesión', async () => {
-  const { db, rodri, sofi, caro, giftId } = await preparar()
+  const { db, rodri, sofi, caro, lista, bici, giftId } = await preparar()
+  const meSumo = compra({ giftId, token: lista.shareToken, itemId: bici.id }, [])
   await sacarDeRegalo(db, giftId, caro.id, rodri.id)
   h.session = { userId: caro.id }
-  await joinGroupGiftAction(compra({ giftId }, []))
+  await joinGroupGiftAction(meSumo)
   expect(await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).toHaveLength(2)
   // Caro (ni Sofi) no se deja volver sola
   await letBackGroupGiftMemberAction(compra({ giftId, miembroId: caro.id }, []))
@@ -161,8 +163,25 @@ test('dejar volver a uno que sacó y posponer el recordatorio: solo el encargado
   await postponeGroupGiftReminderAction(compra({ giftId }, []))
   expect((await db.select().from(groupGifts).where(eq(groupGifts.id, giftId)))[0].recordatorioAt).not.toBeNull()
   h.session = { userId: caro.id }
-  await joinGroupGiftAction(compra({ giftId }, []))
+  await joinGroupGiftAction(meSumo)
   expect(await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).toHaveLength(3)
+})
+
+test('"Me sumo" con el link para regalar de antes (o con el regalo de otro deseo) no suma a nadie', async () => {
+  const { db, mama, lista, bici, giftId } = await preparar()
+  const tia = await upsertUserFromGoogle(db, { googleId: 'g-tia', email: 'tia@test.com', nombre: 'Tía' })
+  const cuantos = async () => (await db.select().from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))).length
+  // Mamá cambia el link para sacarle la lista a la Tía, que tenía el deseo abierto con "Me sumo"
+  const nuevo = (await cambiarLinkParaRegalar(db, lista.id, mama.id))!
+  h.session = { userId: tia.id }
+  await joinGroupGiftAction(compra({ giftId, token: lista.shareToken, itemId: bici.id }, []))
+  expect(await cuantos()).toBe(3)
+  // con el link de ahora pero otro deseo de la lista, tampoco: el regalo tiene que ser de ese deseo
+  const casco = (await createItem(db, mama.id, { tipo: 'exacto', titulo: 'Casco' }))!
+  await joinGroupGiftAction(compra({ giftId, token: nuevo, itemId: casco.id }, []))
+  expect(await cuantos()).toBe(3)
+  await joinGroupGiftAction(compra({ giftId, token: nuevo, itemId: bici.id }, []))
+  expect(await cuantos()).toBe(4)
 })
 
 test('corregir la parte del que después se sumó al grupo: el formulario dice de quién y cuánto dejarle', async () => {

@@ -96,13 +96,14 @@ export async function iniciarRegaloGrupal(db: Db, itemId: string, userId: string
  * "Me sumo", mientras está abierto. Una persona, una reserva por deseo (como reserveItem e iniciarRegaloGrupal): el que ya
  * lo reservó o compró suelto, o está en otro regalo de este deseo, no se suma (la pantalla no se lo ofrece: le dice por qué).
  * Al que sacó el encargado tampoco, hasta que lo deje volver (ver sacarDeRegalo).
+ * itemId: el deseo del link para regalar con el que llegó (ver joinGroupGiftAction); el regalo tiene que ser de ese deseo.
  */
-export async function sumarseARegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
+export async function sumarseARegalo(db: Db, giftId: string, userId: string, itemId?: string): Promise<boolean> {
   if (!esUuid(giftId)) return false
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const [regalo] = await t.select({ itemId: groupGifts.itemId }).from(groupGifts).where(eq(groupGifts.id, giftId))
-    if (!regalo) return false
+    if (!regalo || (itemId !== undefined && regalo.itemId !== itemId)) return false
     // Lock del deseo y después del regalo, en el mismo orden que unirseAGrupo: si a la vez se une al grupo, uno espera al
     // otro. El del regalo solo no alcanza: unirseAGrupo encuentra los regalos por sus miembros y no vería esta fila sin
     // confirmar, así que no esperaría. El del regalo hace esperar a una compra que llega a la vez (o a la compra).
