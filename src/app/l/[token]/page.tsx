@@ -26,7 +26,11 @@ function estadoNoDisponible(item: Tarjeta) {
   // comprado solo si ya se compró todo; si no, quién se ocupa (sin esconder a los demás detrás del primero)
   if (item.claims.length && item.claims.every((c) => c.estado === 'comprado')) return '✓ Comprado'
   const grupal = item.claims.find((c) => c.grupal && c.estado === 'reservado')?.grupal
-  if (grupal && item.claims.length === 1) return grupal.soyParte ? 'Estás en el regalo grupal' : `Regalo grupal de ${grupal.personas.length} · sumate`
+  if (grupal && item.claims.length === 1) {
+    if (grupal.soyParte) return 'Estás en el regalo grupal'
+    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo)
+    return `Regalo grupal de ${grupal.personas.length}${grupal.meSacaron ? '' : ' · sumate'}`
+  }
   const primero = item.claims.find((c) => c.esMia) ?? item.claims[0]
   const otros = item.claims.length - 1
   return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`

@@ -72,7 +72,7 @@ test('armar un regalo grupal reserva el deseo sin vencimiento y los demás se su
 
   const vista = await getItemForViewer(db, lista.shareToken, bici.id, { userId: sofi.id })
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
-  expect(vista.item.claims[0].grupal).toEqual({ giftId, personas: ['Rodri', 'Sofi', 'Ana'], soyParte: true })
+  expect(vista.item.claims[0].grupal).toEqual({ giftId, personas: ['Rodri', 'Sofi', 'Ana'], soyParte: true, meSacaron: false })
   expect(vista.regalos[0]).toMatchObject({ estado: 'abierto', encargado: { nombre: 'Rodri' }, soyParte: true, soyEncargado: false })
   expect(vista.regalos[0].miembros.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi', 'Ana'])
 
@@ -1064,17 +1064,27 @@ test('"Ya le pagué" o "Saldar todo" justo cuando corrigen la compra no marcan p
 })
 
 test('al que sacó el encargado no vuelve a sumarse con un toque: lo deja volver el encargado', async () => {
-  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  const { db, mama, lista, rodri, sofi, ana, martin, bici, giftId } = await conRegalo()
   expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(true)
   expect(await sumarseARegalo(db, giftId, ana.id)).toBe(false)
   // la pantalla no le ofrece "Me sumo", y el encargado ve a quién sacó (los demás, no)
   expect((await regalosDeItem(db, bici.id, { userId: ana.id }))[0]).toMatchObject({ soyParte: false, meSacaron: true, sacados: [] })
   expect((await regalosDeItem(db, bici.id, { userId: rodri.id }))[0]).toMatchObject({ meSacaron: false, sacados: [{ id: ana.id, nombre: 'Ana' }] })
   expect((await regalosDeItem(db, bici.id, { userId: sofi.id }))[0]).toMatchObject({ meSacaron: false, sacados: [] })
+  // la tarjeta de la lista tampoco le dice "sumate" (a los demás que no están, sí)
+  const enLaLista = async (userId: string) => {
+    const vista = await getListForViewer(db, lista.shareToken, { userId })
+    if (vista?.role !== 'giver') throw new Error('esperaba giver')
+    return vista.items.find((i) => i.id === bici.id)!.claims[0].grupal
+  }
+  expect(await enLaLista(ana.id)).toMatchObject({ personas: ['Rodri', 'Sofi'], soyParte: false, meSacaron: true })
+  expect(await enLaLista(martin.id)).toMatchObject({ soyParte: false, meSacaron: false })
+  expect(await enLaLista(sofi.id)).toMatchObject({ soyParte: true, meSacaron: false })
   // se lo sacaron por error: solo el encargado lo deja volver, y ella se vuelve a sumar
   expect(await dejarVolverARegalo(db, giftId, ana.id, sofi.id)).toBe(false)
   expect(await dejarVolverARegalo(db, giftId, ana.id, rodri.id)).toBe(true)
   expect((await regalosDeItem(db, bici.id, { userId: ana.id }))[0].meSacaron).toBe(false)
+  expect((await enLaLista(ana.id))?.meSacaron).toBe(false)
   expect(await sumarseARegalo(db, giftId, ana.id)).toBe(true)
   // si la vuelve a sacar, no ve cuánto puso cada uno al comprarse
   expect(await sacarDeRegalo(db, giftId, ana.id, rodri.id)).toBe(true)

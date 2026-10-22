@@ -30,8 +30,11 @@ export type ClaimView = {
   /** Solo en la compra suelta propia de este evento: "Me equivoqué, todavía no lo compré" (ver desmarcarComprado). */
   deshacer: boolean
   notaQueCompre: string | null
-  /** Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. */
-  grupal: { giftId: string; personas: string[]; soyParte: boolean } | null
+  /**
+   * Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. meSacaron: lo
+   * sacó el encargado y no se puede sumar (ver sacarDeRegalo).
+   */
+  grupal: { giftId: string; personas: string[]; soyParte: boolean; meSacaron: boolean } | null
 }
 
 export type GiverItemView = OwnerItemView & {

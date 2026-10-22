@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, notInArray, or, sql } from 'drizzle-orm'
-import { claims, comments, groupGiftMembers, groupGifts, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
+import { claims, comments, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { expireStaleClaims, miReservaVencida, ocupaSql } from '@/lib/claims'
@@ -53,6 +53,11 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
       .where(inArray(groupGifts.claimId, rows.map((r) => r.id)))
       .orderBy(asc(groupGiftMembers.createdAt))
     : []
+  // De cuáles lo sacó el encargado: la tarjeta no lo invita a sumarse (como el detalle, ver regalosDeItem)
+  const sacados = viewer.userId && grupales.length
+    ? await db.select({ giftId: groupGiftSacados.giftId }).from(groupGiftSacados)
+      .where(and(eq(groupGiftSacados.userId, viewer.userId), inArray(groupGiftSacados.giftId, [...new Set(grupales.map((g) => g.giftId))])))
+    : []
 
   const map = new Map<string, ClaimView[]>()
   for (const r of rows) {
@@ -70,7 +75,10 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
       deshacer: esMia && r.estado === 'comprado' && !gente.length && r.updatedAt >= desde,
       notaQueCompre: r.notaQueCompre,
       grupal: gente.length
-        ? { giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId) }
+        ? {
+          giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId),
+          meSacaron: sacados.some((s) => s.giftId === gente[0].giftId),
+        }
         : null,
     }
     map.set(r.itemId, [...(map.get(r.itemId) ?? []), view])
