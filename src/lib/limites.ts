@@ -9,7 +9,7 @@ export const LARGO = {
 /** Cuántas unidades puede pedir un deseo (más que eso no es un regalo, y la columna tiene su tope). */
 export const CANTIDAD_MAXIMA = 99
 
-export const acotarCantidad = (n: number) => (Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 1), CANTIDAD_MAXIMA) : 1)
+export const acotarCantidad = (n: number, tope = CANTIDAD_MAXIMA) => (Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 1), tope) : 1)
 
 // Intl.Segmenter se crea recién cuando hace falta, y si no existe se cuenta por puntos de código: este archivo también va
 // en los formularios del navegador, y en uno sin Intl.Segmenter (Firefox antes de 125, Safari antes de 14.1) no se podía ni

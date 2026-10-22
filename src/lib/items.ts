@@ -7,7 +7,7 @@ import { expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql } from '@
 import { dejarAviso, type TipoAviso } from '@/lib/notifications'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { recienHecho } from '@/lib/repetido'
-import { acotarCantidad, LARGO, recortar } from '@/lib/limites'
+import { acotarCantidad, CANTIDAD_MAXIMA, LARGO, recortar } from '@/lib/limites'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -24,11 +24,11 @@ export type NewItemData = {
 }
 
 /**
- * Lo escrito, con su largo máximo (ver recortar) y la cantidad entre 1 y 99: así un pedido armado a mano no desborda la
- * columna ni rompe las tarjetas de todos. Un link no se corta (cortado no anda): si se pasa del largo, no va (al editar,
- * queda el que había).
+ * Lo escrito, con su largo máximo (ver recortar) y la cantidad entre 1 y 99 (o topeCantidad): así un pedido armado a mano
+ * no desborda la columna ni rompe las tarjetas de todos. Un link no se corta (cortado no anda): si se pasa del largo, no va
+ * (al editar, queda el que había).
  */
-function acotarDeseo<T extends CambiosDeseo>(data: T): T {
+function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANTIDAD_MAXIMA): T {
   const r: CambiosDeseo = { ...data }
   if (typeof r.titulo === 'string') r.titulo = recortar(r.titulo, LARGO.titulo) || undefined
   for (const k of ['notas', 'precio', 'rangoPrecio', 'categoria'] as const) {
@@ -39,7 +39,7 @@ function acotarDeseo<T extends CambiosDeseo>(data: T): T {
     const v = r[k]
     if (typeof v === 'string' && v.length > LARGO.link) r[k] = undefined
   }
-  if (r.cantidad !== undefined) r.cantidad = acotarCantidad(r.cantidad)
+  if (r.cantidad !== undefined) r.cantidad = acotarCantidad(r.cantidad, topeCantidad)
   return r as T
 }
 
@@ -124,7 +124,8 @@ export async function updateItem(db: Db, itemId: string, userId: string, deseo: 
   const distinto = (d: CambiosDeseo) => Object.fromEntries(
     Object.entries(d).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
   ) as CambiosDeseo
-  const cambios = distinto(soloIdeasSeRepiten(acotarDeseo(distinto(deseo)), antes.tipo))
+  // Uno de antes del tope se puede bajar sin que quede en 99: el formulario deja hasta lo que tenía (ver DeseoForm).
+  const cambios = distinto(soloIdeasSeRepiten(acotarDeseo(distinto(deseo), Math.max(CANTIDAD_MAXIMA, antes.cantidad)), antes.tipo))
   if (!Object.keys(cambios).length) return true
   await db.update(items).set(cambios).where(eq(items.id, itemId))
   // Bajar la cantidad por debajo de lo reservado también llega así (sin nada distinto para el dueño, que no lo sabe).

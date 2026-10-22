@@ -11,7 +11,7 @@ const campo = (fd: FormData, k: string) => {
 
 /**
  * Un entero desde 1. El tope de 99 lo pone createItem/updateItem, y solo si cambió: uno de antes del tope con más se
- * sigue pudiendo editar sin que se la bajen.
+ * sigue pudiendo editar sin que se la bajen (al editar, el tope es lo que ya tenía).
  */
 function cantidad(v: string | null) {
   const n = Math.trunc(Number(v ?? '1'))

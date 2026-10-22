@@ -314,9 +314,14 @@ test('editar un deseo de antes de los topes sin tocar lo largo no lo corta ni le
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
     .toMatchObject({ titulo, precio: '$'.repeat(60), cantidad: 150, prioridad: 'mucho' })
   expect(await h.db.select().from(notifications)).toEqual([])
-  // lo que sí cambia se acota
+  // lo que sí cambia se acota; la cantidad, hasta la que ya tenía (como deja el formulario): bajarla no la manda a 99
   expect(await updateItem(h.db, item.id, owner.id, { titulo: `${titulo}!`, cantidad: 151 })).toBe(true)
-  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo: titulo.slice(0, 120), cantidad: 99 })
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo: titulo.slice(0, 120), cantidad: 150 })
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo: titulo.slice(0, 120), cantidad: '140' })))).toBe('/mi-lista')
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0].cantidad).toBe(140)
+  // una vez bajada, el tope es la nueva: no vuelve a subir a la de antes
+  expect(await updateItem(h.db, item.id, owner.id, { cantidad: 150 })).toBe(true)
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0].cantidad).toBe(140)
 })
 
 test('el título y el link avisan en el navegador antes de que el servidor los corte o los descarte', () => {
