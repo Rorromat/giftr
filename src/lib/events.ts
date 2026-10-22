@@ -353,7 +353,7 @@ export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy:
  * el que venía con la fecha de antes (ver desdeElUltimoEvento), aunque la nueva no lo encuentre (una única que ya fue y
  * se cambia por otra, una anual que pasa a única o cambia de día, quitarla y volver a ponerla).
  * La próxima vez de la anual que ya tenía (la que muestra el formulario, ver fechaParaEditar) no la cambia: guardar sin
- * tocar la fecha no corre la primera vez.
+ * tocar la fecha no corre la primera vez. Y si esa próxima es del año que viene, cambiarle solo el día no la manda a ese.
  */
 export async function guardarFechaGrupo(
   db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, ahora = new Date(),
@@ -366,10 +366,19 @@ export async function guardarFechaGrupo(
     const [antes] = await t.select({ eventoFecha: lists.eventoFecha, eventoAnual: lists.eventoAnual, corte: lists.corteEvento })
       .from(lists).where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(t, userId))).for('update')
     if (!antes) return false
-    const sigueIgual = !!antes.eventoFecha && antes.eventoAnual && anual && fecha === fechaParaEditar(antes.eventoFecha, true, hoy)
+    const hoyIso = hoy.toISOString().slice(0, 10)
+    const mostrada = antes.eventoFecha && antes.eventoAnual ? fechaParaEditar(antes.eventoFecha, true, hoy) : null
+    const sigueIgual = anual && !!mostrada && fecha === mostrada
+    // En una anual que ya cayó, el formulario muestra la próxima, que puede ser del año que viene: si dejan ese año y
+    // cambian el día por uno que todavía no llegó en este, es en este (el 21/10, corregir el 12/10 por el 25 es en 4 días,
+    // no en 2027). Así no se puede saltear una vez de una anual que ya cayó: es raro (se puede pasar a única y volver).
+    // El 29/2 de un año antes que no es bisiesto no existe: ahí se guarda lo que llegó.
+    const unAnioAntes = fecha ? `${Number(fecha.slice(0, 4)) - 1}${fecha.slice(4)}` : null
+    const esDeEsteAnio = anual && !!mostrada && !!fecha && !!unAnioAntes && antes.eventoFecha! < hoyIso
+      && fecha.slice(0, 4) === mostrada.slice(0, 4) && fechaDeGrupoValida(unAnioAntes) && unAnioAntes >= hoyIso
     const corte = desdeDe(antes.eventoFecha ? fechaDeGrupo(antes.eventoFecha, antes.eventoAnual) : null, antes.corte, hoy, ahora)
     await t.update(lists).set({
-      eventoFecha: sigueIgual ? antes.eventoFecha : fecha, eventoAnual: anual,
+      eventoFecha: sigueIgual ? antes.eventoFecha : esDeEsteAnio ? unAnioAntes : fecha, eventoAnual: anual,
       corteEvento: corte.getTime() > 0 ? corte : null, // la de antes todavía no había caído nunca: no hay corte
     }).where(eq(lists.id, listId))
     return true

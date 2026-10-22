@@ -339,8 +339,10 @@ test('la fecha de un grupo se guarda como la cargaron: un año más adelante es 
   expect(await guardarFechaGrupo(db, casamiento, caro.id, '2027-11-20', true, ahora)).toBe(true)
   expect(await fechaDe(casamiento)).toBe('2027-11-20')
 
-  // un grupo que ya tuvo su evento anual y le cargan otra a más de un año: también tal cual
-  const juntada = await crearGrupo(db, caro.id, { nombre: 'Juntada', eventoFecha: '2026-01-10', eventoAnual: true })
+  // un grupo que ya tuvo su evento anual y le cargan otra a más de un año: también tal cual (el formulario mostraba el
+  // 1/12/2026: el 2027 lo eligieron, no venía cargado)
+  const juntada = await crearGrupo(db, caro.id, { nombre: 'Juntada', eventoFecha: '2025-12-01', eventoAnual: true })
+  expect(fechaParaEditar(await fechaDe(juntada), true, hoy)).toBe('2026-12-01')
   expect(await guardarFechaGrupo(db, juntada, caro.id, '2027-11-20', true, ahora)).toBe(true)
   expect(await fechaDe(juntada)).toBe('2027-11-20')
   expect(await eventoDeLista(db, juntada, hoy)).toMatchObject({ fecha: dia('2027-11-20'), dias: 395 })
@@ -369,6 +371,54 @@ test('la fecha de un grupo se guarda como la cargaron: un año más adelante es 
   expect(await desdeElUltimoEvento(db, mellizos, ahora)).toEqual(inicioDelDia(dia('2026-03-11')))
   expect(fechaParaEditar('2026-03-01', false, hoy)).toBe('2026-03-01')
   expect(fechaParaEditar(null, true, hoy)).toBe('')
+})
+
+test('una anual que ya cayó este año: cambiarle solo el día por uno que todavía no llegó es este año, no el que viene', async () => {
+  const hoy = dia('2026-10-21')
+  const ahora = new Date('2026-10-21T15:00:00Z')
+  const { db, caro, rodri } = await setup()
+  const fechaDe = async (id: string) => (await db.select({ f: lists.eventoFecha }).from(lists).where(eq(lists.id, id)))[0].f
+
+  // el cumple de Juan está cargado el 12/10 (anual desde 2024) y ya pasó: el formulario muestra el 12/10/2027. Caro se
+  // da cuenta de que era el 25 y cambia solo el día
+  const juan = await crearGrupo(db, caro.id, { nombre: 'Cumple de Juan', eventoFecha: '2024-10-12', eventoAnual: true })
+  await seguir(db, rodri.id, juan)
+  expect(fechaParaEditar(await fechaDe(juan), true, hoy)).toBe('2027-10-12')
+  expect(await guardarFechaGrupo(db, juan, caro.id, '2027-10-25', true, ahora)).toBe(true)
+  expect(await fechaDe(juan)).toBe('2026-10-25')
+  expect(rotuloFechaGrupo(await fechaDe(juan), true, hoy)).toBe('Domingo 25 de octubre · en 4 días')
+  expect(await eventoDeLista(db, juan, hoy)).toMatchObject({ fecha: dia('2026-10-25'), dias: 4 })
+  expect((await misEventos(db, rodri.id, hoy)).find((e) => e.listId === juan)).toMatchObject({ dias: 4 })
+  // las reservas se acortan para el 25 (nunca menos de 24 horas)
+  expect(await vencimientoDeReserva(db, juan, ahora)).toEqual(new Date('2026-10-22T15:00:00Z'))
+  // Rodri le compró algo el 24 para el 25: pasado el cumple, ya es historial
+  const [remera] = await db.insert(items).values({ listId: juan, tipo: 'exacto', titulo: 'Remera' }).returning()
+  await db.insert(claims).values({
+    itemId: remera.id, claimerUserId: rodri.id, estado: 'comprado', createdAt: dia('2026-10-24'), updatedAt: dia('2026-10-24'),
+  })
+  expect(await desdeElUltimoEvento(db, juan, new Date('2026-10-30T15:00:00Z'))).toEqual(inicioDelDia(dia('2026-10-26')))
+  expect((await misEventos(db, rodri.id, dia('2026-10-30'))).find((e) => e.listId === juan))
+    .toMatchObject({ fecha: dia('2027-10-25'), misReservas: 0 })
+
+  // un día que este año ya pasó sí es el del año que viene
+  const asado = await crearGrupo(db, caro.id, { nombre: 'Asado', eventoFecha: '2024-10-12', eventoAnual: true })
+  expect(await guardarFechaGrupo(db, asado, caro.id, '2027-10-01', true, ahora)).toBe(true)
+  expect(await fechaDe(asado)).toBe('2027-10-01')
+  // un casamiento anual cuya primera vez todavía no llegó: el año lo eligieron y se respeta
+  const casamiento = await crearGrupo(db, caro.id, { nombre: 'Casamiento', eventoFecha: '2027-11-20', eventoAnual: true })
+  expect(await guardarFechaGrupo(db, casamiento, caro.id, '2027-10-25', true, ahora)).toBe(true)
+  expect(await fechaDe(casamiento)).toBe('2027-10-25')
+  // saltearse el de este año (raro) se puede pasándola a única y volviendo a anual
+  const salteado = await crearGrupo(db, caro.id, { nombre: 'Salteado', eventoFecha: '2024-10-12', eventoAnual: true })
+  expect(await guardarFechaGrupo(db, salteado, caro.id, '2027-10-25', false, ahora)).toBe(true)
+  expect(await guardarFechaGrupo(db, salteado, caro.id, '2027-10-25', true, ahora)).toBe(true)
+  expect(await fechaDe(salteado)).toBe('2027-10-25')
+  // el 29/2 de un año que no es bisiesto no existe: se guarda el que llegó (y no un error)
+  const enero = new Date('2027-01-15T15:00:00Z')
+  const bisiesto = await crearGrupo(db, caro.id, { nombre: 'Bisiesto', eventoFecha: '2025-01-10', eventoAnual: true })
+  expect(fechaParaEditar(await fechaDe(bisiesto), true, hoyLocal(enero))).toBe('2028-01-10')
+  expect(await guardarFechaGrupo(db, bisiesto, caro.id, '2028-02-29', true, enero)).toBe(true)
+  expect(await fechaDe(bisiesto)).toBe('2028-02-29')
 })
 
 test('cambiar o quitar la fecha de un grupo no hace que lo comprado para el evento que pasó vuelva a ser de este', async () => {
