@@ -371,14 +371,19 @@ export async function guardarFechaGrupo(
     const sigueIgual = anual && !!mostrada && fecha === mostrada
     // En una anual que ya cayó, el formulario muestra la próxima, que puede ser del año que viene: si dejan ese año y
     // cambian el día por uno que todavía no llegó en este, es en este (el 21/10, corregir el 12/10 por el 25 es en 4 días,
-    // no en 2027). Así no se puede saltear una vez de una anual que ya cayó: es raro (se puede pasar a única y volver).
-    // El 29/2 de un año antes que no es bisiesto no existe: ahí se guarda lo que llegó.
-    const unAnioAntes = fecha ? `${Number(fecha.slice(0, 4)) - 1}${fecha.slice(4)}` : null
+    // no en 2027). El servidor no lo distingue de quien quería ese año, y se ve en el rótulo: volver a guardar con el año
+    // que viene se respeta (ya no es el que muestra el formulario). Así se saltea una vez, o se corrige una fecha cargada
+    // con un año pasado (el casamiento de 2025 que es el 20/11/2027 queda el 20/11 de este año hasta que lo vuelven a
+    // guardar); y por lo mismo un doble envío, o dos co-dueños que corrigen lo mismo, la mandan al año que viene.
+    // El 29/2 de un año que no es bisiesto no existe: se guarda el de cuatro años antes, que este año cae el 28/2 (enAnio).
+    const anio = fecha ? Number(fecha.slice(0, 4)) : 0
+    const unAnioAntes = fecha ? `${anio - 1}${fecha.slice(4)}` : null // '2027-02-29' no existe, pero se compara bien con hoy
     const esDeEsteAnio = anual && !!mostrada && !!fecha && !!unAnioAntes && antes.eventoFecha! < hoyIso
-      && fecha.slice(0, 4) === mostrada.slice(0, 4) && fechaDeGrupoValida(unAnioAntes) && unAnioAntes >= hoyIso
+      && fecha.slice(0, 4) === mostrada.slice(0, 4) && unAnioAntes >= hoyIso
+    const deEsteAnio = unAnioAntes && fechaDeGrupoValida(unAnioAntes) ? unAnioAntes : `${anio - 4}${fecha?.slice(4)}`
     const corte = desdeDe(antes.eventoFecha ? fechaDeGrupo(antes.eventoFecha, antes.eventoAnual) : null, antes.corte, hoy, ahora)
     await t.update(lists).set({
-      eventoFecha: sigueIgual ? antes.eventoFecha : esDeEsteAnio ? unAnioAntes : fecha, eventoAnual: anual,
+      eventoFecha: sigueIgual ? antes.eventoFecha : esDeEsteAnio ? deEsteAnio : fecha, eventoAnual: anual,
       corteEvento: corte.getTime() > 0 ? corte : null, // la de antes todavía no había caído nunca: no hay corte
     }).where(eq(lists.id, listId))
     return true
