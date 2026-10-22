@@ -49,7 +49,7 @@ function EntrarConGoogle({ volver }: { volver: string }) {
  * Un invitado que abre una lista donde todavía no dijo que no es suya. Su nombre vale para todo el navegador: puede ser
  * el dueño, que se anotó en la lista de otro desde un navegador sin su sesión. Hasta que lo diga, la ve como el dueño.
  * Si es otra persona usando la tablet, acá mismo puede dejar de ser ese nombre: si no, con "No es mía" reservaría a su
- * nombre. Solo sale sin sesión.
+ * nombre. Solo sale sin sesión (o con la de un usuario que ya no está en la base, que salirAction trata igual).
  */
 export function ConfirmarLista({ token, nombre, volver }: { token: string; nombre: string; volver: string }) {
   return (

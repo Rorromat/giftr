@@ -21,7 +21,7 @@ import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
-import { asegurarListaPropia } from '@/lib/users'
+import { asegurarListaPropia, existeUsuario } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
@@ -351,17 +351,22 @@ export async function entrarConGoogleAction(formData: FormData) {
  * Con sesión de Google, la cierra y nada más: la cookie de un invitado que no se unió a la cuenta es de otra persona
  * (o de la misma, que todavía no dijo que era ella) y borrarla dejaría sus reservas sin nadie que las maneje.
  * Queda anotado que esta cuenta usó el navegador: en sus listas, ese invitado ya no ve la capa oculta.
- * Sin sesión, borra la cookie de invitado (la pantalla pide confirmarlo antes).
+ * Sin sesión (o con la de un usuario que ya no existe), borra la cookie de invitado (la pantalla pide confirmarlo antes).
  */
 export async function salirAction(formData: FormData) {
   const volver = rutaPropia(str(formData, 'volver'))
-  const session = await auth()
+  const [session, jar] = await Promise.all([auth(), cookies()])
   if (session?.userId) {
-    anotarCuenta(await cookies(), session.userId)
+    if (await existeUsuario(db, session.userId)) anotarCuenta(jar, session.userId)
+    else {
+      // la sesión de un usuario que ya no está en la base: la pantalla lo mostraba como el invitado (ver getViewer) y
+      // le ofrecía "Salir igual"; si solo se cerrara la sesión vieja, el primer toque parecería no hacer nada
+      jar.delete(GUEST_COOKIE)
+      jar.delete(NO_SOY_COOKIE)
+    }
     await signOut({ redirectTo: volver })
     return
   }
-  const jar = await cookies()
   jar.delete(GUEST_COOKIE)
   jar.delete(NO_SOY_COOKIE)
   revalidatePath(volver, 'layout')

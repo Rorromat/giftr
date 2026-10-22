@@ -33,6 +33,7 @@ vi.mock('next/headers', () => ({
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
+  notFound: () => { throw new Error('NEXT_NOT_FOUND') },
 }))
 
 import {
@@ -41,7 +42,9 @@ import {
 } from '@/app/actions'
 import { getViewer, invitadoDeEsteNavegador, invitadoParaPreguntar } from '@/lib/viewer'
 import { getItemForViewer, getListForViewer } from '@/lib/lists'
-import { ConfirmarLista, OtraCuenta } from '@/components/Identidad'
+import { ConfirmarLista, NoSoyYo, OtraCuenta } from '@/components/Identidad'
+import ListaAjena from '@/app/l/[token]/page'
+import DetalleItem from '@/app/l/[token]/item/[itemId]/page'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -64,6 +67,14 @@ function form(campos: Record<string, string>) {
 async function redirigeA(p: Promise<unknown>): Promise<string> {
   try { await p } catch (e) { return (e as { url: string }).url }
   throw new Error('esperaba una redirección')
+}
+
+/** Cuántas veces aparece un componente en lo que devuelve una página (sin dibujarla: solo el árbol, sin abrir los componentes). */
+function cuantos(nodo: React.ReactNode, tipo: unknown): number {
+  if (Array.isArray(nodo)) return nodo.reduce((n: number, x: React.ReactNode) => n + cuantos(x, tipo), 0)
+  if (!nodo || typeof nodo !== 'object' || !('props' in nodo)) return 0
+  const el = nodo as React.ReactElement<{ children?: React.ReactNode }>
+  return (el.type === tipo ? 1 : 0) + cuantos(el.props.children, tipo)
 }
 
 test('"¿Quién sos?": con un nombre se anota como invitado (cookie firmada) y pasa a ver la coordinación', async () => {
@@ -410,6 +421,40 @@ test('"¿Es tu lista?" nombra al invitado y ahí mismo deja salir: otra persona 
   for (const texto of ['No es mía: ver lo reservado', '¿No sos Abuelo?', 'Salir de este dispositivo', 'Salir igual']) {
     expect(html).toContain(texto)
   }
+})
+
+test('con "¿Es tu lista?" el "¿No sos X?" va solo en la tarjeta; cuando dice que no es suya, vuelve al pie', async () => {
+  const { giver, item } = await preparar()
+  // el Abuelo se anotó en la lista de Rodri desde la tablet; ahora alguien abre la de Euge ahí
+  await h.db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' })
+  await identificarseAction(null, form({ token: 'tok-rodri', nombre: 'Abuelo' }))
+  const paginas = () => Promise.all([
+    ListaAjena({ params: Promise.resolve({ token: 'tok-euge' }), searchParams: Promise.resolve({}) }),
+    DetalleItem({ params: Promise.resolve({ token: 'tok-euge', itemId: item.id }), searchParams: Promise.resolve({}) }),
+  ])
+  for (const pagina of await paginas()) {
+    expect([cuantos(pagina, ConfirmarLista), cuantos(pagina, NoSoyYo)]).toEqual([1, 0])
+  }
+  await verLoReservadoAction(form({ token: 'tok-euge' }))
+  for (const pagina of await paginas()) {
+    expect([cuantos(pagina, ConfirmarLista), cuantos(pagina, NoSoyYo)]).toEqual([0, 1])
+  }
+})
+
+test('con la sesión de un usuario que ya no está en la base, "Salir igual" también borra al invitado al primer toque', async () => {
+  const { item } = await preparar()
+  await reserveAction(null, form({ token: 'tok-euge', itemId: item.id, nombre: 'Abuelo' }))
+  const [abuelo] = await h.db.select().from(guestIdentities)
+  h.jar.set(NO_SOY_COOKIE, sumarNoSoy(undefined, abuelo.id, randomUUID()))
+  // el JWT de una base vieja: la pantalla lo muestra como el invitado, con su "¿No sos Abuelo?" (ver getViewer)
+  h.session = { userId: randomUUID() }
+  expect(await getViewer()).toMatchObject({ guestId: abuelo.id })
+  await salirAction(form({ volver: '/l/tok-euge' }))
+  expect(h.signOut).toHaveBeenCalledWith({ redirectTo: '/l/tok-euge' })
+  // y no anota en el navegador una cuenta que no existe
+  expect([...h.jar.keys()]).toEqual([])
+  h.session = null
+  expect(await getViewer()).toEqual({})
 })
 
 test('en Perfil se puede unir el invitado del navegador aunque se haya dicho "No soy yo" por error', async () => {
