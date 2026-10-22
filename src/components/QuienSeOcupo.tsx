@@ -35,7 +35,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
                 <span className={`truncate text-sm ${r.esYo ? 'font-extrabold' : 'font-semibold'}`}>{nombre(r)}</span>
                 <span className="flex min-w-0 items-center gap-2">
                   {/* una sola serie: un solo color; el valor va escrito en la punta */}
-                  <span className="h-5 flex-none rounded-r-[4px] border-2 border-gr-ink bg-gr-accent"
+                  <span className="h-5 flex-none rounded-r-[4px] bg-gr-accent"
                         style={{ width: `calc((100% - 2rem) * ${r.cantidad / max})` }} />
                   <span className="text-sm font-bold tabular-nums">{r.cantidad}</span>
                 </span>
@@ -51,7 +51,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
 
       <ol className="flex flex-col gap-2">
         {entradas.slice(0, 6).map((e) => (
-          <li key={e.id} className="flex items-start gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+          <li key={e.id} className="flex items-start gap-3 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
             <span className="mt-0.5 flex-none rounded-lg bg-gr-ink px-2 py-0.5 text-xs font-bold text-gr-bg tabular-nums">{fecha(e.fecha)}</span>
             <span className="min-w-0 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="font-bold">{e.titulo}</span>

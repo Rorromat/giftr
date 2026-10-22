@@ -8,7 +8,7 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
 import { unfollowAction } from '@/app/actions'
-import { AvatarStack, AvatarSticker, Icon, Seccion, Starburst } from '@/components/ui'
+import { AvatarStack, AvatarSticker, Icon, Seccion } from '@/components/ui'
 
 /**
  * "Cumple el 22 de agosto · en 14 días", "El 12 de octubre", "El 20 de noviembre de 2027" (a más de un año), "Sin cumple
@@ -48,7 +48,7 @@ function Persona({ c, hoy }: { c: Contacto; hoy: Date }) {
           <Icon name="more" size={22} strokeWidth={2.6} />
         </summary>
         <form action={unfollowAction}
-              className="absolute right-0 top-full z-20 mt-1 flex w-60 flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3 shadow-sticker-sm">
+              className="absolute right-0 top-full z-20 mt-1 flex w-60 flex-col gap-2 rounded-2xl border border-gr-line bg-gr-surface p-3">
           <input type="hidden" name="listId" value={c.listId} />
           <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
           <BotonEnviar className="gr-btn gr-btn--sm min-h-11 font-sans text-sm font-bold">Quitar de tu gente</BotonEnviar>
@@ -74,8 +74,7 @@ export default async function Gente() {
       </div>
 
       {gente.length === 0 ? (
-        <div className="relative mt-4 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">
-          <Starburst size={52} fontSize={46} className="absolute -right-2 -top-6 rotate-12">!</Starburst>
+        <div className="relative mt-4 flex flex-col gap-2 rounded-sticker bg-gr-soft px-5 py-7 text-center text-[15px] font-medium leading-snug">
           <p>Acá aparece la gente cuyas listas abrís con tu cuenta.</p>
           <p>Es solo para vos: nadie ve a quién tenés.</p>
         </div>

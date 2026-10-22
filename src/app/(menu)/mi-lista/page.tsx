@@ -27,7 +27,7 @@ export default async function MiLista() {
     <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
         <LogoSticker />
-        <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
+        <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rounded-[14px]">+ Agregar</Link>
       </div>
 
       {/* con deseos, la estrella de la animación de inicio termina en el contador (ver Arranque) */}
@@ -36,7 +36,7 @@ export default async function MiLista() {
         <p className="text-[15px] font-medium">Pedí lo que querés sin pedirlo.</p>
         {activos.length > 0 && (
           <Starburst label={`${activos.length} ${activos.length === 1 ? 'deseo' : 'deseos'}`}
-                     fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[30px] rotate-12">
+                     fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[30px]">
             {activos.length}
           </Starburst>
         )}
@@ -52,8 +52,7 @@ export default async function MiLista() {
       <Banners />
 
       {activos.length === 0 && (
-        <div className="relative mt-6 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
-          <Starburst size={52} fontSize={50} className="absolute -right-2 -top-6 rotate-12">+</Starburst>
+        <div className="relative mt-6 rounded-sticker bg-gr-soft px-5 py-8 text-center text-[15px] font-medium">
           Agregá lo primero que se te venga a la cabeza.<br />¿Un link? Pegalo en “Agregar”.
         </div>
       )}
@@ -62,7 +61,7 @@ export default async function MiLista() {
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
 
       <a href={`https://wa.me/?text=${waText}`} target="_blank"
-         className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">
+         className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
         <Icon name="chat" size={20} strokeWidth={2.4} />
         Mandala por WhatsApp
       </a>

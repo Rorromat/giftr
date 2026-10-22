@@ -15,7 +15,7 @@ import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
+import { BackLink, Icon, ItemPhoto, PriorityTag } from '@/components/ui'
 import { LARGO } from '@/lib/limites'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
@@ -95,17 +95,21 @@ export default async function DetalleItem({ params, searchParams }: {
 
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
-      <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
+      <article className="gr-sticker rounded-3xl">
         <div className="relative">
           <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
-          <PriorityTag prioridad={item.prioridad} className="absolute left-3 top-3 h-[30px]" />
-          {precio && <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{precio}</PriceSticker>}
         </div>
         <div className="flex flex-col gap-3 p-3.5">
-          <h1 className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
+            <div className="flex items-center gap-2">
+              {precio && <p className="text-lg font-bold">{precio}</p>}
+              <PriorityTag prioridad={item.prioridad} className="h-6" />
+            </div>
+          </div>
           {cuantos && <p className="text-sm font-semibold">{cuantos}</p>}
           {item.notas && (
-            <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
+            <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="font-bold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
@@ -134,7 +138,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
-            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border-2 border-gr-ink`}>
+            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border border-gr-line`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
             </span>
             <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -223,7 +227,7 @@ export default async function DetalleItem({ params, searchParams }: {
           </h2>
           <ul className="flex flex-col gap-2">
             {comments.map((c) => (
-              <li key={c.id} className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
+              <li key={c.id} className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
                 <span className="font-bold">{c.autorNombre}:</span> {c.texto}
               </li>
             ))}

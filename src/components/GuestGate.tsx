@@ -32,7 +32,7 @@ export function CartelReserva({ motivo, veTodo, conNombre }: { motivo?: string; 
   if (!motivo || !Object.hasOwn(MOTIVOS, motivo)) return null
   if (motivo === 'sin_identidad' ? conNombre : !veTodo) return null
   return (
-    <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">
+    <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-semibold">
       {MOTIVOS[motivo]}
     </p>
   )

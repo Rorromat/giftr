@@ -66,7 +66,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
 
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">¿Cuánto salió en total?</span>
-        <span className="flex items-center gap-1 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5">
+        <span className="flex items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3.5">
           <span className="font-display text-xl font-extrabold">$</span>
           <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
                  value={conPuntos(total)} onChange={(e) => setTotal(soloDigitos(e.target.value))}
@@ -79,12 +79,12 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
         <button type="button" aria-pressed={manual} onClick={pasarAMano}>A mano</button>
       </div>
 
-      <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5">
+      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3.5">
         {miembros.map((m, i) => (
           <li key={m.userId} className="flex min-h-12 items-center justify-between gap-3 py-1.5">
             <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.esYo ? 'Vos' : m.nombre}</span>
             {manual ? (
-              <span className="flex items-center gap-1 rounded-xl border-2 border-gr-ink px-2">
+              <span className="flex items-center gap-1 rounded-xl border border-gr-line px-2">
                 <span className="font-bold">$</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`} placeholder="0"
                        value={conPuntos(partes[m.userId] ?? '')} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}

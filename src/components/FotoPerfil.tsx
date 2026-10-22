@@ -37,7 +37,7 @@ export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string
       <button type="button" onClick={() => input.current?.click()} aria-label={actual ? 'Cambiar tu foto' : 'Subir tu foto'}
               className={`relative ${estado === 'subiendo' ? 'animate-pulse' : ''}`}>
         <AvatarSticker nombre={nombre} foto={actual} size={size} />
-        <span className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface">
+        <span className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border border-gr-line bg-gr-surface">
           <Icon name="camera" size={16} strokeWidth={2.4} />
         </span>
       </button>

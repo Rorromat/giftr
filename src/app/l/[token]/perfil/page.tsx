@@ -7,7 +7,7 @@ import { MESES, seguirLista } from '@/lib/events'
 import { perfilPublico } from '@/lib/perfil'
 import { IconoSeccion, paraResumen, ResumenGustos, SeccionesGustos } from '@/components/Gustos'
 import { TallesIlustrados } from '@/components/TallesIlustrados'
-import { AvatarSticker, BackLink, Icon, Starburst } from '@/components/ui'
+import { AvatarSticker, BackLink, Icon } from '@/components/ui'
 
 type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ quien?: string }> }
 
@@ -57,7 +57,7 @@ export default async function Perfil({ params, searchParams }: Props) {
         <div className="flex min-w-0 flex-col gap-1.5">
           <h1 className="font-display text-[34px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">{p.nombre}</h1>
           {p.cumple && (
-            <p className="flex items-center gap-1.5 self-start rounded-full border-[2.5px] border-gr-ink bg-gr-accent px-3 py-1 text-[13px] font-bold">
+            <p className="flex items-center gap-1.5 self-start rounded-full bg-gr-accent px-3 py-1 text-[13px] font-bold">
               <Icon name="cake" size={16} strokeWidth={2.4} />
               {p.cumple.dias === 0 ? '¡Hoy es su cumple!' : `${p.cumple.dia} de ${MESES[p.cumple.mes - 1]} · en ${p.cumple.dias} ${p.cumple.dias === 1 ? 'día' : 'días'}`}
             </p>
@@ -69,7 +69,7 @@ export default async function Perfil({ params, searchParams }: Props) {
         <nav aria-label="Otros dueños de la lista" className="flex flex-wrap gap-2">
           {p.otros.map((o) => (
             <Link key={o.id} href={`/l/${token}/perfil?quien=${o.id}`} className="gr-chip gap-2">
-              <AvatarSticker nombre={o.nombre} foto={o.foto} size={24} className="rotate-0" />Ver a {o.nombre.split(' ')[0]}
+              <AvatarSticker nombre={o.nombre} foto={o.foto} size={24} className="" />Ver a {o.nombre.split(' ')[0]}
             </Link>
           ))}
         </nav>
@@ -87,8 +87,7 @@ export default async function Perfil({ params, searchParams }: Props) {
           </details>
         </section>
       ) : nadaCargado ? (
-        <div className="relative rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-6 text-center text-[15px] font-medium leading-snug">
-          <Starburst size={48} fontSize={42} className="absolute -right-2 -top-5 rotate-12">?</Starburst>
+        <div className="relative rounded-sticker bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
           {propio ? 'Todavía no cargaste tus gustos.' : `${primer} todavía no cargó sus gustos.`}
           {propio && <Link href="/bienvenida?editar=1" className="mt-2 block font-bold underline underline-offset-4">Cargarlos ahora</Link>}
         </div>
@@ -106,7 +105,7 @@ export default async function Perfil({ params, searchParams }: Props) {
       )}
 
       {noRegalar && (
-        <section className="flex gap-3 rounded-sticker border-[3px] border-gr-ink bg-gr-ink p-3.5 text-gr-bg">
+        <section className="flex gap-3 rounded-sticker border border-gr-line bg-gr-ink p-3.5 text-gr-bg">
           <IconoSeccion s={noRegalar} size={34} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <h2 className="font-display text-lg leading-tight font-extrabold text-gr-accent">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
@@ -116,13 +115,13 @@ export default async function Perfil({ params, searchParams }: Props) {
       )}
 
       {nota && (
-        <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3.5 py-3 text-sm leading-snug">
+        <p className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm leading-snug">
           <span className="font-bold">{propio ? 'Tu nota' : `${primer} dice`}:</span> {nota.items[0]}
         </p>
       )}
 
       <Link href={dueno ? suLista.href : `/l/${token}`}
-            className="gr-btn gr-btn--dark fixed bottom-7 left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">
+            className="gr-btn gr-btn--dark fixed bottom-7 left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
         <Icon name="gift" size={20} strokeWidth={2.4} />
         {dueno ? suLista.texto : `Ver la lista de ${primer}`}
       </Link>
