@@ -172,23 +172,23 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
 
   const mensaje = subiendo ? 'subiendo'
     : aviso ?? (subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
-  const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] border-[2.5px] border-dashed border-gr-ink text-xs font-bold'
+  const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] bg-gr-soft text-xs font-bold'
   return (
     <div className="flex flex-col gap-3">
+      {foto && rota !== foto && (
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
+          <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
+               // si falló antes de que cargue la página, onError no llega
+               ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
+               className="h-[200px] w-full rounded-[16px] border border-gr-line object-cover" />
+          <button type="button" aria-label="Quitar foto" onClick={quitar}
+                  className="absolute -right-2.5 -top-2.5 flex size-8 items-center justify-center rounded-full border border-gr-line bg-gr-surface before:absolute before:-inset-2 before:content-['']">
+            <Icon name="close" size={13} strokeWidth={3.2} />
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-2.5">
-        {foto && rota !== foto && (
-          <div className="relative flex-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
-            <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
-                 // si falló antes de que cargue la página, onError no llega
-                 ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
-                 className="size-[72px] -rotate-4 rounded-[14px] border-[2.5px] border-gr-ink object-cover" />
-            <button type="button" aria-label="Quitar foto" onClick={quitar}
-                    className="absolute -right-2.5 -top-2.5 flex size-7 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface before:absolute before:-inset-2 before:content-['']">
-              <Icon name="close" size={12} strokeWidth={3.2} />
-            </button>
-          </div>
-        )}
         <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
                 aria-label={foto ? 'Cambiar la foto' : 'Subir una foto de la galería o sacar una'}
                 className={`${boton} ${subiendo ? 'animate-pulse' : ''}`}>
