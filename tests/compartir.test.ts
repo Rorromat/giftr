@@ -15,7 +15,8 @@ import { guardarFotoDeseo } from '@/lib/fotos-deseo'
 import { imagenItem } from '@/lib/og'
 
 // La imagen de la vista previa, con la base en PGlite y los headers que manda cualquiera: un x-forwarded-host de la red
-// interna (no se tiene que usar para nada).
+// interna. og.tsx ya no lee headers (lo que fija el arreglo son los espías de fetch y https.get del test); quedan para
+// que, si alguien vuelve a armar la dirección con ellos, el pedido a ese host salga en los espías.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
 vi.mock('next/headers', () => ({
