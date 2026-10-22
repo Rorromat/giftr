@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { claims, comments, items, lists, notifications } from '@/db/schema'
-import { createItem, updateItem } from '@/lib/items'
+import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { addComment } from '@/lib/comments'
 import { markBought, reserveItem } from '@/lib/claims'
 import { AVISO_LINK_LARGO, AVISO_NO_ES_LINK, avisoDelLink, avisoDelTitulo, deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
@@ -205,6 +205,17 @@ test('volver a cargar enseguida el mismo deseo con otra cantidad, prioridad o "s
     expect(creado).toMatchObject(otro)
   }
   expect(await h.db.select().from(items).where(eq(items.listId, list.id))).toHaveLength(4)
+})
+
+test('archivar un deseo y volver a cargarlo igual enseguida lo agrega de nuevo (no es un doble toque)', async () => {
+  const { owner, list } = await preparar()
+  const termo = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Termo' }))!
+  expect(await archiveItem(h.db, termo.id, owner.id, 'lo_tengo')).toBe(true)
+  const otro = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Termo' }))!
+  expect(otro.id).not.toBe(termo.id)
+  expect(otro.estadoDueno).toBe('activo')
+  const filas = await h.db.select({ id: items.id, estado: items.estadoDueno }).from(items).where(eq(items.listId, list.id))
+  expect(filas.map((f) => f.estado).sort()).toEqual(['activo', 'lo_tengo'])
 })
 
 test('editar un deseo de antes con un link en el título y otro a la tienda: cambiar la prioridad no le toca el título ni avisa', async () => {

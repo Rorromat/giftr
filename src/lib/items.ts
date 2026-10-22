@@ -57,11 +57,13 @@ export async function createItem(db: Db, userId: string, deseo: NewItemData, lis
     if (!list) return null
     // Un doble toque en "Agregar" no lo duplica (dos deseos iguales son dos lugares para reservar el mismo regalo). Es
     // un doble toque solo si vino todo igual: con un link pegado en el título queda de título el sitio, y dos productos de
-    // la misma tienda cargados seguidos son dos deseos; volver a cargarlo enseguida con otra cantidad, también.
+    // la misma tienda cargados seguidos son dos deseos; volver a cargarlo enseguida con otra cantidad, también. Y solo uno
+    // activo: archivarlo y volver a cargarlo enseguida es otro deseo (si no, devolvía el archivado y no quedaba ninguno).
     const nuevo = soloIdeasSeRepiten(data)
     const [repetido] = await t.select().from(items)
       .where(and(
-        eq(items.listId, list.id), eq(items.titulo, nuevo.titulo), eq(items.tipo, nuevo.tipo), recienHecho(items.createdAt),
+        eq(items.listId, list.id), eq(items.estadoDueno, 'activo'), eq(items.titulo, nuevo.titulo), eq(items.tipo, nuevo.tipo),
+        recienHecho(items.createdAt),
         // sin venir, lo que pone la columna
         eq(items.cantidad, nuevo.cantidad ?? 1), eq(items.prioridad, nuevo.prioridad ?? 'gustaria'), eq(items.repetible, nuevo.repetible ?? false),
         ...CAMPOS_OPCIONALES.map((k) => sql`${items[k]} is not distinct from ${nuevo[k] ?? null}`),
