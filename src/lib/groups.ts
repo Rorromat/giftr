@@ -183,8 +183,10 @@ export async function unirseAGrupo(db: Db, inviteToken: string, userId: string):
   if (!esToken(inviteToken)) return null
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
+    // FOR SHARE: si a la vez lo sacan (sacarDelGrupo) o cambian la invitación, espera y vuelve a mirar el token. Si no,
+    // leía salio_at después de que lo sacaron y volvía a activar al sacado con la invitación que se acababa de cambiar.
     const [list] = await t.select({ id: lists.id }).from(lists)
-      .where(and(eq(lists.inviteToken, inviteToken), eq(lists.tipo, 'grupo')))
+      .where(and(eq(lists.inviteToken, inviteToken), eq(lists.tipo, 'grupo'))).for('share')
     if (!list) return null
     const [antes] = await t.select({ salioAt: listMembers.salioAt }).from(listMembers)
       .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId)))

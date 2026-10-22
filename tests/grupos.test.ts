@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createTestDb, seguir } from './helpers'
+import { conConsultas, createTestDb, seguir } from './helpers'
 import { claims, comments, items, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { cambiarLinkParaRegalar, getListForViewer, getItemForViewer, getOwnList } from '@/lib/lists'
@@ -297,6 +297,20 @@ test('sacar a quien se sumó por error: deja de editar, sigue ciego como uno que
   expect(await unirseAGrupo(db, nueva!, tio.id)).toBe(grupo.id)
   expect((await grupoParaDueno(db, grupo.id, tio.id))!.sacables).toEqual([])
   expect((await grupoParaDueno(db, grupo.id, delfina.id))!.sacables).toEqual([{ id: martin.id, nombre: 'Martín' }, { id: tio.id, nombre: 'Tío' }])
+})
+
+test('unirse con la invitación bloquea la fila del grupo (PGlite no deja probar dos pedidos a la vez)', async () => {
+  const { db, delfina, martin, grupo } = await setup()
+  // En Postgres, si Delfina sacaba a Martín justo mientras él volvía a entrar con la invitación de antes, unirseAGrupo ya
+  // había leído el token viejo y después veía salio_at puesto: lo volvía a activar. Con FOR SHARE espera al cambio de
+  // invitación y no encuentra el grupo. Acá las transacciones van de a una, así que se fija que el lock se toma.
+  const unirse = conConsultas(db)
+  expect(await unirseAGrupo(unirse.db, grupo.inviteToken!, martin.id)).toBe(grupo.id)
+  const porInvitacion = unirse.consultas.find((q) => q.includes('from "lists"') && q.includes('"invite_token"'))
+  expect(porInvitacion).toMatch(/for share$/)
+  // y en orden: sacado, con la de antes no vuelve
+  expect(await sacarDelGrupo(db, grupo.id, delfina.id, martin.id)).toBe(true)
+  expect(await unirseAGrupo(db, grupo.inviteToken!, martin.id)).toBeNull()
 })
 
 test('generar una invitación nueva: la anterior deja de servir, y solo la genera un dueño', async () => {
