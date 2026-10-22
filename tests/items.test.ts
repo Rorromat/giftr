@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createTestDb, seedOwnerAndGiver } from './helpers'
+import { createTestDb, seedOwnerAndGiver, seguir } from './helpers'
 import { eq } from 'drizzle-orm'
 import { claims, comments, items, lists, notifications, users } from '@/db/schema'
 import { desmarcarComprado, getMyClaimWarnings, markBought, reserveItem } from '@/lib/claims'
@@ -7,8 +7,10 @@ import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getUnreadNotifications, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
-import { getListForViewer, getOwnList } from '@/lib/lists'
+import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { crearGrupo } from '@/lib/groups'
+import { guardarCumple, misEventos } from '@/lib/events'
+import { historialDeLista } from '@/lib/regalos'
 
 async function setup() {
   const db = await createTestDb()
@@ -184,6 +186,43 @@ test('lo comprado para un evento anterior ya se regaló: editar o "Ya no lo quie
   await db.update(claims).set({ updatedAt: new Date() }).where(eq(claims.claimerUserId, giver.id))
   await restoreItem(db, termo.id, owner.id)
   expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => n.tipo)).toEqual(['compra_vuelve'])
+})
+
+// Euge pidió unos auriculares, Rodri se los regaló para el cumple y se le rompieron: los vuelve a poner desde Archivados.
+test('"Volver a mi lista": lo comprado para un evento anterior ya se regaló y deja de ocupar (no queda comprado para siempre)', async () => {
+  const { db, owner, giver, list } = await setup()
+  const [sofi] = await db.insert(users).values({ googleId: 'g-sofi', nombre: 'Sofi', email: 'sofi@test.com' }).returning()
+  await seguir(db, sofi.id, list.id)
+  const cumple = new Date(Date.now() - 60 * DIA)
+  expect(await guardarCumple(db, owner.id, cumple.getUTCDate(), cumple.getUTCMonth() + 1)).toBe(true)
+  const auris = (await createItem(db, owner.id, { tipo: 'exacto', titulo: 'Auriculares', fotoUrl: 'https://example.com/auris.jpg' }))!
+  // Rodri los compró hace 90 días, para el cumple de hace 60
+  const hace90 = new Date(Date.now() - 90 * DIA)
+  const [compra] = await db.insert(claims).values({ itemId: auris.id, claimerUserId: giver.id, estado: 'comprado', createdAt: hace90, updatedAt: hace90 }).returning()
+  // mientras sigue en la lista, un "Quiero ESTO" comprado queda comprado
+  expect(await reserveItem(db, auris.id, { userId: sofi.id })).toEqual({ ok: false, reason: 'sin_stock' })
+  const paraElDueno = JSON.stringify((await getOwnList(db, owner.id))!.items)
+
+  await archiveItem(db, auris.id, owner.id, 'lo_tengo')
+  expect(await restoreItem(db, auris.id, owner.id)).toBe(true)
+  // al dueño le responde lo mismo que antes, sin nada de la fecha nueva (depende solo del evento, no de las reservas)
+  expect(JSON.stringify((await getOwnList(db, owner.id))!.items)).toBe(paraElDueno)
+
+  const deSofi = await getListForViewer(db, 'tok-euge', { userId: sofi.id })
+  if (deSofi?.role !== 'giver') throw new Error('esperaba giver')
+  expect(deSofi.items[0]).toMatchObject({ disponible: true, quedan: 1, claims: [] })
+  expect((await misEventos(db, sofi.id)).find((e) => e.listId === list.id)?.fotos).toEqual(['https://example.com/auris.jpg'])
+  // a Rodri ya no le dice "Vos lo compraste" (ni le ofrece deshacer una compra de hace meses): los puede regalar otra vez
+  const deRodri = await getItemForViewer(db, 'tok-euge', auris.id, { userId: giver.id })
+  if (deRodri?.role !== 'giver') throw new Error('esperaba giver')
+  expect(deRodri.item.claims).toEqual([])
+  expect(await reserveItem(db, auris.id, { userId: sofi.id })).toMatchObject({ ok: true })
+  // la compra no cambia: sigue en el historial, con su fecha
+  expect((await db.select().from(claims).where(eq(claims.id, compra.id)))[0]).toMatchObject({ estado: 'comprado', updatedAt: hace90 })
+  expect((await historialDeLista(db, list.id, { userId: sofi.id }))!.entradas).toEqual([
+    expect.objectContaining({ titulo: 'Auriculares', encargado: 'Rodri', fecha: hace90 }),
+  ])
+  expect(await db.select().from(notifications)).toEqual([])
 })
 
 test('sacar, volver a poner y sacar otra vez: a cada uno le queda un solo aviso, el que vale', async () => {

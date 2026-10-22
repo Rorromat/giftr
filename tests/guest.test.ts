@@ -10,7 +10,7 @@ import { getUnreadNotifications, markNotificationsRead } from '@/lib/notificatio
 import { asegurarListaPropia, upsertUserFromGoogle } from '@/lib/users'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
-import { createItem, updateItem } from '@/lib/items'
+import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 import { RESERVAS_POR_LISTA } from '@/lib/types'
 
@@ -361,6 +361,25 @@ test('al unirse, lo que la cuenta ya tiene se mira como al reservar: en una idea
   expect(vista.items.find((i) => i.id === medias.id)!.claims).toEqual([expect.objectContaining({ esMia: true, estado: 'reservado' })])
   expect(vista.items.find((i) => i.id === velas.id)!.claims).toEqual([expect.objectContaining({ esMia: true, deshacer: true })])
   expect(await reserveItem(db, medias.id, { userId: giver.id })).toEqual(deMedias)
+})
+
+test('al unirse, en un deseo que volvió a la lista, la compra del invitado para un evento anterior pasa a la cuenta (es historial)', async () => {
+  const db = await createTestDb()
+  const { owner, list, giver } = await seedOwnerAndGiver(db)
+  const [auris] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Auriculares' }).returning()
+  // como invitado en la compu, Rodri se los regaló el cumple pasado; se le rompieron y Euge los volvió a poner
+  const enLaCompu = await createGuest(db, 'Rodri')
+  const hace13Meses = new Date(Date.now() - 395 * DIA)
+  const [vieja] = await db.insert(claims).values({ itemId: auris.id, claimerGuestId: enLaCompu.id, estado: 'comprado', createdAt: hace13Meses, updatedAt: hace13Meses }).returning()
+  await archiveItem(db, auris.id, owner.id, 'lo_tengo')
+  await restoreItem(db, auris.id, owner.id)
+  // y con su cuenta los reservó de nuevo
+  const nueva = await reserveItem(db, auris.id, { userId: giver.id })
+  if (!nueva.ok) throw new Error(nueva.reason)
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  expect((await db.select().from(claims).where(eq(claims.id, vieja.id)))[0]).toMatchObject({ estado: 'comprado', claimerUserId: giver.id, claimerGuestId: null })
+  expect((await db.select().from(claims).where(eq(claims.id, nueva.claimId)))[0]).toMatchObject({ estado: 'reservado', claimerUserId: giver.id })
 })
 
 test('al unirse, si la cuenta está sumada a un regalo grupal del deseo, la reserva suelta del invitado se libera', async () => {

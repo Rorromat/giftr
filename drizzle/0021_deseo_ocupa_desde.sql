@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "ocupa_desde" timestamp with time zone;

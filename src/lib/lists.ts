@@ -27,8 +27,8 @@ export type CommentView = { id: string; autorNombre: string; texto: string; crea
 /** Las reservas de unos deseos de una lista, como las ve quien regala. */
 async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer) {
   if (!deseos.length) return new Map<string, ClaimView[]>()
-  // Lo de este evento: en una idea que se puede repetir, lo comprado para uno anterior ya no se cuenta (ver ocupaSql), y
-  // una compra se deshace solo si es de este (ver desmarcarComprado).
+  // Lo de este evento: en una idea que se puede repetir (o en un deseo que volvió a la lista), lo comprado para uno
+  // anterior ya no se cuenta (ver ocupaSql), y una compra se deshace solo si es de este (ver desmarcarComprado).
   const desde = await desdeElUltimoEvento(db, listId)
   const repetibles = deseos.filter(esRepetible).map((i) => i.id)
   const rows = await db.select({
@@ -40,7 +40,7 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
     .leftJoin(users, eq(claims.claimerUserId, users.id))
     .leftJoin(guestIdentities, eq(claims.claimerGuestId, guestIdentities.id))
     .where(and(
-      inArray(claims.itemId, deseos.map((i) => i.id)), inArray(claims.estado, ['reservado', 'comprado']),
+      inArray(claims.itemId, deseos.map((i) => i.id)), ocupaSql(null),
       repetibles.length ? or(notInArray(claims.itemId, repetibles), ocupaSql(desde)) : undefined,
     ))
 

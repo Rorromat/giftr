@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib/groups'
-import { expireStaleClaims } from '@/lib/claims'
+import { expireStaleClaims, ocupaSql } from '@/lib/claims'
 import { ultimosRegalos } from '@/lib/regalos'
 import { cupoDe } from '@/lib/serialize'
 
@@ -223,7 +223,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
         estado: claims.estado, updatedAt: claims.updatedAt,
       })
         .from(claims).innerJoin(items, eq(claims.itemId, items.id))
-        .where(and(inArray(items.listId, ajenas), eq(items.estadoDueno, 'activo'), inArray(claims.estado, ['reservado', 'comprado'])))
+        .where(and(inArray(items.listId, ajenas), eq(items.estadoDueno, 'activo'), ocupaSql(null)))
       : [],
     // los regalos grupales en los que está (como encargado o sumado): su reserva es una sola, a nombre del encargado
     ajenas.length

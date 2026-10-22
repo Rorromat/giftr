@@ -33,9 +33,12 @@ export async function vencimientoDeReserva(db: Db, listId: string, ahora = new D
  * Lo que ocupa un deseo: lo reservado y lo comprado. En una idea que se puede repetir (desde: ver desdeElUltimoEvento),
  * de lo comprado solo lo de este evento: las medias del cumple pasado no le quitan a nadie volver a regalarle medias. Lo
  * comprado se anota en updated_at (al marcarlo, también en un regalo grupal).
+ * En cualquier deseo que el dueño volvió a poner, lo comprado antes de su ocupa_desde tampoco (ver restoreItem): los
+ * auriculares que le regalaron el cumple pasado, se le rompieron y los vuelve a pedir, no quedan comprados para siempre.
  */
 export function ocupaSql(desde: Date | null) {
-  return or(eq(claims.estado, 'reservado'), and(eq(claims.estado, 'comprado'), desde ? gte(claims.updatedAt, desde) : undefined))
+  const despuesDeVolver = sql`${claims.updatedAt} >= coalesce((select ${items.ocupaDesde} from ${items} where ${items.id} = ${claims.itemId}), '-infinity')`
+  return or(eq(claims.estado, 'reservado'), and(eq(claims.estado, 'comprado'), desde ? gte(claims.updatedAt, desde) : undefined, despuesDeVolver))
 }
 
 type Deseo = { id: string; listId: string; tipo: 'exacto' | 'idea'; repetible: boolean }
@@ -99,7 +102,7 @@ export async function reserveItem(
 
     if (!esRepetible(row.item)) {
       const [{ n }] = await tx.select({ n: count() }).from(claims)
-        .where(and(eq(claims.itemId, itemId), inArray(claims.estado, ['reservado', 'comprado'])))
+        .where(and(eq(claims.itemId, itemId), ocupaSql(null)))
       if (n >= row.item.cantidad) return { ok: false, reason: 'sin_stock' }
     }
 

@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import {
-  desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult,
+  desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult,
 } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
@@ -419,15 +419,15 @@ export async function saldarCon(db: Db, userId: string, otroId: string, visto?: 
 export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Promise<RegaloView[]> {
   const [item] = await db.select({ listId: items.listId, tipo: items.tipo, repetible: items.repetible }).from(items).where(eq(items.id, itemId))
   if (!item || (await accesoALista(db, item.listId, viewer)) !== 'regalador') return []
-  // En una idea que se puede repetir, uno comprado para un evento anterior ya se regaló: no se muestra, como en la lista
-  // y al reservar (ver ocupaSql). Lo comprado se anota en su reserva.
+  // En una idea que se puede repetir (o en un deseo que volvió a la lista), uno comprado para un evento anterior ya se
+  // regaló: no se muestra, como en la lista y al reservar (ver ocupaSql). Lo comprado se anota en su reserva.
   const desde = await desdeQueOcupa(db, item)
   const regalos = await db.select({ gift: groupGifts, nombre: users.nombre })
     .from(groupGifts).innerJoin(users, eq(groupGifts.organizerUserId, users.id))
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
     .where(and(
       eq(groupGifts.itemId, itemId), inArray(groupGifts.estado, ['abierto', 'comprado']),
-      desde ? or(eq(groupGifts.estado, 'abierto'), gte(claims.updatedAt, desde)) : undefined,
+      or(eq(groupGifts.estado, 'abierto'), ocupaSql(desde)),
     ))
     .orderBy(asc(groupGifts.createdAt))
   if (!regalos.length) return []
@@ -645,12 +645,13 @@ export type CompraParaCorregir = {
 /**
  * Lo que compró en un regalo grupal y todavía puede corregir (ver sePuedeCorregir), cuando no lo puede hacer en el deseo:
  * lo sacaron de la lista (se lo dieron en el cumple y dijo "Ya lo tengo"), cambiaron el link y no lo tiene, o el deseo ya
- * no lo muestra (en una idea que se puede repetir, lo comprado para un evento anterior; ver regalosDeItem). Como dividirCon.
+ * no lo muestra (en una idea que se puede repetir o en un deseo que volvió a la lista, lo comprado para un evento anterior;
+ * ver regalosDeItem). Como dividirCon.
  */
 export async function comprasParaCorregir(db: Db, userId: string): Promise<CompraParaCorregir[]> {
   const compras = await db.select({
     giftId: groupGifts.id, total: groupGifts.montoTotal, nota: claims.notaQueCompre, compradoEl: claims.updatedAt, compradoAt: groupGifts.compradoAt,
-    listId: lists.id, tipoDeseo: items.tipo, repetible: items.repetible, ...columnasDestino(db, userId),
+    listId: lists.id, tipoDeseo: items.tipo, repetible: items.repetible, ocupaDesde: items.ocupaDesde, ...columnasDestino(db, userId),
   }).from(groupGifts)
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
     .innerJoin(items, eq(groupGifts.itemId, items.id))
@@ -669,7 +670,8 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
   const lejos: typeof compras = []
   for (const c of compras) {
     const desde = c.activo && c.tieneElLink ? await desdeQueOcupa(db, { listId: c.listId, tipo: c.tipoDeseo, repetible: c.repetible }) : null
-    if (!c.activo || !c.tieneElLink || (desde && c.compradoEl < desde)) lejos.push(c)
+    const yaNoOcupa = (desde && c.compradoEl < desde) || (c.ocupaDesde && c.compradoEl < c.ocupaDesde)
+    if (!c.activo || !c.tieneElLink || yaNoOcupa) lejos.push(c)
   }
   if (!lejos.length) return []
   const filas = await db.select({ m: groupGiftMembers, nombre: users.nombre }).from(groupGiftMembers)

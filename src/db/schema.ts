@@ -111,6 +111,9 @@ export const items = pgTable('items', {
   estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
   linkTienda: text('link_tienda'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Al volverlo a poner (ver restoreItem), lo comprado para un evento anterior ya se regaló: lo de antes de esta fecha no
+  // ocupa (ver ocupaSql). Null: nunca volvió, ocupa todo lo comprado (salvo en una idea que se puede repetir).
+  ocupaDesde: timestamp('ocupa_desde', { withTimezone: true }),
 }, (t) => [
   index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)),
   // los deseos de una lista, en el orden en que se cargaron: cada vista de lista, la vista previa y Eventos

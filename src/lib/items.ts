@@ -201,9 +201,11 @@ export async function archiveItem(db: Db, itemId: string, userId: string, estado
 const YA_NO_VALEN_AL_SACARLO: TipoAviso[] = ['item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'item_editado', 'regalo_cancelado']
 
 /**
- * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía (lo comprado sigue a su nombre, un
- * regalo grupal que quedó abierto sigue abierto). Lo que se les dijo a los que regalan al sacarlo ya no vale (y el cartel
- * ahora lleva al deseo diciendo que salió):
+ * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía para este evento (lo comprado sigue a
+ * su nombre, un regalo grupal que quedó abierto sigue abierto). Lo comprado para un evento anterior ya se regaló: deja de
+ * ocuparlo (ocupa_desde, ver ocupaSql), y el que lo vuelve a pedir porque se le gastó o se le rompió no lo tiene comprado y
+ * sin lugar para siempre. La compra queda igual (el historial no cambia), y depende solo de fechas, no de las reservas.
+ * Lo que se les dijo a los que regalan al sacarlo ya no vale (y el cartel ahora lleva al deseo diciendo que salió):
  * - Al que se le liberó la reserva o se le canceló el regalo grupal y todavía no lo vio, el aviso pasa a decir eso. Si
  *   todavía tiene algo del deseo (una reserva que el archivar de antes no liberaba), no: el aviso de la baja se va.
  * - Al que lo compró para este evento y se le dijo que lo cambiara ("Ya no lo quiero"), que volvió y sigue a su nombre:
@@ -217,7 +219,8 @@ export async function restoreItem(db: Db, itemId: string, userId: string): Promi
     // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez
     const [antes] = await t.select().from(items).where(eq(items.id, itemId)).for('update')
     if (!antes || antes.estadoDueno === 'activo') return false
-    await t.update(items).set({ estadoDueno: 'activo' }).where(eq(items.id, itemId))
+    const desde = await desdeElUltimoEvento(t, antes.listId)
+    await t.update(items).set({ estadoDueno: 'activo', ocupaDesde: desde }).where(eq(items.id, itemId))
 
     // Los de la baja se borran y se dejan los nuevos con dejarAviso: si ya tenía uno igual sin leer (volvió una vez y lo
     // volvieron a sacar), sube ese en vez de sumar otro.
@@ -234,7 +237,7 @@ export async function restoreItem(db: Db, itemId: string, userId: string): Promi
     if (antes.estadoDueno === 'no_lo_quiero') {
       const compras = await t.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId, giftId: groupGifts.id }).from(claims)
         .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
-        .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'comprado'), gte(claims.updatedAt, await desdeElUltimoEvento(t, antes.listId))))
+        .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'comprado'), gte(claims.updatedAt, desde)))
       await dejarAviso(t, itemId, 'compra_vuelve', compras.filter((c) => !c.giftId))
       const regalos = compras.flatMap((c) => (c.giftId ? [c.giftId] : []))
       if (regalos.length) {

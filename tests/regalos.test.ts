@@ -236,6 +236,30 @@ test('si la dueña ya lo tiene, el regalo abierto sigue: el encargado lo divide 
   expect(vista.items.find((i) => i.id === bici.id)).toMatchObject({ disponible: false })
 })
 
+// Un "Quiero ESTO" que Mamá vuelve a pedir (la bici del cumple pasado se la robaron): el regalo de entonces ya se regaló.
+test('"Volver a mi lista": un regalo grupal comprado para un evento anterior ya no ocupa el deseo y se corrige desde Cuentas', async () => {
+  const { db, mama, rodri, sofi, martin, lista, bici, giftId } = await conRegalo()
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
+  // fue para el cumple pasado (la lista no tiene fecha: cuenta el último año) y Sofi y Ana todavía le deben
+  const antes = new Date(Date.now() - 395 * DIA)
+  const [gift] = await db.update(groupGifts).set({ compradoAt: antes }).where(eq(groupGifts.id, giftId)).returning()
+  await db.update(claims).set({ updatedAt: antes }).where(eq(claims.id, gift.claimId))
+  // mientras sigue en la lista, el deseo lo muestra comprado (y se corrige ahí)
+  expect(await regalosDeItem(db, bici.id, { userId: martin.id })).toHaveLength(1)
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
+
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  expect(await restoreItem(db, bici.id, mama.id)).toBe(true)
+  expect(await regalosDeItem(db, bici.id, { userId: martin.id })).toEqual([])
+  const vista = await getListForViewer(db, lista.shareToken, { userId: martin.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.items.find((i) => i.id === bici.id)).toMatchObject({ disponible: true, claims: [] })
+  expect(await reserveItem(db, bici.id, { userId: martin.id })).toMatchObject({ ok: true })
+  // las cuentas siguen como estaban, y la compra (que el deseo ya no muestra) se corrige desde Cuentas
+  expect((await misCuentas(db, sofi.id)).debes).toBe(30000)
+  expect(await comprasParaCorregir(db, rodri.id)).toEqual([expect.objectContaining({ giftId, itemTitulo: 'Bici', total: 90000 })])
+})
+
 test('si la dueña vuelve a poner un deseo que "ya no quería", a los del regalo grupal comprado se les avisa que volvió', async () => {
   const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
   await comprarRegalo(db, giftId, rodri.id, { total: 90000 })

@@ -122,7 +122,7 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     // pasa y para la otra la cuenta ya lo tiene.
     const activas = await t.select({
       id: claims.id, estado: claims.estado, updatedAt: claims.updatedAt, expiresAt: claims.expiresAt, estadoDueno: items.estadoDueno,
-      deseo: { id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible },
+      ocupaDesde: items.ocupaDesde, deseo: { id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible },
     }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
       .where(and(delInvitado, inArray(claims.estado, ['reservado', 'comprado'])))
       .orderBy(asc(claims.estado), asc(claims.createdAt))
@@ -138,9 +138,9 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
         else await pasar(c.id)
       } else if (c.estado === 'reservado') await liberar(c.id)
       else {
-        // una compra de un evento anterior ya no ocupa: es historial, y pasa
+        // una compra de un evento anterior ya no ocupa (ver ocupaSql): es historial, y pasa
         const desde = await desdeQueOcupa(t, c.deseo)
-        if (desde && c.updatedAt < desde) await pasar(c.id)
+        if ((desde && c.updatedAt < desde) || (c.ocupaDesde && c.updatedAt < c.ocupaDesde)) await pasar(c.id)
       }
     }
     await t.update(claims).set({ claimerUserId: userId, claimerGuestId: null })
