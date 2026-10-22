@@ -5,12 +5,16 @@
 -- 1. Los co-dueños que salieron antes de que existiera salio_at no quedaron anotados: la fila se borraba. Lo único que
 --    queda de ellos es un codazo de ese grupo (solo les llega a los dueños). Se anotan como ex, así siguen sin ver lo
 --    reservado. Los que salieron sin haber recibido ninguno no se pueden reconstruir.
---    No se sabe cuándo se sumaron: quedan con la fecha del grupo, como los que lo armaron, así nadie que llegó después
---    los puede sacar (ver sacarDelGrupo).
+--    No se sabe cuándo se sumaron, pero cuando les llegó el primer codazo de ese grupo ya eran dueños: quedan con esa
+--    fecha. Así, si vuelven con la invitación, no sacan a nadie que ya estaba, y nadie que llegó después los saca (ver
+--    sacarDelGrupo). Con la fecha del grupo empataban con el que lo armó y le ganaban a todos los demás. Los que se
+--    sumaron entre su llegada y ese codazo sí los podrían sacar: precio aceptado, gana el que nunca se fue. Uno que
+--    armó el grupo, salió y vuelve cuenta como sumado en esa fecha: no se lo puede distinguir.
 INSERT INTO "list_members" ("list_id", "user_id", "created_at", "salio_at")
-SELECT DISTINCT c."list_id", c."para_user_id", l."created_at", now()
+SELECT c."list_id", c."para_user_id", min(c."created_at"), now()
 FROM "codazos" c JOIN "lists" l ON l."id" = c."list_id"
 WHERE l."tipo" = 'grupo'
+GROUP BY c."list_id", c."para_user_id"
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
 -- Lo mismo que hace soltarLoQueRegalaba (src/lib/groups.ts) al unirse, para los que se unieron (o son ex) desde antes:

@@ -98,12 +98,19 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   expect(await db.select().from(claims)).toEqual(reservas)
   expect((await regalosDeItem(db, heladera.id, { userId: sofi.id }))[0]).toMatchObject({ estado: 'abierto', soyEncargado: true })
 
-  // Rodri queda con la fecha del grupo, como los que lo armaron: no parece recién llegado. El tío, que se sumó después,
-  // no lo puede sacar ni cuando vuelve con la invitación (y Rodri a él sí)
+  // Rodri queda con la fecha de su primer codazo (para entonces ya era dueño): no parece recién llegado, pero tampoco le
+  // gana a los que ya estaban. Cuando vuelve con la invitación, el tío, que se sumó después, no lo puede sacar (y Rodri a
+  // él sí); a Martín, que ya era dueño cuando le llegó el codazo, no lo saca, y Martín y Delfina a él sí. Con la fecha
+  // del grupo empataba con Delfina, que lo armó, y sacaba a todos los demás
   expect(await unirseAGrupo(db, grupo.inviteToken!, rodri.id)).toBe(grupoId)
-  expect((await grupoParaDueno(db, grupoId, tio.id))!.sacables).toEqual([])
+  const sacables = async (de: { id: string }) => (await grupoParaDueno(db, grupoId, de.id))!.sacables.map((m) => m.nombre)
+  expect(await sacables(tio)).toEqual([])
   expect(await sacarDelGrupo(db, grupoId, tio.id, rodri.id)).toBe(false)
-  expect((await grupoParaDueno(db, grupoId, rodri.id))!.sacables.map((m) => m.nombre)).toEqual(['Martín', 'Tío'])
+  expect(await sacables(rodri)).toEqual(['Tío'])
+  expect(await sacables(martin)).toEqual(['Rodri', 'Tío'])
+  expect(await sacables(delfina)).toEqual(['Martín', 'Rodri', 'Tío'])
+  expect(await sacarDelGrupo(db, grupoId, rodri.id, martin.id)).toBe(false)
+  expect(await sacarDelGrupo(db, grupoId, martin.id, rodri.id)).toBe(true)
 })
 
 test('un aviso de un tipo que esta versión no conoce no se muestra (si se vuelve atrás un deploy, no se cae la página)', () => {
