@@ -12,25 +12,29 @@ function revisar(campo: HTMLInputElement, aviso: Aviso) {
   campo.setCustomValidity(campo.value === campo.defaultValue ? '' : aviso(campo.value, campo.form))
 }
 
-/** Si "Link a la tienda" ya tiene un link: entonces uno pegado en el título se queda en el título (ver deseoDesdeForm). */
-function hayLinkTienda(form: HTMLFormElement | null) {
+/**
+ * "Link a la tienda" como lo toma el servidor (null vacío, undefined si no es un link): con otro link, o con uno de antes
+ * que hoy no vale, el pegado en el título se queda en el título (ver deseoDesdeForm).
+ */
+function linkTienda(form: HTMLFormElement | null) {
   const campo = form?.elements.namedItem('linkTienda')
-  return campo instanceof HTMLInputElement && !!linkHttp(campo.value)
+  const v = campo instanceof HTMLInputElement ? campo.value.trim() : ''
+  return v ? linkHttp(v) ?? undefined : null
 }
 
-const avisoTitulo: Aviso = (v, form) => avisoDelTitulo(v, hayLinkTienda(form))
+const avisoTitulo: Aviso = (v, form) => avisoDelTitulo(v, linkTienda(form))
 
 /** Un campo del formulario de un deseo que frena el envío, con el motivo, si el servidor lo cortaría o no lo guardaría. */
 function CampoConAviso({ aviso, alCambiar, ...props }: Props & { aviso: Aviso; alCambiar?: (campo: HTMLInputElement) => void }) {
   return <input {...props} onChange={(e) => { revisar(e.currentTarget, aviso); alCambiar?.(e.currentTarget) }} />
 }
 
-/** "¿Qué querés?": hasta 120 letras, sin contar un link pegado si no hay otro a la tienda (ver avisoDelTitulo). */
+/** "¿Qué querés?": hasta 120 letras, sin contar un link pegado si no hay otro distinto a la tienda (ver avisoDelTitulo). */
 export const CampoTitulo = (props: Props) => <CampoConAviso {...props} aviso={avisoTitulo} />
 
 /**
  * "Link a la tienda": sin maxLength, que cortaría en silencio un link pegado (y se guardaría roto). Al cambiarlo se vuelve
- * a mirar el título: con un link acá, el del título cuenta en su largo.
+ * a mirar el título: con otro link acá, el del título cuenta en su largo.
  */
 export const CampoLink = (props: Props) => (
   <CampoConAviso {...props} aviso={avisoDelLink} alCambiar={(campo) => {

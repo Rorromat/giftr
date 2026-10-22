@@ -27,20 +27,30 @@ function link(fd: FormData, k: string) {
 export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'rangoPrecio' | 'categoria' | 'linkTienda'> & CambiosDeseo
 
 /**
+ * El link del título que pasa a "Link a la tienda" (con lo que queda del título), o null si se queda en el título: pasa si
+ * ese campo vino vacío o con el mismo link (lo pegó en los dos lados). Con uno distinto, o con algo que no es un link (un
+ * link de antes que hoy no vale, que al editar se conserva), se queda: si no, se perdía ese otro link.
+ */
+function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
+  const enTitulo = linkTienda === undefined ? null : linkEnTexto(titulo)
+  return enTitulo && (linkTienda === null || enTitulo.link === linkTienda) ? enTitulo : null
+}
+
+/**
  * Los campos del formulario de un deseo (agregar o editar). Null si falta el título. En los opcionales, null es que
  * quedó vacío (al editar, se borra) y undefined que vino algo que no sirve, como un link que no es link (al editar, queda
  * lo que había). Los largos y el tope de la cantidad los ponen createItem/updateItem.
  * - Un link sin https:// ("mercadolibre.com.ar/…") va con https://.
- * - Un link pegado en "¿Qué querés?" (lo que pide el formulario) pasa a "Link a la tienda" si no hay otro, y el título
- *   queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo cambie. Si ya hay otro, el
- *   título queda como vino: sacárselo perdía ese link, y al editar un deseo de antes (con el link en el título y otro a la
- *   tienda) cualquier cambio le cambiaba el título y les avisaba a los que lo reservaron.
+ * - Un link pegado en "¿Qué querés?" (lo que pide el formulario) pasa a "Link a la tienda" si ese campo vino vacío o con
+ *   el mismo link, y el título queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo
+ *   cambie. Si vino otro, el título queda como vino: sacárselo perdía ese link, y al editar un deseo de antes (con el link
+ *   en el título y otro a la tienda) cualquier cambio le cambiaba el título y les avisaba a los que lo reservaron.
  */
 export function deseoDesdeForm(fd: FormData): DeseoDelForm | null {
   let titulo = campo(fd, 'titulo')
   if (!titulo) return null
   let linkTienda = link(fd, 'linkTienda')
-  const enTitulo = linkTienda ? null : linkEnTexto(titulo)
+  const enTitulo = linkQuePasa(titulo, linkTienda)
   if (enTitulo) {
     titulo = enTitulo.resto || sitioDeLink(enTitulo.link)
     linkTienda = enTitulo.link
@@ -77,13 +87,14 @@ export const AVISO_NO_ES_LINK = 'Eso no parece un link. Copiá el de la página 
 /**
  * Lo que frena el envío del título en el navegador ('' si está bien), en vez de que el servidor lo corte sin avisar. No
  * lleva maxLength: tiene que entrar un link pegado entero (pasa a "Link a la tienda") y el navegador corta lo pegado en
- * silencio. Lo que cuenta es el texto sin el link, salvo que ya haya otro link a la tienda: ahí el del título se queda en
- * el título (ver deseoDesdeForm) y cuenta.
+ * silencio. Lo que cuenta es el texto sin el link, salvo que en "Link a la tienda" haya otro (linkTienda, como lo toma el
+ * servidor: null vacío, undefined si no es un link; sin valor por defecto, que tomaría undefined como vacío): ahí el del
+ * título se queda en el título (ver deseoDesdeForm) y cuenta.
  */
-export function avisoDelTitulo(escrito: string, conLinkTienda = false): string {
+export function avisoDelTitulo(escrito: string, linkTienda: string | null | undefined): string {
   const v = escrito.trim()
   if (v.split(/\s+/).some((p) => p.length > LARGO.link)) return AVISO_LINK_LARGO
-  const n = largo(conLinkTienda ? v : linkEnTexto(v)?.resto ?? v)
+  const n = largo(linkQuePasa(v, linkTienda)?.resto ?? v)
   return n > LARGO.titulo ? `Hasta ${LARGO.titulo} letras: sobran ${n - LARGO.titulo}. Lo demás va en Notas.` : ''
 }
 

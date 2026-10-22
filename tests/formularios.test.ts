@@ -147,6 +147,9 @@ test('el formulario de un deseo: el link pegado en el título pasa a "Link a la 
   // si ya puso otro link a la tienda, no se pisa ni se pierde el del título: queda en el título
   expect(deseoDesdeForm(form({ titulo: ML, linkTienda: 'https://otra.com/x' }))).toMatchObject({ titulo: ML, linkTienda: 'https://otra.com/x' })
   expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: 'otra.com/x' }))).toMatchObject({ titulo: `Mate ${ML}`, linkTienda: 'https://otra.com/x' })
+  // el mismo link pegado en los dos lados (con o sin https://) no deja la URL de título
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: ML }))).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: ML })
+  expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: ML.replace('https://', '') }))).toMatchObject({ titulo: 'Mate', linkTienda: ML })
   // un título sin link queda como está
   expect(deseoDesdeForm(form({ titulo: 'Zara.com gift card' }))).toMatchObject({ titulo: 'Zara.com gift card', linkTienda: null })
   expect(deseoDesdeForm(form({ titulo: '   ' }))).toBeNull()
@@ -195,6 +198,21 @@ test('editar un deseo de antes con un link en el título y otro a la tienda: cam
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
     .toMatchObject({ titulo, linkTienda: 'https://otra.com/x', prioridad: 'mucho' })
   expect(await h.db.select().from(notifications)).toEqual([])
+})
+
+test('editar un deseo de antes con un link en el título y uno a la tienda que hoy no vale: no pisa el de la tienda ni avisa', async () => {
+  const { owner, giver } = await preparar()
+  const titulo = 'https://www.mercadolibre.com.ar/mate-x'
+  const viejo = 'https://www.tienda.com/x talle M'
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Mate' }))!
+  await h.db.update(items).set({ titulo, linkTienda: viejo }).where(eq(items.id, item.id))
+  const r = await reserveItem(h.db, item.id, { userId: giver.id })
+  if (!r.ok) throw new Error('no reservó')
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, linkTienda: viejo, prioridad: 'mucho' })))).toBe('/mi-lista')
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo, linkTienda: viejo, prioridad: 'mucho' })
+  expect(await h.db.select().from(notifications)).toEqual([])
+  // en el navegador cuenta igual: el link del título se queda y cuenta en el largo
+  expect(avisoDelTitulo(`${'x'.repeat(100)} ${titulo}`, undefined)).toContain('sobran')
 })
 
 test('dos productos de la misma tienda pegados seguidos en el título son dos deseos (no un doble toque)', async () => {
@@ -270,16 +288,16 @@ test('editar un deseo de antes de los topes sin tocar lo largo no lo corta ni le
 })
 
 test('el título y el link avisan en el navegador antes de que el servidor los corte o los descarte', () => {
-  expect(avisoDelTitulo('Mate imperial')).toBe('')
-  expect(avisoDelTitulo('x'.repeat(120))).toBe('')
-  expect(avisoDelTitulo('😀'.repeat(120))).toBe('')
-  expect(avisoDelTitulo('x'.repeat(135))).toBe('Hasta 120 letras: sobran 15. Lo demás va en Notas.')
+  expect(avisoDelTitulo('Mate imperial', null)).toBe('')
+  expect(avisoDelTitulo('x'.repeat(120), null)).toBe('')
+  expect(avisoDelTitulo('😀'.repeat(120), null)).toBe('')
+  expect(avisoDelTitulo('x'.repeat(135), null)).toBe('Hasta 120 letras: sobran 15. Lo demás va en Notas.')
   // un link pegado no cuenta (pasa a "Link a la tienda"), pero el texto que lo acompaña sí
-  expect(avisoDelTitulo(ML)).toBe('')
-  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`)).toBe('')
-  expect(avisoDelTitulo(`${'x'.repeat(121)} ${ML}`)).toContain('sobran 1.')
+  expect(avisoDelTitulo(ML, null)).toBe('')
+  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`, null)).toBe('')
+  expect(avisoDelTitulo(`${'x'.repeat(121)} ${ML}`, null)).toContain('sobran 1.')
   const largoLink = `https://tienda.com/${'x'.repeat(2000)}`
-  expect(avisoDelTitulo(largoLink)).toBe(AVISO_LINK_LARGO)
+  expect(avisoDelTitulo(largoLink, null)).toBe(AVISO_LINK_LARGO)
   expect(avisoDelLink(largoLink)).toBe(AVISO_LINK_LARGO)
   expect(avisoDelLink(ML)).toBe('')
   expect(avisoDelLink('')).toBe('')
@@ -290,8 +308,11 @@ test('el título y el link avisan en el navegador antes de que el servidor los c
   }
   expect(avisoDelLink('mercadolibre.com.ar/MLA-1')).toBe('')
   // con otro link a la tienda, el del título se queda en el título: ahí cuenta en el largo
-  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`, true)).toContain('sobran')
-  expect(avisoDelTitulo('Mate imperial', true)).toBe('')
+  expect(avisoDelTitulo(`${'x'.repeat(100)} ${ML}`, 'https://otra.com/x')).toContain('sobran')
+  expect(avisoDelTitulo('Mate imperial', 'https://otra.com/x')).toBe('')
+  // con el mismo link en los dos lados, el del título pasa a la tienda: no cuenta
+  const mlLargo = `${ML}#position=12&search_layout=grid&type=item&tracking_id=${'a'.repeat(60)}`
+  expect(avisoDelTitulo(mlLargo, mlLargo)).toBe('')
 })
 
 test('sin Intl.Segmenter (Firefox antes de 125, Safari antes de 14.1) los formularios cargan igual', async () => {
@@ -301,7 +322,7 @@ test('sin Intl.Segmenter (Firefox antes de 125, Safari antes de 14.1) los formul
   try {
     // antes se creaba al cargar el archivo, y la página de agregar ni hidrataba
     const viejo = await import('@/lib/deseo-form')
-    expect(viejo.avisoDelTitulo('x'.repeat(121))).toContain('sobran 1.')
+    expect(viejo.avisoDelTitulo('x'.repeat(121), null)).toContain('sobran 1.')
     const limites = await import('@/lib/limites')
     expect(limites.recortar('ab😀cd', 3)).toBe('ab😀')
     expect(limites.largo('hola')).toBe(4)
