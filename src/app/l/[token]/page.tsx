@@ -247,7 +247,10 @@ export default async function ListaAjena({
 
       {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}
 
-      {quien && <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>}
+      {/* viendo la lista, el nombre con el que reserva solo sale acá; con "¿Es tu lista?" arriba, el link ya va ahí */}
+      {quien && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
+        <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>
+      )}
 
       <div className="fixed inset-x-0 bottom-0 z-10 bg-gr-ink text-gr-bg">
         <div className="mx-auto flex h-[74px] max-w-md items-center justify-between px-[18px] pb-2.5">

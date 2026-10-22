@@ -237,7 +237,8 @@ export default async function DetalleItem({ params, searchParams }: {
         </section>
       )}
 
-      {quien && <NoSoyYo nombre={quien} volver={aqui} conCuenta={logueado} />}
+      {/* con "¿Es tu lista?" arriba, el link ya va ahí */}
+      {quien && !(detalle.role === 'anonimo' && detalle.motivo === 'confirmar') && <NoSoyYo nombre={quien} volver={aqui} conCuenta={logueado} />}
 
     </main>
   )

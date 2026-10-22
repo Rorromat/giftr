@@ -41,7 +41,7 @@ import {
 } from '@/app/actions'
 import { getViewer, invitadoDeEsteNavegador, invitadoParaPreguntar } from '@/lib/viewer'
 import { getItemForViewer, getListForViewer } from '@/lib/lists'
-import { OtraCuenta } from '@/components/Identidad'
+import { ConfirmarLista, OtraCuenta } from '@/components/Identidad'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -402,6 +402,14 @@ test('anotarse en la lista de otro no abre la propia: en cada lista nueva se pre
   h.jar.clear()
   await verLoReservadoAction(form({ token: 'tok-rodri' }))
   expect(await getViewer()).toEqual({})
+})
+
+test('"¿Es tu lista?" nombra al invitado y ahí mismo deja salir: otra persona en la tablet no reserva a su nombre', async () => {
+  const html = renderToStaticMarkup(createElement(ConfirmarLista, { token: 'tok-euge', nombre: 'Abuelo', volver: '/l/tok-euge' }))
+  expect(html).toContain('Estás como “Abuelo”')
+  for (const texto of ['No es mía: ver lo reservado', '¿No sos Abuelo?', 'Salir de este dispositivo', 'Salir igual']) {
+    expect(html).toContain(texto)
+  }
 })
 
 test('en Perfil se puede unir el invitado del navegador aunque se haya dicho "No soy yo" por error', async () => {

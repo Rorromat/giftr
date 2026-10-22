@@ -48,6 +48,8 @@ function EntrarConGoogle({ volver }: { volver: string }) {
 /**
  * Un invitado que abre una lista donde todavía no dijo que no es suya. Su nombre vale para todo el navegador: puede ser
  * el dueño, que se anotó en la lista de otro desde un navegador sin su sesión. Hasta que lo diga, la ve como el dueño.
+ * Si es otra persona usando la tablet, acá mismo puede dejar de ser ese nombre: si no, con "No es mía" reservaría a su
+ * nombre. Solo sale sin sesión.
  */
 export function ConfirmarLista({ token, nombre, volver }: { token: string; nombre: string; volver: string }) {
   return (
@@ -65,6 +67,7 @@ export function ConfirmarLista({ token, nombre, volver }: { token: string; nombr
         <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px]">No es mía: ver lo reservado</BotonEnviar>
       </form>
       <EntrarConGoogle volver={volver} />
+      <NoSoyYo nombre={nombre} volver={volver} conCuenta={false} />
     </section>
   )
 }
