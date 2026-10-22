@@ -11,9 +11,14 @@ const NEGATIVO = /^\s*[-−–—]\s*\$?\s*\d|\$\s*[-−–—]\s*\d|\s[-−–�
 const NUMERO = /(\d{1,3}(?:([., \u00a0])\d{3}(?!\d))(?:\2\d{3}(?!\d))*|\d+)(?:[.,](\d+))?\s*(k|mil(?![a-záéíóúñ])|lucas?(?![a-záéíóúñ])|mill[oó]n(?:es)?)?/i
 // Lo que une los dos números de un rango: "$10–30k", "$10 a 30 mil", "entre 10 y 30 mil".
 const HASTA = /^\s*(?:hasta|al|a|y|-|–|—)\s*\$?\s*/i
-// "2 x 45.000", "3 por 10 mil", "3 cuotas de 15.000": cuántos, y después el precio de cada uno. En cuotas es lo que sale
-// cada cuota (como con "$": "3 cuotas de $15.000" → 15.000), no el total: el encargado lo corrige al comprar.
-const POR = /^\s*(?:[x×]|por|cuotas?(?:\s+sin\s+inter[eé]s)?(?:\s+de)?)\s*\$?\s*(?=\d)/i
+// "2 x 45.000", "3 por 10 mil": cuántos, y después el precio de cada uno.
+const POR = /^\s*(?:[x×]|por)\s*\$?\s*(?=\d)/i
+// En cuotas no se sabe si el número es el total o lo de cada una ("3 cuotas de $15.000", "$45.000 en 3 cuotas", "$5.000 por
+// cuota"): sin estimación, así "Lo compré" no arranca con un tercio del total, que parece bien y no se nota.
+const CUOTAS = /cuota/i
+// Más largo no es un precio (el del deseo tiene hasta 40 letras, ver LARGO.precio). Además algunas regex de acá tardan con el
+// cuadrado del largo ("1 x" y muchos espacios): un "total" de 1 MB mandado a la acción de comprar trababa el servidor.
+const LARGO_MAXIMO = 100
 // Las palabras que van antes de un precio sin "$" ("entre 10 y 15 lucas", "aprox. 20.000"). Otra palabra dice qué es el
 // número que sigue: "Talle 42 - 30.000", "N° 3", "Pack x 6", "Modelo 2024".
 const ANTES_DEL_PRECIO = /^(?:entre|de|desde|hasta|aprox|aproximadamente|unos|unas|alrededor|cerca|m[aá]s|menos|o|como|tipo|precio|sale|cuesta|ars|pesos)$/i
@@ -49,10 +54,10 @@ function esNegativo(texto: string) {
  * El precio (texto libre) en pesos: "$45.000", "45.000,50" (redondeado), "45k", "15 lucas", "1,5k", "$ 45 000", "$45,000".
  * De un rango, el de abajo ("$10–30k" → 10.000, "$20-30.000" → 20.000). Desde el primer "$" si hay uno ("2 x $10.000" →
  * 10.000); sin "$", "2 x 45.000" → 45.000 y "Talle 42 - 30.000" → 30.000. Null si no hay un número o si no son pesos
- * (otra moneda, negativo): mejor no estimar que estimar mal.
+ * (otra moneda, negativo), en cuotas o muy largo: mejor no estimar que estimar mal.
  */
 export function parsePesos(texto: string | null | undefined): number | null {
-  if (!texto || OTRA_MONEDA.test(texto)) return null
+  if (!texto || texto.length > LARGO_MAXIMO || OTRA_MONEDA.test(texto) || CUOTAS.test(texto)) return null
   const desde = texto.indexOf('$')
   const desdeAca = desde >= 0 ? texto.slice(desde) : texto
   if (esNegativo(texto) || esNegativo(desdeAca)) return null

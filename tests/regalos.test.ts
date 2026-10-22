@@ -756,9 +756,11 @@ test.each([
   // "lucas" son miles; sin "$", en "2 x 45.000" el primero es cuántos (pero "100 x 2" son 100)
   ['15 lucas', 15000], ['$20 lucas', 20000], ['1 luca', 1000], ['entre 10 y 15 lucas', 10000],
   ['2 x 45.000', 45000], ['2x45.000', 45000], ['45.000 x 2', 45000], ['100 x 2', 100], ['$100 x 2', 100],
-  // igual con "por" y en cuotas (lo que sale cada una, como con "$"): antes daba 3, y el regalo grupal decía "~$1 cada uno"
-  ['3 por 10 mil', 10000], ['2 por 45.000', 45000], ['100 por 2', 100], ['3 cuotas de 15.000', 15000], ['12 cuotas de 5k', 5000],
-  ['6 cuotas 10.000', 10000], ['3 cuotas sin interés de 15.000', 15000], ['3 cuotas de $15.000', 15000], ['1 cuota de 20.000', 20000],
+  // igual con "por": antes daba 3, y el regalo grupal decía "~$1 cada uno"
+  ['3 por 10 mil', 10000], ['2 por 45.000', 45000], ['100 por 2', 100],
+  // en cuotas no se sabe si es el total o lo de cada una: con lo de cada una, "Lo compré" arrancaría con un tercio del total
+  ['3 cuotas de 15.000', null], ['3 cuotas de $15.000', null], ['12 cuotas sin interés de 5k', null], ['$45.000 en 3 cuotas', null],
+  ['$5.000 por cuota', null],
   // los miles escritos solo en el de arriba valen para los dos, si así queda más chico
   ['$20-30.000', 20000], ['$2-3.000.000', 2000000], ['$500-1.500', 500], ['$20.000 - $30.000', 20000],
   // un guion entre palabras no es un menos
@@ -773,6 +775,16 @@ test.each([
   ['-$5.000', null], ['$ -5000', null], ['- 5000', null], ['aprox -5000', null], ['', null], ['   ', null],
 ] as const)('pesos: "%s" → %s', (texto, esperado) => {
   expect(parsePesos(texto)).toBe(esperado)
+})
+
+test('un texto largo no traba el servidor: no es un precio', () => {
+  // "1 x" y muchos espacios tardaba con el cuadrado del largo: 50.000 eran unos 6 s, y la acción de comprar acepta 1 MB
+  const largo = `1 x${' '.repeat(50_000)}a`
+  const desde = performance.now()
+  expect(parsePesos(largo)).toBeNull()
+  expect(partePesos(largo)).toBeNull()
+  expect(parsePesos(`$45.000${' '.repeat(200)}`)).toBeNull()
+  expect(performance.now() - desde).toBeLessThan(500)
 })
 
 test('una parte "A mano" vacía vale 0, igual que en la pantalla', () => {
