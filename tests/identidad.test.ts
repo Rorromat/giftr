@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -5,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { claims, guestIdentities, items, lists, users } from '@/db/schema'
-import { CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, NO_SOY_COOKIE, sumarCuenta } from '@/lib/cookie-invitado'
+import { CUENTAS_COOKIE, dijoQueNoEs, firmarInvitado, GUEST_COOKIE, NO_SOY_COOKIE, sumarCuenta, sumarNoSoy } from '@/lib/cookie-invitado'
 import { markBought, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { crearGrupo } from '@/lib/groups'
@@ -289,6 +290,33 @@ test('"No soy yo": lo del invitado queda como estaba, no se le pregunta más a e
   await redirigeA(salirAction(form({ volver: '/' })))
   expect([...h.jar.keys()]).toEqual([CUENTAS_COOKIE])
   expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
+})
+
+test('"No soy yo" de una cuenta no pisa el de otra: en la tablet de la familia no se le vuelve a preguntar a ninguna', async () => {
+  const { owner, giver, item } = await preparar()
+  await reserveAction(null, form({ token: 'tok-euge', itemId: item.id, nombre: 'Mamá' }))
+  h.session = { userId: owner.id }
+  await noSoyElInvitadoAction()
+  h.session = { userId: giver.id }
+  expect(await invitadoParaPreguntar(giver.id)).toBe('Mamá')
+  await noSoyElInvitadoAction()
+  // Euge vuelve a la tablet: la marca de Rodri no borró la suya
+  h.session = { userId: owner.id }
+  expect(await invitadoParaPreguntar(owner.id)).toBeNull()
+  expect(await invitadoParaPreguntar(giver.id)).toBeNull()
+  // contestar otra vez no repite la marca
+  const antes = h.jar.get(NO_SOY_COOKIE)
+  await noSoyElInvitadoAction()
+  expect(h.jar.get(NO_SOY_COOKIE)?.split('~')).toHaveLength(2)
+  expect(h.jar.get(NO_SOY_COOKIE)?.split('~').sort()).toEqual(antes?.split('~').sort())
+  // a una cuenta nueva sí se le pregunta
+  const [caro] = await h.db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
+  expect(await invitadoParaPreguntar(caro.id)).toBe('Mamá')
+  // con el tope, la cookie no crece para siempre: se van las marcas más viejas
+  const [invitado, cuentas] = [randomUUID(), Array.from({ length: 25 }, () => randomUUID())]
+  const valor = cuentas.reduce<string | undefined>((v, id) => sumarNoSoy(v, invitado, id), undefined)
+  expect(valor?.split('~')).toHaveLength(20)
+  expect([dijoQueNoEs(valor, invitado, cuentas[24]), dijoQueNoEs(valor, invitado, cuentas[0])]).toEqual([true, false])
 })
 
 test('la invitada que ya había reservado en la lista de una cuenta que entró en la tablet: el cartel le dice cómo recuperarlo', async () => {

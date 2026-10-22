@@ -50,12 +50,24 @@ export function leerInvitado(valor: string | undefined): string | null {
 
 // "No soy yo": la cuenta que entró en este navegador dijo que no es el invitado que estaba anotado.
 // No se le vuelve a preguntar, y la cookie del invitado sigue ahí para cuando vuelva a usarlo esa persona.
+// Lleva una marca por cuenta (`<marca>~<marca>…`): en la tablet de la familia, que Rodri diga que no, no le vuelve a
+// preguntar a Euge. Cada marca ya es una firma de (invitado, cuenta), así que la lista no necesita otra.
 export const NO_SOY_COOKIE = 'giftr_no_soy'
 
-export const marcaNoSoy = (guestId: string, userId: string) => hmac(`giftr_no_soy:${guestId}:${userId}`)
+// las más recientes; con una familia entera usando la misma tablet sobra
+const NO_SOY_MAXIMO = 20
+
+const marcaNoSoy = (guestId: string, userId: string) => hmac(`giftr_no_soy:${guestId}:${userId}`)
+
+/** Las marcas de antes más la de esta cuenta (la de una sola marca, de antes de que fueran varias, sigue valiendo). */
+export function sumarNoSoy(valor: string | undefined, guestId: string, userId: string): string {
+  const marca = marcaNoSoy(guestId, userId)
+  return [...(valor?.split('~') ?? []).filter((m) => m && m !== marca), marca].slice(-NO_SOY_MAXIMO).join('~')
+}
 
 export function dijoQueNoEs(valor: string | undefined, guestId: string, userId: string): boolean {
-  return !!valor && igualesSinFiltrarTiempo(valor, marcaNoSoy(guestId, userId))
+  const marca = marcaNoSoy(guestId, userId)
+  return !!valor && valor.split('~').some((m) => igualesSinFiltrarTiempo(m, marca))
 }
 
 // Las cuentas de Google que tuvieron sesión en este navegador. Un invitado no ve la capa oculta de las listas de esas

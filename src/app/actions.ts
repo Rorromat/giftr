@@ -8,8 +8,8 @@ import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
 import {
-  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE,
-  OPCIONES_COOKIE_INVITADO, renovarCuentas,
+  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, NO_SOY_COOKIE,
+  OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarNoSoy,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { createItem, archiveItem, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
@@ -401,7 +401,7 @@ export async function noSoyElInvitadoAction() {
   // la cookie del invitado sigue, pero en las listas de esta cuenta ya no ve nada (puede ser ella, después de salir)
   anotarCuenta(jar, session.userId)
   const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
-  if (guestId) jar.set(NO_SOY_COOKIE, marcaNoSoy(guestId, session.userId), OPCIONES_COOKIE_INVITADO)
+  if (guestId) jar.set(NO_SOY_COOKIE, sumarNoSoy(jar.get(NO_SOY_COOKIE)?.value, guestId, session.userId), OPCIONES_COOKIE_INVITADO)
   revalidatePath('/', 'layout')
 }
 
