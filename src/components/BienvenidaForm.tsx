@@ -27,7 +27,7 @@ function Chip({ name, value, checked, type = 'checkbox', children }: {
   name: string; value: string; checked: boolean; type?: 'checkbox' | 'radio'; children?: ReactNode
 }) {
   return (
-    <label className="gr-chip gap-1.5 has-[:checked]:-rotate-2">
+    <label className="gr-chip gap-1.5">
       <input type={type} name={name} value={value} defaultChecked={checked} className="sr-only" />
       {children ?? value}
     </label>
@@ -105,7 +105,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
       <div className="flex items-center gap-3">
         <div className="flex flex-1 gap-1" aria-hidden>
           {PASOS.map((_, i) => (
-            <span key={i} className={`h-2 flex-1 rounded-full border-2 border-gr-ink ${i <= paso ? 'bg-gr-ink' : 'bg-gr-surface'}`} />
+            <span key={i} className={`h-2 flex-1 rounded-full border border-gr-line ${i <= paso ? 'bg-gr-ink' : 'bg-gr-surface'}`} />
           ))}
         </div>
         <span className="text-sm font-bold tabular-nums">{paso + 1} de {PASOS.length}</span>
@@ -116,7 +116,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
       </div>
 
       <div className="flex items-start gap-3">
-        <span aria-hidden className="mt-0.5 flex size-12 flex-none -rotate-6 items-center justify-center rounded-2xl border-[3px] border-gr-ink bg-gr-accent shadow-sticker-sm">
+        <span aria-hidden className="mt-0.5 flex size-12 flex-none items-center justify-center rounded-2xl bg-gr-accent">
           <Icon name={PASOS[paso].icono} size={26} strokeWidth={2.4} />
         </span>
         <div className="flex flex-col gap-1">
@@ -149,7 +149,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         <ul className="flex flex-col gap-2 text-[15px] font-medium">
           {['Qué deportes y qué cuadro', 'Tus hobbies y tus marcas', 'Colores y talles', 'Lo que no querés ni regalado'].map((t) => (
             <li key={t} className="flex items-center gap-2.5">
-              <span className="size-2.5 flex-none rotate-45 bg-gr-ink" />{t}
+              <span className="size-2.5 flex-none bg-gr-ink" />{t}
             </li>
           ))}
         </ul>
@@ -164,7 +164,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         <input type="hidden" name="club" value={club} />
         <div role="radiogroup" aria-label="Fútbol" className="flex flex-wrap gap-2">
           {[NO_FUTBOL, SOLO_SELECCION].map((o) => (
-            <label key={o} className="gr-chip has-[:checked]:-rotate-2">
+            <label key={o} className="gr-chip">
               <input type="radio" name="club-ui" value={o} checked={club === o} onChange={() => setClub(o)} className="sr-only" />{o}
             </label>
           ))}
@@ -173,11 +173,11 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
                aria-label="Buscar club" className="gr-input" />
         <div role="radiogroup" aria-label="Club" className="flex flex-wrap gap-2">
           {clubes.map((c) => (
-            <label key={c} className="gr-chip has-[:checked]:-rotate-2">
+            <label key={c} className="gr-chip">
               <input type="radio" name="club-ui" value={c} checked={club === c} onChange={() => setClub(c)} className="sr-only" />{c}
             </label>
           ))}
-          <label className="gr-chip has-[:checked]:-rotate-2">
+          <label className="gr-chip">
             <input type="radio" name="club-ui" value="otro" checked={club === 'otro'} onChange={() => setClub('otro')} className="sr-only" />Otro
           </label>
         </div>
@@ -209,7 +209,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         <div className="flex flex-wrap gap-2">
           {COLORES.map((c) => (
             <Chip key={c.nombre} name="colores" value={c.nombre} checked={inicial.colores.includes(c.nombre)}>
-              <span aria-hidden className="size-4 rounded-full border-2 border-current" style={{ background: c.hex }} />{c.nombre}
+              <span aria-hidden className="size-4 rounded-full border border-current" style={{ background: c.hex }} />{c.nombre}
             </Chip>
           ))}
         </div>
@@ -235,7 +235,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
                   placeholder="Soy alérgica a la lana, ya tengo mil tazas…" className="gr-input py-3" />
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t-[3px] border-gr-ink bg-gr-bg">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gr-line bg-gr-bg">
         <div className="mx-auto flex max-w-md items-center gap-2.5 px-[18px] pb-6 pt-3">
           {paso > 0
             ? <button type="button" onClick={() => ir(paso - 1)} className="gr-btn gr-btn--sm flex-none px-4 font-sans font-bold">Atrás</button>

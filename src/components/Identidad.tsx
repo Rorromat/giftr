@@ -38,7 +38,7 @@ function EntrarConGoogle({ volver }: { volver: string }) {
     <form action={entrarConGoogleAction}>
       <input type="hidden" name="volver" value={volver} />
       <button className="gr-btn min-h-11 w-full gap-2 font-sans text-[15px] font-bold">
-        <span aria-hidden className="flex size-6 items-center justify-center rounded-full border-2 border-gr-ink bg-gr-surface text-xs font-bold">G</span>
+        <span aria-hidden className="flex size-6 items-center justify-center rounded-full border border-gr-line bg-gr-surface text-xs font-bold">G</span>
         Entrar con Google
       </button>
     </form>

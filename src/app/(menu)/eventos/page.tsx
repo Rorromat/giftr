@@ -10,10 +10,10 @@ import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={150} />
   return (
-    <div className="grid h-[150px] border-b-[3px] border-gr-ink" style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
+    <div className="grid h-[150px] border-b border-gr-line" style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
       {e.fotos.map((src, i) => (
-        <FotoConRespaldo key={i} src={src} className={`size-full object-cover ${i ? 'border-l-[3px] border-gr-ink' : ''}`}
-                         respaldo={<span className={`size-full bg-gr-bg ${i ? 'border-l-[3px] border-gr-ink' : ''}`} />} />
+        <FotoConRespaldo key={i} src={src} className={`size-full object-cover ${i ? 'border-l border-gr-line' : ''}`}
+                         respaldo={<span className={`size-full bg-gr-bg ${i ? 'border-l border-gr-line' : ''}`} />} />
       ))}
     </div>
   )
@@ -46,13 +46,13 @@ function Estado({ e }: { e: Evento }) {
 function Proximos({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
   return (
     <ul className="flex flex-col gap-5">
-      {eventos.map((e, i) => (
-        <li key={e.listId} style={{ transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }}>
-          <Link href={e.href} className="gr-sticker relative block overflow-visible rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
+      {eventos.map((e) => (
+        <li key={e.listId}>
+          <Link href={e.href} className="gr-sticker relative block overflow-visible rounded-3xl">
             <div className="overflow-hidden rounded-t-[19px]"><Fotos e={e} /></div>
             <Starburst size={76} fontSize={e.dias > 99 ? 26 : 34} sub={e.dias === 0 ? undefined : e.dias === 1 ? 'día' : 'días'}
                        label={e.dias === 0 ? 'Es hoy' : `Faltan ${e.dias} ${e.dias === 1 ? 'día' : 'días'}`}
-                       className="absolute -right-2 -top-3 rotate-12">
+                       className="absolute -right-2 -top-3">
               {e.dias === 0 ? '¡Hoy!' : e.dias}
             </Starburst>
             <div className="flex items-center gap-3 px-4 py-3.5">
@@ -76,8 +76,8 @@ function TodoElAnio({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
     <>
       <ul className="grid grid-cols-3 gap-2.5">
         {meses.map((m) => (
-          <li key={m.nombre} className="flex flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-2.5">
-            <span className={`self-start font-display text-[15px] font-extrabold ${m.actual ? 'rounded-full border-2 border-gr-ink bg-gr-accent px-2' : ''}`}>{m.nombre}</span>
+          <li key={m.nombre} className="flex flex-col gap-2 rounded-2xl border border-gr-line bg-gr-surface p-2.5">
+            <span className={`self-start font-display text-[15px] font-extrabold ${m.actual ? 'rounded-full bg-gr-accent px-2' : ''}`}>{m.nombre}</span>
             <div aria-hidden className="grid grid-cols-7 gap-[3px]">
               {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => (
                 <span key={d} className={`aspect-square rounded-full ${
@@ -88,13 +88,13 @@ function TodoElAnio({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
         ))}
       </ul>
       <p className="flex gap-4 text-sm font-medium">
-        <span className="flex items-center gap-1.5"><span className="size-3.5 rounded-full border-[1.5px] border-gr-ink bg-gr-accent" />Evento o cumple</span>
+        <span className="flex items-center gap-1.5"><span className="size-3.5 rounded-full border-[1.5px] border-gr-line bg-gr-accent" />Evento o cumple</span>
         <span className="flex items-center gap-1.5"><span className="size-3.5 rounded-full bg-gr-ink" />Hoy</span>
       </p>
       <ul className="flex flex-col gap-2.5">
         {eventos.map((e) => (
           <li key={e.listId}>
-            <Link href={e.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2">
+            <Link href={e.href} className="flex min-h-14 items-center gap-3 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2">
               <span className="flex-none rounded-xl bg-gr-ink px-2.5 py-1 font-display text-[15px] font-extrabold text-gr-bg">{fechaCorta(e.fecha, hoy)}</span>
               <span className="min-w-0 font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">{e.titulo}</span>
             </Link>
@@ -123,7 +123,7 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
 
       {/* los totales son netos: con alguien pueden estar a mano y tener partes sin marcar */}
       {cuentas.personas.length > 0 && (
-        <Link href="/cuentas" className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink px-3.5 py-2 text-sm font-semibold text-gr-bg">
+        <Link href="/cuentas" className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-gr-line bg-gr-ink px-3.5 py-2 text-sm font-semibold text-gr-bg">
           <span>
             Cuentas pendientes:{' '}
             {cuentas.debes || cuentas.teDeben
@@ -140,8 +140,7 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
       </nav>
 
       {eventos.length === 0 ? (
-        <div className="relative mt-4 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">
-          <Starburst size={52} fontSize={46} className="absolute -right-2 -top-6 rotate-12">!</Starburst>
+        <div className="relative mt-4 flex flex-col gap-2 rounded-sticker bg-gr-soft px-5 py-7 text-center text-[15px] font-medium leading-snug">
           <p>Acá aparecen los cumples de la gente cuyas listas abrís y las fechas de tus grupos.</p>
           <p>Pediles el link de su lista y abrilo con tu cuenta.</p>
         </div>

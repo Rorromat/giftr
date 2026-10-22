@@ -17,7 +17,7 @@ import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
-import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
+import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag } from '@/components/ui'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
@@ -140,7 +140,7 @@ export default async function ListaAjena({
       </div>
 
       {cuenta && (
-        <p className="self-start -rotate-1 rounded-full border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-1.5 font-display text-[15px] font-extrabold">
+        <p className="self-start rounded-full bg-gr-accent px-3.5 py-1.5 font-display text-[15px] font-extrabold">
           {cuenta}
         </p>
       )}
@@ -176,59 +176,59 @@ export default async function ListaAjena({
       </nav>
 
       {mostrados.length === 0 && (
-        <p className="mt-8 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
+        <p className="mt-8 rounded-sticker bg-gr-soft px-5 py-8 text-center text-[15px] font-medium">
           {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
         </p>
       )}
 
       {hero && (
-        <article className="gr-sticker relative mt-1 rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
+        <article className="gr-sticker relative mt-1 rounded-3xl">
           <div className="relative">
-            <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={222} />
-            <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
-            {(hero.precio ?? hero.rangoPrecio) && (
-              <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{hero.precio ?? hero.rangoPrecio}</PriceSticker>
-            )}
+            <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
           </div>
           <div className="flex flex-col gap-2.5 p-3.5">
             <div className="flex flex-col gap-1">
-              <Link href={`/l/${token}/item/${hero.id}`} className="font-display text-[22px] leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere]">
+              <Link href={`/l/${token}/item/${hero.id}`} className="text-[19px] leading-snug font-semibold [overflow-wrap:anywhere]">
                 {hero.titulo}
               </Link>
+              <div className="flex items-center gap-2">
+                {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-bold">{hero.precio ?? hero.rangoPrecio}</p>}
+                <PriorityTag prioridad={hero.prioridad} className="h-6" />
+              </div>
               {hero.notas && <p className="text-sm leading-snug [overflow-wrap:anywhere]">{hero.notas}</p>}
               {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
             </div>
             <div className="flex items-center gap-2">
               {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
-              <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn min-h-[50px] flex-1 font-sans text-sm font-bold">Ver más</Link>
+              <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn min-h-[50px] flex-1 text-sm">Ver más</Link>
             </div>
           </div>
         </article>
       )}
 
       {resto.length > 0 && (
-        <ul className="mt-1.5 grid grid-cols-2 items-start gap-3.5 pr-[5px]">
-          {resto.map((item, i) => {
+        <ul className="mt-1.5 grid grid-cols-2 items-start gap-3">
+          {resto.map((item) => {
             const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
             const cuantas = cupo(item)
             return (
-              <li key={item.id} className="gr-sticker relative rounded-[20px] shadow-[4px_4px_0_var(--gr-ink)]"
-                  style={{ transform: `rotate(${i % 2 ? 1 : -1}deg)` }}>
+              <li key={item.id} className="gr-sticker relative">
                 <div className="relative">
-                  <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={116} dimmed={!item.disponible} />
-                  {item.disponible
-                    ? <PriorityTag prioridad={item.prioridad} className="absolute left-2 top-2" />
-                    : (
-                      <span className="absolute left-2.5 top-10 max-w-[calc(100%-20px)] -rotate-8 rounded-[10px] bg-gr-ink px-2.5 py-1.5 font-display text-[15px] leading-tight font-extrabold text-gr-accent [overflow-wrap:anywhere]">
-                        {estadoNoDisponible(item)}
-                      </span>
-                    )}
+                  <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                  {!item.disponible && (
+                    <span className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] rounded-lg bg-gr-ink px-2 py-1 text-[13px] leading-tight font-bold text-gr-bg [overflow-wrap:anywhere]">
+                      {estadoNoDisponible(item)}
+                    </span>
+                  )}
                 </div>
-                <div className="flex flex-col gap-1 px-2.5 pb-2.5 pt-2">
-                  <Link href={`/l/${token}/item/${item.id}`} className="font-display text-[15px] leading-tight font-extrabold [overflow-wrap:anywhere]">
+                <div className="flex flex-col gap-1 px-3 pb-3 pt-2.5">
+                  <Link href={`/l/${token}/item/${item.id}`} className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
                     {item.titulo}
                   </Link>
-                  {(item.precio ?? item.rangoPrecio) && <p className="text-xs font-semibold">{item.precio ?? item.rangoPrecio}</p>}
+                  <div className="flex items-center gap-1.5">
+                    {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-bold">{item.precio ?? item.rangoPrecio}</p>}
+                    {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
+                  </div>
                   {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
                   <div className="mt-1 flex flex-col items-start gap-0.5">
                     {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}

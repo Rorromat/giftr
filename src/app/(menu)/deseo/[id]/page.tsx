@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { deseoParaEditar } from '@/lib/items'
 import { textoDueno } from '@/lib/compartir'
 import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
-import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag, Seccion } from '@/components/ui'
+import { BackLink, Icon, ItemPhoto, PriorityTag, Seccion } from '@/components/ui'
 
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
 // regalos, ni comentarios (la regla de la sorpresa). Desde acá se edita o se saca de la lista.
@@ -25,18 +25,22 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
       <BackLink href={lista} label={`Volver a ${grupo?.nombre ?? 'Mi lista'}`} />
 
-      <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
+      <article className="gr-sticker rounded-3xl">
         <div className="relative">
           <ItemPhoto src={deseo.fotoUrl} titulo={deseo.titulo} height={260} />
-          <PriorityTag prioridad={deseo.prioridad} className="absolute left-3 top-3 h-[30px]" />
-          {precio && <PriceSticker rotate={-5} className="right-3 rounded-xl px-2.5 py-1 text-lg">{precio}</PriceSticker>}
         </div>
         <div className="flex flex-col gap-3 p-3.5">
           {deseo.categoria && <p className="gr-label">{deseo.categoria}</p>}
-          <h1 className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{deseo.titulo}</h1>
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{deseo.titulo}</h1>
+            <div className="flex items-center gap-2">
+              {precio && <p className="text-lg font-bold">{precio}</p>}
+              <PriorityTag prioridad={deseo.prioridad} className="h-6" />
+            </div>
+          </div>
           {cuantos && <p className="text-sm font-semibold">{cuantos}</p>}
           {deseo.notas && (
-            <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
+            <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="font-bold">Nota:</span> {deseo.notas}
             </p>
           )}
@@ -60,7 +64,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
       {/* Sacarlo pide confirmar, como en la lista, y después vuelve a la lista */}
       <div className="flex flex-col gap-2.5">
         {ARCHIVAR.map(([estado, texto]) => (
-          <details key={estado} className="group rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface">
+          <details key={estado} className="group rounded-2xl border border-gr-line bg-gr-surface">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-3 font-display text-[17px] font-extrabold [&::-webkit-details-marker]:hidden">
               {texto}
               <Icon name="chevron" size={18} strokeWidth={2.6} className="transition-transform group-open:rotate-90" />

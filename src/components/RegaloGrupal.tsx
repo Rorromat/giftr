@@ -74,14 +74,14 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partia
   return (
     <details className="group flex flex-col">
       <summary className={linkSubrayado}>¿Se sumó alguien que no va?</summary>
-      <div className="mt-1 flex flex-col gap-1 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+      <div className="mt-1 flex flex-col gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
         {otros.length > 0 && (
           <>
             <p className="text-[13px] font-medium leading-snug">
               {/* no promete "salvo que lo dejes": con el deseo fuera de la lista (Cuentas) no hay dónde dejarlo volver */}
               Si lo sacás, no entra en la división, le avisamos que ya no está y no se puede volver a sumar por su cuenta.
             </p>
-            <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+            <ul className="flex flex-col divide-y divide-dashed divide-gr-dot">
               {otros.map((m) => (
                 <li key={m.userId} className={fila}>
                   <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
@@ -98,7 +98,7 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partia
         {sacados.length > 0 && (
           <>
             <p className="text-[13px] font-medium leading-snug">Los que sacaste. Si fue sin querer, dejalos volver y se pueden sumar de nuevo.</p>
-            <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+            <ul className="flex flex-col divide-y divide-dashed divide-gr-dot">
               {sacados.map((m) => (
                 <li key={m.id} className={fila}>
                   <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.nombre}</span>
@@ -130,7 +130,7 @@ const CORRECCION: Record<string, string> = {
 export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: string }) {
   if (!motivo || !Object.hasOwn(CORRECCION, motivo)) return null
   return (
-    <div role="status" className="flex items-start gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent py-1.5 pl-3.5 pr-1.5 text-sm font-semibold shadow-sticker-sm">
+    <div role="status" className="flex items-start gap-2 rounded-2xl bg-gr-accent py-1.5 pl-3.5 pr-1.5 text-sm font-semibold">
       <p className="flex-1 py-1.5">{CORRECCION[motivo]}</p>
       <Link href={cerrar} replace scroll={false} aria-label="Cerrar" className="-my-1 flex size-11 flex-none items-center justify-center">
         <Icon name="close" size={16} strokeWidth={3} />
@@ -163,7 +163,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   if (regalo.estado === 'comprado' && !regalo.soyParte) {
     return (
       <p className="flex items-start gap-2 text-sm font-medium">
-        <span className="mt-px flex size-5 flex-none items-center justify-center rounded-full border-2 border-gr-ink bg-gr-accent">
+        <span className="mt-px flex size-5 flex-none items-center justify-center rounded-full bg-gr-accent">
           <Icon name="check" size={11} strokeWidth={3} />
         </span>
         Regalo grupal de {juntarNombres(nombres)}: ya lo compraron.
@@ -204,7 +204,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
 
           {regalo.soyParte && !regalo.soyEncargado && (
             <>
-              <p className="rounded-2xl border-[2.5px] border-dashed border-gr-ink px-3 py-2.5 text-sm leading-snug">
+              <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug">
                 Estás adentro. Cuando {regalo.encargado.nombre} lo compre, te va a aparecer cuánto le debés.
               </p>
               <form action={leaveGroupGiftAction}>
@@ -244,7 +244,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
         <>
           {/* Comprado: quién puso cuánto y quién ya le pagó al encargado, a lo Splitwise */}
           {nota && <p className="text-sm"><span className="font-bold">Compró:</span> {nota}</p>}
-          <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3">
+          <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3">
             {regalo.miembros.map((m) => {
               const puedoMarcar = !m.esEncargado && (regalo.soyEncargado || m.esYo)
               return (
@@ -254,7 +254,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                     {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                   </span>
                   <span className="font-display text-lg font-extrabold tabular-nums">{pesos(m.monto ?? 0)}</span>
-                  <span className={`flex-none rounded-full border-2 border-gr-ink px-2 py-0.5 text-xs font-bold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-ink text-gr-bg'}`}>
+                  <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-bold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-ink text-gr-bg'}`}>
                     {m.esEncargado ? 'Puso' : m.pagado ? 'Pagó ✓' : 'Debe'}
                   </span>
                   {puedoMarcar && (

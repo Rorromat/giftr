@@ -7,7 +7,7 @@ import { boughtAction, markNotifsReadAction, postponeGroupGiftReminderAction, re
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
-import { Icon, QuizasLink, Starburst } from '@/components/ui'
+import { Icon, QuizasLink } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
@@ -39,8 +39,7 @@ export async function Banners() {
     <div className="flex flex-col gap-2.5">
       {invitado && <PreguntaInvitado nombre={invitado} />}
       {codazos.length > 0 && (
-        <div className="relative flex flex-col gap-2.5 rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent py-3 pl-3.5 pr-12 shadow-sticker-sm">
-          <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
+        <div className="relative flex flex-col gap-2.5 rounded-2xl bg-gr-accent py-3 pl-3.5 pr-12">
           <p className="text-sm font-semibold leading-snug [overflow-wrap:anywhere]">
             <span className="font-extrabold">{juntarNombres(quienes)}</span> te {quienes.length > 1 ? 'dieron' : 'dio'} un codazo:
             {quienes.length > 1 ? ' quieren' : ' quiere'} saber qué regalarte{grupo ? ` en "${grupo.listaNombre ?? 'tu grupo'}"` : ''}.
@@ -58,14 +57,14 @@ export async function Banners() {
       )}
       {notifs.map((n) => (
         <QuizasLink key={n.id} href={n.href}
-                    className="flex items-center gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3.5 py-3 text-sm font-medium shadow-sticker-sm">
+                    className="flex items-center gap-2 rounded-2xl border border-gr-line bg-gr-surface px-3.5 py-3 text-sm font-medium">
           <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{n.texto}</span>
           {n.href && <Icon name="chevron" size={18} strokeWidth={2.6} className="flex-none" />}
         </QuizasLink>
       ))}
       {warnings.map((w) => (
         <QuizasLink key={w.claimId} href={w.href}
-                    className="relative block rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
+                    className="relative block rounded-2xl border border-gr-line bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
           {`¿Conseguiste "${w.itemTitulo}"? Te quedan `}
           <span className="font-bold text-gr-accent">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
           {' de reserva.'}
@@ -90,14 +89,13 @@ export async function Banners() {
               </form>
             </div>
           )}
-          <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </QuizasLink>
       ))}
       {/* Un regalo grupal no vence solo (quizás ya lo compró, y con gente adentro se perdería la coordinación): al que lo
           organiza se le recuerda que lo cierre (ver cuandoRecordar). Si todavía no es momento, "Sigue en pie" lo saca por 2
           semanas. */}
       {sinCerrar.map((r) => (
-        <div key={r.giftId} className="relative rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink pb-1 pl-3.5 pr-12 pt-3 text-sm font-medium text-gr-bg">
+        <div key={r.giftId} className="relative rounded-2xl border border-gr-line bg-gr-ink pb-1 pl-3.5 pr-12 pt-3 text-sm font-medium text-gr-bg">
           <Link href={r.href} className="block">
             {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
             <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
@@ -106,7 +104,6 @@ export async function Banners() {
             <input type="hidden" name="giftId" value={r.giftId} />
             <BotonEnviar className="min-h-11 text-xs font-bold text-gr-accent underline decoration-2 underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
           </form>
-          <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </div>
       ))}
       {notifs.length > 0 && (

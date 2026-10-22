@@ -22,7 +22,6 @@ import { UnirInvitado } from '@/components/Identidad'
 import { invitadoDeEsteNavegador } from '@/lib/viewer'
 import { Icon, Seccion, Starburst } from '@/components/ui'
 
-const GIROS_FOTOS = [-8, 3, 9]
 
 export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string }> }) {
   const { nuevo, cumple: avisoCumple } = await searchParams
@@ -56,10 +55,10 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
           {fotos.length > 0
             ? fotos.map((f, i) => (
                 // la que no carga no se muestra (en vez del ícono de imagen rota)
-                <FotoConRespaldo key={f.id} src={f.src} respaldo={null} className="absolute size-[46px] rounded-xl border-[2.5px] border-gr-ink object-cover"
-                                 style={{ left: i * 20, top: [6, 0, 10][i], transform: `rotate(${GIROS_FOTOS[i]}deg)` }} />
+                <FotoConRespaldo key={f.id} src={f.src} respaldo={null} className="absolute size-[46px] rounded-xl border-2 border-gr-surface object-cover"
+                                 style={{ left: i * 20, top: [6, 0, 10][i] }} />
               ))
-            : <Starburst size={60} className="mx-auto rotate-12">{activos.length}</Starburst>}
+            : <Starburst size={60} className="mx-auto">{activos.length}</Starburst>}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-display text-xl font-extrabold">Mi lista</p>
@@ -68,7 +67,7 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         <Icon name="chevron" size={20} strokeWidth={2.6} />
       </Link>
 
-      <div className="flex items-center gap-3 rounded-sticker border-[3px] border-gr-ink bg-gr-ink py-3 pl-4 pr-3 text-gr-bg">
+      <div className="flex items-center gap-3 rounded-sticker border border-gr-line bg-gr-ink py-3 pl-4 pr-3 text-gr-bg">
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-extrabold">Compartir mi lista</p>
           <p className="truncate text-[13px] font-semibold text-gr-accent">{shareUrl.replace(/^https?:\/\//, '')}</p>
@@ -76,7 +75,7 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         <CopyLinkButton url={shareUrl} />
       </div>
       {nuevo === 'regalar' && (
-        <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">
+        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-semibold">
           Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
         </p>
       )}
@@ -89,7 +88,7 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
 
       {/* Tus gustos: los ve tu gente arriba de tu lista */}
       <Link href="/bienvenida?editar=1" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
-        <span aria-hidden className="flex size-[46px] flex-none -rotate-6 items-center justify-center rounded-xl border-[2.5px] border-gr-ink bg-gr-accent font-display text-2xl font-extrabold">♥</span>
+        <span aria-hidden className="flex size-[46px] flex-none items-center justify-center rounded-xl bg-gr-accent font-display text-2xl font-extrabold">♥</span>
         <div className="min-w-0 flex-1">
           <p className="font-display text-xl font-extrabold">Tus gustos</p>
           <p className="truncate text-[13px] font-medium">{secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}</p>
@@ -111,7 +110,7 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
 
       {/* Cuentas de los regalos grupales: a quién le debés y quién te debe */}
       <Link href="/cuentas" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
-        <span className="flex size-[46px] flex-none items-center justify-center rounded-xl border-[2.5px] border-gr-ink bg-gr-accent font-display text-2xl font-extrabold">$</span>
+        <span className="flex size-[46px] flex-none items-center justify-center rounded-xl bg-gr-accent font-display text-2xl font-extrabold">$</span>
         <div className="min-w-0 flex-1">
           <p className="font-display text-xl font-extrabold">Cuentas</p>
           <p className="text-[13px] font-medium">

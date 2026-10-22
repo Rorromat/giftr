@@ -14,7 +14,7 @@ export default function ErrorDePantalla({ error, retry }: { error: Error & { dig
   }, [error])
   return (
     <main className="flex min-h-[85dvh] flex-col items-center justify-center gap-4 py-12 text-center">
-      <Starburst size={120} fontSize={64} label="Error" className="-rotate-6">!</Starburst>
+      <Starburst size={120} fontSize={64} label="Error">!</Starburst>
       <h1 className="gr-title">Algo no salió</h1>
       <p className="text-[15px] font-medium leading-snug">
         No pudimos cargar esta pantalla. Puede ser la conexión: probá de nuevo en un ratito.

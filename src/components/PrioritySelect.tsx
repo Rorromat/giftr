@@ -17,7 +17,7 @@ export function PrioritySelect({ itemId, prioridad }: { itemId: string; priorida
         aria-label="Cuánto lo querés"
         defaultValue={prioridad}
         onChange={() => formRef.current?.requestSubmit()}
-        className="min-h-7 cursor-pointer appearance-none bg-transparent pr-4 text-xs font-semibold text-gr-ink"
+        className="min-h-7 cursor-pointer appearance-none bg-transparent pr-4 text-xs font-semibold text-gr-muted"
       >
         {Object.entries(PRIORIDADES).map(([value, { label }]) => (
           <option key={value} value={value}>{label}</option>
