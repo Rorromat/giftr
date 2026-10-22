@@ -44,7 +44,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
           </ul>
         </figure>
       ) : (
-        <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold">
+        <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold [overflow-wrap:anywhere]">
           {ranking[0].esYo ? 'Vos te ocupaste' : `${ranking[0].nombre} se ocupó`} {entradas.length === 1 ? 'del único regalo' : `de los ${entradas.length} regalos`} hasta ahora.
         </p>
       )}
@@ -53,8 +53,8 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
         {entradas.slice(0, 6).map((e) => (
           <li key={e.id} className="flex items-start gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
             <span className="mt-0.5 flex-none rounded-lg bg-gr-ink px-2 py-0.5 text-xs font-bold text-gr-bg tabular-nums">{fecha(e.fecha)}</span>
-            <span className="min-w-0 text-sm leading-snug">
-              <span className="font-bold [overflow-wrap:anywhere]">{e.titulo}</span>
+            <span className="min-w-0 text-sm leading-snug [overflow-wrap:anywhere]">
+              <span className="font-bold">{e.titulo}</span>
               {' · '}{e.grupal ? `regalo grupal de ${e.encargado}${e.con.length ? ` con ${juntarNombres(e.con)}` : ''}` : `lo compró ${e.encargado}`}
               {e.nota && <span className="text-gr-muted"> — {e.nota}</span>}
             </span>

@@ -165,6 +165,12 @@ test('el link pegado en el título no se lleva la puntuación de la oración (la
     ['Mate https://es.wikipedia.org/wiki/Mate_(infusión)', { titulo: 'Mate', linkTienda: 'https://es.wikipedia.org/wiki/Mate_(infusión)' }],
     ['(Mate https://es.wikipedia.org/wiki/Mate_(infusión)).', { titulo: '(Mate', linkTienda: 'https://es.wikipedia.org/wiki/Mate_(infusión)' }],
     ['Termo https://tienda.com/x?ref=', { titulo: 'Termo', linkTienda: 'https://tienda.com/x?ref=' }],
+    // lo que pone solo el teclado del iPhone ("..." pasa a "…", "'" a "’"), y los corchetes o <> alrededor
+    ['Mate https://a.com/x…', { titulo: 'Mate', linkTienda: 'https://a.com/x' }],
+    ['Mirá ‘https://a.com/x’', { titulo: 'Mirá ‘', linkTienda: 'https://a.com/x' }],
+    ['Ver [https://x.com/a]', { titulo: 'Ver [', linkTienda: 'https://x.com/a' }],
+    ['Mate <https://x.com/a>', { titulo: 'Mate <', linkTienda: 'https://x.com/a' }],
+    ['Ver https://x.com/a?f[0]=1', { titulo: 'Ver', linkTienda: 'https://x.com/a?f[0]=1' }],
     [ML, { titulo: 'mercadolibre.com.ar', linkTienda: ML }],
   ]
   for (const [titulo, esperado] of casos) expect(deseoDesdeForm(form({ titulo })), titulo).toMatchObject(esperado)
@@ -173,6 +179,7 @@ test('el link pegado en el título no se lleva la puntuación de la oración (la
   const inicio = Date.now()
   expect(deseoDesdeForm(form({ titulo: `https://a.com/${'.'.repeat(200_000)}x` }))!.linkTienda).toBeNull()
   expect(deseoDesdeForm(form({ titulo: `https://a.com/x${')'.repeat(200_000)}` }))!.linkTienda).toBe('https://a.com/x')
+  expect(deseoDesdeForm(form({ titulo: `https://a.com/x${']…'.repeat(100_000)}` }))!.linkTienda).toBe('https://a.com/x')
   expect(Date.now() - inicio).toBeLessThan(2000)
 })
 
@@ -245,6 +252,16 @@ test('editar un deseo de antes con un link en el título y uno a la tienda que h
   expect(await h.db.select().from(notifications)).toEqual([])
   // en el navegador cuenta igual: el link del título se queda y cuenta en el largo
   expect(avisoDelTitulo(`${'x'.repeat(100)} ${titulo}`, undefined)).toContain('sobran')
+})
+
+test('agregar sin JS un link en el título y algo que no es link a la tienda: el del título pasa igual (no se corta)', async () => {
+  const { list } = await preparar()
+  // más largo que el título: quedarse ahí lo cortaba a 120 y se perdían los dos links
+  const largo = `${ML}-${'x'.repeat(80)}`
+  expect(await redirigeA(addItemAction(form({ titulo: largo, linkTienda: '@lacasadelmate' })))).toBe('/mi-lista')
+  expect((await h.db.select().from(items).where(eq(items.listId, list.id)))[0]).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: largo })
+  // al editar sigue quedando en el título: el undefined conserva el link guardado (test de arriba)
+  expect(deseoDesdeForm(form({ titulo: largo, linkTienda: '@lacasadelmate' }))).toMatchObject({ titulo: largo, linkTienda: undefined })
 })
 
 test('dos productos de la misma tienda pegados seguidos en el título son dos deseos (no un doble toque)', async () => {

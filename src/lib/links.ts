@@ -36,19 +36,20 @@ export function sitioDeLink(link: string): string {
 }
 
 const LINK_EN_TEXTO = /(?:https?:\/\/|www\.)\S+/i
-const PUNTUACION = `.,;:!?'"»”`
+// "…" y "’" son los que pone solo el teclado del iPhone en vez de "..." y "'".
+const PUNTUACION = `.,;:!?'"»”’…>`
 const cuenta = (s: string, c: string) => s.split(c).length - 1
 
-// La puntuación de la oración pegada al final ("…/m, el negro", "…/x.", "(ver www.zara.com/ar)") no es del link: con eso
-// "Ver en la tienda" llevaba a una página que no existe. Un ")" que abre adentro se queda (wikipedia …/Mate_(infusión)).
-// Letra por letra desde el final, sin una regex con $: el título no tiene largo máximo y una así tarda el cuadrado.
+// La puntuación de la oración pegada al final ("…/m, el negro", "…/x.", "(ver www.zara.com/ar)", "[https://…]") no es del
+// link: con eso "Ver en la tienda" llevaba a una página que no existe. Un ")" o "]" que abre adentro se queda (wikipedia
+// …/Mate_(infusión)). Letra por letra desde el final, sin una regex con $: el título no tiene largo máximo y una así tarda
+// el cuadrado.
 function sinPuntuacionFinal(s: string): string {
-  const abren = cuenta(s, '(')
-  let cierran = cuenta(s, ')')
+  const sobran = { ')': cuenta(s, ')') - cuenta(s, '('), ']': cuenta(s, ']') - cuenta(s, '[') }
   let fin = s.length
   while (fin > 0) {
     const c = s[fin - 1]
-    if (c === ')' && cierran > abren) cierran--
+    if ((c === ')' || c === ']') && sobran[c] > 0) sobran[c]--
     else if (!PUNTUACION.includes(c)) break
     fin--
   }

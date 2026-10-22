@@ -45,12 +45,14 @@ function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
  *   el mismo link, y el título queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo
  *   cambie. Si vino otro, el título queda como vino: sacárselo perdía ese link, y al editar un deseo de antes (con el link
  *   en el título y otro a la tienda) cualquier cambio le cambiaba el título y les avisaba a los que lo reservaron.
+ * - alAgregar: no hay link guardado que conservar, así que algo que no es link en "Link a la tienda" cuenta como vacío y
+ *   el del título pasa igual (llega sin JS o antes de que hidrate: si no, se quedaba en el título y createItem lo cortaba).
  */
-export function deseoDesdeForm(fd: FormData): DeseoDelForm | null {
+export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | null {
   let titulo = campo(fd, 'titulo')
   if (!titulo) return null
   let linkTienda = link(fd, 'linkTienda')
-  const enTitulo = linkQuePasa(titulo, linkTienda)
+  const enTitulo = linkQuePasa(titulo, alAgregar ? linkTienda ?? null : linkTienda)
   if (enTitulo) {
     titulo = enTitulo.resto || sitioDeLink(enTitulo.link)
     linkTienda = enTitulo.link

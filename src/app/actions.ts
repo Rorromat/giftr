@@ -79,7 +79,7 @@ const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${r
 export async function addItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const data = deseoDesdeForm(formData)
+  const data = deseoDesdeForm(formData, true)
   if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
