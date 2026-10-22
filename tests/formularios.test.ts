@@ -233,7 +233,7 @@ test('editar un deseo de antes con un link en el título y otro a la tienda: cam
   const r = await reserveItem(h.db, item.id, { userId: giver.id })
   if (!r.ok) throw new Error('no reservó')
   expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, linkTienda: 'https://otra.com/x', prioridad: 'mucho' }))))
-    .toBe('/mi-lista')
+    .toBe(`/deseo/${item.id}`)
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
     .toMatchObject({ titulo, linkTienda: 'https://otra.com/x', prioridad: 'mucho' })
   expect(await h.db.select().from(notifications)).toEqual([])
@@ -247,7 +247,7 @@ test('editar un deseo de antes con un link en el título y uno a la tienda que h
   await h.db.update(items).set({ titulo, linkTienda: viejo }).where(eq(items.id, item.id))
   const r = await reserveItem(h.db, item.id, { userId: giver.id })
   if (!r.ok) throw new Error('no reservó')
-  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, linkTienda: viejo, prioridad: 'mucho' })))).toBe('/mi-lista')
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, linkTienda: viejo, prioridad: 'mucho' })))).toBe(`/deseo/${item.id}`)
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo, linkTienda: viejo, prioridad: 'mucho' })
   expect(await h.db.select().from(notifications)).toEqual([])
   // en el navegador cuenta igual: el link del título se queda y cuenta en el largo
@@ -327,14 +327,14 @@ test('editar un deseo de antes de los topes sin tocar lo largo no lo corta ni le
   if (!r.ok) throw new Error('no reservó')
   // cambia solo la prioridad (que no avisa), con lo demás como vino en el formulario
   expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo, precio: '$'.repeat(60), cantidad: '150', prioridad: 'mucho' }))))
-    .toBe('/mi-lista')
+    .toBe(`/deseo/${item.id}`)
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0])
     .toMatchObject({ titulo, precio: '$'.repeat(60), cantidad: 150, prioridad: 'mucho' })
   expect(await h.db.select().from(notifications)).toEqual([])
   // lo que sí cambia se acota; la cantidad, hasta la que ya tenía (como deja el formulario): bajarla no la manda a 99
   expect(await updateItem(h.db, item.id, owner.id, { titulo: `${titulo}!`, cantidad: 151 })).toBe(true)
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo: titulo.slice(0, 120), cantidad: 150 })
-  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo: titulo.slice(0, 120), cantidad: '140' })))).toBe('/mi-lista')
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo: titulo.slice(0, 120), cantidad: '140' })))).toBe(`/deseo/${item.id}`)
   expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0].cantidad).toBe(140)
   // una vez bajada, el tope es la nueva: no vuelve a subir a la de antes
   expect(await updateItem(h.db, item.id, owner.id, { cantidad: 150 })).toBe(true)

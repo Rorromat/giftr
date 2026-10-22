@@ -30,7 +30,8 @@ export default async function MiLista() {
         <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
       </div>
 
-      <div className="relative flex flex-col gap-1">
+      {/* con deseos, la estrella de la animación de inicio termina en el contador (ver Arranque) */}
+      <div className="relative flex flex-col gap-1" data-arranque-destino={activos.length > 0 || undefined}>
         <h1 className="gr-title">Mi lista</h1>
         <p className="text-[15px] font-medium">Pedí lo que querés sin pedirlo.</p>
         {activos.length > 0 && (

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
+import { Arranque } from '@/components/Arranque'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${bricolage.variable} ${instrument.variable}`}>
       <body className="min-h-screen font-sans">
         <div className="mx-auto max-w-md px-[18px]">{children}</div>
+        <Arranque />
       </body>
     </html>
   )

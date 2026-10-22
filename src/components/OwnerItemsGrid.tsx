@@ -27,14 +27,15 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
           const c = COLLAGE[i % COLLAGE.length]
           const precio = item.precio ?? item.rangoPrecio
           return (
-            <li key={item.id} className="gr-sticker even:mt-[18px]" style={{ transform: `rotate(${c.giro}deg)` }}>
+            // Toda la card abre el deseo (el ::after del título la cubre); el menú y la prioridad van por arriba.
+            <li key={item.id} className="gr-sticker relative even:mt-[18px]" style={{ transform: `rotate(${c.giro}deg)` }}>
               <div className="relative">
                 <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={c.foto} />
                 <PriorityTag prioridad={item.prioridad} className="absolute left-2.5 top-2.5" />
                 {precio && <PriceSticker rotate={c.precio}>{precio}</PriceSticker>}
                 <details className="group">
                   <summary aria-label={`Opciones de ${item.titulo}`}
-                           className="absolute right-0.5 top-0.5 flex size-11 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
+                           className="absolute right-0.5 top-0.5 z-[2] flex size-11 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
                     <span className="flex size-8 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface group-open:bg-gr-ink group-open:text-gr-bg">
                       <Icon name="more" size={18} strokeWidth={2.6} />
                     </span>
@@ -64,8 +65,13 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
                 </details>
               </div>
               <div className="flex flex-col gap-0.5 px-[11px] pb-[11px] pt-[9px]">
-                <p className="font-display text-base leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere]">{item.titulo}</p>
-                <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
+                <Link href={`/deseo/${item.id}`}
+                      className="font-display text-base leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] after:absolute after:inset-0 after:z-[1]">
+                  {item.titulo}
+                </Link>
+                <div className="relative z-[2] self-start">
+                  <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
+                </div>
                 {item.notas && <p className="text-xs text-gr-muted [overflow-wrap:anywhere]">{item.notas}</p>}
               </div>
             </li>

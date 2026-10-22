@@ -136,16 +136,20 @@ export async function updateItem(db: Db, itemId: string, userId: string, deseo: 
   return true
 }
 
-/** Un deseo activo para editarlo, solo si es del usuario (o de un grupo suyo), con su grupo para volver. */
+/**
+ * Un deseo activo para verlo o editarlo, solo si es del usuario (o de un grupo suyo), con su grupo para volver y el link
+ * de su lista (para mandarlo por WhatsApp).
+ */
 export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
   if (!esUuid(itemId)) return null
-  const [row] = await db.select({ item: items, lista: { id: lists.id, tipo: lists.tipo, nombre: lists.nombre } })
+  const [row] = await db.select({ item: items, lista: { id: lists.id, tipo: lists.tipo, nombre: lists.nombre, shareToken: lists.shareToken } })
     .from(items).innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), esDuenoSql(db, userId)))
   if (!row || row.item.estadoDueno !== 'activo') return null
   return {
     deseo: pickItemFields(row.item),
     grupo: row.lista.tipo === 'grupo' ? { id: row.lista.id, nombre: row.lista.nombre ?? 'Grupo' } : null,
+    shareToken: row.lista.shareToken,
   }
 }
 
