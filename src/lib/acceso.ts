@@ -15,7 +15,10 @@ import { esOFueDuenoSql, noEsNiFueDuenoSql, relacionConLista } from '@/lib/group
  *   que alguien se sumara (o volviera) al grupo: puede ser ese que se sumó, que usó el link para regalar sin su sesión.
  * - otra_cuenta: sin sesión, en un navegador donde tuvo sesión un dueño (o ex co-dueño) de esta lista (la tablet de la
  *   familia después de "Cerrar sesión"): puede ser ese dueño, con la cookie de otro invitado o sin ninguna. No ve la capa
- *   oculta ni reserva; con su Google, sí.
+ *   oculta ni reserva; con su Google, sí. Costo aceptado: un invitado que ya había reservado acá (la abuela) deja de verlo
+ *   desde este navegador, sin el cartel de que vence (ver listasAjenasSql); con su Google y "Sí, soy yo" lo recupera, y
+ *   sin Google su reserva vence como cualquier otra. Un "No soy X" pediría otra marca que esta cookie no tiene, y que no
+ *   venza, guardar en la base qué ve cada navegador: no vale la pena por este caso.
  * Nada de esto depende de qué reservaron los demás: al dueño le toca lo mismo en todos los casos.
  */
 export type Acceso = 'dueno' | 'regalador' | 'ex_dueno' | 'sin_identidad' | 'confirmar' | 'otra_cuenta'

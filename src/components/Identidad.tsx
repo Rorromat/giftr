@@ -72,6 +72,8 @@ export function ConfirmarLista({ token, nombre, volver }: { token: string; nombr
 /**
  * Sin sesión, en un navegador donde ya entró con su cuenta alguien de esta lista (la tablet de la familia después de
  * "Cerrar sesión"): puede ser esa persona, así que acá no se ve la coordinación ni se reserva. Con su Google, sí.
+ * Un invitado que ya había reservado acá (la abuela) tampoco ve lo suyo: el texto le dice cómo recuperarlo, igual para
+ * todos (no depende de qué se reservó ni de si hay invitado, así que a la dueña no le cuenta nada).
  */
 export function OtraCuenta({ volver }: { volver: string }) {
   return (
@@ -80,6 +82,8 @@ export function OtraCuenta({ volver }: { volver: string }) {
         <h2 id="otra-cuenta" className="font-display text-lg leading-tight font-extrabold">Para reservar, entrá con Google</h2>
         <p className="text-[13px] font-medium leading-snug">
           En este dispositivo ya entró con su cuenta alguien de esta lista, así que acá no se muestra qué reservaron los demás.
+          Si ya habías reservado algo acá con tu nombre, entrá con tu Google y tocá “Sí, soy yo”: pasa a tu cuenta y lo
+          manejás desde ahí.
         </p>
       </div>
       <EntrarConGoogle volver={volver} />

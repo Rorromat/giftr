@@ -1,10 +1,12 @@
 import { expect, test, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
-import { claims, guestIdentities, items, lists } from '@/db/schema'
+import { claims, guestIdentities, items, lists, users } from '@/db/schema'
 import { CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, NO_SOY_COOKIE, sumarCuenta } from '@/lib/cookie-invitado'
-import { reserveItem } from '@/lib/claims'
+import { markBought, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { crearGrupo } from '@/lib/groups'
 
@@ -38,6 +40,7 @@ import {
 } from '@/app/actions'
 import { getViewer, invitadoDeEsteNavegador, invitadoParaPreguntar } from '@/lib/viewer'
 import { getItemForViewer, getListForViewer } from '@/lib/lists'
+import { OtraCuenta } from '@/components/Identidad'
 
 async function preparar() {
   h.db = await createTestDb()
@@ -286,6 +289,36 @@ test('"No soy yo": lo del invitado queda como estaba, no se le pregunta más a e
   await redirigeA(salirAction(form({ volver: '/' })))
   expect([...h.jar.keys()]).toEqual([CUENTAS_COOKIE])
   expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
+})
+
+test('la invitada que ya había reservado en la lista de una cuenta que entró en la tablet: el cartel le dice cómo recuperarlo', async () => {
+  const { owner, item } = await preparar()
+  // Mamá reserva el Termo de Euge como invitada; Euge entra con Google en la tablet, dice "No soy yo" y cierra sesión
+  await reserveAction(null, form({ token: 'tok-euge', itemId: item.id, nombre: 'Mamá' }))
+  const [mama] = await h.db.select().from(guestIdentities)
+  const [termo] = await h.db.select().from(claims)
+  h.session = { userId: owner.id }
+  await noSoyElInvitadoAction()
+  await salirAction(form({ volver: '/' }))
+  h.session = null
+
+  // desde la tablet Mamá ya no ve ni maneja su reserva (puede ser Euge con la cookie de Mamá)
+  expect(await getViewer()).toEqual({ guestId: mama.id, cuentas: [owner.id] })
+  expect(await getItemForViewer(h.db, 'tok-euge', item.id, await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
+  expect(await markBought(h.db, termo.id, await getViewer())).toEqual({ ok: false, reason: 'no_permitido' })
+  // el cartel le dice cómo recuperarlo; es un texto fijo, el mismo para la dueña
+  expect(renderToStaticMarkup(createElement(OtraCuenta, { volver: '/l/tok-euge' })))
+    .toContain('Si ya habías reservado algo acá con tu nombre, entrá con tu Google y tocá “Sí, soy yo”')
+
+  // entra con su propio Google: a ella sí se le pregunta (el "No soy yo" era de la cuenta de Euge), dice que sí y lo maneja
+  const [cuentaDeMama] = await h.db.insert(users).values({ googleId: 'g-mama', nombre: 'Mamá', email: 'mama@test.com' }).returning()
+  h.session = { userId: cuentaDeMama.id }
+  expect(await invitadoParaPreguntar(cuentaDeMama.id)).toBe('Mamá')
+  await unirInvitadoAction()
+  const deEuge = await getItemForViewer(h.db, 'tok-euge', item.id, await getViewer())
+  if (deEuge?.role !== 'giver') throw new Error('esperaba giver')
+  expect(deEuge.item.claims[0]).toMatchObject({ id: termo.id, esMia: true, estado: 'reservado' })
+  expect(await markBought(h.db, termo.id, await getViewer())).toEqual({ ok: true })
 })
 
 test('la dueña que fue invitada, entra con Google sin contestar "¿Sos vos?" y cierra sesión: en su lista no ve nada', async () => {
