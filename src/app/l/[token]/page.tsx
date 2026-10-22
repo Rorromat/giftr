@@ -219,7 +219,7 @@ export default async function ListaAjena({
                   {item.disponible
                     ? <PriorityTag prioridad={item.prioridad} className="absolute left-2 top-2" />
                     : (
-                      <span className="absolute left-2.5 top-10 max-w-[calc(100%-20px)] -rotate-8 rounded-[10px] bg-gr-ink px-2.5 py-1.5 font-display text-[15px] leading-tight font-extrabold text-gr-accent">
+                      <span className="absolute left-2.5 top-10 max-w-[calc(100%-20px)] -rotate-8 rounded-[10px] bg-gr-ink px-2.5 py-1.5 font-display text-[15px] leading-tight font-extrabold text-gr-accent [overflow-wrap:anywhere]">
                         {estadoNoDisponible(item)}
                       </span>
                     )}
