@@ -38,10 +38,15 @@ export function porQueEsperar(p: { subiendo: boolean; probandoPegado: boolean; s
 /**
  * Un pegado que trae una imagen, en cualquier campo del formulario. Una planilla o una nota copian el texto y además una
  * imagen de cómo se ve: el texto se pega normal en el campo y la imagen se sube solo si todavía no hay foto. Una imagen
- * sola ("Copiar imagen", que a veces trae también su link) es la foto. Nunca dos subidas a la vez.
+ * sola ("Copiar imagen") es la foto: sin texto, o con su link y sin HTML (Safari) o con el HTML de la imagen (Chrome). Una
+ * celda de planilla con el link del producto trae su tabla en HTML, sin <img>: el link va al campo y no pisa la foto.
+ * Una app que copie un link y una imagen sin HTML se sigue tomando como "Copiar imagen": no hay cómo distinguirla.
+ * Nunca dos subidas a la vez.
  */
-export function alPegarImagen(p: { texto: string; enCampoDeTexto: boolean; hayFoto: boolean; subiendo: boolean }): { dejarTexto: boolean; subir: boolean } {
+export function alPegarImagen(p: { texto: string; html: string; enCampoDeTexto: boolean; hayFoto: boolean; subiendo: boolean }):
+  { dejarTexto: boolean; subir: boolean } {
   const texto = p.texto.trim()
-  if (texto && p.enCampoDeTexto && !linkHttp(texto)) return { dejarTexto: true, subir: !p.hayFoto && !p.subiendo }
+  const imagenSola = !texto || (!!linkHttp(texto) && (!p.html.trim() || /<img\b/i.test(p.html)))
+  if (p.enCampoDeTexto && !imagenSola) return { dejarTexto: true, subir: !p.hayFoto && !p.subiendo }
   return { dejarTexto: false, subir: !p.subiendo }
 }

@@ -148,7 +148,10 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     const destino = e.target
     const enCampoDeTexto = destino instanceof HTMLTextAreaElement || destino instanceof HTMLInputElement
       || (destino instanceof HTMLElement && destino.isContentEditable)
-    const que = alPegarImagen({ texto: e.clipboardData?.getData('text/plain') ?? '', enCampoDeTexto, hayFoto: !!foto, subiendo: enCurso.current })
+    const que = alPegarImagen({
+      texto: e.clipboardData?.getData('text/plain') ?? '', html: e.clipboardData?.getData('text/html') ?? '',
+      enCampoDeTexto, hayFoto: !!foto, subiendo: enCurso.current,
+    })
     if (!que.dejarTexto) e.preventDefault()
     if (que.subir) subir(imagen)
   })

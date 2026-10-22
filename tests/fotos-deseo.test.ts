@@ -142,15 +142,22 @@ test('el link de una foto en el formulario: el guardado vale, uno nuevo se prueb
 })
 
 test('pegar algo con imagen: el texto va al campo y la imagen solo si no hay foto; una imagen sola es la foto; nunca dos a la vez', () => {
-  const planilla = { texto: 'Talle M, color negro', enCampoDeTexto: true }
+  const planilla = { texto: 'Talle M, color negro', html: '<table><tr><td>Talle M, color negro</td></tr></table>', enCampoDeTexto: true }
   expect(alPegarImagen({ ...planilla, hayFoto: true, subiendo: false })).toEqual({ dejarTexto: true, subir: false })
   expect(alPegarImagen({ ...planilla, hayFoto: false, subiendo: false })).toEqual({ dejarTexto: true, subir: true })
   expect(alPegarImagen({ ...planilla, hayFoto: false, subiendo: true })).toEqual({ dejarTexto: true, subir: false })
-  // "Copiar imagen": sin texto, o con el link de la imagen
-  for (const texto of ['', '  ', 'https://x.com/foto.jpg']) {
-    expect(alPegarImagen({ texto, enCampoDeTexto: true, hayFoto: true, subiendo: false })).toEqual({ dejarTexto: false, subir: true })
+  // "Copiar imagen": sin texto, o con el link de la imagen sin HTML (Safari) o con el HTML de la imagen (Chrome)
+  for (const [texto, html] of [['', ''], ['  ', ''], ['https://x.com/foto.jpg', ''], ['https://x.com/foto.jpg', '<meta charset="utf-8"><img src="https://x.com/foto.jpg">']]) {
+    expect(alPegarImagen({ texto, html, enCampoDeTexto: true, hayFoto: true, subiendo: false }), html).toEqual({ dejarTexto: false, subir: true })
   }
-  expect(alPegarImagen({ texto: '', enCampoDeTexto: false, hayFoto: true, subiendo: true })).toEqual({ dejarTexto: false, subir: false })
+  expect(alPegarImagen({ texto: '', html: '', enCampoDeTexto: false, hayFoto: true, subiendo: true })).toEqual({ dejarTexto: false, subir: false })
   // fuera de un campo, el texto no tiene dónde ir
-  expect(alPegarImagen({ texto: 'hola', enCampoDeTexto: false, hayFoto: true, subiendo: false })).toEqual({ dejarTexto: false, subir: true })
+  expect(alPegarImagen({ texto: 'hola', html: '', enCampoDeTexto: false, hayFoto: true, subiendo: false })).toEqual({ dejarTexto: false, subir: true })
+  // una celda de Excel o Numbers con el link del producto (copian además una imagen de la celda): el link va al campo y
+  // no pisa la foto que ya estaba
+  for (const texto of ['https://www.zara.com/ar/campera', 'www.zara.com/ar/campera']) {
+    const celda = { texto, html: `<table><tr><td><a href="${texto}">${texto}</a></td></tr></table>`, enCampoDeTexto: true, subiendo: false }
+    expect(alPegarImagen({ ...celda, hayFoto: true }), texto).toEqual({ dejarTexto: true, subir: false })
+    expect(alPegarImagen({ ...celda, hayFoto: false }), texto).toEqual({ dejarTexto: true, subir: true })
+  }
 })
