@@ -410,14 +410,23 @@ export async function noSoyElInvitadoAction() {
   revalidatePath('/', 'layout')
 }
 
+/**
+ * Lo que cambió una reserva. Sin token viene del cartel "¿Conseguiste…?" de alguien que no tiene el link de ahora (está en
+ * Mi lista, en el grupo o en otra lista): que el cartel se vaya donde esté.
+ */
+function revalidarReserva(token: string, itemId: string) {
+  if (!token) return revalidatePath('/', 'layout')
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+}
+
 export async function boughtAction(formData: FormData) {
   const viewer = await getViewer()
   const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
   // Volver a reservar una que venció pide lo mismo que reservar: el deseo, con el link para regalar de ahora (ver markBought).
   const conLink = esUuid(itemId) && !!(await listaDelItem(itemId, token))
   const r = await markBought(db, str(formData, 'claimId') ?? '', viewer, str(formData, 'nota'), conLink ? itemId : undefined)
-  revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidarReserva(token, itemId)
   // la reserva había vencido y el lugar ya lo tomó otro: que se entere, en vez de que no pase nada
   if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
 }
@@ -434,10 +443,8 @@ export async function unboughtAction(formData: FormData) {
 
 export async function releaseAction(formData: FormData) {
   const viewer = await getViewer()
-  const token = str(formData, 'token')!
-  await releaseClaim(db, str(formData, 'claimId')!, viewer)
-  revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${str(formData, 'itemId')}`)
+  await releaseClaim(db, str(formData, 'claimId') ?? '', viewer)
+  revalidarReserva(str(formData, 'token') ?? '', str(formData, 'itemId') ?? '')
 }
 
 export async function commentAction(formData: FormData) {

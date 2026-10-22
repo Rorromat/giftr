@@ -422,6 +422,32 @@ test('"Me equivoqué" no vale para un co-dueño que lo compró antes de sumarse,
   expect((await db.select({ estado: claims.estado }).from(claims)).map((c) => c.estado)).toEqual(['comprado', 'comprado'])
 })
 
+test('sin el link de ahora, la reserva se marca comprada o se libera desde el cartel, sin pasar por el deseo', async () => {
+  const { db, item, giver, owner, list } = await setup()
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  const reservar = async (itemId: string) => {
+    const r = await reserveItem(db, itemId, { userId: giver.id })
+    if (!r.ok) throw new Error(r.reason)
+    return r.claimId
+  }
+  const [delTermo, delMate] = [await reservar(item.id), await reservar(mate.id)]
+  // reservó hace 11 días (le quedan 3) y después la dueña cambió el link: el cartel sale sin llevar al deseo
+  await db.update(claims).set({ createdAt: new Date(Date.now() - 11 * DIA), expiresAt: new Date(Date.now() + 3 * DIA) })
+  expect(await cambiarLinkParaRegalar(db, list.id, owner.id)).toBeTruthy()
+  const carteles = await getMyClaimWarnings(db, { userId: giver.id })
+  expect(carteles.map((w) => w.claimId).sort()).toEqual([delTermo, delMate].sort())
+  expect(carteles.every((w) => w.href === null)).toBe(true)
+  // la dueña no las toca
+  expect(await markBought(db, delTermo, { userId: owner.id })).toEqual({ ok: false, reason: 'no_permitido' })
+  expect(await releaseClaim(db, delMate, { userId: owner.id })).toBe(false)
+  // los botones del cartel (boughtAction y releaseAction sin token): solo con la reserva
+  expect(await markBought(db, delTermo, { userId: giver.id })).toEqual({ ok: true })
+  expect(await releaseClaim(db, delMate, { userId: giver.id })).toBe(true)
+  expect(await getMyClaimWarnings(db, { userId: giver.id })).toEqual([])
+  const estados = Object.fromEntries((await db.select({ id: claims.id, estado: claims.estado }).from(claims)).map((c) => [c.id, c.estado]))
+  expect(estados).toEqual({ [delTermo]: 'comprado', [delMate]: 'liberado' })
+})
+
 test('deshacer una compra de antes de que cambiaran el link para regalar no le pasa el nuevo', async () => {
   const { db, item, giver, owner, list } = await setup()
   const r = await reserveItem(db, item.id, { userId: giver.id })

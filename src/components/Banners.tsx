@@ -3,7 +3,7 @@ import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getMyClaimWarnings } from '@/lib/claims'
 import { regalosParaCerrar } from '@/lib/regalos'
-import { markNotifsReadAction, postponeGroupGiftReminderAction, vistoCodazosAction } from '@/app/actions'
+import { boughtAction, markNotifsReadAction, postponeGroupGiftReminderAction, releaseAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
@@ -11,7 +11,10 @@ import { Icon, QuizasLink, Starburst } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
-/** Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link. */
+/**
+ * Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link (el de
+ * una reserva, con sus botones ahí mismo).
+ */
 export async function Banners() {
   const viewer = await getViewer()
   const [todas, warnings, sinCerrar, codazos, avisos, invitado] = await Promise.all([
@@ -68,6 +71,21 @@ export async function Banners() {
           {' de reserva.'}
           {/* en el deseo se marca comprado o se libera */}
           {w.href && <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Marcalo o liberalo</span>}
+          {/* Sin el link de ahora no llega al deseo: lo marca o lo libera desde acá, como un regalo grupal en Cuentas. Si
+              no, vencía y el deseo volvía a quedar libre aunque ya lo hubiera comprado. Un invitado que solo tenía esa
+              lista no ve este cartel en ningún lado (no abre otras): su reserva vence sola. */}
+          {!w.href && (
+            <div className="flex gap-4">
+              <form action={boughtAction}>
+                <input type="hidden" name="claimId" value={w.claimId} />
+                <BotonEnviar className="min-h-11 font-bold text-gr-accent underline decoration-2 underline-offset-4">Ya lo compré</BotonEnviar>
+              </form>
+              <form action={releaseAction}>
+                <input type="hidden" name="claimId" value={w.claimId} />
+                <BotonEnviar className="min-h-11 font-bold underline decoration-2 underline-offset-4">Liberala</BotonEnviar>
+              </form>
+            </div>
+          )}
           <Starburst size={40} fontSize={46} className="absolute -right-2 -top-3 rotate-12">!</Starburst>
         </QuizasLink>
       ))}
