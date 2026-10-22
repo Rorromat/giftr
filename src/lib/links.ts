@@ -71,3 +71,6 @@ const RUTA_FOTO_DESEO = /^\/foto\/deseo\/([0-9a-f-]{36})$/i
 
 /** Si el valor es la URL de una foto de deseo subida (y no un link cualquiera). */
 export const esUrlFotoDeseo = (v: string) => RUTA_FOTO_DESEO.test(v)
+
+/** El id (en minúsculas) de la foto subida de esa URL; null si es un link cualquiera. */
+export const idDeUrlFotoDeseo = (v: string) => RUTA_FOTO_DESEO.exec(v)?.[1].toLowerCase() ?? null

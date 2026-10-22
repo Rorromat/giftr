@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { headers } from 'next/headers'
 import { ImageResponse } from 'next/og'
 import sharp from 'sharp'
+import { db } from '@/db'
 import { esFotoPublica, type ItemCompartido, type ListaCompartida } from '@/lib/compartir'
-import { bajarFoto, pedirAfuera, pedirConFetch } from '@/lib/bajar-foto'
+import { bajarFoto, pedirAfuera } from '@/lib/bajar-foto'
+import { leerFotoDeseo } from '@/lib/fotos-deseo'
+import { idDeUrlFotoDeseo } from '@/lib/links'
 
 // Imágenes Open Graph (la vista previa de WhatsApp) con el estilo Sticker: crema, tinta, ácido y bordes gruesos.
 // Generador: next/og (Satori), que solo entiende flexbox y no lee WebP; las fotos pasan antes por sharp.
@@ -18,27 +20,19 @@ const fuentes = Promise.all([800, 600].map(async (weight) => ({
   data: await readFile(join(process.cwd(), `assets/fonts/BricolageGrotesque-${weight}.ttf`)),
 })))
 
-async function origen() {
-  const h = await headers()
-  return `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('x-forwarded-host') ?? h.get('host')}`
-}
-
 /**
- * Baja la foto del deseo y la deja en JPEG del tamaño justo. Las fotos relativas son de este mismo sitio;
- * las de afuera solo por https a direcciones públicas, siguiendo a mano hasta 3 redirecciones (cada una se revisa),
- * con 5 s y 8 MB como mucho en total (ver bajarFoto).
+ * Trae la foto del deseo y la deja en JPEG del tamaño justo. Las subidas (/foto/deseo/:id) se leen de la base; las de
+ * afuera, solo por https a direcciones públicas, siguiendo a mano hasta 3 redirecciones (cada una se revisa), con 5 s y
+ * 8 MB como mucho en total (ver bajarFoto). Cualquier otra ruta relativa no es una URL para esFotoPublica: no se pide.
  * Si algo falla, null: la imagen sale con el starburst en vez de la foto.
  */
 async function foto(src: string | null, ancho: number, alto: number): Promise<string | null> {
   if (!src) return null
   try {
-    let datos: Buffer | null
-    if (src.startsWith('/') && !src.startsWith('//')) {
-      const base = await origen()
-      datos = await bajarFoto(`${base}${src}`, pedirConFetch, (u) => new URL(u).origin === new URL(base).origin)
-    } else {
-      datos = await bajarFoto(src, pedirAfuera, esFotoPublica)
-    }
+    // Antes la subida se pedía por HTTP a "este mismo sitio", armado con x-forwarded-host: lo manda el cliente, así que
+    // el servidor le pegaba a cualquier host:puerto que le dijeran (de la red interna también).
+    const id = idDeUrlFotoDeseo(src)
+    const datos = id ? await leerFotoDeseo(db, id) : await bajarFoto(src, pedirAfuera, esFotoPublica)
     if (!datos) return null
     const jpg = await sharp(datos, { limitInputPixels: 40_000_000 }).rotate().resize(ancho, alto, { fit: 'cover' }).jpeg({ quality: 82 }).toBuffer()
     return `data:image/jpeg;base64,${jpg.toString('base64')}`

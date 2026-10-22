@@ -67,27 +67,6 @@ export const pedirAfuera: Pedir = (url, signal) => new Promise((resolve, reject)
   })).on('error', reject)
 })
 
-async function* pedazos(cuerpo: ReadableStream<Uint8Array> | null) {
-  if (!cuerpo) return
-  const lector = cuerpo.getReader()
-  try {
-    for (;;) {
-      const { done, value } = await lector.read()
-      if (done) return
-      yield value
-    }
-  } finally {
-    // si se dejó de leer a la mitad, se corta la descarga
-    await lector.cancel().catch(() => {})
-  }
-}
-
-/** Una foto de este mismo sitio (/foto/deseo/…), con el fetch de siempre. */
-export const pedirConFetch: Pedir = async (url, signal) => {
-  const r = await fetch(url, { redirect: 'manual', signal, headers: { accept: 'image/*' } })
-  return { status: r.status, header: (nombre) => r.headers.get(nombre), cuerpo: pedazos(r.body) }
-}
-
 /**
  * Baja una foto: sigue a mano hasta 3 redirecciones (cada destino tiene que estar permitido), con un tiempo total, y corta
  * apenas pasa el máximo de bytes: si dice que es más grande, sin bajar nada; si no lo dice o miente, a medida que llega
