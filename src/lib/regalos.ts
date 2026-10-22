@@ -373,15 +373,19 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
  * "Ya le pagué" (lo marca quien debe) o "Me pagó" (lo marca el encargado). Se puede deshacer. visto: la parte que mostraba
  * la pantalla. Si justo el encargado la corrigió, el UPDATE espera a la corrección y no marca paga una parte que el que
  * paga no vio (la pantalla vuelve con la nueva).
+ * Si después se sumó al grupo de esa lista (aunque haya salido) ya no ve el regalo (ver enCuentasDe): tampoco lo marca
+ * desde una pestaña vieja, como corregirCompra y saldarCon. El otro lo sigue viendo y lo marca desde su lado.
  */
 export async function marcarPagado(db: Db, giftId: string, deudorId: string, actorId: string, pagado = true, visto?: number): Promise<boolean> {
   if (!esUuid(giftId) || !esUuid(deudorId)) return false
   // visto viene del formulario: una parte es un entero entre 0 y MONTO_MAXIMO, y otro número (fuera de lo que entra en la
   // columna) haría fallar la consulta
   if (visto !== undefined && !(Number.isSafeInteger(visto) && visto >= 0 && visto <= MONTO_MAXIMO)) return false
-  const [g] = await db.select({ encargado: groupGifts.organizerUserId }).from(groupGifts)
+  const [g] = await db.select({ encargado: groupGifts.organizerUserId, listId: items.listId }).from(groupGifts)
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
     .where(and(eq(groupGifts.id, giftId), eq(groupGifts.estado, 'comprado')))
   if (!g || deudorId === g.encargado || (actorId !== g.encargado && actorId !== deudorId)) return false
+  if (await esOFueDuenoDeLista(db, g.listId, actorId)) return false
   const filas = await db.update(groupGiftMembers).set({ pagado, pagadoAt: pagado ? new Date() : null })
     .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, deudorId),
       pagado && visto !== undefined ? eq(groupGiftMembers.monto, visto) : undefined))

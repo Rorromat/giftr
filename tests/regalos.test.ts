@@ -965,6 +965,41 @@ test('corregir la compra no le cambia la parte al que después se sumó al grupo
   expect((await misCuentas(db, tia.id)).personas).toEqual([])
 })
 
+// Una pestaña vieja de Cuentas: el que después se sumó al grupo ya no ve el regalo (ni lo puede saldar), así que tampoco
+// marca ni deshace el pago de otro a ciegas. El otro lo sigue viendo y lo marca desde su lado.
+test('"Ya le pagué" o "Me pagó" no los marca el que después se sumó al grupo de la lista (ya no ve el regalo)', async () => {
+  const db = await createTestDb()
+  const [delfina, rodri, sofi, tia] = [await usuario(db, 'Delfina'), await usuario(db, 'Rodri'), await usuario(db, 'Sofi'), await usuario(db, 'Tía')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const tele = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Tele' }, grupoId))!
+  const g = await iniciarRegaloGrupal(db, tele.id, rodri.id)
+  if (!g.ok) throw new Error(g.reason)
+  await sumarseARegalo(db, g.giftId, sofi.id)
+  await sumarseARegalo(db, g.giftId, tia.id)
+  expect(await comprarRegalo(db, g.giftId, rodri.id, { total: 90000 })).toEqual({ ok: true })
+
+  // Sofi (la que debe) se suma al grupo: no marca la suya; el encargado, que la sigue viendo, sí
+  await unirseAGrupo(db, grupo.inviteToken!, sofi.id)
+  expect((await misCuentas(db, sofi.id)).personas).toEqual([])
+  expect(await marcarPagado(db, g.giftId, sofi.id, sofi.id, true, 30000)).toBe(false)
+  expect((await misCuentas(db, rodri.id)).personas.find((p) => p.nombre === 'Sofi')).toMatchObject({ neto: 30000 })
+  expect(await marcarPagado(db, g.giftId, sofi.id, rodri.id, true, 30000)).toBe(true)
+  expect(await marcarPagado(db, g.giftId, sofi.id, rodri.id, false)).toBe(true)
+
+  // Rodri (el encargado) se suma al grupo: no marca ni deshace lo de la Tía, que sigue debiendo; ella sí lo marca
+  await unirseAGrupo(db, grupo.inviteToken!, rodri.id)
+  expect(await saldarCon(db, rodri.id, tia.id)).toBe(0)
+  expect(await marcarPagado(db, g.giftId, tia.id, rodri.id, true, 30000)).toBe(false)
+  expect((await misCuentas(db, tia.id)).debes).toBe(30000)
+  expect(await marcarPagado(db, g.giftId, tia.id, tia.id, true, 30000)).toBe(true)
+  expect((await misCuentas(db, tia.id)).debes).toBe(0)
+  // y si salió del grupo, tampoco: no le deshace el pago
+  expect(await salirDeGrupo(db, grupoId, rodri.id)).toBe(true)
+  expect(await marcarPagado(db, g.giftId, tia.id, rodri.id, false)).toBe(false)
+  expect((await misCuentas(db, tia.id)).debes).toBe(0)
+})
+
 test('corregir la compra le avisa a quien le cambió la parte (y a nadie más)', async () => {
   const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
   const todos = [rodri.id, sofi.id, ana.id]
