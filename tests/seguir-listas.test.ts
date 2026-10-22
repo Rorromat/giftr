@@ -1,12 +1,13 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { items, listFollows, lists } from '@/db/schema'
+import { claims, items, listFollows, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { guardarCumple, misEventos, seguirLista } from '@/lib/events'
-import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { cambiarLinkParaRegalar, getListForViewer } from '@/lib/lists'
 import { miGente } from '@/lib/gente'
 import { iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 
@@ -27,6 +28,8 @@ vi.mock('next/navigation', () => ({
 import ListaAjena from '@/app/l/[token]/page'
 import DetalleItem from '@/app/l/[token]/item/[itemId]/page'
 import Perfil from '@/app/l/[token]/perfil/page'
+import { reserveAction } from '@/app/actions'
+import { getViewer } from '@/lib/viewer'
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
@@ -104,4 +107,23 @@ test('si cambian el link para regalar mientras carga la página, no la sigue con
   // con el de ahora, sí
   await seguirLista(db, sofi.id, lista.id, nuevo!)
   expect(await siguen(db, lista.id)).toEqual([sofi.id])
+})
+
+test('una sesión de un usuario que ya no está en la base (la restauraron) es como no tener sesión: ni error ni capa oculta', async () => {
+  const { db, rodri, lista, bici } = await preparar()
+  const reservas = (await db.select().from(claims)).length
+  // en este navegador quedó el JWT de una base vieja: puede ser Mamá, que después volvió a entrar con otro id
+  h.session = { userId: randomUUID() }
+  expect(await getViewer()).toEqual({})
+  expect(await getListForViewer(db, lista.shareToken, await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'sin_identidad' })
+  await ListaAjena({ params: Promise.resolve({ token: lista.shareToken }), searchParams: Promise.resolve({}) })
+  await abrirDeseo(lista.shareToken, bici.id)
+  await Perfil({ params: Promise.resolve({ token: lista.shareToken }), searchParams: Promise.resolve({}) })
+  expect(await siguen(db, lista.id)).toEqual([rodri.id])
+  // reservar le pide el nombre en vez de fallar
+  const fd = new FormData()
+  fd.set('token', lista.shareToken)
+  fd.set('itemId', bici.id)
+  await expect(reserveAction(null, fd)).rejects.toMatchObject({ url: `/l/${lista.shareToken}?reserva=sin_identidad` })
+  expect((await db.select().from(claims)).length).toBe(reservas)
 })

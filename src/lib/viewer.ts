@@ -4,10 +4,16 @@ import { db } from '@/db'
 import { CUENTAS_COOKIE, GUEST_COOKIE, NO_SOY_COOKIE } from '@/lib/cookie-invitado'
 import { invitadoParaUnir, nombreDelInvitado, viewerDeCookie } from '@/lib/guest'
 import type { Viewer } from '@/lib/types'
+import { existeUsuario } from '@/lib/users'
 
 export async function getViewer(): Promise<Viewer> {
   const session = await auth()
-  if (session?.userId) return { userId: session.userId }
+  // La sesión de un usuario que ya no está en la base (restauraron la base o cambiaron de branch) es como no tener
+  // sesión, igual que la cookie de un invitado que no existe: seguir la lista o reservar fallarían por la FK, y si
+  // ahora es otra cuenta, vería su propia lista como regaladora. Las pantallas del menú leen la sesión directo: ahí "/"
+  // la manda a entrar de nuevo (ver asegurarListaPropia), y unirse o crear un grupo con esa sesión fallaría, pero hace
+  // falta además el link: no vale una consulta más en cada auth().
+  if (session?.userId && await existeUsuario(db, session.userId)) return { userId: session.userId }
   const jar = await cookies()
   return viewerDeCookie(db, jar.get(GUEST_COOKIE)?.value, jar.get(CUENTAS_COOKIE)?.value)
 }

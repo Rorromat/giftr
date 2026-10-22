@@ -33,11 +33,16 @@ export async function asegurarListaPropia(db: Db, userId: string) {
   const buscar = () => db.select({ id: lists.id, shareToken: lists.shareToken }).from(lists).where(eq(lists.ownerId, userId))
   const [lista] = await buscar()
   if (lista) return lista
-  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId))
-  if (!user) return null
+  if (!await existeUsuario(db, userId)) return null
   await db.insert(lists).values({ ownerId: userId, shareToken: newShareToken() }).onConflictDoNothing({ target: lists.ownerId })
   const [creada] = await buscar()
   return creada ?? null
+}
+
+/** Si el usuario existe: una sesión puede ser de una base vieja (la restauraron o cambiaron de branch en Neon). */
+export async function existeUsuario(db: Db, userId: string): Promise<boolean> {
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId))
+  return !!user
 }
 
 /** La foto subida (versionada para poder cachearla para siempre), si no la de Google, si no nada (iniciales). */
