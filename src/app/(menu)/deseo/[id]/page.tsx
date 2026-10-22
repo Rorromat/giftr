@@ -4,10 +4,11 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { deseoParaEditar } from '@/lib/items'
 import { textoDueno } from '@/lib/compartir'
+import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag, Seccion } from '@/components/ui'
 
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
-// regalos, ni comentarios (la regla de la sorpresa). Desde acá se edita.
+// regalos, ni comentarios (la regla de la sorpresa). Desde acá se edita o se saca de la lista.
 export default async function Deseo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await auth()
@@ -15,13 +16,14 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
   const editable = await deseoParaEditar(db, id, session.userId)
   if (!editable) notFound()
   const { deseo, grupo, shareToken } = editable
+  const lista = grupo ? `/grupos/${grupo.id}` : '/mi-lista'
   const precio = deseo.precio ?? deseo.rangoPrecio
   const cuantos = deseo.repetible ? 'Se puede repetir: varios pueden regalar algo así.'
     : deseo.cantidad > 1 ? `Cantidad: ${deseo.cantidad}.` : null
 
   return (
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
-      <BackLink href={grupo ? `/grupos/${grupo.id}` : '/mi-lista'} label={`Volver a ${grupo?.nombre ?? 'Mi lista'}`} />
+      <BackLink href={lista} label={`Volver a ${grupo?.nombre ?? 'Mi lista'}`} />
 
       <article className="gr-sticker rounded-3xl shadow-[6px_6px_0_var(--gr-ink)]">
         <div className="relative">
@@ -54,6 +56,19 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
       </article>
 
       <Link href={`/editar/${deseo.id}`} className="gr-btn-primary w-full">Editar</Link>
+
+      {/* Sacarlo pide confirmar, como en la lista, y después vuelve a la lista */}
+      <div className="flex flex-col gap-2.5">
+        {ARCHIVAR.map(([estado, texto]) => (
+          <details key={estado} className="group rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-3 font-display text-[17px] font-extrabold [&::-webkit-details-marker]:hidden">
+              {texto}
+              <Icon name="chevron" size={18} strokeWidth={2.6} className="transition-transform group-open:rotate-90" />
+            </summary>
+            <ConfirmarSacar itemId={deseo.id} estado={estado} volver={lista} />
+          </details>
+        ))}
+      </div>
     </Seccion>
   )
 }

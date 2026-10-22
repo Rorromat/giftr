@@ -14,7 +14,23 @@ const COLLAGE = [
   { foto: 182, giro: -1, precio: 4 },
 ]
 
-const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
+export const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
+
+/**
+ * Confirmar que sale de la lista (un toque sin querer lo hacía desaparecer). El texto es siempre el mismo: no dice nada
+ * de reservas. volver: adónde ir después (desde la pantalla del deseo, que archivado ya no se abre).
+ */
+export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; estado: (typeof ARCHIVAR)[number][0]; volver?: string }) {
+  return (
+    <form action={archiveItemAction} className="flex flex-col gap-2 px-3 pb-3">
+      <input type="hidden" name="itemId" value={itemId} />
+      <input type="hidden" name="estado" value={estado} />
+      {volver && <input type="hidden" name="volver" value={volver} />}
+      <p className="text-xs font-medium leading-snug">Sale de la lista. Si te arrepentís, lo volvés a poner desde Archivados, abajo de todo.</p>
+      <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px] text-[15px]">Sí, sacarlo</BotonEnviar>
+    </form>
+  )
+}
 
 /** Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas. */
 export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; shareToken: string }) {
@@ -47,18 +63,13 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
                        href={`https://wa.me/?text=${encodeURIComponent(textoDueno(item, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${item.id}`))}`}>
                       Mandar por WhatsApp
                     </a>
-                    {/* Sacarlo pide confirmar (un toque sin querer lo hacía desaparecer). El texto es siempre el mismo: no dice nada de reservas. */}
+                    {/* Sacarlo pide confirmar (ver ConfirmarSacar) */}
                     {ARCHIVAR.map(([estado, texto]) => (
                       <details key={estado} className="border-t-[2.5px] border-gr-ink">
                         <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
                           {texto}
                         </summary>
-                        <form action={archiveItemAction} className="flex flex-col gap-2 px-3 pb-3">
-                          <input type="hidden" name="itemId" value={item.id} />
-                          <input type="hidden" name="estado" value={estado} />
-                          <p className="text-xs font-medium leading-snug">Sale de la lista. Si te arrepentís, lo volvés a poner desde Archivados, abajo de todo.</p>
-                          <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px] text-[15px]">Sí, sacarlo</BotonEnviar>
-                        </form>
+                        <ConfirmarSacar itemId={item.id} estado={estado} />
                       </details>
                     ))}
                   </div>

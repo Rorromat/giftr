@@ -114,6 +114,9 @@ export async function archiveItemAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
+  // desde la pantalla del deseo, que archivado ya no se abre, vuelve a su lista
+  const volver = str(formData, 'volver')
+  if (volver) redirect(rutaPropia(volver))
 }
 
 /** "Volver a mi lista" desde Archivados. */
