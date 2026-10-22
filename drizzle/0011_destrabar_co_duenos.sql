@@ -9,7 +9,9 @@
 --    fecha. Así, si vuelven con la invitación, no sacan a nadie que ya estaba, y nadie que llegó después los saca (ver
 --    sacarDelGrupo). Con la fecha del grupo empataban con el que lo armó y le ganaban a todos los demás. Los que se
 --    sumaron entre su llegada y ese codazo sí los podrían sacar: precio aceptado, gana el que nunca se fue. Uno que
---    armó el grupo, salió y vuelve cuenta como sumado en esa fecha: no se lo puede distinguir.
+--    armó el grupo, salió y vuelve cuenta como sumado en esa fecha: no se lo puede distinguir. La 0020 copia esa fecha a
+--    unido_at, así que a los invitados que dijeron que la lista no era suya antes de ese codazo se les vuelve a preguntar
+--    (ver accesoALista): ese ex pudo ser uno de ellos.
 INSERT INTO "list_members" ("list_id", "user_id", "created_at", "salio_at")
 SELECT c."list_id", c."para_user_id", min(c."created_at"), now()
 FROM "codazos" c JOIN "lists" l ON l."id" = c."list_id"

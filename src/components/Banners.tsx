@@ -73,7 +73,11 @@ export async function Banners() {
           {w.href && <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Marcalo o liberalo</span>}
           {/* Sin el link de ahora no llega al deseo: lo marca o lo libera desde acá, como un regalo grupal en Cuentas. Si
               no, vencía y el deseo volvía a quedar libre aunque ya lo hubiera comprado. Un invitado que solo tenía esa
-              lista no ve este cartel en ningún lado (no abre otras): su reserva vence sola. */}
+              lista no ve este cartel en ningún lado (no abre otras): su reserva vence sola.
+              Costos aceptados, sin estados ni mensajes nuevos: "Ya lo compré" no hace nada si venció con la pantalla
+              abierta (volver a reservarla pide el link de ahora) o si es un invitado al que hay que volver a preguntarle
+              "¿Es tu lista?" (se sumó alguien al grupo después de que dijo que no); liberarla, sí. Y deshacer un "Ya lo
+              compré" tocado de más pide el link de ahora, igual que reservar de nuevo. */}
           {!w.href && (
             <div className="flex gap-4">
               <form action={boughtAction}>

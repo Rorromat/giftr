@@ -30,6 +30,9 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   ]
   const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
   const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  // quién llegó antes se compara por la fecha de alta, y dos sentencias seguidas pueden caer en el mismo milisegundo de
+  // now(): las altas que importan van con fecha
+  const despues = (ms: number) => new Date(grupo.createdAt.getTime() + ms)
   const deseo = async (titulo: string, cantidad = 1) => (await createItem(db, delfina.id, { tipo: 'exacto', titulo, cantidad }, grupoId))!
   const [copas, heladera, tostadora, vela, plantas] = [
     await deseo('Copas'), await deseo('Heladera'), await deseo('Tostadora', 2), await deseo('Vela'), await deseo('Plantas'),
@@ -48,14 +51,14 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   await sumarseARegalo(db, deTostadora.giftId, ana.id)
   await sumarseARegalo(db, deVela.giftId, martin.id)
   // ...y se unió como se unía antes: solo la fila de dueño
-  await db.insert(listMembers).values({ listId: grupoId, userId: martin.id })
+  await db.insert(listMembers).values({ listId: grupoId, userId: martin.id, createdAt: despues(1) })
   // Rodri armaba la lista con ellos y salió cuando salir borraba la fila (le había llegado un codazo de este grupo);
   // después reservó las plantas como cualquier regalador
-  await db.insert(codazos).values({ listId: grupoId, paraUserId: rodri.id, deNombre: 'Tía Marta' })
+  await db.insert(codazos).values({ listId: grupoId, paraUserId: rodri.id, deNombre: 'Tía Marta', createdAt: despues(2) })
   expect(await reserveItem(db, plantas.id, { userId: rodri.id })).toMatchObject({ ok: true })
   // y el tío se sumó después de que Rodri salió
   const tio = await usuario(db, 'Tío')
-  await db.insert(listMembers).values({ listId: grupoId, userId: tio.id })
+  await db.insert(listMembers).values({ listId: grupoId, userId: tio.id, createdAt: despues(3) })
 
   // trabado: la heladera no la puede comprar nadie y Martín ya no la ve
   expect(await reserveItem(db, heladera.id, { userId: ana.id })).toEqual({ ok: false, reason: 'sin_stock' })
