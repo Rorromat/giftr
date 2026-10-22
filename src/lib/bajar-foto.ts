@@ -55,9 +55,13 @@ export function lookupPublico(resolver: Resolver = resolverDelSistema): LookupFu
 export type Respuesta = { status: number; header: (nombre: string) => string | null; cuerpo: AsyncIterable<Uint8Array> }
 export type Pedir = (url: string, signal: AbortSignal) => Promise<Respuesta>
 
-/** Una foto de afuera: por https, conectándose solo a direcciones públicas (ver lookupPublico) y sin reusar conexiones. */
+/**
+ * Una foto de afuera: por https, conectándose solo a direcciones públicas (ver lookupPublico) y sin reusar conexiones.
+ * Con User-Agent: https.get no manda ninguno (fetch mandaba "node") y hay hosts de fotos, como Wikimedia, que sin él dan 403.
+ */
 export const pedirAfuera: Pedir = (url, signal) => new Promise((resolve, reject) => {
-  https.get(url, { signal, lookup: lookupPublico(), agent: false, headers: { accept: 'image/*' } }, (res) => resolve({
+  const headers = { accept: 'image/*', 'user-agent': 'GiftR (vista previa)' }
+  https.get(url, { signal, lookup: lookupPublico(), agent: false, headers }, (res) => resolve({
     status: res.statusCode ?? 0,
     header: (nombre) => {
       const v = res.headers[nombre.toLowerCase()]

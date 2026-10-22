@@ -1,5 +1,6 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import type { LookupAddress } from 'node:dns'
+import https from 'node:https'
 import { bajarFoto, esIpPublica, lookupPublico, pedirAfuera, type Pedir, type Resolver, type Respuesta } from '@/lib/bajar-foto'
 import { esFotoPublica } from '@/lib/compartir'
 
@@ -126,4 +127,18 @@ test('al conectarse se revisa a qué IP resuelve el nombre (un nombre público q
 test('la descarga de afuera usa ese control en la conexión misma', async () => {
   // localhost resuelve sin red: sin el control sería "conexión rechazada"; con él, ni se conecta
   await expect(pedirAfuera('https://localhost:1/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('no es una dirección pública')
+})
+
+test('la descarga de afuera se presenta: sin User-Agent hay hosts de fotos (Wikimedia) que contestan 403', async () => {
+  let opciones: https.RequestOptions | undefined
+  const espia = vi.spyOn(https, 'get').mockImplementation((_url, o) => {
+    opciones = o
+    throw new Error('sin red')
+  })
+  try {
+    await expect(pedirAfuera('https://upload.wikimedia.org/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('sin red')
+    expect(opciones?.headers).toMatchObject({ 'user-agent': expect.stringMatching(/\S/), accept: 'image/*' })
+  } finally {
+    espia.mockRestore()
+  }
 })
