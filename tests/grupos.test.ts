@@ -16,6 +16,8 @@ import { guardarFechaGrupo, misEventos } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 import { comprarRegalo, historialDeLista, iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo, ultimosRegalos } from '@/lib/regalos'
 import { getUnreadNotifications } from '@/lib/notifications'
+import { abrirListaAInvitado } from '@/lib/acceso'
+import { createGuest } from '@/lib/guest'
 
 const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo'].sort()
 
@@ -109,6 +111,57 @@ test('EL TEST DE ORO, grupos: el que sale del grupo sigue sin ver nada de lo que
   expect(await grupoParaDueno(db, grupo.id, martin.id)).not.toBeNull()
   expect((await getListForViewer(db, grupo.shareToken, yo))?.role).toBe('owner')
   expect((await getListForViewer(db, grupo.shareToken, { userId: rodri.id }))).toMatchObject({ duenos: ['Delfina', 'Martín'] })
+})
+
+test('EL TEST DE ORO, grupos: el que usó la lista como invitado y después se suma no ve nada con su cookie de invitado', async () => {
+  const { db, delfina, rodri, grupo, item } = await setup()
+  const juan = await usuario(db, 'Juan')
+  const cafetera = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Cafetera' }, grupo.id))!
+  // Juan abrió el link para regalar en el navegador de WhatsApp, se anotó como invitado y reservó la cafetera. La tía
+  // también regala, como invitada. Rodri reservó las copas y comentó (en setup).
+  const juanDeWhatsApp = await createGuest(db, 'Juan')
+  const tia = await createGuest(db, 'Tía')
+  const r = await reserveItem(db, cafetera.id, { guestId: juanDeWhatsApp.id })
+  if (!r.ok) throw new Error(r.reason)
+  await abrirListaAInvitado(db, tia.id, grupo.id)
+  expect((await getListForViewer(db, grupo.shareToken, { guestId: tia.id }))?.role).toBe('giver')
+  await new Promise((ok) => setTimeout(ok, 5))
+
+  // después Delfina lo invita y se suma desde Chrome, con su Google: el servidor no sabe que el invitado es él
+  expect(await unirseAGrupo(db, grupo.inviteToken!, juan.id)).toBe(grupo.id)
+  for (const invitado of [juanDeWhatsApp, tia]) {
+    const yo = { guestId: invitado.id }
+    const lista = await getListForViewer(db, grupo.shareToken, yo)
+    expect(lista).toMatchObject({ role: 'anonimo', motivo: 'confirmar' })
+    const detalle = await getItemForViewer(db, grupo.shareToken, item.id, yo)
+    expect(detalle).toMatchObject({ role: 'anonimo', motivo: 'confirmar' })
+    expect(await historialDeLista(db, grupo.id, yo)).toBeNull()
+    expect(await regalosDeItem(db, item.id, yo)).toEqual([])
+    expect(await addComment(db, item.id, yo, 'yo llevo el vino')).toBe(false)
+    for (const json of [lista, detalle].map((v) => JSON.stringify(v).toLowerCase())) {
+      for (const palabra of SPOILERS) expect(json).not.toContain(palabra.toLowerCase())
+    }
+  }
+
+  // la tía vuelve a decir que no es suya y la ve de nuevo; Juan, con su Google, es dueño
+  await new Promise((ok) => setTimeout(ok, 5))
+  await abrirListaAInvitado(db, tia.id, grupo.id)
+  expect((await getListForViewer(db, grupo.shareToken, { guestId: tia.id }))?.role).toBe('giver')
+  expect((await getListForViewer(db, grupo.shareToken, { userId: juan.id }))?.role).toBe('owner')
+  expect((await getListForViewer(db, grupo.shareToken, { guestId: juanDeWhatsApp.id }))?.role).toBe('anonimo')
+
+  // si sale y vuelve con la invitación, se pregunta otra vez: también puede haberla usado como invitado entretanto
+  expect(await salirDeGrupo(db, grupo.id, juan.id)).toBe(true)
+  await new Promise((ok) => setTimeout(ok, 5))
+  expect(await unirseAGrupo(db, grupo.inviteToken!, juan.id)).toBe(grupo.id)
+  expect(await getListForViewer(db, grupo.shareToken, { guestId: tia.id })).toMatchObject({ role: 'anonimo', motivo: 'confirmar' })
+  // y entrar de nuevo con una invitación de la que ya es parte no cambia nada
+  await new Promise((ok) => setTimeout(ok, 5))
+  await abrirListaAInvitado(db, tia.id, grupo.id)
+  expect(await unirseAGrupo(db, grupo.inviteToken!, juan.id)).toBe(grupo.id)
+  expect((await getListForViewer(db, grupo.shareToken, { guestId: tia.id }))?.role).toBe('giver')
+  // a nadie le cambió lo que reservó: la de Rodri sigue y la del invitado de Juan vence sola
+  expect((await db.select().from(claims).where(eq(claims.claimerUserId, rodri.id)))[0].estado).toBe('reservado')
 })
 
 test('un co-dueño no puede reservar ni comentar en su propio grupo', async () => {

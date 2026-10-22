@@ -3,18 +3,22 @@ import { esUuid } from '@/lib/groups'
 
 // La cookie del invitado es su única credencial. Lleva el id firmado (`<id>.<firma>`), así que conocer el id
 // de alguien (por ejemplo, porque se filtró en una página) no alcanza para hacerse pasar por él.
-
-export const GUEST_COOKIE = 'giftr_guest'
+// No se llama como la de antes (giftr_guest, con el id sin firmar): si se vuelve atrás el deploy, el código viejo la
+// tomaría como el id y cada consulta sobre columnas uuid daría error. Con otro nombre, ese código ve un visitante sin
+// cookie. La vieja ya no se lee: sin firma no vale.
+export const GUEST_COOKIE = 'giftr_invitado'
 
 export const OPCIONES_COOKIE_INVITADO = {
   httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 31536000, path: '/',
 } as const
 
-// Solo para tests y desarrollo local: en producción la firma usa AUTH_SECRET (el mismo de las sesiones).
+// Solo para tests y desarrollo local: en producción la firma usa el secreto de las sesiones.
 const SECRETO_DE_DESARROLLO = 'giftr-solo-para-desarrollo'
 
 function secreto(): string {
-  const s = process.env.AUTH_SECRET
+  // el mismo que usa Auth.js, que también acepta el nombre viejo: si no, con solo NEXTAUTH_SECRET se entra pero
+  // anotarse, reservar como invitado o cerrar sesión darían error
+  const s = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   if (s) return s
   if (process.env.NODE_ENV === 'production') {
     throw new Error('Falta AUTH_SECRET: sin esa variable no se pueden firmar las cookies de los invitados.')
@@ -57,7 +61,9 @@ export function dijoQueNoEs(valor: string | undefined, guestId: string, userId: 
 // Las cuentas de Google que tuvieron sesión en este navegador. Un invitado no ve la capa oculta de las listas de esas
 // cuentas: después de "Cerrar sesión" en la tablet de la familia (o si se le venció la sesión), el dueño queda con la
 // cookie de otro invitado, o con la suya de cuando se anotó con su nombre, y abrir su link le contaría todo.
-// Se anota al entrar con Google, al contestar "¿Sos vos?" y al cerrar sesión.
+// Se anota al entrar con Google, al contestar "¿Sos vos?", al cerrar sesión y al abrir la app con una sesión que todavía no
+// la anotó (las de antes de que existiera). Se vuelve a escribir al anotar un invitado: así nunca vence antes que la cookie
+// de un invitado más nuevo (si no, al año del último login la dueña volvería a ver lo que reservó la abuela).
 export const CUENTAS_COOKIE = 'giftr_cuentas'
 
 // las más recientes; con una familia entera usando la misma tablet sobra
@@ -87,4 +93,15 @@ type Frasco = {
 /** Anota en las cookies de este navegador que esta cuenta tuvo sesión acá (en una server action o un route handler). */
 export function anotarCuenta(jar: Frasco, userId: string) {
   jar.set(CUENTAS_COOKIE, sumarCuenta(jar.get(CUENTAS_COOKIE)?.value, userId), OPCIONES_COOKIE_INVITADO)
+}
+
+/** Si esta cuenta ya está anotada en este navegador (para no escribir la cookie en cada pantalla). */
+export function cuentaAnotada(jar: Pick<Frasco, 'get'>, userId: string): boolean {
+  return leerCuentas(jar.get(CUENTAS_COOKIE)?.value).includes(userId)
+}
+
+/** Vuelve a escribir las cuentas anotadas, iguales, con el vencimiento contado desde ahora (al anotar un invitado). */
+export function renovarCuentas(jar: Frasco) {
+  const valor = jar.get(CUENTAS_COOKIE)?.value
+  if (valor && leerCuentas(valor).length) jar.set(CUENTAS_COOKIE, valor, OPCIONES_COOKIE_INVITADO)
 }

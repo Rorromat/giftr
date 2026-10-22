@@ -130,7 +130,7 @@ export const noEsDeRegaloGrupal = () => sql`not exists (select 1 from ${groupGif
  * Antes de contar toma un lock por persona y lista hasta el fin de la transacción: dos reservas a la vez sobre deseos
  * distintos (dos pestañas, un script) no cuentan las dos lo mismo y se pasan. Se toma después del lock del deseo.
  */
-async function tomadasEnLista(t: Db, listId: string, viewer: Viewer): Promise<number> {
+export async function tomadasEnLista(t: Db, listId: string, viewer: Viewer): Promise<number> {
   const quien = viewer.userId ? `u:${viewer.userId}` : `g:${viewer.guestId}`
   await t.execute(sql`select pg_advisory_xact_lock(hashtext(${`reservas:${listId}:${quien}`}))`)
   const regaloSolo = sql`exists (select 1 from ${groupGifts} where ${groupGifts.claimId} = ${claims.id} and ${groupGifts.estado} = 'abierto'

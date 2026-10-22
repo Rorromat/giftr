@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, items, listMembers, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
 import { recienHecho } from '@/lib/repetido'
+import { noEsDeRegaloGrupal } from '@/lib/claims'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
@@ -174,6 +175,8 @@ export async function grupoPorInvitacion(db: Db, inviteToken: string) {
  * - De los regalos grupales abiertos se baja. Si organizaba uno, pasa al que se sumó primero de los que quedan (con la
  *   reserva a su nombre, y se le avisa); si no queda nadie, se cancela, el deseo se libera y se les avisa a los que estaban.
  * - Lo ya comprado queda como está: son compras y deudas de verdad.
+ * Lo que haya hecho como invitado (otro navegador, sin su sesión) no se puede saber: por eso los invitados de esta lista
+ * vuelven a contestar "¿Es tu lista?" (ver accesoALista), y lo que reservó así vence solo.
  * Lo que quedó trabado de antes de esto lo destrabó la migración 0011_destrabar_co_duenos (la misma lógica, en SQL).
  */
 export async function unirseAGrupo(db: Db, inviteToken: string, userId: string): Promise<string | null> {
@@ -186,8 +189,10 @@ export async function unirseAGrupo(db: Db, inviteToken: string, userId: string):
     const [antes] = await t.select({ salioAt: listMembers.salioAt }).from(listMembers)
       .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId)))
     if (antes && !antes.salioAt) return list.id
+    // unido_at, también al volver (con la hora de la base, la de listas_de_invitado): lo que un invitado haya dicho antes
+    // de esta lista ya no vale, puede ser este mismo desde otro navegador (ver accesoALista)
     await t.insert(listMembers).values({ listId: list.id, userId })
-      .onConflictDoUpdate({ target: [listMembers.listId, listMembers.userId], set: { salioAt: null } })
+      .onConflictDoUpdate({ target: [listMembers.listId, listMembers.userId], set: { salioAt: null, unidoAt: sql`now()` } })
     // Lock de los deseos, el mismo que toman reserveItem, iniciarRegaloGrupal y sumarseARegalo: si llega una reserva o un
     // regalo a la vez, o espera y después ve que ya es dueño, o se confirma antes y lo de abajo lo encuentra.
     // Siempre en el mismo orden, así dos que se unen a la vez no se traban entre ellos.
@@ -204,7 +209,7 @@ async function soltarLoQueRegalaba(t: Db, listId: string, userId: string) {
   const duenos = t.select({ id: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, listId))
   await t.update(claims).set({ estado: 'liberado', updatedAt: ahora })
     .where(and(eq(claims.claimerUserId, userId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseos),
-      notInArray(claims.id, t.select({ id: groupGifts.claimId }).from(groupGifts))))
+      noEsDeRegaloGrupal()))
 
   const regalos = await t.select({ id: groupGifts.id, itemId: groupGifts.itemId, claimId: groupGifts.claimId, encargado: groupGifts.organizerUserId })
     .from(groupGifts)

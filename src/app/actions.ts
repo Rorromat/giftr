@@ -8,7 +8,8 @@ import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
 import {
-  anotarCuenta, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO,
+  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, marcaNoSoy, NO_SOY_COOKIE,
+  OPCIONES_COOKIE_INVITADO, renovarCuentas,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { createItem, archiveItem, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
@@ -289,6 +290,9 @@ async function viewerIdentificandoGuest(formData: FormData, listId: string): Pro
   await abrirListaAInvitado(db, guest.id, listId)
   const jar = await cookies()
   jar.set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  // las cuentas anotadas duran desde ahora, como la cookie nueva: si vencieran antes, la dueña sin su sesión volvería a
+  // ver como regaladora la lista que este invitado abrió
+  renovarCuentas(jar)
   // con las cuentas que tuvieron sesión acá: en sus listas, este invitado nuevo tampoco ve nada
   return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value) }
 }
@@ -362,6 +366,17 @@ export async function salirAction(formData: FormData) {
   jar.delete(NO_SOY_COOKIE)
   revalidatePath(volver, 'layout')
   redirect(volver)
+}
+
+/**
+ * Al abrir la app con una sesión que todavía no está anotada en este navegador (la de antes de que se anotaran, que
+ * nunca pasó por el login de ahora): se anota, así cuando venza la sesión sus listas siguen protegidas (ver accesoALista).
+ */
+export async function anotarCuentaAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  if (!cuentaAnotada(jar, session.userId)) anotarCuenta(jar, session.userId)
 }
 
 /** "Sí, soy yo": el invitado de este navegador se une a la cuenta (sus reservas, comentarios y avisos pasan a ella). */

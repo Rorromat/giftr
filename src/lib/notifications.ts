@@ -87,8 +87,11 @@ export async function getUnreadNotifications(db: Db, viewer: Viewer) {
   return filas.map(({ itemId, token, activo, conLink, ...n }) => ({
     ...n,
     // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro. El regalo
-    // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista), y una parte corregida se ve ahí
-    href: A_CUENTAS.has(n.tipo) ? '/cuentas' : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
+    // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista), y una parte corregida se ve ahí.
+    // El encargo de un regalo cuyo deseo ya no se abre (salió de la lista, o no tiene el link) también: se divide o se
+    // cancela desde Cuentas, como el recordatorio (ver regalosParaCerrar)
+    href: A_CUENTAS.has(n.tipo) || (n.tipo === 'regalo_encargo' && !(activo && conLink)) ? '/cuentas'
+      : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
   }))
 }
 

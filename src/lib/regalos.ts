@@ -1,9 +1,11 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
-import { desdeQueOcupa, expireStaleClaims, loQueYaTiene, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult } from '@/lib/claims'
+import {
+  desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult,
+} from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir } from '@/lib/pesos'
@@ -784,7 +786,7 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
     .leftJoin(users, eq(claims.claimerUserId, users.id))
     .leftJoin(guestIdentities, eq(claims.claimerGuestId, guestIdentities.id))
     .where(and(inArray(items.listId, listIds), eq(claims.estado, 'comprado'),
-      notInArray(claims.id, db.select({ id: groupGifts.claimId }).from(groupGifts))))
+      noEsDeRegaloGrupal()))
 
   const grupales = await db.select({
     id: groupGifts.id, listId: items.listId, titulo: items.titulo, nota: claims.notaQueCompre,

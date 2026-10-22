@@ -90,6 +90,9 @@ export const listMembers = pgTable('list_members', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   // Cuándo salió del grupo. La fila queda: ya no edita, pero sigue sin ver la capa oculta de lo que armó (ver acceso.ts).
   salioAt: timestamp('salio_at', { withTimezone: true }),
+  // La última vez que se sumó (o volvió) al grupo. created_at no cambia al volver (y da la antigüedad, ver sacarDelGrupo).
+  // Lo que un invitado dijo de esta lista antes de esa fecha ya no vale: puede ser este mismo, ahora dueño (ver accesoALista).
+  unidoAt: timestamp('unido_at', { withTimezone: true }).notNull().defaultNow(),
 },(t) => [primaryKey({ columns: [t.listId, t.userId] }), index('list_members_user_id_idx').on(t.userId)])
 
 export const items = pgTable('items', {
@@ -128,6 +131,7 @@ export const guestIdentities = pgTable('guest_identities', {
 export const listasDeInvitado = pgTable('listas_de_invitado', {
   guestId: uuid('guest_id').notNull().references(() => guestIdentities.id),
   listId: uuid('list_id').notNull().references(() => lists.id),
+  // La última vez que lo dijo, siempre con el link para regalar de ahora (ver abrirListaAInvitado).
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.guestId, t.listId] })])
 

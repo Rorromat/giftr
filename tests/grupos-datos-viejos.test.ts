@@ -113,3 +113,22 @@ test('un aviso de un tipo que esta versión no conoce no se muestra (si se vuelv
   expect(textoDeAviso('__proto__', 'Copas')).toBeNull()
   expect(textoDeAviso('toString', 'Copas')).toBeNull()
 })
+
+test('la migración 0020 toma como fecha de unión de los que ya estaban la de su alta (no la de la migración)', async () => {
+  const db = await createTestDb()
+  const [delfina, martin] = [await usuario(db, 'Delfina'), await usuario(db, 'Martín')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  expect(await unirseAGrupo(db, grupo.inviteToken!, martin.id)).toBe(grupoId)
+  // como quedan al agregar la columna: con la hora de la migración, no la de su alta
+  const hace = (dias: number) => new Date(Date.now() - dias * 86400_000)
+  await db.update(listMembers).set({ createdAt: hace(30) }).where(eq(listMembers.userId, delfina.id))
+  await db.update(listMembers).set({ createdAt: hace(20) }).where(eq(listMembers.userId, martin.id))
+  await db.update(listMembers).set({ unidoAt: sql`now()` })
+
+  const archivo = readFileSync('drizzle/0020_co_duenos_unido_at.sql', 'utf8')
+  // la segunda sentencia (la primera agrega la columna, que createTestDb ya agregó)
+  await db.execute(sql.raw(archivo.split('--> statement-breakpoint')[1]))
+  const filas = await db.select().from(listMembers).where(eq(listMembers.listId, grupoId))
+  expect(filas.map((f) => f.unidoAt.getTime() - f.createdAt.getTime())).toEqual([0, 0])
+})

@@ -1,9 +1,9 @@
 import { and, asc, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { NOMBRE_INVITADO_MAXIMO, type Viewer } from '@/lib/types'
+import { NOMBRE_INVITADO_MAXIMO, RESERVAS_POR_LISTA, type Viewer } from '@/lib/types'
 import { esOFueDuenoSql } from '@/lib/groups'
-import { desdeQueOcupa, loQueYaTiene } from '@/lib/claims'
+import { desdeQueOcupa, loQueYaTiene, tomadasEnLista } from '@/lib/claims'
 import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
 import { sinControl, sinZalgo } from '@/lib/limites'
 
@@ -85,6 +85,8 @@ export async function nombreDeViewer(db: Db, viewer: Viewer): Promise<string | n
  * (al dueño no le cambia nada de lo que ve).
  * Una reserva por persona y por deseo, como al reservar: si la cuenta ya tiene algo de ese deseo, la reservada del
  * invitado se libera y la comprada queda a nombre del invitado (fue una compra de verdad y tiene que seguir contando).
+ * Y el mismo tope de reservas sin comprar por lista (RESERVAS_POR_LISTA): las que la cuenta ya no podría tomar se liberan.
+ * Si no, "Salir de este dispositivo", otro nombre, 10 reservas más y "Sí, soy yo" juntaban la lista entera en una cuenta.
  * Devuelve false si el invitado no existe o ya se había unido a una cuenta.
  */
 export async function unirInvitadoACuenta(db: Db, guestId: string, userId: string): Promise<boolean> {
@@ -119,15 +121,22 @@ export async function unirInvitadoACuenta(db: Db, guestId: string, userId: strin
     // Una por una, lo comprado primero: si por un doble toque de antes el invitado tenía dos del mismo deseo, la primera
     // pasa y para la otra la cuenta ya lo tiene.
     const activas = await t.select({
-      id: claims.id, estado: claims.estado, updatedAt: claims.updatedAt,
+      id: claims.id, estado: claims.estado, updatedAt: claims.updatedAt, expiresAt: claims.expiresAt, estadoDueno: items.estadoDueno,
       deseo: { id: items.id, listId: items.listId, tipo: items.tipo, repetible: items.repetible },
     }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
       .where(and(delInvitado, inArray(claims.estado, ['reservado', 'comprado'])))
       .orderBy(asc(claims.estado), asc(claims.createdAt))
     const pasar = (id: string) => t.update(claims).set({ claimerUserId: userId, claimerGuestId: null }).where(eq(claims.id, id))
+    const liberar = (id: string) => t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, id))
+    // la que el tope contaría (tomadasEnLista): sin comprar, sin vencer y de un deseo que sigue en la lista
+    const tomada = (c: (typeof activas)[number]) =>
+      c.estado === 'reservado' && c.estadoDueno === 'activo' && (!c.expiresAt || c.expiresAt > new Date())
     for (const c of activas) {
-      if (!(await loQueYaTiene(t, c.deseo, { userId }))) await pasar(c.id)
-      else if (c.estado === 'reservado') await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, c.id))
+      if (!(await loQueYaTiene(t, c.deseo, { userId }))) {
+        // lo comprado pasa siempre; lo reservado, si a la cuenta todavía le entra en esa lista
+        if (tomada(c) && (await tomadasEnLista(t, c.deseo.listId, { userId })) >= RESERVAS_POR_LISTA) await liberar(c.id)
+        else await pasar(c.id)
+      } else if (c.estado === 'reservado') await liberar(c.id)
       else {
         // una compra de un evento anterior ya no ocupa: es historial, y pasa
         const desde = await desdeQueOcupa(t, c.deseo)

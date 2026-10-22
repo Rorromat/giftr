@@ -12,6 +12,8 @@ import { crearGrupo } from '@/lib/groups'
 const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   jar: new Map<string, string>(),
+  // qué cookies se escribieron, en orden (para ver cuándo se renuevan)
+  escritas: [] as string[],
   session: null as { userId: string } | null,
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -21,7 +23,7 @@ vi.mock('@/auth', () => ({ auth: async () => h.session, signIn: h.signIn, signOu
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (k: string) => (h.jar.has(k) ? { name: k, value: h.jar.get(k)! } : undefined),
-    set: (k: string, v: string) => { h.jar.set(k, v) },
+    set: (k: string, v: string) => { h.jar.set(k, v); h.escritas.push(k) },
     delete: (k: string) => { h.jar.delete(k) },
   }),
 }))
@@ -31,8 +33,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 import {
-  codazoAction, entrarConGoogleAction, identificarseAction, noSoyElInvitadoAction, releaseAction, reserveAction, salirAction,
-  unirInvitadoAction, verLoReservadoAction,
+  anotarCuentaAction, codazoAction, entrarConGoogleAction, identificarseAction, noSoyElInvitadoAction, releaseAction, reserveAction,
+  salirAction, unirInvitadoAction, verLoReservadoAction,
 } from '@/app/actions'
 import { getViewer, invitadoDeEsteNavegador, invitadoParaPreguntar } from '@/lib/viewer'
 import { getItemForViewer, getListForViewer } from '@/lib/lists'
@@ -40,6 +42,7 @@ import { getItemForViewer, getListForViewer } from '@/lib/lists'
 async function preparar() {
   h.db = await createTestDb()
   h.jar.clear()
+  h.escritas.length = 0
   h.session = null
   h.signIn.mockReset()
   h.signOut.mockReset()
@@ -109,6 +112,59 @@ test('con el id de un invitado (sin su firma) no se puede hacer pasar por él', 
   await releaseAction(form({ token: 'tok-euge', itemId: item.id, claimId: c.id }))
   const [despues] = await h.db.select().from(claims).where(eq(claims.id, c.id))
   expect(despues.estado).toBe('reservado')
+})
+
+test('la cookie de un invitado de antes (giftr_guest, firmada o no) ya no se lee: el nombre nuevo deja volver atrás el deploy', async () => {
+  const { item } = await preparar()
+  expect(GUEST_COOKIE).not.toBe('giftr_guest')
+  await identificarseAction(null, form({ token: 'tok-euge', nombre: 'Abuela' }))
+  const [g] = await h.db.select().from(guestIdentities)
+  h.jar.clear()
+  for (const valor of [g.id, firmarInvitado(g.id)]) {
+    h.jar.set('giftr_guest', valor)
+    expect(await getViewer()).toEqual({})
+  }
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: item.id })))).toBe('/l/tok-euge?reserva=sin_identidad')
+  expect(await h.db.select().from(claims)).toEqual([])
+})
+
+test('la cookie de las cuentas se renueva al anotar un invitado: nunca vence antes que la de él', async () => {
+  const { owner } = await preparar()
+  // Euge entró con Google en la tablet de la familia hace casi un año y la sesión ya venció
+  const cuentas = sumarCuenta(undefined, owner.id)
+  h.jar.set(CUENTAS_COOKIE, cuentas)
+  h.escritas.length = 0
+  // la abuela se anota en la lista de Euge desde la tablet: las cuentas se vuelven a escribir, iguales, junto con su cookie
+  await identificarseAction(null, form({ token: 'tok-euge', nombre: 'Abuela' }))
+  expect(h.escritas).toEqual([GUEST_COOKIE, CUENTAS_COOKIE])
+  expect(h.jar.get(CUENTAS_COOKIE)).toBe(cuentas)
+  expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
+
+  // sin cuentas anotadas (o con una cookie tocada a mano) no se escribe ninguna
+  for (const antes of [undefined, `${owner.id}.firma-falsa`]) {
+    h.jar.clear()
+    if (antes) h.jar.set(CUENTAS_COOKIE, antes)
+    h.escritas.length = 0
+    await identificarseAction(null, form({ token: 'tok-euge', nombre: 'Tía' }))
+    expect(h.escritas).toEqual([GUEST_COOKIE])
+  }
+})
+
+test('una sesión que nunca anotó la cuenta (de antes de que se anotaran) la anota al abrir la app, una sola vez', async () => {
+  const { owner, giver } = await preparar()
+  await anotarCuentaAction()
+  expect(h.escritas).toEqual([])
+  h.session = { userId: owner.id }
+  await anotarCuentaAction()
+  await anotarCuentaAction()
+  expect(h.escritas).toEqual([CUENTAS_COOKIE])
+  // otra cuenta en el mismo navegador se suma a la que estaba
+  h.session = { userId: giver.id }
+  await anotarCuentaAction()
+  h.session = null
+  expect(await getViewer()).toEqual({ cuentas: [owner.id, giver.id] })
+  // cuando vence la sesión, su lista sigue protegida
+  expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
 })
 
 test('"¿No sos X? Salir de este dispositivo" borra la cookie de invitado y "Cerrar sesión" cierra la de Google', async () => {

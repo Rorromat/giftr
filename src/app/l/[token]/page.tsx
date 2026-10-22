@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
-import type { ClaimView, OwnerItemView } from '@/lib/serialize'
+import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
 import { nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
@@ -32,15 +32,11 @@ function estadoNoDisponible(item: Tarjeta) {
   return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`
 }
 
-/**
- * Cuántas quedan de un deseo de varias unidades. Si el dueño bajó la cantidad por debajo de lo reservado, lo dice (en vez
- * de "quedan 0 de 2"), para que se acomoden entre ellos. Una idea que se puede repetir no tiene cupo.
- */
+/** Cuántas quedan de un deseo de varias unidades, o cuántas reservas hay de más (ver avisoDeCupo). */
 function cupo(item: Tarjeta) {
-  if (item.quedan === null) return null
-  const ocupados = item.claims.length
-  if (ocupados > item.cantidad) return `Pide ${item.cantidad} y hay ${ocupados} reservas: arréglenlo en el deseo`
-  return item.cantidad > 1 ? `quedan ${item.quedan} de ${item.cantidad}` : null
+  const c = avisoDeCupo(item, item.claims.length)
+  if (!c) return null
+  return c.deMas ? `Pide ${item.cantidad} y hay ${c.reservas} reservas: arréglenlo en el deseo` : `quedan ${c.quedan} de ${item.cantidad}`
 }
 
 function YaLoReservaste({ item }: { item: Tarjeta }) {

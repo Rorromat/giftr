@@ -149,6 +149,11 @@ export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: 
   )
 }
 
+/** Un link si hay adónde ir; si no (cambiaron el link para regalar y no lo tiene), lo mismo sin link. */
+export function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
+  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
+}
+
 export function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} aria-label={label} className="gr-icon-btn">

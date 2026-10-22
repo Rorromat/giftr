@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
@@ -9,12 +8,7 @@ import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAc
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
-
-/** Un link si lo hay; si no (cambiaron el link para regalar y no lo tiene), lo mismo sin link. */
-function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
-  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
-}
+import { AvatarSticker, BackLink, Icon, QuizasLink, Seccion, Starburst } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (

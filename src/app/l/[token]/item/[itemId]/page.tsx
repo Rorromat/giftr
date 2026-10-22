@@ -14,7 +14,7 @@ import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
-import type { GiverItemView, OwnerItemView } from '@/lib/serialize'
+import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { BackLink, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 import { LARGO } from '@/lib/limites'
 
@@ -25,14 +25,15 @@ function ultimoDia(hasta: Date) {
 }
 
 /**
- * Cuántos pide de un deseo de varias unidades y, para quien ve la coordinación, cuántos quedan. Si el dueño bajó la
- * cantidad por debajo de lo reservado, lo dice para que se acomoden entre ellos (al dueño no le llega nada).
+ * Cuántos pide de un deseo de varias unidades y, para quien ve la coordinación, cuántos quedan o cuántas reservas hay de
+ * más (ver avisoDeCupo; al dueño no le llega nada).
  */
 function cantidad(item: OwnerItemView, giver: GiverItemView | null) {
   if (item.repetible) return 'Se puede repetir: varios pueden regalar algo así.'
   if (!giver) return item.cantidad > 1 ? `Pide ${item.cantidad}.` : null
-  if (giver.claims.length > item.cantidad) return `Pide ${item.cantidad} y hay ${giver.claims.length} reservas: arréglenlo en el hilo de abajo.`
-  return item.cantidad > 1 ? `Pide ${item.cantidad} · quedan ${giver.quedan}.` : null
+  const c = avisoDeCupo(giver, giver.claims.length)
+  if (!c) return null
+  return c.deMas ? `Pide ${item.cantidad} y hay ${c.reservas} reservas: arréglenlo en el hilo de abajo.` : `Pide ${item.cantidad} · quedan ${c.quedan}.`
 }
 
 // La vista previa al compartir (WhatsApp): qué es, para quién y cuánto sale. La imagen sale de opengraph-image.

@@ -7,15 +7,11 @@ import { markNotifsReadAction, postponeGroupGiftReminderAction, vistoCodazosActi
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
 import Link from 'next/link'
-import { Icon, Starburst } from '@/components/ui'
+import { Icon, QuizasLink, Starburst } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
 /** Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link. */
-function QuizasLink({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
-  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
-}
-
 export async function Banners() {
   const viewer = await getViewer()
   const [todas, warnings, sinCerrar, codazos, avisos, invitado] = await Promise.all([

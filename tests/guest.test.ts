@@ -12,6 +12,7 @@ import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList 
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem, updateItem } from '@/lib/items'
 import { iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
+import { RESERVAS_POR_LISTA } from '@/lib/types'
 
 test('un guest puede reservar', async () => {
   const db = await createTestDb()
@@ -90,6 +91,24 @@ test('la firma usa AUTH_SECRET y en producción sin esa variable falla claro', (
     vi.stubEnv('AUTH_SECRET', '')
     vi.stubEnv('NODE_ENV', 'production')
     expect(() => firmarInvitado(id)).toThrow(/AUTH_SECRET/)
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+test('la firma acepta el nombre viejo del secreto (NEXTAUTH_SECRET), como Auth.js: con ese solo, producción no falla', () => {
+  const id = '8a1f3c2e-0000-4000-8000-000000000000'
+  const deDesarrollo = firmarInvitado(id)
+  try {
+    vi.stubEnv('AUTH_SECRET', '')
+    vi.stubEnv('NEXTAUTH_SECRET', 'secreto-viejo')
+    vi.stubEnv('NODE_ENV', 'production')
+    const firmada = firmarInvitado(id)
+    expect(firmada).not.toBe(deDesarrollo)
+    expect(leerInvitado(firmada)).toBe(id)
+    // si están los dos, manda AUTH_SECRET (el que usa Auth.js)
+    vi.stubEnv('AUTH_SECRET', 'secreto-nuevo')
+    expect(leerInvitado(firmada)).toBeNull()
   } finally {
     vi.unstubAllEnvs()
   }
@@ -277,6 +296,40 @@ test('al unirse, queda una sola reserva activa por persona y por deseo', async (
     [giver.id, null, 'reservado'], [null, enLaCompu.id, 'comprado'],
   ].sort())
   expect(await activas(termo.id)).toEqual([expect.objectContaining({ claimerUserId: giver.id, claimerGuestId: null })])
+})
+
+test('al unirse, el tope de reservas por lista vale para la cuenta: lo que no le entra se libera y lo comprado pasa', async () => {
+  const db = await createTestDb()
+  const { list, giver } = await seedOwnerAndGiver(db)
+  const deseos = await db.insert(items).values(Array.from({ length: RESERVAS_POR_LISTA + 4 }, (_, n) => ({
+    listId: list.id, tipo: 'exacto' as const, titulo: `Deseo ${n}`,
+  }))).returning()
+  // Rodri tiene 8 reservadas con su cuenta; como invitado en la compu, otras 3 y una compra
+  for (const it of deseos.slice(0, RESERVAS_POR_LISTA - 2)) expect((await reserveItem(db, it.id, { userId: giver.id })).ok).toBe(true)
+  const enLaCompu = await createGuest(db, 'Rodri')
+  const delInvitado = []
+  for (const it of deseos.slice(RESERVAS_POR_LISTA - 2, RESERVAS_POR_LISTA + 2)) {
+    const r = await reserveItem(db, it.id, { guestId: enLaCompu.id })
+    if (!r.ok) throw new Error(r.reason)
+    delInvitado.push(r.claimId)
+  }
+  await markBought(db, delInvitado[3], { guestId: enLaCompu.id })
+
+  expect(await unirInvitadoACuenta(db, enLaCompu.id, giver.id)).toBe(true)
+  const estados = await db.select({ id: claims.id, estado: claims.estado, user: claims.claimerUserId, guest: claims.claimerGuestId })
+    .from(claims).where(inArray(claims.id, delInvitado))
+  const de = (id: string) => estados.find((c) => c.id === id)!
+  // le entran dos (las primeras que reservó): la tercera se libera para otro regalador
+  expect([de(delInvitado[0]), de(delInvitado[1])]).toEqual([
+    expect.objectContaining({ estado: 'reservado', user: giver.id, guest: null }),
+    expect.objectContaining({ estado: 'reservado', user: giver.id, guest: null }),
+  ])
+  expect(de(delInvitado[2]).estado).toBe('liberado')
+  // la compra pasa igual: no ocupa lugar del tope
+  expect(de(delInvitado[3])).toMatchObject({ estado: 'comprado', user: giver.id, guest: null })
+  const reservadas = await db.select().from(claims).where(and(eq(claims.claimerUserId, giver.id), eq(claims.estado, 'reservado')))
+  expect(reservadas).toHaveLength(RESERVAS_POR_LISTA)
+  expect(await reserveItem(db, deseos.at(-1)!.id, { userId: giver.id })).toEqual({ ok: false, reason: 'muchas' })
 })
 
 const DIA = 86400_000

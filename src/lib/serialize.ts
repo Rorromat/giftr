@@ -54,6 +54,19 @@ export function cupoDe(i: { tipo: 'exacto' | 'idea'; repetible: boolean; cantida
   return { quedan, disponible: quedan > 0 }
 }
 
+/**
+ * Qué decirle del cupo a quien ve la coordinación de un deseo (la lista y el detalle lo dicen con sus palabras). Si el
+ * dueño bajó la cantidad por debajo de lo reservado, cuántas reservas hay, para que se acomoden entre ellos (en vez de
+ * "quedan 0 de 2"); si pide más de uno, cuántos quedan. Null si no hay nada que decir: pide uno, o es una idea que se
+ * puede repetir (no tiene cupo).
+ */
+export function avisoDeCupo(i: { cantidad: number; quedan: number | null }, reservas: number):
+  { deMas: true; reservas: number } | { deMas: false; quedan: number } | null {
+  if (i.quedan === null) return null
+  if (reservas > i.cantidad) return { deMas: true, reservas }
+  return i.cantidad > 1 ? { deMas: false, quedan: i.quedan } : null
+}
+
 export function pickItemFields(i: ItemRow): OwnerItemView {
   return {
     id: i.id, tipo: i.tipo, titulo: i.titulo, notas: i.notas, fotoUrl: i.fotoUrl,
