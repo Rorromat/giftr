@@ -156,7 +156,8 @@ export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
  *   quiero" se cancelan (se libera su reserva) y se les avisa a todos los que estaban.
  * - Lo comprado queda como está. Con "Ya lo tengo" no se avisa (seguramente ya se lo dieron); con "Ya no lo quiero",
  *   sí, para que lo cambie si puede (solo lo de este evento: lo de antes ya se regaló).
- * - Los avisos sin leer que decían que se podía hacer algo con el deseo (volvió, fue editado, reservalo) ya no valen.
+ * - Los avisos sin leer que decían que se podía hacer algo con el deseo (volvió, fue editado, reservalo) ya no valen. Con
+ *   "Ya no lo quiero", tampoco el de que ahora organiza un regalo grupal: se canceló (con "Ya lo tengo" sigue, en Cuentas).
  * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
  */
 export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero'): Promise<boolean> {
@@ -171,7 +172,8 @@ export async function archiveItem(db: Db, itemId: string, userId: string, estado
     const ahora = new Date()
 
     await t.update(notifications).set({ leida: true }).where(and(
-      eq(notifications.itemId, itemId), eq(notifications.leida, false), inArray(notifications.tipo, YA_NO_VALEN_AL_SACARLO),
+      eq(notifications.itemId, itemId), eq(notifications.leida, false),
+      inArray(notifications.tipo, estado === 'no_lo_quiero' ? [...YA_NO_VALEN_AL_SACARLO, 'regalo_encargo'] : YA_NO_VALEN_AL_SACARLO),
     ))
 
     const liberadas = await t.update(claims).set({ estado: 'liberado', updatedAt: ahora })

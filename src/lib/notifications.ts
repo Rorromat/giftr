@@ -8,7 +8,8 @@ const TEXTOS = {
   item_baja: (t: string) => `"${t}" fue dado de baja por su dueño — te conviene elegir otro regalo.`,
   item_editado: (t: string) => `"${t}" fue editado por su dueño — revisá los detalles.`,
   regalo_encargo: (t: string) => `Ahora organizás vos el regalo grupal de "${t}" — cuando lo compres, dividí lo que salió (o cancelalo si ya no va).`,
-  regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si todavía querés regalarlo, podés reservarlo o armar otro.`,
+  // también cuando el deseo ya salió de la lista ("Ya lo tengo" y el encargado lo cancela desde Cuentas): no promete que se puede reservar
+  regalo_cancelado: (t: string) => `Se canceló el regalo grupal de "${t}" — si sigue en la lista y todavía querés regalarlo, podés reservarlo o armar otro.`,
   regalo_sacado: (t: string) => `Ya no estás en el regalo grupal de "${t}": te sacó quien lo organiza — si fue un error, hablalo con esa persona, que te puede dejar volver.`,
   compra_corregida: (t: string) => `Quien compró el regalo grupal de "${t}" corrigió la compra y te cambió la parte — fijate en Cuentas cuánto te toca.`,
   item_baja_comprado: (t: string) => `"${t}" salió de la lista porque ya no lo quiere — si todavía podés, cambialo por otra cosa.`,

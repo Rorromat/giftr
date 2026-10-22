@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import {
@@ -203,6 +203,12 @@ export async function cancelarRegalo(db: Db, giftId: string, userId: string): Pr
       .returning({ claimId: groupGifts.claimId, itemId: groupGifts.itemId })
     if (!g) return false
     await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, g.claimId))
+    // Lo que se les dijo de este regalo ya no vale, tampoco al encargado: que seguía en Cuentas para dividirlo ("Ya lo
+    // tengo") o que ahora lo organiza él. Por persona y deseo: cada uno está en un solo regalo por deseo (ver loQueYaTiene).
+    await t.update(notifications).set({ leida: true }).where(and(
+      eq(notifications.itemId, g.itemId), eq(notifications.leida, false), inArray(notifications.tipo, ['regalo_lo_tiene', 'regalo_encargo']),
+      inArray(notifications.userId, t.select({ id: groupGiftMembers.userId }).from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))),
+    ))
     const estaban = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
       .where(and(eq(groupGiftMembers.giftId, giftId), ne(groupGiftMembers.userId, userId)))
     await dejarAviso(t, g.itemId, 'regalo_cancelado', estaban.map((m) => ({ userId: m.userId, guestId: null })))

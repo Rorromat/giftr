@@ -9,7 +9,7 @@ import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { getUnreadNotifications } from '@/lib/notifications'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
-import { iniciarRegaloGrupal, misCuentas, sumarseARegalo } from '@/lib/regalos'
+import { cancelarRegalo, iniciarRegaloGrupal, misCuentas, sumarseARegalo } from '@/lib/regalos'
 import { upsertUserFromGoogle } from '@/lib/users'
 
 async function setup() {
@@ -88,4 +88,35 @@ test('el encargo de un regalo grupal lleva a Cuentas si el deseo ya no se abre (
   const mesaSinLink = (await getUnreadNotifications(db, { userId: sofi.id })).find((n) => n.tipo === 'regalo_encargo' && n.itemTitulo === 'Mesa')
   expect(mesaSinLink?.href).toBe('/cuentas')
   expect((await misCuentas(db, sofi.id)).enCurso.find((r) => r.itemTitulo === 'Mesa')).toMatchObject({ soyEncargado: true, dividirCon: expect.any(Array) })
+})
+
+test('cuando el regalo se cancela, al que quedó organizándolo no le queda "Ahora organizás vos"', async () => {
+  const db = await createTestDb()
+  const usuario = (nombre: string) => upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre}@test.com`, nombre })
+  const [delfina, rodri, sofi] = [await usuario('Delfina'), await usuario('Rodri'), await usuario('Sofi')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Casa' })
+  const bici = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Bici' }, grupoId))!
+  const mesa = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Mesa' }, grupoId))!
+  const regalos: string[] = []
+  for (const it of [bici, mesa]) {
+    const g = await iniciarRegaloGrupal(db, it.id, rodri.id)
+    if (!g.ok) throw new Error(g.reason)
+    expect(await sumarseARegalo(db, g.giftId, sofi.id)).toBe(true)
+    regalos.push(g.giftId)
+  }
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  await seguir(db, sofi.id, grupoId)
+  // Rodri se suma al grupo: los dos regalos pasan a Sofi
+  expect(await unirseAGrupo(db, grupo.inviteToken!, rodri.id)).toBe(grupoId)
+  const tipos = async () => (await getUnreadNotifications(db, { userId: sofi.id })).map((n) => `${n.tipo} ${n.itemTitulo}`).sort()
+  expect(await tipos()).toEqual(['regalo_encargo Bici', 'regalo_encargo Mesa'])
+
+  // "Ya no lo quiero" cancela el de la bici: le queda la baja, no "cuando lo compres, dividí" (y Cuentas no tiene nada)
+  await archiveItem(db, bici.id, delfina.id, 'no_lo_quiero')
+  expect(await tipos()).toEqual(['regalo_baja Bici', 'regalo_encargo Mesa'])
+  expect((await misCuentas(db, sofi.id)).enCurso.map((r) => r.itemTitulo)).toEqual(['Mesa'])
+  // y si ella misma cancela el de la mesa, ese encargo tampoco queda
+  expect(await cancelarRegalo(db, regalos[1], sofi.id)).toBe(true)
+  expect(await tipos()).toEqual(['regalo_baja Bici'])
+  for (const u of [delfina, rodri]) expect(await db.select().from(notifications).where(eq(notifications.userId, u.id))).toEqual([])
 })

@@ -9,7 +9,7 @@ import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { archiveItem, createItem, restoreItem, updateItem } from '@/lib/items'
 import { getMyClaimWarnings, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { cambiarLinkParaRegalar, getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
-import { getUnreadNotifications, markNotificationsRead } from '@/lib/notifications'
+import { getUnreadNotifications, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { guardarCumple, hoyLocal, misEventos } from '@/lib/events'
 import {
   cancelarRegalo, comprarRegalo, comprasParaCorregir, corregirCompra, dejarVolverARegalo, dividir, historialDeLista, iniciarRegaloGrupal,
@@ -234,6 +234,24 @@ test('si la dueña ya lo tiene, el regalo abierto sigue: el encargado lo divide 
   const vista = await getListForViewer(db, lista.shareToken, { userId: martin.id })
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
   expect(vista.items.find((i) => i.id === bici.id)).toMatchObject({ disponible: false })
+})
+
+// Mamá ya tiene la bici (se la compró ella) y Rodri cancela el regalo desde Cuentas: "sigue en Cuentas" ya no vale, y
+// "se canceló" no promete que se puede reservar algo que salió de la lista.
+test('si la dueña ya lo tiene y el encargado cancela desde Cuentas, a cada uno le queda solo el aviso de la cancelación', async () => {
+  const { db, mama, rodri, sofi, ana, lista, bici, giftId } = await conRegalo()
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  expect(await cancelarRegalo(db, giftId, rodri.id)).toBe(true)
+  for (const u of [sofi, ana]) {
+    expect(await getUnreadNotifications(db, { userId: u.id })).toEqual([
+      expect.objectContaining({ tipo: 'regalo_cancelado', href: `/l/${lista.shareToken}` }),
+    ])
+    expect((await misCuentas(db, u.id)).enCurso).toEqual([])
+  }
+  expect(textoDeAviso('regalo_cancelado', 'Bici')).toContain('si sigue en la lista')
+  // el que lo canceló no tiene nada que leer; la dueña, nada
+  expect(await getUnreadNotifications(db, { userId: rodri.id })).toEqual([])
+  expect(await db.select().from(notifications).where(eq(notifications.userId, mama.id))).toEqual([])
 })
 
 // Un "Quiero ESTO" que Mamá vuelve a pedir (la bici del cumple pasado se la robaron): el regalo de entonces ya se regaló.
