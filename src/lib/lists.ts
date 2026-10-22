@@ -77,7 +77,8 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
       grupal: gente.length
         ? {
           giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId),
-          meSacaron: sacados.some((s) => s.giftId === gente[0].giftId),
+          // solo mientras está abierto (la reserva sin comprar), como en regalosDeItem
+          meSacaron: r.estado === 'reservado' && sacados.some((s) => s.giftId === gente[0].giftId),
         }
         : null,
     }

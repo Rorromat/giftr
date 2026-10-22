@@ -1108,6 +1108,8 @@ test('al que sacó el encargado no vuelve a sumarse con un toque: lo deja volver
   const [comprado] = await regalosDeItem(db, bici.id, { userId: ana.id })
   expect(comprado).toMatchObject({ estado: 'comprado', soyParte: false, montoTotal: null, meSacaron: false })
   expect(comprado.miembros.map((m) => [m.nombre, m.monto])).toEqual([['Rodri', null], ['Sofi', null]])
+  // en la lista tampoco: lo de que la sacaron vale mientras está abierto, igual que en el detalle
+  expect((await enLaLista(ana.id))?.meSacaron).toBe(false)
   expect(await dejarVolverARegalo(db, giftId, ana.id, rodri.id)).toBe(false) // ya no está abierto
   // en Cuentas, si el encargado lo termina desde ahí (Mamá cambió el link y él no lo tiene), también ve a quién sacó y lo
   // deja volver

@@ -32,7 +32,7 @@ export type ClaimView = {
   notaQueCompre: string | null
   /**
    * Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. meSacaron: lo
-   * sacó el encargado y no se puede sumar (ver sacarDeRegalo).
+   * sacó el encargado del regalo, que sigue abierto, y no se puede sumar (ver sacarDeRegalo).
    */
   grupal: { giftId: string; personas: string[]; soyParte: boolean; meSacaron: boolean } | null
 }
