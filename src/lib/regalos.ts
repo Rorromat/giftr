@@ -518,7 +518,7 @@ export type RegaloEnCurso = {
    * comprarRegalo.
    */
   dividirCon: { userId: string; nombre: string; esYo: boolean }[] | null
-  /** Con dividirCon: a quiénes sacó (los puede dejar volver, como en el deseo). */
+  /** Con dividirCon y el deseo en la lista: a quiénes sacó (los puede dejar volver, como en el deseo). */
   sacados: Persona[]
 }
 
@@ -647,7 +647,8 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
           ? [...miembros.filter((m) => m.userId === userId), ...miembros.filter((m) => m.userId !== userId)]
             .map((m) => ({ userId: m.userId, nombre: m.nombre, esYo: m.userId === userId }))
           : null,
-        sacados: desdeCuentas ? sacados.filter((x) => x.giftId === a.giftId).map(({ id, nombre }) => ({ id, nombre })) : [],
+        // con el deseo fuera de la lista no se puede volver a sumar (ver sumarseARegalo): si vuelve, lo deja volver desde el deseo
+        sacados: desdeCuentas && a.activo ? sacados.filter((x) => x.giftId === a.giftId).map(({ id, nombre }) => ({ id, nombre })) : [],
       }
     }),
     saldadas: saldadas.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 10),

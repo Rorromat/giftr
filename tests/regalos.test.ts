@@ -1094,18 +1094,32 @@ test('al que sacó el encargado no vuelve a sumarse con un toque: lo deja volver
   expect(comprado).toMatchObject({ estado: 'comprado', soyParte: false, montoTotal: null, meSacaron: false })
   expect(comprado.miembros.map((m) => [m.nombre, m.monto])).toEqual([['Rodri', null], ['Sofi', null]])
   expect(await dejarVolverARegalo(db, giftId, ana.id, rodri.id)).toBe(false) // ya no está abierto
-  // en Cuentas, si el encargado lo termina desde ahí (Mamá dijo "Ya lo tengo"), también ve a quién sacó
+  // en Cuentas, si el encargado lo termina desde ahí (Mamá cambió el link y él no lo tiene), también ve a quién sacó y lo
+  // deja volver
   const otro = (await createItem(db, mama.id, { tipo: 'exacto', titulo: 'Casco' }))!
   const g = await iniciarRegaloGrupal(db, otro.id, rodri.id)
   if (!g.ok) throw new Error(g.reason)
   await sumarseARegalo(db, g.giftId, sofi.id)
   await sumarseARegalo(db, g.giftId, ana.id)
   await sacarDeRegalo(db, g.giftId, ana.id, rodri.id)
-  await archiveItem(db, otro.id, mama.id, 'lo_tengo')
+  await cambiarLinkParaRegalar(db, lista.id, mama.id)
   const [enCurso] = (await misCuentas(db, rodri.id)).enCurso
-  expect(enCurso).toMatchObject({ itemTitulo: 'Casco', sacados: [{ id: ana.id, nombre: 'Ana' }] })
+  expect(enCurso).toMatchObject({ itemTitulo: 'Casco', sigueEnLaLista: true, sacados: [{ id: ana.id, nombre: 'Ana' }] })
   expect(enCurso.dividirCon!.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi'])
   expect((await misCuentas(db, sofi.id)).enCurso[0].sacados).toEqual([])
+  expect(await dejarVolverARegalo(db, g.giftId, ana.id, rodri.id)).toBe(true)
+  expect(await sumarseARegalo(db, g.giftId, ana.id)).toBe(true)
+  // Con el deseo fuera de la lista ("Ya lo tengo") no se puede volver a sumar: Cuentas no le ofrece "Dejar que vuelva", y a
+  // ella no le queda "sigue en Cuentas" (ya no está en el regalo) ni un aviso que le promete volver
+  expect(await archiveItem(db, otro.id, mama.id, 'lo_tengo')).toBe(true)
+  expect(await sacarDeRegalo(db, g.giftId, ana.id, rodri.id)).toBe(true)
+  const [archivado] = (await misCuentas(db, rodri.id)).enCurso
+  expect(archivado).toMatchObject({ itemTitulo: 'Casco', sigueEnLaLista: false, sacados: [] })
+  expect(archivado.dividirCon!.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi'])
+  const deAna = (await getUnreadNotifications(db, { userId: ana.id })).filter((n) => n.itemTitulo === 'Casco')
+  expect(deAna.map((n) => n.tipo)).toEqual(['regalo_sacado'])
+  expect(textoDeAviso('regalo_sacado', 'Casco')).not.toContain('volver')
+  expect(await sumarseARegalo(db, g.giftId, ana.id)).toBe(false)
 })
 
 test('cuentas: con alguien a mano los totales dan 0, pero las partes siguen ahí para marcarlas saldadas', async () => {
