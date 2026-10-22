@@ -756,6 +756,9 @@ test.each([
   // "lucas" son miles; sin "$", en "2 x 45.000" el primero es cuántos (pero "100 x 2" son 100)
   ['15 lucas', 15000], ['$20 lucas', 20000], ['1 luca', 1000], ['entre 10 y 15 lucas', 10000],
   ['2 x 45.000', 45000], ['2x45.000', 45000], ['45.000 x 2', 45000], ['100 x 2', 100], ['$100 x 2', 100],
+  // igual con "por" y en cuotas (lo que sale cada una, como con "$"): antes daba 3, y el regalo grupal decía "~$1 cada uno"
+  ['3 por 10 mil', 10000], ['2 por 45.000', 45000], ['100 por 2', 100], ['3 cuotas de 15.000', 15000], ['12 cuotas de 5k', 5000],
+  ['6 cuotas 10.000', 10000], ['3 cuotas sin interés de 15.000', 15000], ['3 cuotas de $15.000', 15000], ['1 cuota de 20.000', 20000],
   // los miles escritos solo en el de arriba valen para los dos, si así queda más chico
   ['$20-30.000', 20000], ['$2-3.000.000', 2000000], ['$500-1.500', 500], ['$20.000 - $30.000', 20000],
   // un guion entre palabras no es un menos

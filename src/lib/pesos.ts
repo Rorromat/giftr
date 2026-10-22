@@ -11,8 +11,9 @@ const NEGATIVO = /^\s*[-−–—]\s*\$?\s*\d|\$\s*[-−–—]\s*\d|\s[-−–�
 const NUMERO = /(\d{1,3}(?:([., \u00a0])\d{3}(?!\d))(?:\2\d{3}(?!\d))*|\d+)(?:[.,](\d+))?\s*(k|mil(?![a-záéíóúñ])|lucas?(?![a-záéíóúñ])|mill[oó]n(?:es)?)?/i
 // Lo que une los dos números de un rango: "$10–30k", "$10 a 30 mil", "entre 10 y 30 mil".
 const HASTA = /^\s*(?:hasta|al|a|y|-|–|—)\s*\$?\s*/i
-// "2 x 45.000": cuántos, y después el precio de cada uno.
-const POR = /^\s*[x×]\s*\$?\s*(?=\d)/i
+// "2 x 45.000", "3 por 10 mil", "3 cuotas de 15.000": cuántos, y después el precio de cada uno. En cuotas es lo que sale
+// cada cuota (como con "$": "3 cuotas de $15.000" → 15.000), no el total: el encargado lo corrige al comprar.
+const POR = /^\s*(?:[x×]|por|cuotas?(?:\s+sin\s+inter[eé]s)?(?:\s+de)?)\s*\$?\s*(?=\d)/i
 // Las palabras que van antes de un precio sin "$" ("entre 10 y 15 lucas", "aprox. 20.000"). Otra palabra dice qué es el
 // número que sigue: "Talle 42 - 30.000", "N° 3", "Pack x 6", "Modelo 2024".
 const ANTES_DEL_PRECIO = /^(?:entre|de|desde|hasta|aprox|aproximadamente|unos|unas|alrededor|cerca|m[aá]s|menos|o|como|tipo|precio|sale|cuesta|ars|pesos)$/i
