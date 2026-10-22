@@ -1,7 +1,7 @@
-import { and, asc, count, eq, inArray } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm'
 import { items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { noEsDuenoSql, type Dueno } from '@/lib/groups'
+import { noEsNiFueDuenoSql, type Dueno } from '@/lib/groups'
 import { diasEntre, hoyLocal, proximaDeGrupo, proximaFecha } from '@/lib/events'
 import { urlFoto } from '@/lib/users'
 
@@ -21,11 +21,11 @@ export type Contacto = {
   proxima: { fecha: Date; dias: number } | null
 }
 
-/** Tu gente por orden alfabético. Las listas de las que sos dueño o co-dueño no cuentan. */
+/** Tu gente por orden alfabético. Las listas de las que sos (o fuiste) dueño o co-dueño no cuentan. */
 export async function miGente(db: Db, userId: string, hoy = hoyLocal()): Promise<Contacto[]> {
   const seguidas = await db.select({ list: lists }).from(listFollows)
     .innerJoin(lists, eq(listFollows.listId, lists.id))
-    .where(and(eq(listFollows.userId, userId), noEsDuenoSql(db, userId)))
+    .where(and(eq(listFollows.userId, userId), noEsNiFueDuenoSql(db, userId)))
     .then((rows) => rows.map((r) => r.list))
   if (!seguidas.length) return []
 
@@ -40,7 +40,7 @@ export async function miGente(db: Db, userId: string, hoy = hoyLocal()): Promise
     grupoIds.length
       ? db.select({ ...campos, listId: listMembers.listId })
         .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
-        .where(inArray(listMembers.listId, grupoIds)).orderBy(asc(listMembers.createdAt))
+        .where(and(inArray(listMembers.listId, grupoIds), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
       : [],
     db.select({ listId: items.listId, n: count() }).from(items)
       .where(and(inArray(items.listId, ids), eq(items.estadoDueno, 'activo'))).groupBy(items.listId),

@@ -1,16 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { saveGustosAction } from '@/app/actions'
 import { FotoPerfil } from '@/components/FotoPerfil'
+import { CumpleCampos } from '@/components/CumpleCampos'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { Icon, type IconName } from '@/components/ui'
 import {
   BEBIDAS, CLUBES, COLORES, DEPORTES, ESTILOS, HOBBIES, MARCAS, MASCOTAS, NO_FUTBOL, NO_REGALAR, SOLO_SELECCION, TALLES,
   TODAS_LAS_MARCAS, type Gustos,
 } from '@/lib/gustos'
-
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 const PASOS: { titulo: string; sub: string; icono: IconName }[] = [
   { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.', icono: 'cake' },
@@ -46,7 +46,7 @@ function Subtitulo({ children }: { children: ReactNode }) {
   return <p className="gr-label mt-2">{children}</p>
 }
 
-export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, editar, pasoInicial = 0 }: {
+export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, editar, pasoInicial = 0, cumpleInvalido = false }: {
   nombre: string
   nombreCompleto: string
   foto: string | null
@@ -54,8 +54,14 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
   cumple: { dia: number; mes: number } | null
   editar: boolean
   pasoInicial?: number
+  /**
+   * Volvió porque el cumple no se pudo guardar (falta el día o el mes, o no existe): se avisa en el primer paso. La
+   * página le pone una key con esto, así se arma de nuevo en ese paso: cambiar solo la dirección no lo vuelve a montar.
+   */
+  cumpleInvalido?: boolean
 }) {
   const [paso, setPaso] = useState(Math.min(Math.max(pasoInicial, 0), PASOS.length - 1))
+  const [avisoCumple, setAvisoCumple] = useState(cumpleInvalido)
   const [busqueda, setBusqueda] = useState('')
   const clubPropio = inicial.club && ![...CLUBES, NO_FUTBOL, SOLO_SELECCION].includes(inicial.club) ? inicial.club : null
   const [club, setClub] = useState(clubPropio ? 'otro' : inicial.club ?? '')
@@ -69,6 +75,18 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     setPaso(n)
     window.scrollTo({ top: 0 })
   }
+  // Un cumple a medias no se guardaría: en vez de mandar, vuelve a ese paso a avisar (el aviso estaba solo en el primer
+  // paso, escondido, y el usuario se quedaba en el último sin saber por qué). "Más tarde" sale igual: el servidor guarda
+  // lo demás y lo lleva a Perfil, con el aviso al lado del cumple.
+  function alMandar(e: FormEvent<HTMLFormElement>) {
+    if ((e.nativeEvent as SubmitEvent).submitter?.getAttribute('name') === 'corte') return
+    const datos = new FormData(e.currentTarget)
+    if (!datos.get('dia') !== !datos.get('mes')) {
+      e.preventDefault()
+      setAvisoCumple(true)
+      ir(0)
+    }
+  }
   // Enter en un campo de texto pasa al paso siguiente en vez de mandar todo el formulario.
   function alApretarEnter(e: KeyboardEvent<HTMLFormElement>) {
     if (e.key === 'Enter' && e.target instanceof HTMLInputElement && !ultimo) {
@@ -81,7 +99,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     .includes(busqueda.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')))
 
   return (
-    <form action={saveGustosAction} onKeyDown={alApretarEnter} className="flex min-h-[calc(100dvh-52px)] flex-col gap-4 pb-36">
+    <form action={saveGustosAction} onSubmit={alMandar} onKeyDown={alApretarEnter} className="flex min-h-[calc(100dvh-52px)] flex-col gap-4 pb-36">
       {editar && <input type="hidden" name="volver" value="perfil" />}
 
       <div className="flex items-center gap-3">
@@ -92,9 +110,9 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         </div>
         <span className="text-sm font-bold tabular-nums">{paso + 1} de {PASOS.length}</span>
         {/* Se puede cortar en cualquier momento: se guarda lo elegido hasta ahí (y no pasa por "¡Todo listo!"). */}
-        <button name="corte" value="1" className="min-h-11 flex-none text-[13px] font-bold underline underline-offset-4">
+        <BotonEnviar name="corte" value="1" className="min-h-11 flex-none text-[13px] font-bold underline underline-offset-4">
           {editar ? 'Guardar' : 'Más tarde'}
-        </button>
+        </BotonEnviar>
       </div>
 
       <div className="flex items-start gap-3">
@@ -121,15 +139,11 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         <div className="gr-sticker flex flex-col gap-2.5 p-3.5">
           <p className="font-display text-lg font-extrabold">¿Cuándo es tu cumple?</p>
           <div className="flex gap-2">
-            <select name="dia" aria-label="Día" defaultValue={cumple?.dia ?? ''} className="gr-input w-[34%] min-w-0">
-              <option value="">Día</option>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <select name="mes" aria-label="Mes" defaultValue={cumple?.mes ?? ''} className="gr-input min-w-0 flex-1">
-              <option value="">Mes</option>
-              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
+            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" />
           </div>
+          {avisoCumple && (
+            <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
+          )}
           <p className="text-[13px] font-medium text-gr-muted">Tu gente lo ve en Eventos, con tiempo para elegir.</p>
         </div>
         <ul className="flex flex-col gap-2 text-[15px] font-medium">
@@ -229,7 +243,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
           {/* keys distintas: si React reusara el mismo <button>, el click en "Siguiente" del anteúltimo paso
               lo convertiría en submit durante ese mismo click y mandaría el formulario sin mostrar el último paso */}
           {ultimo
-            ? <button key="listo" className="gr-btn-primary gr-btn--sm flex-1">{editar ? 'Guardar' : '¡Listo!'}</button>
+            ? <BotonEnviar key="listo" pendiente="Guardando…" className="gr-btn-primary gr-btn--sm flex-1">{editar ? 'Guardar' : '¡Listo!'}</BotonEnviar>
             : <button key="siguiente" type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary gr-btn--sm flex-1">{paso === 0 && !editar ? 'Empezar' : 'Siguiente'}</button>}
         </div>
       </div>

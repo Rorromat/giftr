@@ -1,6 +1,8 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import https from 'node:https'
 import { eq } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import sharp from 'sharp'
+import { createTestDb, seedOwnerAndGiver } from './helpers'
 import { claims, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
@@ -9,6 +11,17 @@ import { archiveItem, createItem } from '@/lib/items'
 import { comprarRegalo, iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 import { addComment } from '@/lib/comments'
 import { esFotoPublica, itemParaCompartir, listaParaCompartir, textoDueno, textoRegalador } from '@/lib/compartir'
+import { guardarFotoDeseo } from '@/lib/fotos-deseo'
+import { imagenItem } from '@/lib/og'
+
+// La imagen de la vista previa, con la base en PGlite y los headers que manda cualquiera: un x-forwarded-host de la red
+// interna. og.tsx ya no lee headers (lo que fija el arreglo son los espías de fetch y https.get del test); quedan para
+// que, si alguien vuelve a armar la dirección con ellos, el pedido a ese host salga en los espías.
+const h = vi.hoisted(() => ({ db: undefined as unknown as Db }))
+vi.mock('@/db', () => ({ get db() { return h.db } }))
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers({ host: 'giftr.app', 'x-forwarded-host': '10.0.0.5:5432', 'x-forwarded-proto': 'http' }),
+}))
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
@@ -76,4 +89,38 @@ test('textos para WhatsApp', () => {
     .toBe('Mirá este regalo para Euge: Mate ($45.000) 🎁\nhttps://g.app/l/t/item/1')
   expect(textoRegalador({ titulo: 'Copas', precio: null, para: 'Delfina y Martín' }, 'u')).toBe('Mirá este regalo para Delfina y Martín: Copas 🎁\nu')
   expect(textoDueno({ titulo: 'Mate' }, 'u')).toBe('Esto es algo que me encantaría: Mate 🎁\nu')
+})
+
+test('la foto subida de la vista previa se lee de la base: el servidor no le pide nada a nadie, diga lo que diga x-forwarded-host', async () => {
+  h.db = await createTestDb()
+  const { owner } = await seedOwnerAndGiver(h.db)
+  const rojo = await sharp({ create: { width: 60, height: 60, channels: 3, background: '#FF0000' } }).jpeg().toBuffer()
+  const id = (await guardarFotoDeseo(h.db, owner.id, rojo))!.split('/').at(-1)!
+  // ImageResponse se trae su wasm con un fetch de data:; cualquier otro pedido sería al host que dijo el header
+  const fetchDeVerdad = globalThis.fetch
+  const pedidos: string[] = []
+  const espiaFetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    const u = url instanceof Request ? url.url : String(url)
+    if (u.startsWith('data:')) return fetchDeVerdad(url, init)
+    pedidos.push(u)
+    throw new Error('sin red')
+  })
+  const espiaHttps = vi.spyOn(https, 'get').mockImplementation(() => { throw new Error('sin red') })
+  /** Si el medio de la foto sale rojo (sin foto, ahí va el starburst: verde y tinta). */
+  const conLaFoto = async (fotoUrl: string) => {
+    const r = await imagenItem({ titulo: 'Mate', fotoUrl, precio: null, prioridad: 'gustaria', para: 'Euge', grupoNombre: null })
+    const data = await sharp(Buffer.from(await r.arrayBuffer())).extract({ left: 301, top: 310, width: 1, height: 1 }).raw().toBuffer()
+    return data[0] > 200 && data[1] < 80 && data[2] < 80
+  }
+  try {
+    // como venga escrita (el id en mayúsculas en un deseo viejo), la foto sale
+    expect(await conLaFoto(`/foto/deseo/${id.toUpperCase()}`)).toBe(true)
+    // otra ruta del sitio no es una foto subida: ni se pide
+    expect(await conLaFoto('/api/deseo/foto')).toBe(false)
+    expect(pedidos).toEqual([])
+    expect(espiaHttps).not.toHaveBeenCalled()
+  } finally {
+    espiaFetch.mockRestore()
+    espiaHttps.mockRestore()
+  }
 })

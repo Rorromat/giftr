@@ -5,68 +5,85 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { guestIdentities, items, lists, users } from '@/db/schema'
-import { getViewer, GUEST_COOKIE } from '@/lib/viewer'
-import { auth } from '@/auth'
-import { CAMPOS_OPCIONALES, createItem, archiveItem, deseoParaEditar, updateItem, type CambiosDeseo, type NewItemData } from '@/lib/items'
-import { esUrlFotoDeseo } from '@/lib/fotos-deseo'
-import { markBought, releaseClaim, reserveItem } from '@/lib/claims'
+import { items, lists } from '@/db/schema'
+import { getViewer } from '@/lib/viewer'
+import {
+  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, NO_SOY_COOKIE,
+  OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarNoSoy,
+} from '@/lib/cookie-invitado'
+import { auth, signIn, signOut } from '@/auth'
+import { createItem, archiveItem, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
+import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
+import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest } from '@/lib/guest'
+import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
+import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { asegurarListaPropia, existeUsuario } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
-import { avisar, borrarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos } from '@/lib/codazos'
+import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
-import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, marcarPagado, parsePesos, salirDeRegalo, saldarCon, sumarseARegalo } from '@/lib/regalos'
-import type { Viewer } from '@/lib/types'
+import {
+  cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
+  salirDeRegalo, saldarCon, sumarseARegalo, type CompraResult, type DatosCompra,
+} from '@/lib/regalos'
+import { parsePesos, partePesos, pesos } from '@/lib/pesos'
+import { identificado, type Viewer } from '@/lib/types'
+import { LARGO, recortar } from '@/lib/limites'
+
+/** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
+export type EstadoForm = { error: string } | null
 
 const str = (fd: FormData, k: string) => {
   const v = fd.get(k)
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
 }
 
-const httpUrl = (v?: string) => (v && /^https?:\/\//i.test(v) ? v : undefined)
+/** Un número entero de un campo oculto (lo que mostraba la pantalla); si no vino, undefined. */
+const entero = (fd: FormData, k: string) => {
+  const v = str(fd, k)
+  return v && /^-?\d{1,12}$/.test(v) ? Number(v) : undefined
+}
 
-async function itemPerteneceAToken(itemId: string, token: string) {
-  const [row] = await db.select({ id: items.id }).from(items)
+/** Solo rutas de la app ("/l/…"), nunca a otro sitio. */
+const rutaPropia = (v?: string) => (v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : '/')
+
+/** La lista del link para regalar. Un token que no puede ser (armado a mano, con un \u0000) no es de ninguna. */
+async function listaDeToken(token: string): Promise<string | null> {
+  if (!esToken(token)) return null
+  const [row] = await db.select({ id: lists.id }).from(lists).where(eq(lists.shareToken, token))
+  return row?.id ?? null
+}
+
+/** La lista del deseo, si el deseo es de la lista de ese token. Un id que no es de un deseo no es de ninguna. */
+async function listaDelItem(itemId: string, token: string): Promise<string | null> {
+  if (!esUuid(itemId) || !esToken(token)) return null
+  const [row] = await db.select({ id: lists.id }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, token)))
-  return !!row
+  return row?.id ?? null
 }
 
-/** Los campos del formulario de un deseo (agregar o editar). Lo vacío queda undefined. Null si falta el título. */
-function deseoDelForm(formData: FormData): NewItemData | null {
-  const titulo = str(formData, 'titulo')
-  if (!titulo) return null
-  const p = str(formData, 'prioridad')
-  const cant = Math.trunc(Number(str(formData, 'cantidad') ?? '1'))
-  const foto = str(formData, 'fotoUrl')
-  return {
-    tipo: str(formData, 'tipo') === 'idea' ? 'idea' : 'exacto',
-    titulo,
-    notas: str(formData, 'notas'),
-    precio: str(formData, 'precio'),
-    rangoPrecio: str(formData, 'rangoPrecio'),
-    categoria: str(formData, 'categoria'),
-    prioridad: p === 'mucho' || p === 'suelta' ? p : 'gustaria',
-    cantidad: Number.isFinite(cant) && cant >= 1 ? cant : 1,
-    repetible: formData.get('repetible') === 'on',
-    linkTienda: httpUrl(str(formData, 'linkTienda')),
-    // un link de foto o una foto subida desde el teléfono (/foto/deseo/:id)
-    fotoUrl: httpUrl(foto) ?? (foto && esUrlFotoDeseo(foto) ? foto : undefined),
-  }
+/** Adónde vuelve un formulario de una lista: la página de donde vino (con sus filtros), si es de esa misma lista. */
+function volverALista(fd: FormData, token: string) {
+  const v = rutaPropia(str(fd, 'volver'))
+  const base = `/l/${token}`
+  return v === base || v.startsWith(`${base}/`) || v.startsWith(`${base}?`) ? v : base
 }
+
+const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${ruta.includes('?') ? '&' : '?'}${clave}=${valor}`
 
 export async function addItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const data = deseoDelForm(formData)
+  const data = deseoDesdeForm(formData, true)
   if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
-  const creado = await createItem(db, session.userId, data, listaId)
+  const creado = await createItem(db, session.userId, paraAgregar(data), listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect(listaId && creado ? `/grupos/${listaId}` : '/mi-lista')
@@ -79,12 +96,10 @@ export async function updateItemAction(formData: FormData) {
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
   const volver = editable.grupo ? `/grupos/${editable.grupo.id}` : '/mi-lista'
-  const data = deseoDelForm(formData)
+  const data = deseoDesdeForm(formData)
   if (!data) redirect(`/editar/${itemId}`)
-  // Al editar, lo que quedó vacío se borra (al agregar, simplemente no se carga).
-  const cambios: CambiosDeseo = { ...data }
-  for (const campo of CAMPOS_OPCIONALES) cambios[campo] = data[campo] ?? null
-  await updateItem(db, itemId, session.userId, cambios)
+  // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
+  await updateItem(db, itemId, session.userId, data)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
@@ -95,9 +110,20 @@ export async function archiveItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const estado = str(formData, 'estado') === 'no_lo_quiero' ? 'no_lo_quiero' : 'lo_tengo'
-  await archiveItem(db, str(formData, 'itemId')!, session.userId, estado)
+  await archiveItem(db, str(formData, 'itemId') ?? '', session.userId, estado)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+}
+
+/** "Volver a mi lista" desde Archivados. */
+export async function restoreItemAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await restoreItem(db, str(formData, 'itemId') ?? '', session.userId)
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
 }
 
 export async function updatePriorityAction(formData: FormData) {
@@ -113,34 +139,53 @@ export async function updatePriorityAction(formData: FormData) {
 export async function createGroupAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const nombre = str(formData, 'nombre')
+  const nombre = recortar(str(formData, 'nombre') ?? '', LARGO.nombreGrupo)
   if (!nombre) redirect('/grupos/nuevo')
-  const id = await crearGrupo(db, session.userId, { nombre: nombre.slice(0, 60), descripcion: str(formData, 'descripcion')?.slice(0, 120) })
   const fecha = str(formData, 'fecha')
-  if (fecha) await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
+  // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
+  // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
+  const id = await crearGrupo(db, session.userId, {
+    nombre, descripcion: recortar(str(formData, 'descripcion') ?? '', LARGO.descripcionGrupo) || undefined,
+    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on',
+  })
   revalidatePath('/mi-lista')
   revalidatePath('/eventos')
-  redirect(`/grupos/${id}`)
+  redirect(fecha && !fechaDeGrupoValida(fecha) ? `/grupos/${id}?fecha=invalida` : `/grupos/${id}`)
 }
 
 export async function setGroupDateAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const id = str(formData, 'grupoId') ?? ''
+  if (!esUuid(id)) return
   const fecha = formData.get('quitar') ? null : str(formData, 'fecha') ?? null
+  if (fecha !== null && !fechaDeGrupoValida(fecha)) redirect(`/grupos/${id}?fecha=invalida`)
   await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
   revalidatePath(`/grupos/${id}`)
   revalidatePath('/eventos')
+  // sin el aviso de una fecha inválida anterior, si quedó en la dirección
+  redirect(`/grupos/${id}`)
 }
 
 const numero = (fd: FormData, k: string) => { const v = Number(str(fd, k)); return Number.isInteger(v) && v > 0 ? v : null }
 
+/**
+ * "Tu cumple" en Perfil. Se borra solo con "Quitar": un envío con los campos vacíos (un segundo "Guardar" después de que el
+ * formulario volvió a como estaba) no lo borra. Si falta el día o el mes, o la fecha no existe, vuelve con el aviso
+ * (antes no se guardaba y no decía nada).
+ */
 export async function saveBirthdayAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+  const [dia, mes] = [numero(formData, 'dia'), numero(formData, 'mes')]
+  const ok = formData.get('quitar')
+    ? await guardarCumple(db, session.userId, null, null)
+    : dia !== null && mes !== null && await guardarCumple(db, session.userId, dia, mes)
   revalidatePath('/perfil')
   revalidatePath('/eventos')
+  if (!ok) redirect('/perfil?cumple=invalido#cumple')
+  // si arriba quedó el aviso de un intento anterior, se va
+  if (str(formData, 'conAviso')) redirect('/perfil#cumple')
 }
 
 /** Bienvenida (o editar gustos desde Perfil): guarda lo elegido, aunque se corte a mitad de camino. */
@@ -148,17 +193,24 @@ export async function saveGustosAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   await guardarGustos(db, session.userId, gustosDesdeForm(formData))
-  if (formData.has('dia')) await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+  // los dos vacíos lo borran (los campos vienen con el cumple guardado); uno sin el otro, o uno que no existe, no se guarda
+  const cumpleOk = !formData.has('dia') || await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
   revalidatePath('/perfil')
   revalidatePath('/eventos')
   revalidatePath('/mi-lista')
   const desdePerfil = str(formData, 'volver') === 'perfil'
-  if (formData.has('corte')) redirect(desdePerfil ? '/perfil' : '/mi-lista')
+  const corte = formData.has('corte')
+  // Lo demás ya se guardó: vuelve al primer paso a avisar, en vez de seguir como si el cumple estuviera. Con "Más tarde"
+  // (o "Guardar" desde Perfil) quería salir: va a Perfil, que avisa al lado de su cumple, en vez de dejarlo adentro.
+  if (!cumpleOk) redirect(corte ? '/perfil?cumple=invalido#cumple' : `/bienvenida?${desdePerfil ? 'editar=1&' : ''}paso=0&cumple=invalido`)
+  if (corte) redirect(desdePerfil ? '/perfil' : '/mi-lista')
   redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/listo')
 }
 
 export async function joinGroupAction(formData: FormData) {
   const invite = str(formData, 'invite') ?? ''
+  // una invitación que no puede ser no es de ningún grupo (y no se arma una dirección con lo que vino)
+  if (!esToken(invite)) redirect('/mi-lista')
   const session = await auth()
   if (!session?.userId) redirect(`/grupos/unirme/${invite}`)
   const id = await unirseAGrupo(db, invite, session.userId)
@@ -177,6 +229,44 @@ export async function leaveGroupAction(formData: FormData) {
   redirect('/mi-lista')
 }
 
+/** "Se sumó por error": un dueño saca a alguien que se sumó después que él (deja de editar y sigue ciego) y cambia la invitación. */
+export async function removeMemberAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const sacado = await sacarDelGrupo(db, id, session.userId, str(formData, 'userId') ?? '')
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  if (sacado) redirect(`/grupos/${id}?nuevo=sacado`)
+}
+
+/** "Generar un link de invitación nuevo": el anterior deja de servir para sumarse al grupo. */
+export async function newInviteAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const nuevo = await nuevaInvitacion(db, id, session.userId)
+  revalidatePath(`/grupos/${id}`)
+  if (nuevo) redirect(`/grupos/${id}?nuevo=invitacion`)
+}
+
+/**
+ * "Cambiar el link para regalar" de la lista personal (desde Perfil) o de un grupo (con grupoId): el anterior deja de
+ * andar y hay que volver a compartirlo.
+ */
+export async function newShareLinkAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const grupoId = str(formData, 'grupoId')
+  const listId = grupoId ?? (await asegurarListaPropia(db, session.userId))?.id
+  const nuevo = listId ? await cambiarLinkParaRegalar(db, listId, session.userId) : null
+  revalidatePath('/mi-lista')
+  revalidatePath('/perfil')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+  if (nuevo) redirect(grupoId ? `/grupos/${grupoId}?nuevo=regalar` : '/perfil?nuevo=regalar')
+}
+
 /** Saca una lista de Tu gente (y su cumple o fecha de Eventos). */
 export async function unfollowAction(formData: FormData) {
   const session = await auth()
@@ -186,48 +276,182 @@ export async function unfollowAction(formData: FormData) {
   revalidatePath('/eventos')
 }
 
-async function viewerIdentificandoGuest(formData: FormData): Promise<Viewer> {
-  let viewer = await getViewer()
-  const nombre = str(formData, 'nombre')
-  if (!viewer.userId && !viewer.guestId && nombre) {
-    const guest = await createGuest(db, nombre, str(formData, 'email'))
-    ;(await cookies()).set(GUEST_COOKIE, guest.id, { httpOnly: true, maxAge: 31536000, path: '/' })
-    viewer = { guestId: guest.id }
-  }
-  return viewer
+/**
+ * El que mira. Si no se sabe quién es y el formulario trae un nombre, lo anota como invitado
+ * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
+ * Anotarse con su nombre en una lista es decir que no es suya: ve lo que reservaron los demás ahí (y solo ahí).
+ */
+async function viewerIdentificandoGuest(formData: FormData, listId: string): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
+  const viewer = await getViewer()
+  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer }
+  const v = validarNombre(formData.get('nombre'))
+  if (!v.ok) return v
+  const guest = await createGuest(db, v.nombre)
+  await abrirListaAInvitado(db, guest.id, listId)
+  const jar = await cookies()
+  jar.set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  // las cuentas anotadas duran desde ahora, como la cookie nueva: si vencieran antes, la dueña sin su sesión volvería a
+  // ver como regaladora la lista que este invitado abrió
+  renovarCuentas(jar)
+  // con las cuentas que tuvieron sesión acá: en sus listas, este invitado nuevo tampoco ve nada
+  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value) }
 }
 
-export async function reserveAction(formData: FormData) {
-  const token = str(formData, 'token')!
-  const itemId = str(formData, 'itemId')!
-  if (!(await itemPerteneceAToken(itemId, token))) return
-  const viewer = await viewerIdentificandoGuest(formData)
-  await reserveItem(db, itemId, viewer)
+export async function reserveAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  const listId = await listaDelItem(itemId, token)
+  if (!listId) return null
+  const quien = await viewerIdentificandoGuest(formData, listId)
+  if (!quien.ok) return { error: quien.error }
+  const r = await reserveItem(db, itemId, quien.viewer)
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  const volver = volverALista(formData, token)
+  // Un doble toque manda el segundo envío con la reserva del primero ya hecha: reserveItem le devuelve esa.
+  if (r.ok) {
+    // si arriba quedó el cartel de una reserva anterior que no salió (?reserva=), se va
+    if (str(formData, 'conCartel')) redirect(volver)
+    return null
+  }
+  // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
+  // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
+  // Se vuelve a la misma página, con sus filtros; del detalle, a la lista si el deseo ya no está.
+  const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad' || r.reason === 'muchas'
+  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', r.reason))
+}
+
+/** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */
+export async function identificarseAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  const listId = await listaDeToken(token)
+  if (!listId) return null
+  const quien = await viewerIdentificandoGuest(formData, listId)
+  if (!quien.ok) return { error: quien.error }
+  revalidatePath(`/l/${token}`, 'layout')
+  return null
+}
+
+/** "No es mía: ver lo reservado": un invitado que se anotó en otra lista dice que esta tampoco es suya. */
+export async function verLoReservadoAction(formData: FormData) {
+  const token = str(formData, 'token') ?? ''
+  const [listId, viewer] = await Promise.all([listaDeToken(token), getViewer()])
+  if (!listId || !viewer.guestId) return
+  await abrirListaAInvitado(db, viewer.guestId, listId)
+  revalidatePath(`/l/${token}`, 'layout')
+}
+
+/** "Entrar con Google" desde una lista o un deseo: vuelve a la misma página. */
+export async function entrarConGoogleAction(formData: FormData) {
+  await signIn('google', { redirectTo: rutaPropia(str(formData, 'volver')) })
+}
+
+/**
+ * "Cerrar sesión" (Perfil) o "¿No sos X?" (en una lista): este navegador se olvida del que está ahora.
+ * Con sesión de Google, la cierra y nada más: la cookie de un invitado que no se unió a la cuenta es de otra persona
+ * (o de la misma, que todavía no dijo que era ella) y borrarla dejaría sus reservas sin nadie que las maneje.
+ * Queda anotado que esta cuenta usó el navegador: en sus listas, ese invitado ya no ve la capa oculta.
+ * Sin sesión (o con la de un usuario que ya no existe), borra la cookie de invitado (la pantalla pide confirmarlo antes).
+ */
+export async function salirAction(formData: FormData) {
+  const volver = rutaPropia(str(formData, 'volver'))
+  const [session, jar] = await Promise.all([auth(), cookies()])
+  if (session?.userId) {
+    if (await existeUsuario(db, session.userId)) anotarCuenta(jar, session.userId)
+    else {
+      // la sesión de un usuario que ya no está en la base: la pantalla lo mostraba como el invitado (ver getViewer) y
+      // le ofrecía "Salir igual"; si solo se cerrara la sesión vieja, el primer toque parecería no hacer nada
+      jar.delete(GUEST_COOKIE)
+      jar.delete(NO_SOY_COOKIE)
+    }
+    await signOut({ redirectTo: volver })
+    return
+  }
+  jar.delete(GUEST_COOKIE)
+  jar.delete(NO_SOY_COOKIE)
+  revalidatePath(volver, 'layout')
+  redirect(volver)
+}
+
+/**
+ * Al abrir la app con una sesión que todavía no está anotada en este navegador (la de antes de que se anotaran, que
+ * nunca pasó por el login de ahora): se anota, así cuando venza la sesión sus listas siguen protegidas (ver accesoALista).
+ */
+export async function anotarCuentaAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  if (!cuentaAnotada(jar, session.userId)) anotarCuenta(jar, session.userId)
+}
+
+/** "Sí, soy yo": el invitado de este navegador se une a la cuenta (sus reservas, comentarios y avisos pasan a ella). */
+export async function unirInvitadoAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  anotarCuenta(jar, session.userId)
+  const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
+  // si falla, la cookie queda y la pregunta sigue ahí para volver a intentar
+  if (guestId) await unirInvitadoACuenta(db, guestId, session.userId)
+  jar.delete(GUEST_COOKIE)
+  jar.delete(NO_SOY_COOKIE)
+  revalidatePath('/', 'layout')
+}
+
+/** "No soy yo": el invitado queda como estaba (es de otra persona que usa este navegador) y no se pregunta más. */
+export async function noSoyElInvitadoAction() {
+  const session = await auth()
+  if (!session?.userId) return
+  const jar = await cookies()
+  // la cookie del invitado sigue, pero en las listas de esta cuenta ya no ve nada (puede ser ella, después de salir)
+  anotarCuenta(jar, session.userId)
+  const guestId = leerInvitado(jar.get(GUEST_COOKIE)?.value)
+  if (guestId) jar.set(NO_SOY_COOKIE, sumarNoSoy(jar.get(NO_SOY_COOKIE)?.value, guestId, session.userId), OPCIONES_COOKIE_INVITADO)
+  revalidatePath('/', 'layout')
+}
+
+/**
+ * Lo que cambió una reserva. Sin token viene del cartel "¿Conseguiste…?" de alguien que no tiene el link de ahora (está en
+ * Mi lista, en el grupo o en otra lista): que el cartel se vaya donde esté.
+ */
+function revalidarReserva(token: string, itemId: string) {
+  if (!token) return revalidatePath('/', 'layout')
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
 }
 
 export async function boughtAction(formData: FormData) {
   const viewer = await getViewer()
-  const token = str(formData, 'token')!
-  await markBought(db, str(formData, 'claimId')!, viewer, str(formData, 'nota'))
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  // Volver a reservar una que venció pide lo mismo que reservar: el deseo, con el link para regalar de ahora (ver markBought).
+  const conLink = esUuid(itemId) && !!(await listaDelItem(itemId, token))
+  const r = await markBought(db, str(formData, 'claimId') ?? '', viewer, str(formData, 'nota'), conLink ? itemId : undefined)
+  revalidarReserva(token, itemId)
+  // la reserva había vencido y el lugar ya lo tomó otro: que se entere, en vez de que no pase nada
+  if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
+}
+
+/** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva (si no tiene ya el tope de reservas en la lista). */
+export async function unboughtAction(formData: FormData) {
+  const viewer = await getViewer()
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  const r = await desmarcarComprado(db, str(formData, 'claimId') ?? '', viewer)
   revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${str(formData, 'itemId')}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  if (!r.ok && r.reason === 'muchas' && (await listaDelItem(itemId, token))) redirect(`/l/${token}/item/${itemId}?reserva=muchas_deshacer`)
 }
 
 export async function releaseAction(formData: FormData) {
   const viewer = await getViewer()
-  const token = str(formData, 'token')!
-  await releaseClaim(db, str(formData, 'claimId')!, viewer)
-  revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${str(formData, 'itemId')}`)
+  await releaseClaim(db, str(formData, 'claimId') ?? '', viewer)
+  revalidarReserva(str(formData, 'token') ?? '', str(formData, 'itemId') ?? '')
 }
 
 export async function commentAction(formData: FormData) {
   const viewer = await getViewer()
   const token = str(formData, 'token')!
   const itemId = str(formData, 'itemId')!
-  if (!(await itemPerteneceAToken(itemId, token))) return
+  if (!(await listaDelItem(itemId, token))) return
   await addComment(db, itemId, viewer, str(formData, 'texto') ?? '')
   revalidatePath(`/l/${token}/item/${itemId}`)
 }
@@ -259,13 +483,20 @@ export async function startGroupGiftAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const token = str(formData, 'token') ?? ''
   const itemId = str(formData, 'itemId') ?? ''
-  if (!(await itemPerteneceAToken(itemId, token))) return
-  await iniciarRegaloGrupal(db, itemId, userId)
+  if (!(await listaDelItem(itemId, token))) return
+  const r = await iniciarRegaloGrupal(db, itemId, userId)
   revalidarRegalo(formData)
+  // un regalo en el que está solo cuenta para el tope de reservas (ver tomadasEnLista): que sepa por qué no se armó
+  if (!r.ok && r.reason === 'muchas') redirect(`/l/${token}/item/${itemId}?reserva=muchas`)
 }
 
 export async function joinGroupGiftAction(formData: FormData) {
-  await sumarseARegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  const userId = await usuarioRegalador()
+  // Pide lo mismo que armar uno: el deseo, con el link para regalar de ahora (y el regalo, de ese deseo). Si no, a quien le
+  // cambiaron el link para sacarle la lista se sumaría desde la página que le quedó abierta.
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await listaDelItem(itemId, str(formData, 'token') ?? ''))) return
+  await sumarseARegalo(db, str(formData, 'giftId') ?? '', userId, itemId)
   revalidarRegalo(formData)
 }
 
@@ -279,34 +510,99 @@ export async function cancelGroupGiftAction(formData: FormData) {
   revalidarRegalo(formData)
 }
 
-/** "0" es una parte válida (alguien que no pone); cualquier otra cosa se lee como pesos. */
-const parte = (v: string) => (/^\D*0+\D*$/.test(v) ? 0 : parsePesos(v) ?? Number.NaN)
+/** "Sacar" a alguien del regalo: solo el encargado (el de la sesión, nunca uno que venga en el formulario). */
+export async function removeGroupGiftMemberAction(formData: FormData) {
+  await sacarDeRegalo(db, str(formData, 'giftId') ?? '', str(formData, 'miembroId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
 
-export async function buyGroupGiftAction(formData: FormData) {
-  const userId = await usuarioRegalador()
-  const volver = `/l/${str(formData, 'token')}/item/${str(formData, 'itemId')}`
+/** "Dejar que vuelva" a alguien que sacó: también solo el encargado de la sesión. */
+export async function letBackGroupGiftMemberAction(formData: FormData) {
+  await dejarVolverARegalo(db, str(formData, 'giftId') ?? '', str(formData, 'miembroId') ?? '', await usuarioRegalador())
+  revalidarRegalo(formData)
+}
+
+/** "Sigue en pie" en el recordatorio de cerrar un regalo abierto. */
+export async function postponeGroupGiftReminderAction(formData: FormData) {
+  await posponerRecordatorio(db, str(formData, 'giftId') ?? '', await usuarioRegalador())
+  revalidatePath('/', 'layout')
+}
+
+/** Lo que manda CompraGrupalForm: el total, con quiénes vio la división el encargado y, "A mano", la parte de cada uno. */
+function compraDesdeForm(formData: FormData): DatosCompra {
   let partes: Record<string, number> | undefined
   if (str(formData, 'modo') === 'manual') {
     partes = {}
+    // vacía o en 0 es que no pone, igual que en la pantalla (ver partePesos)
     for (const [k, v] of formData.entries()) {
-      if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = parte(v)
+      if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = partePesos(v) ?? Number.NaN
     }
   }
-  const r = await comprarRegalo(db, str(formData, 'giftId') ?? '', userId, {
-    total: parsePesos(str(formData, 'total')) ?? 0, partes, nota: str(formData, 'nota'),
-  })
-  revalidarRegalo(formData)
-  redirect(r.ok ? volver : `${volver}?error=${r.reason}`)
+  return {
+    total: parsePesos(str(formData, 'total')) ?? 0,
+    miembros: formData.getAll('miembro').filter((v): v is string => typeof v === 'string'),
+    partes, nota: str(formData, 'nota'),
+  }
 }
 
+const ERRORES_COMPRA = {
+  monto_invalido: 'Revisá los montos: tienen que ser pesos. Si alguien no pone, dejá su parte vacía o en 0.',
+  cambiaron: 'Se sumó o se bajó alguien, revisá la división.',
+  ya_pagaron: 'Alguien ya figura como que te pagó: para corregir, primero deshacé ese pago.',
+  nada_que_corregir: 'Ya nadie te debe nada de este regalo: no hay nada que corregir.',
+  no_permitido: 'No se pudo: puede que ya se haya comprado o cancelado. Recargá la página.',
+}
+
+/** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
+function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
+  if (r.reason === 'de_la_lista') {
+    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${pesos(r.monto)}.`
+  }
+  if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
+  const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
+  return suma < p.total
+    ? `Las partes suman ${pesos(suma)}: faltan ${pesos(p.total - suma)} para llegar a ${pesos(p.total)}.`
+    : `Las partes suman ${pesos(suma)}: te pasaste ${pesos(suma - p.total)} de ${pesos(p.total)}.`
+}
+
+/**
+ * "Lo compré" (en el deseo o desde Cuentas). Si no sale, el mensaje va en el formulario, que se queda con lo cargado; la
+ * página se vuelve a armar igual (si se sumó alguien, ya aparece en la división).
+ */
+export async function buyGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const p = compraDesdeForm(formData)
+  const r = await comprarRegalo(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
+  revalidarRegalo(formData)
+  return r.ok ? null : { error: errorDeCompra(r, p) }
+}
+
+/**
+ * "Corregir la compra": lo mismo, sobre un regalo ya comprado que nadie le pagó todavía al encargado. Si sale, o si ya no
+ * se puede corregir (alguien pagó mientras tanto), el formulario se va al volver a armar la página y con él su mensaje:
+ * cómo salió va en la página (?correccion=, ver CartelCorreccion), como el de una reserva que no sale.
+ */
+export async function fixGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const p = compraDesdeForm(formData)
+  const r = await corregirCompra(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
+  revalidarRegalo(formData)
+  if (r.ok || r.reason === 'ya_pagaron' || r.reason === 'nada_que_corregir') {
+    const token = str(formData, 'token')
+    const itemId = str(formData, 'itemId')
+    redirect(`${token && itemId && esUuid(itemId) ? `/l/${encodeURIComponent(token)}/item/${itemId}` : '/cuentas'}?correccion=${r.ok ? 'ok' : r.reason}`)
+  }
+  return { error: errorDeCompra(r, p) }
+}
+
+/** monto: la parte que mostraba la pantalla (ver marcarPagado). */
 export async function markPaidAction(formData: FormData) {
   const userId = await usuarioRegalador()
-  await marcarPagado(db, str(formData, 'giftId') ?? '', str(formData, 'deudorId') ?? '', userId, str(formData, 'pagado') !== '0')
+  await marcarPagado(db, str(formData, 'giftId') ?? '', str(formData, 'deudorId') ?? '', userId, str(formData, 'pagado') !== '0', entero(formData, 'monto'))
   revalidarRegalo(formData)
 }
 
+/** neto: lo que decía el botón (ver saldarCon). */
 export async function settleUpAction(formData: FormData) {
-  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '')
+  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '', entero(formData, 'neto'))
   revalidarRegalo(formData)
 }
 
@@ -318,29 +614,32 @@ export async function suscribirAvisosAction(suscripcion: unknown): Promise<boole
   return guardarSuscripcion(db, session.userId, suscripcion)
 }
 
+/** Al abrir Perfil: si los avisos de este navegador están a nombre de uno (y si faltaban, los vuelve a guardar). */
+export async function confirmarAvisosAction(suscripcion: unknown): Promise<boolean> {
+  const session = await auth()
+  if (!session?.userId) return false
+  return confirmarSuscripcion(db, session.userId, suscripcion)
+}
+
 export async function desuscribirAvisosAction(endpoint: string) {
   const session = await auth()
   if (session?.userId) await borrarSuscripcion(db, session.userId, endpoint)
 }
 
-/** Un aviso de prueba a los dispositivos de uno mismo. Devuelve a cuántos llegó. */
-export async function probarAvisoAction(): Promise<number> {
+/** Un aviso de prueba a los dispositivos de uno mismo. Devuelve a cuántos llegó, o 'espera' si probó hace menos de un minuto. */
+export async function probarAvisoAction(): Promise<number | 'espera'> {
   const session = await auth()
   if (!session?.userId) return 0
-  return avisar(db, session.userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' })
-}
-
-async function nombreDe(viewer: Viewer): Promise<string> {
-  const [fila] = viewer.userId
-    ? await db.select({ nombre: users.nombre }).from(users).where(eq(users.id, viewer.userId))
-    : viewer.guestId ? await db.select({ nombre: guestIdentities.nombre }).from(guestIdentities).where(eq(guestIdentities.id, viewer.guestId)) : []
-  return fila?.nombre ?? 'Alguien'
+  const r = await probarAviso(db, session.userId)
+  return r.ok ? r.llegaron : r.reason
 }
 
 export async function codazoAction(formData: FormData) {
   const token = str(formData, 'token') ?? ''
-  const viewer = await viewerIdentificandoGuest(formData)
-  const r = await mandarCodazo(db, token, viewer, await nombreDe(viewer))
+  if (!(await listaDeToken(token))) redirect('/')
+  // Sin decir quién es no hay codazo, y acá no se anota a nadie: se anota arriba ("¿Quién sos?") o entra con Google.
+  const viewer = await getViewer()
+  const r = await mandarCodazo(db, token, viewer, (await nombreDeViewer(db, viewer)) ?? 'Alguien')
   redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)
 }
 

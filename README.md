@@ -52,8 +52,26 @@ para el login.
    | `AUTH_GOOGLE_SECRET` | el *Client secret* de Google |
    | `NEXT_PUBLIC_BASE_URL` | `https://TU-PROYECTO.vercel.app` (arma el link que se comparte) |
 
-5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) aplica las
-   migraciones y después compila, así que la base queda lista sola en cada deploy.
+5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) compila y, si
+   salió bien y es el deploy a producción, aplica las migraciones: la base queda lista sola en cada
+   deploy a producción.
+
+**Previews y migraciones.** `DATABASE_URL` es la misma en todos los entornos, así que los previews
+(cada push a una rama que no es `main`) **no** migran: si lo hicieran, cambiarían la base de
+producción mientras `main` sigue sirviendo el código de antes, quizás por días. Un preview con
+migraciones nuevas falla hasta que se mergea; si querés probarlo, dale al preview su propia base (una
+rama de Neon en *Settings → Environment Variables → Preview*) y migrala a mano con
+`DATABASE_URL=… npm run db:migrate`. Las migraciones corren mientras todavía sirve el deploy anterior
+(unos segundos, hasta que se publica el nuevo): mergeá y dejá que salga el deploy a producción
+enseguida.
+
+**Volver atrás.** No vuelvas atrás (*Instant Rollback*) a un deploy de antes de la migración
+`0008_listas_de_invitado` sin preparar la base: el código de antes no conoce los avisos nuevos (los
+de cualquier tipo que no sea `item_baja` ni `item_editado` le tiran abajo las pantallas a quien los
+tenga, así que primero hay que marcarlos como leídos) y trata como co-dueños a los que salieron de
+un grupo o a los que sacaron (las filas de `list_members` con `salio_at`: volverían a editar y a
+figurar como dueños). La cookie de los invitados cambió de nombre para que el código de antes no se
+caiga con ella: para ese código, los invitados anotados después son visitantes sin nombre.
 
 **Región.** `vercel.json` corre las funciones en `gru1` (São Paulo), la misma región que la base
 Neon. Si la base se crea en otra región, cambiá `regions` a esa: cada pantalla hace varias consultas

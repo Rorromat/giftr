@@ -1,0 +1,1 @@
+CREATE INDEX "items_foto_deseo_idx" ON "items" USING btree (lower(substring("foto_url" from '/foto/deseo/([0-9A-Fa-f-]{36})')));

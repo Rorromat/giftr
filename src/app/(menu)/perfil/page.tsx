@@ -3,28 +3,35 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { saveBirthdayAction } from '@/app/actions'
+import { newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
 import { MESES, miCumple } from '@/lib/events'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { misGustos } from '@/lib/bienvenida'
 import { miFoto } from '@/lib/perfil'
 import { FotoPerfil } from '@/components/FotoPerfil'
+import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { CumpleCampos } from '@/components/CumpleCampos'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
 import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
+import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
+import { UnirInvitado } from '@/components/Identidad'
+import { invitadoDeEsteNavegador } from '@/lib/viewer'
 import { Icon, Seccion, Starburst } from '@/components/ui'
 
 const GIROS_FOTOS = [-8, 3, 9]
 
-export default async function Perfil() {
+export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string }> }) {
+  const { nuevo, cumple: avisoCumple } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, cuentas, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misCuentas(db, session.userId), misGustos(db, session.userId),
   ])
-  const [foto, vapid] = await Promise.all([miFoto(db, session.userId), clavesVapid(db)])
+  const [foto, vapid, invitado] = await Promise.all([miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador()])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
@@ -48,9 +55,9 @@ export default async function Perfil() {
         <div className="relative h-[60px] w-[86px] flex-none">
           {fotos.length > 0
             ? fotos.map((f, i) => (
-                // eslint-disable-next-line @next/next/no-img-element -- PoC: remote host images, no next/image config
-                <img key={f.id} src={f.src} alt="" className="absolute size-[46px] rounded-xl border-[2.5px] border-gr-ink object-cover"
-                     style={{ left: i * 20, top: [6, 0, 10][i], transform: `rotate(${GIROS_FOTOS[i]}deg)` }} />
+                // la que no carga no se muestra (en vez del ícono de imagen rota)
+                <FotoConRespaldo key={f.id} src={f.src} respaldo={null} className="absolute size-[46px] rounded-xl border-[2.5px] border-gr-ink object-cover"
+                                 style={{ left: i * 20, top: [6, 0, 10][i], transform: `rotate(${GIROS_FOTOS[i]}deg)` }} />
               ))
             : <Starburst size={60} className="mx-auto rotate-12">{activos.length}</Starburst>}
         </div>
@@ -68,6 +75,17 @@ export default async function Perfil() {
         </div>
         <CopyLinkButton url={shareUrl} />
       </div>
+      {nuevo === 'regalar' && (
+        <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">
+          Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
+        </p>
+      )}
+      {/* por si el link llegó a quien no tenía que llegar */}
+      <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
+                 className="-mt-1.5 items-end">
+        El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
+        tu lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+      </Confirmar>
 
       {/* Tus gustos: los ve tu gente arriba de tu lista */}
       <Link href="/bienvenida?editar=1" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
@@ -99,31 +117,47 @@ export default async function Perfil() {
           <p className="text-[13px] font-medium">
             {cuentas.debes || cuentas.teDeben
               ? [cuentas.debes && `Debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `Te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+              // los totales son netos: a mano con alguien, pero con partes sin marcar
+              : cuentas.personas.length ? 'Están a mano: falta marcarlo como saldado'
               : cuentas.enCurso.length ? `${cuentas.enCurso.length} ${cuentas.enCurso.length === 1 ? 'regalo grupal' : 'regalos grupales'} en curso` : 'Regalos entre varios, a lo Splitwise'}
           </p>
         </div>
         <Icon name="chevron" size={20} strokeWidth={2.6} />
       </Link>
 
-      {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista */}
-      <form id="cumple" action={saveBirthdayAction} className="gr-sticker flex flex-col gap-3 p-3.5">
+      {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista. La key lo vuelve a armar con lo
+          guardado: React deja el formulario como estaba al montarse y un <select> volvía al valor viejo. */}
+      <form key={`${cumple?.dia ?? ''}-${cumple?.mes ?? ''}-${avisoCumple ?? ''}`} id="cumple" action={saveBirthdayAction}
+            className="gr-sticker flex scroll-mt-6 flex-col gap-3 p-3.5">
         <div>
           <p className="font-display text-lg font-extrabold">Tu cumple</p>
           <p className="text-[13px] font-medium leading-snug">
             {cumple ? `El ${cumple.dia} de ${MESES[cumple.mes - 1]}. ` : ''}Tu gente lo ve en Eventos, con tiempo para elegir.
           </p>
         </div>
+        {avisoCumple === 'invalido' && (
+          <>
+            <input type="hidden" name="conAviso" value="1" />
+            <p role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
+          </>
+        )}
         <div className="flex gap-2">
-          <select name="dia" aria-label="Día" defaultValue={cumple?.dia ?? ''} className="gr-input w-[30%] min-w-0">
-            <option value="">Día</option>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select name="mes" aria-label="Mes" defaultValue={cumple?.mes ?? ''} className="gr-input min-w-0 flex-1">
-            <option value="">Mes</option>
-            {MESES.map((m, i) => <option key={m} value={i + 1}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
-          </select>
-          <button className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</button>
+          <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" />
+          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</BotonEnviar>
         </div>
+        {cumple && (
+          <BotonEnviar name="quitar" value="1" formNoValidate className="self-start min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">
+            Quitar mi cumple
+          </BotonEnviar>
+        )}
+      </form>
+
+      {invitado && <UnirInvitado nombre={invitado} />}
+
+      {/* Para dejar este dispositivo (el de la familia, la tablet) o entrar con otra cuenta */}
+      <form action={salirAction} className="self-center">
+        <input type="hidden" name="volver" value="/" />
+        <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Cerrar sesión</button>
       </form>
     </Seccion>
   )

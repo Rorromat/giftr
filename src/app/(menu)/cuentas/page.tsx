@@ -1,24 +1,30 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { misCuentas, pesos, type CuentaPersona, type LineaCuenta } from '@/lib/regalos'
-import { cancelGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
-import { AvatarSticker, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
+import {
+  comprasParaCorregir, misCuentas, pesos, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
+} from '@/lib/regalos'
+import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
+import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
+import { BotonEnviar } from '@/components/BotonEnviar'
+import { AvatarSticker, BackLink, Icon, QuizasLink, Seccion, Starburst } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (
     <li className="flex items-center gap-2 py-2">
-      <Link href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
-        <span className="font-bold underline decoration-2 underline-offset-2 [overflow-wrap:anywhere]">{l.itemTitulo}</span>
+      <QuizasLink href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
+        <span className={`font-bold [overflow-wrap:anywhere] ${l.href ? 'underline decoration-2 underline-offset-2' : ''}`}>{l.itemTitulo}</span>
         <span className="block text-xs font-medium text-gr-muted">para {l.para} · {l.tipo === 'debes' ? 'tu parte' : 'su parte'}</span>
-      </Link>
+      </QuizasLink>
       <span className="font-display text-lg font-extrabold tabular-nums">{pesos(l.monto)}</span>
       <form action={markPaidAction}>
         <input type="hidden" name="giftId" value={l.giftId} />
         <input type="hidden" name="deudorId" value={l.deudorId} />
         <input type="hidden" name="pagado" value="1" />
-        <button className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</button>
+        {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
+        <input type="hidden" name="monto" value={l.monto} />
+        <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</BotonEnviar>
       </form>
     </li>
   )
@@ -42,20 +48,109 @@ function Persona({ p }: { p: CuentaPersona }) {
       {p.lineas.length > 1 && (
         <form action={settleUpAction}>
           <input type="hidden" name="otroId" value={p.id} />
-          <button className={`${leDebo ? 'gr-btn-primary' : 'gr-btn font-sans font-bold'} gr-btn--sm mt-1 w-full`}>
+          {/* lo que dice el botón: si cambió mientras tanto, no salda nada */}
+          <input type="hidden" name="neto" value={p.neto} />
+          <BotonEnviar className={`${leDebo ? 'gr-btn-primary' : 'gr-btn font-sans font-bold'} gr-btn--sm mt-1 w-full`}>
             {p.neto === 0 ? 'Marcar todo como saldado' : leDebo ? `Ya le pagué todo (${pesos(-p.neto)})` : `Me pagó todo (${pesos(p.neto)})`}
-          </button>
+          </BotonEnviar>
         </form>
       )}
     </li>
   )
 }
 
-export default async function Cuentas() {
+const linkSubrayado = 'min-h-11 font-bold underline decoration-2 underline-offset-4'
+
+function CancelarRegalo({ giftId }: { giftId: string }) {
+  return (
+    <form action={cancelGroupGiftAction}>
+      <input type="hidden" name="giftId" value={giftId} />
+      <BotonEnviar className={linkSubrayado}>Cancelar el regalo</BotonEnviar>
+    </form>
+  )
+}
+
+function MeBajo({ giftId }: { giftId: string }) {
+  return (
+    <form action={leaveGroupGiftAction}>
+      <input type="hidden" name="giftId" value={giftId} />
+      <BotonEnviar className={linkSubrayado}>Me bajo</BotonEnviar>
+    </form>
+  )
+}
+
+/**
+ * Un regalo abierto que no se puede terminar en el deseo: lo sacaron de la lista ("Ya lo tengo": quizás ya se lo dieron)
+ * o cambiaron el link y no lo tiene. Lo que haría en el deseo lo hace desde acá, sin pasar por la lista: el encargado lo
+ * compra, saca a alguien que se sumó por error o lo cancela; los demás se pueden bajar.
+ */
+function DesdeAca({ r }: { r: RegaloEnCurso }) {
+  if (r.dividirCon) {
+    return (
+      <div className="mt-1.5 flex flex-col gap-2 px-1 text-xs font-semibold">
+        <span>
+          {r.sigueEnLaLista
+            ? 'Ya no tenés el link de esta lista: el regalo lo terminás desde acá.'
+            : 'Lo sacaron de la lista: si ya lo compraste, dividí lo que salió; si no, cancelalo.'}
+        </span>
+        <details className="group flex flex-col">
+          <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            Ya lo compré: dividir
+          </summary>
+          <div className="mt-3">
+            <CompraGrupalForm giftId={r.giftId} miembros={r.dividirCon} sugerido={null} />
+          </div>
+        </details>
+        <SacarDelRegalo giftId={r.giftId} otros={r.dividirCon.filter((m) => !m.esYo)} sacados={r.sacados} />
+        <CancelarRegalo giftId={r.giftId} />
+      </div>
+    )
+  }
+  if (r.soyEncargado) return null
+  return (
+    <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
+      <span className="flex-1">
+        {r.sigueEnLaLista ? 'Ya no tenés el link de esta lista' : 'Lo sacaron de la lista'}. Si no vas a poner, bajate desde acá.
+      </span>
+      <MeBajo giftId={r.giftId} />
+    </div>
+  )
+}
+
+/**
+ * Lo que compró en un regalo y no puede corregir en el deseo (lo sacaron de la lista, o cambiaron el link): desde acá,
+ * mientras nadie le pagó (o el primer mes, si los demás quedaron en 0: ver sePuedeCorregir). Cambia con cada corrección:
+ * el formulario vuelve a arrancar cerrado y con lo nuevo.
+ */
+function Corregir({ c }: { c: CompraParaCorregir }) {
+  const alguienDebe = c.miembros.some((m) => !m.esYo && m.monto > 0)
+  return (
+    <li className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+      <p className="text-sm leading-snug">
+        <span className="font-bold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
+        <span className="block text-xs font-medium text-gr-muted">
+          Lo compraste por {pesos(c.total)} · {alguienDebe ? 'nadie te pagó todavía' : 'los demás quedaron en $0'}
+        </span>
+      </p>
+      <details key={`${c.total}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
+        <summary className={`${linkSubrayado} flex cursor-pointer list-none items-center text-sm [&::-webkit-details-marker]:hidden`}>
+          Corregir la compra
+        </summary>
+        <div className="mt-2">
+          <CompraGrupalForm giftId={c.giftId} miembros={c.miembros} sugerido={null}
+                            corregir={{ total: c.total, nota: c.nota, partes: Object.fromEntries(c.miembros.map((m) => [m.userId, m.monto])) }} />
+        </div>
+      </details>
+    </li>
+  )
+}
+
+export default async function Cuentas({ searchParams }: { searchParams: Promise<{ correccion?: string }> }) {
+  const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const c = await misCuentas(db, session.userId)
-  const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length
+  const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
+  const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
   return (
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
@@ -77,6 +172,8 @@ export default async function Cuentas() {
           <span className="font-display text-[28px] leading-none font-extrabold tabular-nums">{pesos(c.teDeben)}</span>
         </div>
       </div>
+
+      <CartelCorreccion motivo={correccion} cerrar="/cuentas" />
 
       {vacio && (
         <div className="relative mt-2 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">
@@ -100,29 +197,27 @@ export default async function Cuentas() {
           <ul className="flex flex-col gap-2.5">
             {c.enCurso.map((r) => (
               <li key={r.giftId}>
-                <Link href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+                <QuizasLink href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
                   <span className="min-w-0 flex-1 text-sm leading-snug">
                     <span className="font-bold [overflow-wrap:anywhere]">{r.itemTitulo}</span> para {r.para}
                     <span className="block text-xs font-medium text-gr-muted">
                       {r.soyEncargado ? 'Lo organizás vos' : `Lo organiza ${r.encargado}`} · {r.personas.length} {r.personas.length === 1 ? 'persona' : 'personas'} · todavía no se compró
                     </span>
                   </span>
-                  <Icon name="chevron" size={18} strokeWidth={2.6} />
-                </Link>
-                {!r.sigueEnLaLista && (
-                  <div className="mt-1.5 flex items-center gap-2 px-1 text-xs font-semibold">
-                    <span className="flex-1">Lo sacaron de la lista: ya no hace falta comprarlo.</span>
-                    {r.soyEncargado && (
-                      <form action={cancelGroupGiftAction}>
-                        <input type="hidden" name="giftId" value={r.giftId} />
-                        <button className="min-h-11 font-bold underline decoration-2 underline-offset-4">Cancelar el regalo</button>
-                      </form>
-                    )}
-                  </div>
-                )}
+                  {r.href && <Icon name="chevron" size={18} strokeWidth={2.6} />}
+                </QuizasLink>
+                {(!r.sigueEnLaLista || !r.href) && <DesdeAca r={r} />}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {aCorregir.length > 0 && (
+        <section className="flex flex-col gap-2.5">
+          <h2 className="font-display text-[22px] leading-none font-extrabold tracking-[-0.03em]">Lo que compraste</h2>
+          <p className="text-[13px] font-medium leading-snug">Mientras nadie te pague, podés cambiar el total o cómo se dividió.</p>
+          <ul className="flex flex-col gap-2.5">{aCorregir.map((x) => <Corregir key={x.giftId} c={x} />)}</ul>
         </section>
       )}
 

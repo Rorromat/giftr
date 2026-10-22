@@ -1,0 +1,1 @@
+ALTER TABLE "lists" ADD COLUMN "corte_evento" timestamp with time zone;

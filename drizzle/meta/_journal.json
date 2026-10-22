@@ -57,6 +57,104 @@
       "when": 1792553335330,
       "tag": "0007_fotos_deseo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792580204429,
+      "tag": "0008_listas_de_invitado",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792582865029,
+      "tag": "0009_ex_miembros_de_grupo",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792585556605,
+      "tag": "0010_link_para_regalar_cambiado",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792585560390,
+      "tag": "0011_destrabar_co_duenos",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792596394371,
+      "tag": "0012_limpiar_regalos_repetidos",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792601983248,
+      "tag": "0013_regalo_sacados_y_recordatorio",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792610629875,
+      "tag": "0014_corte_del_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792613103881,
+      "tag": "0015_fotos_deseo_por_usuario",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792618277023,
+      "tag": "0016_items_foto_deseo_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792620361534,
+      "tag": "0017_indices_de_consultas",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792620487503,
+      "tag": "0018_email_de_usuario_no_unico",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792620700241,
+      "tag": "0019_prueba_de_avisos",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792626260267,
+      "tag": "0020_co_duenos_unido_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792637905474,
+      "tag": "0021_deseo_ocupa_desde",
+      "breakpoints": true
     }
   ]
 }

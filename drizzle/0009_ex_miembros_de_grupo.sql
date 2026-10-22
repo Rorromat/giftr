@@ -1,0 +1,1 @@
+ALTER TABLE "list_members" ADD COLUMN "salio_at" timestamp with time zone;

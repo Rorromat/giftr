@@ -2,6 +2,8 @@
 // Las opciones son una lista curada de lo más popular en Argentina; lo que se guarda se valida contra ella.
 // Sin dependencias de servidor: el formulario de la bienvenida (cliente) usa este mismo catálogo.
 
+import { recortar } from '@/lib/limites'
+
 export const DEPORTES = [
   'Fútbol', 'Pádel', 'Running', 'Gimnasio', 'Tenis', 'Básquet', 'Vóley', 'Hockey', 'Rugby', 'Natación',
   'Ciclismo', 'Golf', 'Yoga', 'Pilates', 'Crossfit', 'Boxeo', 'Artes marciales', 'Trekking', 'Escalada',
@@ -94,10 +96,9 @@ export const GUSTOS_VACIOS: Gustos = {
   talles: { remera: null, pantalon: null, calzado: null }, bebidas: [], noRegalar: [], nota: null,
 }
 
-const texto = (v: unknown, max: number) => {
-  const t = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : ''
-  return t || null
-}
+// por caracteres de verdad: cortar un emoji al medio deja medio carácter, que el jsonb de Postgres rechaza (y no se
+// guardaba nada de la bienvenida)
+const texto = (v: unknown, max: number) => (typeof v === 'string' && recortar(v.replace(/\s+/g, ' '), max)) || null
 const lista = (v: unknown) => (Array.isArray(v) ? v : v == null ? [] : [v]).filter((x): x is string => typeof x === 'string')
 const delCatalogo = (v: unknown, catalogo: readonly string[]) => [...new Set(lista(v).filter((x) => catalogo.includes(x)))]
 const NOMBRES_COLORES: readonly string[] = COLORES.map((c) => c.nombre)

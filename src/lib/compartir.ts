@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { duenosDeLista, juntarNombres } from '@/lib/groups'
+import { duenosDeLista, esToken, esUuid, juntarNombres } from '@/lib/groups'
 
 // Lo que se muestra al compartir un link (vista previa de WhatsApp, imagen Open Graph).
 // Es lo mismo que ve cualquiera con el link, y NUNCA incluye reservas, compras ni comentarios:
@@ -27,6 +27,7 @@ export type ListaCompartida = {
 const PESO = { mucho: 0, gustaria: 1, suelta: 2 } as const
 
 async function listaPorToken(db: Db, token: string) {
+  if (!esToken(token)) return null
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, token))
   if (!list) return null
   const duenos = await duenosDeLista(db, list)
@@ -35,6 +36,7 @@ async function listaPorToken(db: Db, token: string) {
 
 /** El deseo tal como se ve al compartirlo. Null si no existe, no es de esa lista o ya no está activo. */
 export async function itemParaCompartir(db: Db, token: string, itemId: string): Promise<ItemCompartido | null> {
+  if (!esUuid(itemId)) return null
   const l = await listaPorToken(db, token)
   if (!l) return null
   const [i] = await db.select({
@@ -69,13 +71,15 @@ export function textoDueno(i: { titulo: string }, url: string) {
 
 /**
  * ¿Se puede ir a buscar esta foto desde el servidor? Solo https a un host con nombre (nada de IPs,
- * localhost ni nombres internos): las fotos las carga cualquiera y no queremos pedidos a la red interna.
+ * localhost ni nombres internos, tampoco con un punto al final): las fotos las carga cualquiera y no queremos
+ * pedidos a la red interna. Esto mira el texto; al conectarse, bajarFoto revisa además a qué IP resuelve.
  */
 export function esFotoPublica(url: string): boolean {
   let u: URL
   try { u = new URL(url) } catch { return false }
   if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
-  const h = u.hostname.toLowerCase()
+  // "localhost." y "db.internal." son los mismos nombres que sin el punto
+  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
   if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
   if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
   return true

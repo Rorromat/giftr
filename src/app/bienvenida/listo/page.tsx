@@ -35,6 +35,9 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
     { paso: 7, icono: 'ban', titulo: 'Lo que no querés', valor: unir(g?.noRegalar, g?.nota) },
   ]
   const completas = filas.filter((f) => f.valor).length
+  // Completar un paso desde acá vuelve acá. editar=1 es el modo de Perfil (Guardar/Cancelar y vuelta a Perfil): solo si
+  // vino de Perfil; la primera vez llevaba a un usuario nuevo a Perfil en vez de a cargar su primer deseo.
+  const editar = desde === 'perfil' ? 'editar=1&' : ''
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo').length
 
   return (
@@ -54,7 +57,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
           <p className="font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">{nombre}</p>
           <p className="text-[13px] font-medium">{foto ? 'Con tu foto' : 'Sin foto todavía'}</p>
         </div>
-        {!foto && <Link href="/bienvenida?editar=1" className="text-sm font-bold underline underline-offset-4">Subir foto</Link>}
+        {!foto && <Link href={`/bienvenida?${editar}paso=0`} className="text-sm font-bold underline underline-offset-4">Subir foto</Link>}
       </div>
 
       <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-sticker border-[3px] border-gr-ink bg-gr-surface px-3.5">
@@ -69,7 +72,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
             </div>
             {f.valor
               ? <Icon name="check" size={20} strokeWidth={3} className="flex-none" />
-              : <Link href={`/bienvenida?editar=1&paso=${f.paso}`} className="flex-none text-[13px] font-bold underline underline-offset-4">Completar</Link>}
+              : <Link href={`/bienvenida?${editar}paso=${f.paso}`} className="flex-none text-[13px] font-bold underline underline-offset-4">Completar</Link>}
           </li>
         ))}
       </ul>

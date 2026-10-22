@@ -1,0 +1,52 @@
+import { linkHttp } from '@/lib/links'
+import { LARGO } from '@/lib/limites'
+
+// Las decisiones del campo de foto del formulario de un deseo (FotoField), sin React ni navegador para poder probarlas.
+
+export type EstadoLink = 'ok' | 'probando' | 'no-es-foto' | 'muy-largo'
+
+/**
+ * El link de foto escrito, listo para mandar, y cómo está: ok si ya cargó como imagen en el navegador (o es el que
+ * estaba guardado, al editar: no se vuelve a pedir), probando mientras se prueba, no-es-foto si no es un link o no
+ * cargó (una página de tienda), muy-largo si no entra (el campo no tiene maxLength: cortaría lo pegado y quedaría una
+ * foto rota). Sin nada escrito, sin estado.
+ */
+export function estadoDelLink(escrito: string, guardado: string | null, probados: Record<string, boolean>): { link: string | null; estado: EstadoLink | null } {
+  const v = escrito.trim()
+  if (!v) return { link: null, estado: null }
+  if (v === guardado) return { link: v, estado: 'ok' }
+  if (v.length > LARGO.link) return { link: null, estado: 'muy-largo' }
+  const link = linkHttp(v)
+  if (!link) return { link: null, estado: 'no-es-foto' }
+  const probado = Object.hasOwn(probados, link) ? probados[link] : undefined
+  return { link, estado: probado === undefined ? 'probando' : probado ? 'ok' : 'no-es-foto' }
+}
+
+/**
+ * Por qué el formulario todavía no se puede mandar (null si se puede). Mientras sube una foto o se prueba un link, escrito o
+ * copiado con Pegar, el deseo se guardaría sin la foto; con un link que no es una foto, se mandaría sin foto y el que lo
+ * escribió no se entera. Con una foto subida, lo escrito en el link ya no cuenta (la subida lo vacía).
+ */
+export function porQueEsperar(p: { subiendo: boolean; probandoPegado: boolean; subida: boolean; estado: EstadoLink | null }):
+  'subiendo' | Exclude<EstadoLink, 'ok'> | null {
+  if (p.subiendo) return 'subiendo'
+  if (p.probandoPegado) return 'probando'
+  if (p.subida || p.estado === 'ok') return null
+  return p.estado
+}
+
+/**
+ * Un pegado que trae una imagen, en cualquier campo del formulario. Una planilla o una nota copian el texto y además una
+ * imagen de cómo se ve: el texto se pega normal en el campo y la imagen se sube solo si todavía no hay foto. Una imagen
+ * sola ("Copiar imagen") es la foto: sin texto, o con su link y sin HTML (Safari) o con el HTML de la imagen (Chrome). Una
+ * celda de planilla con el link del producto trae su tabla en HTML, sin <img>: el link va al campo y no pisa la foto.
+ * Una app que copie un link y una imagen sin HTML se sigue tomando como "Copiar imagen": no hay cómo distinguirla.
+ * Nunca dos subidas a la vez.
+ */
+export function alPegarImagen(p: { texto: string; html: string; enCampoDeTexto: boolean; hayFoto: boolean; subiendo: boolean }):
+  { dejarTexto: boolean; subir: boolean } {
+  const texto = p.texto.trim()
+  const imagenSola = !texto || (!!linkHttp(texto) && (!p.html.trim() || /<img\b/i.test(p.html)))
+  if (p.enCampoDeTexto && !imagenSola) return { dejarTexto: true, subir: !p.hayFoto && !p.subiendo }
+  return { dejarTexto: false, subir: !p.subiendo }
+}

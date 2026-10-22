@@ -28,8 +28,9 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
         <figure className="gr-sticker p-3.5">
           <figcaption className="mb-2.5 text-xs font-bold uppercase tracking-wide text-gr-muted">Regalos comprados por persona</figcaption>
           <ul className="flex flex-col gap-2.5">
-            {ranking.map((r) => (
-              <li key={r.key} title={`${nombre(r)}: ${r.cantidad} ${r.cantidad === 1 ? 'regalo' : 'regalos'}`}
+            {/* key por posición: el ranking no lleva ids (el de un invitado es parte de su credencial) */}
+            {ranking.map((r, i) => (
+              <li key={i} title={`${nombre(r)}: ${r.cantidad} ${r.cantidad === 1 ? 'regalo' : 'regalos'}`}
                   className="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)] items-center gap-2.5">
                 <span className={`truncate text-sm ${r.esYo ? 'font-extrabold' : 'font-semibold'}`}>{nombre(r)}</span>
                 <span className="flex min-w-0 items-center gap-2">
@@ -43,7 +44,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
           </ul>
         </figure>
       ) : (
-        <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold">
+        <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold [overflow-wrap:anywhere]">
           {ranking[0].esYo ? 'Vos te ocupaste' : `${ranking[0].nombre} se ocupó`} {entradas.length === 1 ? 'del único regalo' : `de los ${entradas.length} regalos`} hasta ahora.
         </p>
       )}
@@ -52,8 +53,8 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
         {entradas.slice(0, 6).map((e) => (
           <li key={e.id} className="flex items-start gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
             <span className="mt-0.5 flex-none rounded-lg bg-gr-ink px-2 py-0.5 text-xs font-bold text-gr-bg tabular-nums">{fecha(e.fecha)}</span>
-            <span className="min-w-0 text-sm leading-snug">
-              <span className="font-bold [overflow-wrap:anywhere]">{e.titulo}</span>
+            <span className="min-w-0 text-sm leading-snug [overflow-wrap:anywhere]">
+              <span className="font-bold">{e.titulo}</span>
               {' · '}{e.grupal ? `regalo grupal de ${e.encargado}${e.con.length ? ` con ${juntarNombres(e.con)}` : ''}` : `lo compró ${e.encargado}`}
               {e.nota && <span className="text-gr-muted"> — {e.nota}</span>}
             </span>

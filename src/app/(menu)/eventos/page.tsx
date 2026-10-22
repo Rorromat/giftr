@@ -5,17 +5,29 @@ import { db } from '@/db'
 import { misCuentas, pesos } from '@/lib/regalos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, hoyLocal, miCumple, misEventos, type Evento } from '@/lib/events'
 import { AvatarStack, Icon, ItemPhoto, Seccion, Starburst } from '@/components/ui'
+import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={150} />
   return (
     <div className="grid h-[150px] border-b-[3px] border-gr-ink" style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
       {e.fotos.map((src, i) => (
-        // eslint-disable-next-line @next/next/no-img-element -- fotos de tiendas externas
-        <img key={i} src={src} alt="" className={`size-full object-cover ${i ? 'border-l-[3px] border-gr-ink' : ''}`} />
+        <FotoConRespaldo key={i} src={src} className={`size-full object-cover ${i ? 'border-l-[3px] border-gr-ink' : ''}`}
+                         respaldo={<span className={`size-full bg-gr-bg ${i ? 'border-l-[3px] border-gr-ink' : ''}`} />} />
       ))}
     </div>
   )
+}
+
+/** "Ya reservaste 1 regalo · Estás en un regalo grupal": los sueltos y los grupales por separado (sumarse no es reservar). */
+function TeOcupas({ e }: { e: Evento }) {
+  const grupales = e.misGrupales ?? 0
+  const sueltos = (e.misReservas ?? 0) - grupales
+  const partes = [
+    sueltos > 0 && `Ya reservaste ${sueltos} ${sueltos === 1 ? 'regalo' : 'regalos'}`,
+    grupales > 0 && `Estás en ${grupales === 1 ? 'un regalo grupal' : `${grupales} regalos grupales`}`,
+  ].filter(Boolean)
+  return <p className="text-[13px] font-semibold">{partes.join(' · ')}</p>
 }
 
 function Estado({ e }: { e: Evento }) {
@@ -24,14 +36,14 @@ function Estado({ e }: { e: Evento }) {
   return (
     <>
       {e.misReservas
-        ? <p className="text-[13px] font-semibold">Ya reservaste {e.misReservas} {e.misReservas === 1 ? 'regalo' : 'regalos'}</p>
+        ? <TeOcupas e={e} />
         : <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-[13px] font-bold">Todavía no reservaste nada</p>}
       {e.ultimo && <p className="text-[13px] font-medium text-gr-muted [overflow-wrap:anywhere]">El último lo compró {e.ultimo.encargado}: {e.ultimo.titulo}</p>}
     </>
   )
 }
 
-function Proximos({ eventos }: { eventos: Evento[] }) {
+function Proximos({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
   return (
     <ul className="flex flex-col gap-5">
       {eventos.map((e, i) => (
@@ -46,7 +58,7 @@ function Proximos({ eventos }: { eventos: Evento[] }) {
             <div className="flex items-center gap-3 px-4 py-3.5">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <h2 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{e.titulo}</h2>
-                <p className="text-sm font-medium">{[fechaLarga(e.fecha), e.contexto].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm font-medium">{[fechaLarga(e.fecha, hoy), e.contexto].filter(Boolean).join(' · ')}</p>
                 <Estado e={e} />
               </div>
               <AvatarStack nombres={e.personas.slice(0, 3)} />
@@ -83,7 +95,7 @@ function TodoElAnio({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
         {eventos.map((e) => (
           <li key={e.listId}>
             <Link href={e.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2">
-              <span className="flex-none rounded-xl bg-gr-ink px-2.5 py-1 font-display text-[15px] font-extrabold text-gr-bg">{fechaCorta(e.fecha)}</span>
+              <span className="flex-none rounded-xl bg-gr-ink px-2.5 py-1 font-display text-[15px] font-extrabold text-gr-bg">{fechaCorta(e.fecha, hoy)}</span>
               <span className="min-w-0 font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">{e.titulo}</span>
             </Link>
           </li>
@@ -109,11 +121,14 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
         <p className="text-[15px] font-medium">Los cumples y fechas de tu gente, con tiempo.</p>
       </div>
 
-      {(cuentas.debes > 0 || cuentas.teDeben > 0) && (
+      {/* los totales son netos: con alguien pueden estar a mano y tener partes sin marcar */}
+      {cuentas.personas.length > 0 && (
         <Link href="/cuentas" className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-ink px-3.5 py-2 text-sm font-semibold text-gr-bg">
           <span>
             Cuentas pendientes:{' '}
-            {[cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')}
+            {cuentas.debes || cuentas.teDeben
+              ? [cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+              : 'están a mano, falta marcarlo'}
           </span>
           <Icon name="chevron" size={18} strokeWidth={2.6} className="text-gr-accent" />
         </Link>
@@ -130,7 +145,7 @@ export default async function Eventos({ searchParams }: { searchParams: Promise<
           <p>Acá aparecen los cumples de la gente cuyas listas abrís y las fechas de tus grupos.</p>
           <p>Pediles el link de su lista y abrilo con tu cuenta.</p>
         </div>
-      ) : anio ? <TodoElAnio eventos={eventos} hoy={hoy} /> : <Proximos eventos={eventos} />}
+      ) : anio ? <TodoElAnio eventos={eventos} hoy={hoy} /> : <Proximos eventos={eventos} hoy={hoy} />}
 
       {!cumple && (
         <Link href="/perfil#cumple" className="gr-sticker flex items-center justify-between gap-3 px-4 py-3">

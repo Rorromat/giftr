@@ -5,28 +5,51 @@ import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
-import type { GiverItemView } from '@/lib/serialize'
+import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
+import { identificado } from '@/lib/types'
+import { nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
 import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
-import { GuestGate } from '@/components/GuestGate'
+import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
+import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 
-function estadoNoDisponible(item: GiverItemView) {
-  if (item.claims.some((c) => c.estado === 'comprado')) return '✓ Comprado'
-  const grupal = item.claims.find((c) => c.grupal)?.grupal
-  if (grupal) return grupal.soyParte ? 'Estás en el regalo grupal' : `Regalo grupal de ${grupal.personas.length} · sumate`
-  return `Reservado por ${item.claims[0]?.claimerNombre ?? 'alguien'}`
+// Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
+type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
+
+function estadoNoDisponible(item: Tarjeta) {
+  // comprado solo si ya se compró todo; si no, quién se ocupa (sin esconder a los demás detrás del primero)
+  if (item.claims.length && item.claims.every((c) => c.estado === 'comprado')) return '✓ Comprado'
+  const grupal = item.claims.find((c) => c.grupal && c.estado === 'reservado')?.grupal
+  if (grupal && item.claims.length === 1) {
+    if (grupal.soyParte) return 'Estás en el regalo grupal'
+    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo)
+    return `Regalo grupal de ${grupal.personas.length}${grupal.meSacaron ? '' : ' · sumate'}`
+  }
+  const primero = item.claims.find((c) => c.esMia) ?? item.claims[0]
+  const otros = item.claims.length - 1
+  return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`
 }
 
-function YaLoReservaste({ grupal = false }: { grupal?: boolean }) {
+/** Cuántas quedan de un deseo de varias unidades, o cuántas reservas hay de más (ver avisoDeCupo). */
+function cupo(item: Tarjeta) {
+  const c = avisoDeCupo(item, item.claims.length)
+  if (!c) return null
+  return c.deMas ? `Pide ${item.cantidad} y hay ${c.reservas} reservas: arréglenlo en el deseo` : `quedan ${c.quedan} de ${item.cantidad}`
+}
+
+function YaLoReservaste({ item }: { item: Tarjeta }) {
+  const grupal = item.claims.some((c) => c.grupal?.soyParte)
+  const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
   return (
     <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-gr-ink px-3 text-[13px] font-bold text-gr-accent">
-      <Icon name={grupal ? 'users' : 'lock'} size={14} strokeWidth={2.6} />{grupal ? 'En el regalo grupal' : 'Ya lo reservaste'}
+      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.6} />
+      {grupal ? 'En el regalo grupal' : compraste ? 'Ya lo compraste' : 'Ya lo reservaste'}
     </span>
   )
 }
@@ -44,38 +67,58 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string }>
 }) {
   const { token } = await params
-  const { cat, disp, codazo } = await searchParams
+  const { cat, disp, codazo, reserva } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) notFound()
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
-  const identified = !!viewer.userId || !!viewer.guestId
-  const [evento, historial, gustos] = await Promise.all([
+  // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
+  const veTodo = vista.role === 'giver'
+  const identified = identificado(viewer)
+  const [evento, historial, gustos, quien] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
-    identified ? historialDeLista(db, vista.listId, viewer) : null,
+    veTodo ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
-    viewer.userId ? seguirLista(db, viewer.userId, vista.listId) : null,
+    identified ? nombreDeViewer(db, viewer) : null,
+    viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
   const cuenta = evento && evento.dias <= 60
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
     : null
 
-  const categorias = [...new Set(vista.items.map((i) => i.categoria).filter(Boolean))] as string[]
-  let mostrados = vista.items
+  const tarjetas: Tarjeta[] = vista.role === 'giver'
+    ? vista.items
+    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null }))
+  const categorias = [...new Set(tarjetas.map((i) => i.categoria).filter(Boolean))] as string[]
+  let mostrados = tarjetas
   if (cat) mostrados = mostrados.filter((i) => i.categoria === cat)
-  if (disp === '1') mostrados = mostrados.filter((i) => i.disponible)
+  if (disp === '1' && veTodo) mostrados = mostrados.filter((i) => i.disponible)
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
 
   // Foto hero: el primer deseo de la lista tal como viene ordenada (solo si está disponible).
   const hero = mostrados[0]?.disponible ? mostrados[0] : undefined
   const resto = mostrados.filter((i) => i !== hero)
+
+  // Si una reserva no sale, se vuelve acá con los mismos filtros (y sin el cartel cuando la próxima sale bien).
+  const filtros = new URLSearchParams({ ...(cat && { cat }), ...(disp === '1' && { disp }) }).toString()
+  const aqui = `/l/${token}${filtros ? `?${filtros}` : ''}`
+  // Sin nombre, "Reservar" lo pide. Un invitado que todavía no dijo que esta lista no es suya, primero lo dice (así ve
+  // qué está libre de verdad); en un navegador donde entró con su cuenta alguien de la lista, no (ver accesoALista).
+  const reservar = (itemId: string, variant?: 'primary') => vista.role === 'anonimo' && vista.motivo !== 'sin_identidad'
+    ? null
+    : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
+
+  const heroAccion = hero && (hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
+    ? <YaLoReservaste item={hero} />
+    : reservar(hero.id, 'primary'))
+  const heroCupo = hero && cupo(hero)
 
   return (
     <main className="flex flex-col gap-3 pb-32 pt-[52px]">
@@ -102,10 +145,17 @@ export default async function ListaAjena({
         </p>
       )}
 
-      <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
-        <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-        {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
-      </p>
+      {veTodo ? (
+        <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
+          <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
+          {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
+        </p>
+      ) : vista.motivo === 'ex_dueno' ? <ExDueno />
+        : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+          : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+            : <QuienSos token={token} volver={aqui} />}
+
+      <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 
       {gustos.map((g) => (
         <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
@@ -116,7 +166,7 @@ export default async function ListaAjena({
 
       <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1">
         <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
-        <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>
+        {veTodo && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
         {categorias.map((c) => (
           <Link key={c} href={`/l/${token}?cat=${encodeURIComponent(c)}`} aria-current={cat === c ? 'page' : undefined}
                 className="gr-chip">
@@ -127,7 +177,7 @@ export default async function ListaAjena({
 
       {mostrados.length === 0 && (
         <p className="mt-8 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
-          {vista.items.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
+          {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
         </p>
       )}
 
@@ -145,15 +195,11 @@ export default async function ListaAjena({
               <Link href={`/l/${token}/item/${hero.id}`} className="font-display text-[22px] leading-tight font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere]">
                 {hero.titulo}
               </Link>
-              {hero.notas && <p className="text-sm leading-snug">{hero.notas}</p>}
-              {hero.cantidad > 1 && <p className="text-xs font-semibold text-gr-muted">quedan {hero.quedan} de {hero.cantidad}</p>}
+              {hero.notas && <p className="text-sm leading-snug [overflow-wrap:anywhere]">{hero.notas}</p>}
+              {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex-[1.3]">
-                {hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
-                  ? <YaLoReservaste grupal={hero.claims.some((c) => c.grupal?.soyParte)} />
-                  : <GuestGate token={token} itemId={hero.id} identified={identified} variant="primary" />}
-              </div>
+              {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
               <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn min-h-[50px] flex-1 font-sans text-sm font-bold">Ver más</Link>
             </div>
           </div>
@@ -164,6 +210,7 @@ export default async function ListaAjena({
         <ul className="mt-1.5 grid grid-cols-2 items-start gap-3.5 pr-[5px]">
           {resto.map((item, i) => {
             const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
+            const cuantas = cupo(item)
             return (
               <li key={item.id} className="gr-sticker relative rounded-[20px] shadow-[4px_4px_0_var(--gr-ink)]"
                   style={{ transform: `rotate(${i % 2 ? 1 : -1}deg)` }}>
@@ -172,7 +219,7 @@ export default async function ListaAjena({
                   {item.disponible
                     ? <PriorityTag prioridad={item.prioridad} className="absolute left-2 top-2" />
                     : (
-                      <span className="absolute left-2.5 top-10 max-w-[calc(100%-20px)] -rotate-8 rounded-[10px] bg-gr-ink px-2.5 py-1.5 font-display text-[15px] leading-tight font-extrabold text-gr-accent">
+                      <span className="absolute left-2.5 top-10 max-w-[calc(100%-20px)] -rotate-8 rounded-[10px] bg-gr-ink px-2.5 py-1.5 font-display text-[15px] leading-tight font-extrabold text-gr-accent [overflow-wrap:anywhere]">
                         {estadoNoDisponible(item)}
                       </span>
                     )}
@@ -182,11 +229,9 @@ export default async function ListaAjena({
                     {item.titulo}
                   </Link>
                   {(item.precio ?? item.rangoPrecio) && <p className="text-xs font-semibold">{item.precio ?? item.rangoPrecio}</p>}
-                  {item.cantidad > 1 && <p className="text-xs text-gr-muted">quedan {item.quedan} de {item.cantidad}</p>}
+                  {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
                   <div className="mt-1 flex flex-col items-start gap-0.5">
-                    {item.disponible && (yaEsMio
-                      ? <YaLoReservaste grupal={item.claims.some((c) => c.grupal?.soyParte)} />
-                      : <GuestGate token={token} itemId={item.id} identified={identified} />)}
+                    {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
                     <Link href={`/l/${token}/item/${item.id}`}
                           className="inline-flex min-h-11 items-center text-[13px] font-bold underline decoration-2 underline-offset-4">
                       Ver más
@@ -201,10 +246,15 @@ export default async function ListaAjena({
 
       <div className="mt-4">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
-                identified={identified} resultado={codazo} />
+                identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
       </div>
 
       {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}
+
+      {/* viendo la lista, el nombre con el que reserva solo sale acá; con "¿Es tu lista?" arriba, el link ya va ahí */}
+      {quien && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
+        <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>
+      )}
 
       <div className="fixed inset-x-0 bottom-0 z-10 bg-gr-ink text-gr-bg">
         <div className="mx-auto flex h-[74px] max-w-md items-center justify-between px-[18px] pb-2.5">

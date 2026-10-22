@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { archiveItemAction } from '@/app/actions'
+import { archiveItemAction, restoreItemAction } from '@/app/actions'
+import { BotonEnviar } from '@/components/BotonEnviar'
 import { PrioritySelect } from '@/components/PrioritySelect'
 import { Icon, ItemPhoto, PriceSticker, PriorityTag } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
@@ -12,6 +13,8 @@ const COLLAGE = [
   { foto: 150, giro: 0.8, precio: -5 },
   { foto: 182, giro: -1, precio: 4 },
 ]
+
+const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
 
 /** Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas. */
 export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; shareToken: string }) {
@@ -43,11 +46,20 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
                        href={`https://wa.me/?text=${encodeURIComponent(textoDueno(item, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${item.id}`))}`}>
                       Mandar por WhatsApp
                     </a>
-                    <form action={archiveItemAction} className="flex flex-col">
-                      <input type="hidden" name="itemId" value={item.id} />
-                      <button name="estado" value="lo_tengo" className="min-h-11 border-t-[2.5px] border-gr-ink px-3 text-left text-sm font-bold">Ya lo tengo</button>
-                      <button name="estado" value="no_lo_quiero" className="min-h-11 border-t-[2.5px] border-gr-ink px-3 text-left text-sm font-bold">Ya no lo quiero</button>
-                    </form>
+                    {/* Sacarlo pide confirmar (un toque sin querer lo hacía desaparecer). El texto es siempre el mismo: no dice nada de reservas. */}
+                    {ARCHIVAR.map(([estado, texto]) => (
+                      <details key={estado} className="border-t-[2.5px] border-gr-ink">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
+                          {texto}
+                        </summary>
+                        <form action={archiveItemAction} className="flex flex-col gap-2 px-3 pb-3">
+                          <input type="hidden" name="itemId" value={item.id} />
+                          <input type="hidden" name="estado" value={estado} />
+                          <p className="text-xs font-medium leading-snug">Sale de la lista. Si te arrepentís, lo volvés a poner desde Archivados, abajo de todo.</p>
+                          <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px] text-[15px]">Sí, sacarlo</BotonEnviar>
+                        </form>
+                      </details>
+                    ))}
                   </div>
                 </details>
               </div>
@@ -62,4 +74,36 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
       </ul>
     </section>
   ))
+}
+
+/**
+ * Los deseos que salieron de la lista ("Ya lo tengo", "Ya no lo quiero"), para volver a ponerlos con todo lo que tenían.
+ * Como el resto de la vista del dueño, sin nada de reservas.
+ */
+export function Archivados({ items, grupo = false }: { items: OwnerItemView[]; grupo?: boolean }) {
+  if (!items.length) return null
+  return (
+    <details className="mt-4 flex flex-col">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 self-start text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+        Archivados ({items.length})
+      </summary>
+      <ul className="mt-1 flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3">
+        {/* los últimos primero */}
+        {[...items].reverse().map((item) => (
+          <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
+            <span className="min-w-0 flex-1 text-sm leading-snug">
+              <span className="font-bold [overflow-wrap:anywhere]">{item.titulo}</span>
+              <span className="block text-xs font-medium text-gr-muted">
+                {item.estadoDueno === 'lo_tengo' ? (grupo ? 'Ya lo tienen' : 'Ya lo tenés') : grupo ? 'Ya no lo quieren' : 'Ya no lo querés'}
+              </span>
+            </span>
+            <form action={restoreItemAction}>
+              <input type="hidden" name="itemId" value={item.id} />
+              <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{grupo ? 'Volver a la lista' : 'Volver a mi lista'}</BotonEnviar>
+            </form>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
 }

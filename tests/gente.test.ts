@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createTestDb } from './helpers'
+import { createTestDb, seguir } from './helpers'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { crearGrupo, unirseAGrupo } from '@/lib/groups'
-import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, misEventos, seguirLista } from '@/lib/events'
+import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, misEventos } from '@/lib/events'
 import { miGente } from '@/lib/gente'
 
 const HOY = new Date(Date.UTC(2026, 7, 8)) // sábado 8 de agosto de 2026
@@ -29,7 +29,7 @@ async function setup() {
   ])
   const mellizos = await crearGrupo(db, caro.id, { nombre: 'Cumple de los mellizos' })
   await guardarFechaGrupo(db, mellizos, caro.id, '2026-10-12', true)
-  for (const listId of [deEuge.id, deRodri.id, mellizos]) await seguirLista(db, sofi.id, listId)
+  for (const listId of [deEuge.id, deRodri.id, mellizos]) await seguir(db, sofi.id, listId)
   return { db, euge, rodri, sofi, caro, deEuge, deRodri, mellizos }
 }
 
@@ -57,6 +57,21 @@ test('una lista de la que sos co-dueño no es tu gente, aunque la hayas abierto 
   const [{ inviteToken }] = await db.select({ inviteToken: lists.inviteToken }).from(lists).where(eq(lists.id, mellizos))
   await unirseAGrupo(db, inviteToken!, sofi.id)
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Euge Mateus', 'rodri'])
+  // si sale del grupo tampoco vuelve: lo armó ella, así que no ve qué le regalan (ni en Tu gente ni en Eventos)
+  expect(await salirDeGrupo(db, mellizos, sofi.id)).toBe(true)
+  expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Euge Mateus', 'rodri'])
+  expect((await misEventos(db, sofi.id, HOY)).map((e) => e.titulo)).toEqual(['Cumple de Euge'])
+})
+
+test('para quien sigue un grupo, sus dueños son los que están: el que salió ya no figura', async () => {
+  const { db, euge, sofi, mellizos } = await setup()
+  const [{ inviteToken }] = await db.select({ inviteToken: lists.inviteToken }).from(lists).where(eq(lists.id, mellizos))
+  await unirseAGrupo(db, inviteToken!, euge.id)
+  const grupo = async () => (await miGente(db, sofi.id, HOY)).find((c) => c.listId === mellizos)!
+  expect((await grupo()).duenos.map((d) => d.nombre)).toEqual(['Caro', 'Euge Mateus'])
+  await salirDeGrupo(db, mellizos, euge.id)
+  expect((await grupo()).duenos.map((d) => d.nombre)).toEqual(['Caro'])
+  expect((await misEventos(db, sofi.id, HOY)).find((e) => e.listId === mellizos)!.personas).toEqual(['Caro'])
 })
 
 test('dejar de seguir la saca de tu gente y de Eventos; si la volvés a abrir, vuelve', async () => {
@@ -65,6 +80,6 @@ test('dejar de seguir la saca de tu gente y de Eventos; si la volvés a abrir, v
   await dejarDeSeguir(db, sofi.id, 'no-es-un-id') // ignorado
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toEqual(['Cumple de los mellizos', 'rodri'])
   expect((await misEventos(db, sofi.id, HOY)).map((e) => e.titulo)).toEqual(['Cumple de los mellizos'])
-  await seguirLista(db, sofi.id, deEuge.id)
+  await seguir(db, sofi.id, deEuge.id)
   expect((await miGente(db, sofi.id, HOY)).map((c) => c.nombre)).toContain('Euge Mateus')
 })

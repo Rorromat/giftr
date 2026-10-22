@@ -3,9 +3,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
 import { getViewer } from '@/lib/viewer'
-import { MESES } from '@/lib/events'
+import { MESES, seguirLista } from '@/lib/events'
 import { perfilPublico } from '@/lib/perfil'
-import { IconoSeccion, ResumenGustos, SeccionesGustos } from '@/components/Gustos'
+import { IconoSeccion, paraResumen, ResumenGustos, SeccionesGustos } from '@/components/Gustos'
 import { TallesIlustrados } from '@/components/TallesIlustrados'
 import { AvatarSticker, BackLink, Icon, Starburst } from '@/components/ui'
 
@@ -24,14 +24,25 @@ export default async function Perfil({ params, searchParams }: Props) {
   if (!p) notFound()
   const primer = p.nombre.split(' ')[0]
   const propio = viewer.userId === p.id
+  // un dueño de la lista (el de este perfil u otro del grupo): su lista no se ve "como la ven", es la suya
+  const dueno = propio || p.otros.some((o) => o.id === viewer.userId)
+  // como en la lista: abrir el perfil de alguien con sesión sigue su lista (la de un dueño, no: es suya)
+  if (viewer.userId && !dueno) await seguirLista(db, viewer.userId, p.listId, token)
   const noRegalar = p.secciones.find((s) => s.clave === 'noRegalar')
   const nota = p.secciones.find((s) => s.clave === 'nota')
-  const hayGustos = p.secciones.some((s) => !['noRegalar', 'nota', 'talles'].includes(s.clave))
+  // "Lo que le gusta" es el resumen; los talles, lo que no y la nota van aparte. Sin nada de nada, recién ahí "no cargó".
+  const hayGustos = paraResumen(p.secciones).length > 0
+  const nadaCargado = p.secciones.length === 0
+  // Al dueño, "Ver mi lista como la ven" lo llevaba a su propia lista de siempre (no hay vista previa: la de quien
+  // regala tiene las reservas). Vuelve a su lista o a su grupo, y la flecha a donde vino.
+  const suLista = p.tipo === 'grupo' ? { href: `/grupos/${p.listId}`, texto: 'Volver al grupo' } : { href: '/mi-lista', texto: 'Volver a mi lista' }
+  const atras = !dueno ? { href: `/l/${token}`, texto: 'Volver a la lista' }
+    : p.tipo === 'grupo' ? suLista : { href: '/perfil', texto: 'Volver a Perfil' }
 
   return (
     <main className="flex flex-col gap-5 pb-32 pt-[52px]">
       <div className="flex items-center justify-between">
-        <BackLink href={`/l/${token}`} label="Volver a la lista" />
+        <BackLink href={atras.href} label={atras.texto} />
         {propio && (
           <Link href="/bienvenida?editar=1" className="gr-btn gr-btn--sm rounded-[14px] px-4 font-sans text-sm font-bold">Editar mis gustos</Link>
         )}
@@ -75,12 +86,16 @@ export default async function Perfil({ params, searchParams }: Props) {
             <div className="gr-sticker mt-2 p-3.5"><SeccionesGustos secciones={p.secciones} /></div>
           </details>
         </section>
-      ) : (
+      ) : nadaCargado ? (
         <div className="relative rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-6 text-center text-[15px] font-medium leading-snug">
           <Starburst size={48} fontSize={42} className="absolute -right-2 -top-5 rotate-12">?</Starburst>
           {propio ? 'Todavía no cargaste tus gustos.' : `${primer} todavía no cargó sus gustos.`}
           {propio && <Link href="/bienvenida?editar=1" className="mt-2 block font-bold underline underline-offset-4">Cargarlos ahora</Link>}
         </div>
+      ) : propio && (
+        <Link href="/bienvenida?editar=1" className="self-start text-sm font-bold underline decoration-2 underline-offset-4">
+          Sumá lo que te gusta: deportes, hobbies, marcas…
+        </Link>
       )}
 
       {p.talles && (
@@ -106,10 +121,10 @@ export default async function Perfil({ params, searchParams }: Props) {
         </p>
       )}
 
-      <Link href={`/l/${token}`}
+      <Link href={dueno ? suLista.href : `/l/${token}`}
             className="gr-btn gr-btn--dark fixed bottom-7 left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">
         <Icon name="gift" size={20} strokeWidth={2.4} />
-        {propio ? 'Ver mi lista como la ven' : `Ver la lista de ${primer}`}
+        {dueno ? suLista.texto : `Ver la lista de ${primer}`}
       </Link>
     </main>
   )
