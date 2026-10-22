@@ -1,10 +1,12 @@
 import { expect, test, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { eq } from 'drizzle-orm'
 import { createTestDb } from './helpers'
 import type { Db } from '@/db/types'
 import { groupGiftMembers, groupGifts, lists } from '@/db/schema'
 import { upsertUserFromGoogle } from '@/lib/users'
-import { createItem } from '@/lib/items'
+import { archiveItem, createItem } from '@/lib/items'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { getUnreadNotifications } from '@/lib/notifications'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, misCuentas, regalosDeItem, sacarDeRegalo, sumarseARegalo } from '@/lib/regalos'
@@ -23,6 +25,7 @@ import {
   buyGroupGiftAction, fixGroupGiftAction, joinGroupGiftAction, letBackGroupGiftMemberAction, markPaidAction, postponeGroupGiftReminderAction,
   removeGroupGiftMemberAction, settleUpAction,
 } from '@/app/actions'
+import { SacarDelRegalo } from '@/components/RegaloGrupal'
 
 /** Mamá pide una bici; Rodri arma el regalo y se suman Sofi y Caro. Rodri tiene la sesión. */
 async function preparar() {
@@ -188,4 +191,14 @@ test('corregir la parte del que después se sumó al grupo: el formulario dice d
     giftId: g.giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '45.000', [`parte:${sofi.id}`]: '15.000', [`parte:${tia.id}`]: '30.000',
   }, todos))).rejects.toMatchObject({ url: '/cuentas?correccion=ok' })
   expect((await misCuentas(db, sofi.id)).debes).toBe(15000)
+})
+
+test('sacar a alguien desde Cuentas con el deseo fuera de la lista: no le promete al encargado que lo puede dejar volver', async () => {
+  const { db, mama, rodri, bici, giftId } = await preparar()
+  expect(await archiveItem(db, bici.id, mama.id, 'lo_tengo')).toBe(true)
+  const [r] = (await misCuentas(db, rodri.id)).enCurso
+  expect(r).toMatchObject({ sigueEnLaLista: false, sacados: [] })
+  const html = renderToStaticMarkup(createElement(SacarDelRegalo, { giftId, otros: r.dividirCon!.filter((m) => !m.esYo), sacados: r.sacados }))
+  expect(html).toContain('no se puede volver a sumar por su cuenta')
+  expect(html).not.toContain('salvo que lo dejes')
 })

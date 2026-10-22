@@ -78,7 +78,8 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partia
         {otros.length > 0 && (
           <>
             <p className="text-[13px] font-medium leading-snug">
-              Si lo sacás, no entra en la división, le avisamos que ya no está y no se puede volver a sumar, salvo que lo dejes.
+              {/* no promete "salvo que lo dejes": con el deseo fuera de la lista (Cuentas) no hay dónde dejarlo volver */}
+              Si lo sacás, no entra en la división, le avisamos que ya no está y no se puede volver a sumar por su cuenta.
             </p>
             <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
               {otros.map((m) => (
