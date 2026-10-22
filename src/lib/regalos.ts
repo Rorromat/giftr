@@ -134,20 +134,30 @@ async function lockDeseoDelRegalo(t: Db, giftId: string): Promise<string | null>
   return regalo.itemId
 }
 
+/**
+ * Lo que se les dijo a los de un regalo que dejó de ser de ellos (se canceló, se bajaron, los sacaron) y ya no vale: que
+ * seguía en Cuentas para dividirlo ("Ya lo tengo") o que ahora lo organizan ellos. Por persona y deseo: cada uno está en
+ * un solo regalo por deseo (ver loQueYaTiene).
+ */
+const avisosDelRegaloSinLeer = (itemId: string) => and(eq(notifications.itemId, itemId), eq(notifications.leida, false),
+  inArray(notifications.tipo, ['regalo_lo_tiene', 'regalo_encargo']))
+
 /** Bajarse mientras está abierto. El encargado no se baja: cancela. */
 export async function salirDeRegalo(db: Db, giftId: string, userId: string): Promise<boolean> {
   if (!esUuid(giftId)) return false
   return db.transaction(async (tx) => {
     // lock del regalo: si a la vez le pasan el encargo (unirseAGrupo), o espera y ya es encargado, o se baja antes y el
     // encargo pasa a otro; nunca queda de encargado sin estar en el regalo
-    const [g] = await tx.select({ id: groupGifts.id }).from(groupGifts)
+    const [g] = await tx.select({ id: groupGifts.id, itemId: groupGifts.itemId }).from(groupGifts)
       .where(and(eq(groupGifts.id, giftId), eq(groupGifts.estado, 'abierto'), ne(groupGifts.organizerUserId, userId)))
       .for('update')
     if (!g) return false
     const borrados = await tx.delete(groupGiftMembers)
       .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, userId)))
       .returning({ userId: groupGiftMembers.userId })
-    return borrados.length > 0
+    if (!borrados.length) return false
+    await tx.update(notifications).set({ leida: true }).where(and(avisosDelRegaloSinLeer(g.itemId), eq(notifications.userId, userId)))
+    return true
   })
 }
 
@@ -172,6 +182,7 @@ export async function sacarDeRegalo(db: Db, giftId: string, miembroId: string, e
       .returning({ userId: groupGiftMembers.userId })
     if (!sacados.length) return false
     await t.insert(groupGiftSacados).values({ giftId, userId: miembroId }).onConflictDoNothing()
+    await t.update(notifications).set({ leida: true }).where(and(avisosDelRegaloSinLeer(itemId), eq(notifications.userId, miembroId)))
     await dejarAviso(t, itemId, 'regalo_sacado', [{ userId: miembroId, guestId: null }])
     return true
   })
@@ -203,12 +214,9 @@ export async function cancelarRegalo(db: Db, giftId: string, userId: string): Pr
       .returning({ claimId: groupGifts.claimId, itemId: groupGifts.itemId })
     if (!g) return false
     await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, g.claimId))
-    // Lo que se les dijo de este regalo ya no vale, tampoco al encargado: que seguía en Cuentas para dividirlo ("Ya lo
-    // tengo") o que ahora lo organiza él. Por persona y deseo: cada uno está en un solo regalo por deseo (ver loQueYaTiene).
-    await t.update(notifications).set({ leida: true }).where(and(
-      eq(notifications.itemId, g.itemId), eq(notifications.leida, false), inArray(notifications.tipo, ['regalo_lo_tiene', 'regalo_encargo']),
-      inArray(notifications.userId, t.select({ id: groupGiftMembers.userId }).from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId))),
-    ))
+    // a todos los del regalo, también al encargado
+    await t.update(notifications).set({ leida: true }).where(and(avisosDelRegaloSinLeer(g.itemId),
+      inArray(notifications.userId, t.select({ id: groupGiftMembers.userId }).from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId)))))
     const estaban = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
       .where(and(eq(groupGiftMembers.giftId, giftId), ne(groupGiftMembers.userId, userId)))
     await dejarAviso(t, g.itemId, 'regalo_cancelado', estaban.map((m) => ({ userId: m.userId, guestId: null })))

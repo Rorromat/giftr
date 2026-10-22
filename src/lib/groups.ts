@@ -6,7 +6,7 @@ import type { Db } from '@/db/types'
 import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
 import { recienHecho } from '@/lib/repetido'
-import { noEsDeRegaloGrupal } from '@/lib/claims'
+import { desdeQueOcupa, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
@@ -213,24 +213,29 @@ async function soltarLoQueRegalaba(t: Db, listId: string, userId: string) {
     .where(and(eq(claims.claimerUserId, userId), eq(claims.estado, 'reservado'), inArray(claims.itemId, deseos),
       noEsDeRegaloGrupal()))
 
-  const regalos = await t.select({ id: groupGifts.id, itemId: groupGifts.itemId, claimId: groupGifts.claimId, encargado: groupGifts.organizerUserId })
-    .from(groupGifts)
-    .where(and(inArray(groupGifts.itemId, deseos), eq(groupGifts.estado, 'abierto'), or(
+  const regalos = await t.select({
+    id: groupGifts.id, itemId: groupGifts.itemId, claimId: groupGifts.claimId, encargado: groupGifts.organizerUserId,
+    tipo: items.tipo, repetible: items.repetible,
+  })
+    .from(groupGifts).innerJoin(items, eq(items.id, groupGifts.itemId))
+    .where(and(eq(items.listId, listId), eq(groupGifts.estado, 'abierto'), or(
       eq(groupGifts.organizerUserId, userId),
       inArray(groupGifts.id, t.select({ id: groupGiftMembers.giftId }).from(groupGiftMembers).where(eq(groupGiftMembers.userId, userId))),
     )))
-    .for('update')
+    .for('update', { of: groupGifts })
   for (const g of regalos) {
     await t.delete(groupGiftMembers).where(and(eq(groupGiftMembers.giftId, g.id), eq(groupGiftMembers.userId, userId)))
     if (g.encargado !== userId) continue
     // El que se sumó primero, salvo otro que es (o fue) dueño de esta lista, que tampoco lo vería, y uno que ya tiene su
-    // propia reserva o compra de este deseo (una persona, una reserva por deseo).
+    // propia reserva o compra de este deseo (una persona, una reserva por deseo). Con lo que ocupa (ocupaSql), como
+    // loQueYaTiene al dejarlo sumarse: una compra de un evento anterior ya se regaló y no le quita el encargo.
+    const desde = await desdeQueOcupa(t, { listId, tipo: g.tipo, repetible: g.repetible })
     const [siguiente] = await t.select({ userId: groupGiftMembers.userId }).from(groupGiftMembers)
       .where(and(
         eq(groupGiftMembers.giftId, g.id),
         notInArray(groupGiftMembers.userId, duenos),
         notInArray(groupGiftMembers.userId, t.select({ id: claims.claimerUserId }).from(claims).where(and(
-          eq(claims.itemId, g.itemId), inArray(claims.estado, ['reservado', 'comprado']), isNotNull(claims.claimerUserId)))),
+          eq(claims.itemId, g.itemId), ocupaSql(desde), isNotNull(claims.claimerUserId)))),
       ))
       .orderBy(asc(groupGiftMembers.createdAt)).limit(1)
       .for('update')

@@ -207,6 +207,7 @@ const YA_NO_VALEN_AL_SACARLO: TipoAviso[] = ['item_vuelve', 'compra_vuelve', 're
  * su nombre, un regalo grupal que quedó abierto sigue abierto). Lo comprado para un evento anterior ya se regaló: deja de
  * ocuparlo (ocupa_desde, ver ocupaSql), y el que lo vuelve a pedir porque se le gastó o se le rompió no lo tiene comprado y
  * sin lugar para siempre. La compra queda igual (el historial no cambia), y depende solo de fechas, no de las reservas.
+ * Lo marcado comprado después del evento (una reserva vencida que se marcó tarde) cuenta como de este: sigue ocupando.
  * Lo que se les dijo a los que regalan al sacarlo ya no vale (y el cartel ahora lleva al deseo diciendo que salió):
  * - Al que se le liberó la reserva o se le canceló el regalo grupal y todavía no lo vio, el aviso pasa a decir eso. Si
  *   todavía tiene algo del deseo (una reserva que el archivar de antes no liberaba), no: el aviso de la baja se va.
@@ -221,7 +222,10 @@ export async function restoreItem(db: Db, itemId: string, userId: string): Promi
     // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez
     const [antes] = await t.select().from(items).where(eq(items.id, itemId)).for('update')
     if (!antes || antes.estadoDueno === 'activo') return false
-    const desde = await desdeElUltimoEvento(t, antes.listId)
+    // El corte solo avanza: si borraron o cambiaron la fecha de la lista, desdeElUltimoEvento puede dar uno anterior, y lo
+    // que ya se había liberado volvería a ocupar el deseo.
+    const corte = await desdeElUltimoEvento(t, antes.listId)
+    const desde = antes.ocupaDesde && antes.ocupaDesde > corte ? antes.ocupaDesde : corte
     await t.update(items).set({ estadoDueno: 'activo', ocupaDesde: desde }).where(eq(items.id, itemId))
 
     // Los de la baja se borran y se dejan los nuevos con dejarAviso: si ya tenía uno igual sin leer (volvió una vez y lo

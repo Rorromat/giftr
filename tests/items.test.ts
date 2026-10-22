@@ -225,6 +225,27 @@ test('"Volver a mi lista": lo comprado para un evento anterior ya se regaló y d
   expect(await db.select().from(notifications)).toEqual([])
 })
 
+test('"Volver a mi lista" otra vez después de borrar el cumple: lo que ya se había liberado no vuelve a ocupar', async () => {
+  const { db, owner, giver } = await setup()
+  const cumple = new Date(Date.now() - 60 * DIA)
+  expect(await guardarCumple(db, owner.id, cumple.getUTCDate(), cumple.getUTCMonth() + 1)).toBe(true)
+  const auris = (await createItem(db, owner.id, { tipo: 'exacto', titulo: 'Auriculares' }))!
+  const hace90 = new Date(Date.now() - 90 * DIA)
+  await db.insert(claims).values({ itemId: auris.id, claimerUserId: giver.id, estado: 'comprado', createdAt: hace90, updatedAt: hace90 })
+  await archiveItem(db, auris.id, owner.id, 'lo_tengo')
+  await restoreItem(db, auris.id, owner.id)
+  const [{ ocupaDesde }] = await db.select({ ocupaDesde: items.ocupaDesde }).from(items).where(eq(items.id, auris.id))
+
+  // sin cumple, el corte de ahora sería un año para atrás: la compra de Rodri volvería a ocupar el deseo
+  expect(await guardarCumple(db, owner.id, null, null)).toBe(true)
+  await archiveItem(db, auris.id, owner.id, 'lo_tengo')
+  expect(await restoreItem(db, auris.id, owner.id)).toBe(true)
+  expect((await db.select({ ocupaDesde: items.ocupaDesde }).from(items).where(eq(items.id, auris.id)))[0].ocupaDesde).toEqual(ocupaDesde)
+  const deRodri = await getItemForViewer(db, 'tok-euge', auris.id, { userId: giver.id })
+  if (deRodri?.role !== 'giver') throw new Error('esperaba giver')
+  expect(deRodri.item).toMatchObject({ disponible: true, claims: [] })
+})
+
 test('sacar, volver a poner y sacar otra vez: a cada uno le queda un solo aviso, el que vale', async () => {
   const { db, owner, giver, caro, copas } = await conCopas()
   const tipos = async (userId: string) => (await getUnreadNotifications(db, { userId })).map((n) => n.tipo).sort()

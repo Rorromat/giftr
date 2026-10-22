@@ -254,6 +254,23 @@ test('si la dueña ya lo tiene y el encargado cancela desde Cuentas, a cada uno 
   expect(await db.select().from(notifications).where(eq(notifications.userId, mama.id))).toEqual([])
 })
 
+test('si la dueña ya lo tiene, al que se baja o sacan del regalo no le queda "sigue en Cuentas"', async () => {
+  const { db, mama, rodri, sofi, ana, bici, giftId } = await conRegalo()
+  await archiveItem(db, bici.id, mama.id, 'lo_tengo')
+  const tipos = async (userId: string) => (await getUnreadNotifications(db, { userId })).map((n) => n.tipo)
+  for (const u of [rodri, sofi, ana]) expect(await tipos(u.id)).toEqual(['regalo_lo_tiene'])
+
+  expect(await salirDeRegalo(db, giftId, ana.id)).toBe(true)
+  expect(await sacarDeRegalo(db, giftId, sofi.id, rodri.id)).toBe(true)
+  expect(await tipos(ana.id)).toEqual([])
+  expect(await tipos(sofi.id)).toEqual(['regalo_sacado'])
+  // el encargado sigue con el regalo en Cuentas
+  expect(await tipos(rodri.id)).toEqual(['regalo_lo_tiene'])
+  expect(await cancelarRegalo(db, giftId, rodri.id)).toBe(true)
+  for (const u of [rodri, ana]) expect(await tipos(u.id)).toEqual([])
+  expect(await tipos(sofi.id)).toEqual(['regalo_sacado'])
+})
+
 // Un "Quiero ESTO" que Mamá vuelve a pedir (la bici del cumple pasado se la robaron): el regalo de entonces ya se regaló.
 test('"Volver a mi lista": un regalo grupal comprado para un evento anterior ya no ocupa el deseo y se corrige desde Cuentas', async () => {
   const { db, mama, rodri, sofi, martin, lista, bici, giftId } = await conRegalo()
@@ -632,6 +649,38 @@ test('si organizabas un regalo y solo quedan los que tienen su propia reserva de
   expect(await db.select({ estado: claims.estado }).from(claims).where(eq(claims.claimerUserId, sofi.id))).toEqual([{ estado: 'reservado' }])
   expect(await reserveItem(db, copas.id, { userId: ana.id })).toMatchObject({ ok: true })
   expect(await getUnreadNotifications(db, { userId: martin.id })).toEqual([])
+})
+
+// Sofi le regaló a la casa una bici y plantas hace más de un año. La bici volvió a la lista y las plantas se repiten:
+// esas compras ya no ocupan los deseos, y por eso se pudo sumar a los regalos que arma Rodri.
+test('si organizabas un regalo, el encargo pasa también a quien solo tiene una compra de un evento anterior', async () => {
+  const db = await createTestDb()
+  const [delfina, rodri, sofi] = [await usuario(db, 'Delfina'), await usuario(db, 'Rodri'), await usuario(db, 'Sofi')]
+  const grupoId = await crearGrupo(db, delfina.id, { nombre: 'Nuestra casa' })
+  const [grupo] = await db.select().from(lists).where(eq(lists.id, grupoId))
+  const bici = (await createItem(db, delfina.id, { tipo: 'exacto', titulo: 'Bici' }, grupoId))!
+  const plantas = (await createItem(db, delfina.id, { tipo: 'idea', titulo: 'Plantas', repetible: true }, grupoId))!
+  const hace400 = new Date(Date.now() - 400 * DIA)
+  for (const it of [bici, plantas]) {
+    await db.insert(claims).values({ itemId: it.id, claimerUserId: sofi.id, estado: 'comprado', createdAt: hace400, updatedAt: hace400 })
+  }
+  await archiveItem(db, bici.id, delfina.id, 'lo_tengo')
+  await restoreItem(db, bici.id, delfina.id)
+  const regalos: string[] = []
+  for (const it of [bici, plantas]) {
+    const g = await iniciarRegaloGrupal(db, it.id, rodri.id)
+    if (!g.ok) throw new Error(g.reason)
+    expect(await sumarseARegalo(db, g.giftId, sofi.id)).toBe(true)
+    regalos.push(g.giftId)
+  }
+
+  await unirseAGrupo(db, grupo.inviteToken!, rodri.id)
+  for (const it of [bici, plantas]) {
+    expect(await regalosDeItem(db, it.id, { userId: sofi.id })).toEqual([expect.objectContaining({ estado: 'abierto', soyEncargado: true })])
+  }
+  expect((await getUnreadNotifications(db, { userId: sofi.id })).map((n) => `${n.tipo} ${n.itemTitulo}`).sort())
+    .toEqual(['regalo_encargo Bici', 'regalo_encargo Plantas'])
+  expect(await comprarRegalo(db, regalos[0], sofi.id, { total: 90000 })).toEqual({ ok: true })
 })
 
 test('si la dueña cambia el link para regalar, Cuentas no se lo pasa a quien solo tenía un regalo de antes', async () => {
