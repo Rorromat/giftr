@@ -12,9 +12,9 @@ const DESTINOS: { href: string; label: string; icon: IconName; columna: number }
   { href: '/perfil', label: 'Perfil', icon: 'user', columna: 4 },
 ]
 
-/** La sección del menú a la que pertenece una pantalla (un grupo es parte de Mi lista; Cuentas, de Perfil). */
+/** La sección del menú a la que pertenece una pantalla (un grupo o un deseo es parte de Mi lista; Cuentas, de Perfil). */
 function seccionDe(path: string) {
-  if (path.startsWith('/grupos/')) return '/mi-lista'
+  if (path.startsWith('/grupos/') || path.startsWith('/deseo/')) return '/mi-lista'
   if (path === '/cuentas') return '/perfil'
   return path
 }

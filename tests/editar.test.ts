@@ -17,7 +17,7 @@ async function setup() {
 
 test('editar: solo el dueño (o un co-dueño del grupo) abre su deseo, y solo si sigue activo', async () => {
   const { db, owner, giver, item } = await setup()
-  expect(await deseoParaEditar(db, item.id, owner.id)).toMatchObject({ deseo: { id: item.id, titulo: 'Termo' }, grupo: null })
+  expect(await deseoParaEditar(db, item.id, owner.id)).toMatchObject({ deseo: { id: item.id, titulo: 'Termo' }, grupo: null, shareToken: 'tok-euge' })
   expect(await deseoParaEditar(db, item.id, giver.id)).toBeNull()
   expect(await deseoParaEditar(db, 'no-es-uuid', owner.id)).toBeNull()
 
