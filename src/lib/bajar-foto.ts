@@ -16,11 +16,11 @@ for (const [red, bits] of [
   ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.88.99.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24],
   ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
 ] as const) NO_PUBLICAS.addSubnet(red, bits, 'ipv4')
-// Una IPv4 escrita como IPv6 (::ffff:10.0.0.1) se revisa con las reglas de arriba: BlockList lo hace solo. NAT64 y 6to4
-// llevan adentro una IPv4 que no miramos, así que también quedan afuera.
+// Una IPv4 escrita como IPv6 (::ffff:10.0.0.1) se revisa con las reglas de arriba: BlockList lo hace solo. NAT64, 6to4 y
+// la forma traducida de SIIT (::ffff:0:10.0.0.1) llevan adentro una IPv4 que no miramos, así que también quedan afuera.
 for (const [red, bits] of [
-  ['::', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001::', 23], ['2001:db8::', 32], ['2002::', 16],
-  ['3fff::', 20], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
+  ['::', 96], ['::ffff:0:0:0', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001::', 23], ['2001:db8::', 32],
+  ['2002::', 16], ['3fff::', 20], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
 ] as const) NO_PUBLICAS.addSubnet(red, bits, 'ipv6')
 
 export function esIpPublica(ip: string): boolean {

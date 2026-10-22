@@ -98,6 +98,8 @@ test('qué direcciones son de internet', () => {
     '127.0.0.1', '10.0.0.5', '172.16.3.4', '172.31.255.255', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '224.0.0.1',
     '255.255.255.255', '192.0.2.10', '198.18.0.1', '::1', '::', 'fd00::1', 'fe80::1', 'ff02::1', '::ffff:127.0.0.1', '::ffff:10.0.0.1',
     '64:ff9b::a00:1', '2002:a00:1::', '2001:db8::1', 'no es una ip', '',
+    // la forma traducida de SIIT: adentro van 127.0.0.1, 10.0.0.1 y la metadata de la nube
+    '::ffff:0:7f00:1', '::ffff:0:a00:1', '::ffff:0:a9fe:a9fe',
   ]) expect(esIpPublica(ip), ip).toBe(false)
 })
 
@@ -105,6 +107,7 @@ test('al conectarse se revisa a qué IP resuelve el nombre (un nombre público q
   const dns: Record<string, LookupAddress[]> = {
     '127.0.0.1.nip.io': [{ address: '127.0.0.1', family: 4 }],
     'mitad.com': [{ address: '8.8.8.8', family: 4 }, { address: '10.0.0.5', family: 4 }],
+    'siit.com': [{ address: '::ffff:0:7f00:1', family: 6 }],
     'fotos.com': [{ address: '2800:3f0:4002:80b::200e', family: 6 }, { address: '200.45.12.3', family: 4 }],
   }
   const resolver: Resolver = (host, cb) => (dns[host] ? cb(null, dns[host]) : cb(Object.assign(new Error('no existe'), { code: 'ENOTFOUND' }), []))
@@ -113,6 +116,7 @@ test('al conectarse se revisa a qué IP resuelve el nombre (un nombre público q
   })
   await expect(buscar('127.0.0.1.nip.io')).rejects.toThrow('no es una dirección pública')
   await expect(buscar('mitad.com')).rejects.toThrow('no es una dirección pública')
+  await expect(buscar('siit.com')).rejects.toThrow('no es una dirección pública')
   await expect(buscar('no-existe.com')).rejects.toThrow('no existe')
   expect(await buscar('fotos.com')).toEqual({ address: '2800:3f0:4002:80b::200e', family: 6 })
   expect(await buscar('fotos.com', { family: 4 })).toEqual({ address: '200.45.12.3', family: 4 })
