@@ -155,6 +155,27 @@ test('el formulario de un deseo: el link pegado en el título pasa a "Link a la 
   expect(deseoDesdeForm(form({ titulo: '   ' }))).toBeNull()
 })
 
+test('el link pegado en el título no se lleva la puntuación de la oración (la tienda daba una página que no existe)', () => {
+  const casos: [string, { titulo: string; linkTienda: string }][] = [
+    ['Mate, https://a.com/m, el negro', { titulo: 'Mate, el negro', linkTienda: 'https://a.com/m' }],
+    ['Quiero este: https://tienda.com/x.', { titulo: 'Quiero este:', linkTienda: 'https://tienda.com/x' }],
+    ['Remera (ver www.zara.com/ar)', { titulo: 'Remera (ver', linkTienda: 'https://www.zara.com/ar' }],
+    ['Mirá https://a.com/x!', { titulo: 'Mirá', linkTienda: 'https://a.com/x' }],
+    // los paréntesis del link, y lo que termina en "=", son del link
+    ['Mate https://es.wikipedia.org/wiki/Mate_(infusión)', { titulo: 'Mate', linkTienda: 'https://es.wikipedia.org/wiki/Mate_(infusión)' }],
+    ['(Mate https://es.wikipedia.org/wiki/Mate_(infusión)).', { titulo: '(Mate', linkTienda: 'https://es.wikipedia.org/wiki/Mate_(infusión)' }],
+    ['Termo https://tienda.com/x?ref=', { titulo: 'Termo', linkTienda: 'https://tienda.com/x?ref=' }],
+    [ML, { titulo: 'mercadolibre.com.ar', linkTienda: ML }],
+  ]
+  for (const [titulo, esperado] of casos) expect(deseoDesdeForm(form({ titulo })), titulo).toMatchObject(esperado)
+  expect(deseoDesdeForm(form({ titulo: 'www.' }))).toMatchObject({ titulo: 'www.', linkTienda: null })
+  // un título enorme de puntuación no traba el servidor
+  const inicio = Date.now()
+  expect(deseoDesdeForm(form({ titulo: `https://a.com/${'.'.repeat(200_000)}x` }))!.linkTienda).toBeNull()
+  expect(deseoDesdeForm(form({ titulo: `https://a.com/x${')'.repeat(200_000)}` }))!.linkTienda).toBe('https://a.com/x')
+  expect(Date.now() - inicio).toBeLessThan(2000)
+})
+
 test('el formulario de un deseo: vacío es null, un link que no es link es undefined (al editar no borra), cantidad entera desde 1', () => {
   // el tope de 99 lo pone createItem/updateItem (ver el test de abajo)
   const d = deseoDesdeForm(form({ titulo: 'Campera', linkTienda: 'www.zara.com/x', fotoUrl: 'no es un link', notas: '', cantidad: '99999999999' }))!

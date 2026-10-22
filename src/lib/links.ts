@@ -36,11 +36,32 @@ export function sitioDeLink(link: string): string {
 }
 
 const LINK_EN_TEXTO = /(?:https?:\/\/|www\.)\S+/i
+const PUNTUACION = `.,;:!?'"»”`
+const cuenta = (s: string, c: string) => s.split(c).length - 1
 
-/** El primer link http(s) de un texto ("Mate imperial https://…") y lo que queda sin él. Null si no tiene. */
+// La puntuación de la oración pegada al final ("…/m, el negro", "…/x.", "(ver www.zara.com/ar)") no es del link: con eso
+// "Ver en la tienda" llevaba a una página que no existe. Un ")" que abre adentro se queda (wikipedia …/Mate_(infusión)).
+// Letra por letra desde el final, sin una regex con $: el título no tiene largo máximo y una así tarda el cuadrado.
+function sinPuntuacionFinal(s: string): string {
+  const abren = cuenta(s, '(')
+  let cierran = cuenta(s, ')')
+  let fin = s.length
+  while (fin > 0) {
+    const c = s[fin - 1]
+    if (c === ')' && cierran > abren) cierran--
+    else if (!PUNTUACION.includes(c)) break
+    fin--
+  }
+  return s.slice(0, fin)
+}
+
+/**
+ * El primer link http(s) de un texto ("Mate imperial https://…") y lo que queda sin él ni la puntuación pegada ("Remera
+ * (ver": el dueño lo corrige si quiere). Null si no tiene.
+ */
 export function linkEnTexto(texto: string): { link: string; resto: string } | null {
   const m = LINK_EN_TEXTO.exec(texto)
-  const link = m && linkHttp(m[0])
+  const link = m && linkHttp(sinPuntuacionFinal(m[0]))
   if (!m || !link) return null
   return { link, resto: `${texto.slice(0, m.index)} ${texto.slice(m.index + m[0].length)}`.replace(/\s+/g, ' ').trim() }
 }
