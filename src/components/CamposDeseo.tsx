@@ -42,3 +42,18 @@ export const CampoLink = (props: Props) => (
     if (titulo instanceof HTMLInputElement) revisar(titulo, avisoTitulo)
   }} />
 )
+
+/**
+ * Escribir un campo desde el código (lo que completó la lectura del link, ver CompletarDesdeLink). Los campos no son
+ * controlados: un .value no dispara onChange, así que se vuelven a mirar el título y el link (si no, quedaba el aviso de
+ * antes frenando el envío). Tampoco dispara input, así que no vuelve a buscar.
+ */
+export function completarCampo(form: HTMLFormElement, nombre: 'titulo' | 'linkTienda' | 'precio', valor: string) {
+  const campo = form.elements.namedItem(nombre)
+  if (!(campo instanceof HTMLInputElement)) return
+  campo.value = valor
+  const link = form.elements.namedItem('linkTienda')
+  const titulo = form.elements.namedItem('titulo')
+  if (link instanceof HTMLInputElement) revisar(link, avisoDelLink)
+  if (titulo instanceof HTMLInputElement) revisar(titulo, avisoTitulo)
+}

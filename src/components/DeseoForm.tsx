@@ -1,5 +1,6 @@
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CampoLink, CampoTitulo } from '@/components/CamposDeseo'
+import { CompletarDesdeLink } from '@/components/CompletarDesdeLink'
 import { FotoField } from '@/components/FotoField'
 import { Hearts, PRIORIDADES } from '@/components/ui'
 import { CANTIDAD_MAXIMA, LARGO } from '@/lib/limites'
@@ -41,6 +42,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
           <CampoTitulo name="titulo" required placeholder="Pegá un link o escribí" defaultValue={deseo?.titulo}
                        className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
         </label>
+        {/* con el link del producto (acá o en "Link a la tienda") completa el nombre, el precio y la foto que estén vacíos */}
+        <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} />
         <FotoField inicial={deseo?.fotoUrl} />
       </div>
 

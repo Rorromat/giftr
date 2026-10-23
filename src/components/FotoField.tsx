@@ -3,14 +3,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
 import { achicarFoto } from '@/lib/achicar-foto'
-import { alPegarImagen, estadoDelLink, porQueEsperar } from '@/lib/foto-del-form'
-import { linkHttp } from '@/lib/links'
+import { aceptaFotoPropuesta, alPegarImagen, estadoDelLink, porQueEsperar, TRAER_FOTO_MS } from '@/lib/foto-del-form'
+import { esUrlFotoDeseo, linkHttp } from '@/lib/links'
 
 const ES_LINK = /^https?:\/\/\S+$/i
 
 const AVISOS = {
   subiendo: 'Subiendo la foto…',
   probando: 'Cargando la foto…',
+  trayendo: 'Trayendo la foto…',
   error: 'No pudimos subir esa foto. Probá con otra.',
   muchas: 'Ya subiste muchas fotos hoy. Probá mañana, o pegá el link de una foto.',
   'sin-foto': 'No hay una foto copiada. Mantené apretada una foto, tocá Copiar y volvé a tocar Pegar.',
@@ -19,23 +20,36 @@ const AVISOS = {
   'muy-largo': 'Ese link es muy largo. Copiá la foto y tocá Pegar.',
 } as const
 
-/** Si el link carga como imagen en este navegador (la página de un producto, no). */
-function cargaComoFoto(src: string): Promise<boolean> {
+/** Si el link carga como imagen en este navegador (la página de un producto, no). Con tope, lo que tarda más no cargó. */
+function cargaComoFoto(src: string, tope?: number): Promise<boolean> {
   return new Promise((listo) => {
     const img = new Image()
     img.onload = () => listo(img.naturalWidth > 0)
     img.onerror = () => listo(false)
+    if (tope !== undefined) setTimeout(() => listo(false), Math.max(0, tope))
     img.src = src
   })
+}
+
+const PROPUESTA = 'deseo:foto-propuesta'
+
+/**
+ * La foto del producto que encontró la lectura del link (ver CompletarDesdeLink), para el campo de foto de ese formulario;
+ * null si el producto no tiene: se saca la que había propuesto otro link. El campo decide si la toma (aceptaFotoPropuesta).
+ */
+export function proponerFoto(form: HTMLFormElement, src: string | null) {
+  form.dispatchEvent(new CustomEvent<string | null>(PROPUESTA, { detail: src }))
 }
 
 /**
  * La foto del deseo, que es lo que más ayuda a que acierten: de la galería o la cámara, pegada (con el botón
  * o pegando una imagen en cualquier campo del formulario) o con el link de una foto. Lo elegido viaja en el
  * campo oculto fotoUrl: la URL de la foto subida (/foto/deseo/:id) o el link, solo si cargó como foto (un link de
- * tienda en el campo de foto quedaba como foto rota para todos).
+ * tienda en el campo de foto quedaba como foto rota para todos). También la del producto del link pegado (proponerFoto),
+ * si no hay una que eligió el dueño: se trae y se guarda como una subida.
  */
 export function FotoField({ inicial = null }: { inicial?: string | null }) {
+  const raiz = useRef<HTMLDivElement>(null)
   const elegir = useRef<HTMLInputElement>(null)
   const link = useRef<HTMLInputElement>(null)
   const guardado = inicial && ES_LINK.test(inicial) ? inicial : null
@@ -55,6 +69,11 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   const espera = useRef<ReturnType<typeof setTimeout>>(undefined)
   // el link copiado que se está probando con Pegar: hasta que carga, el formulario no se manda
   const [probandoPegado, setProbandoPegado] = useState(false)
+  // La foto del producto del link: mientras se trae, el formulario no se manda (9 s como mucho), pero Foto y Pegar siguen
+  // andando y lo que elija el dueño gana. La que vino así y nadie tocó (dePropuesta) la cambia la de otro link.
+  const [trayendo, setTrayendo] = useState(false)
+  const [dePropuesta, setDePropuesta] = useState(false)
+  const propuesta = useRef<string | null>(null)
 
   const delLink = estadoDelLink(url, guardado, probados)
   const foto = subida ?? (delLink.estado === 'ok' ? delLink.link : null)
@@ -63,9 +82,14 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     setProbados((p) => ({ ...p, [l]: ok }))
   }
 
-  /** Algo nuevo con la foto: lo que estaba en curso (una subida, la prueba de un link pegado) ya no lo pisa al terminar. */
-  function nuevaAccion() {
+  /**
+   * Algo nuevo con la foto: lo que estaba en curso (una subida, la prueba de un link pegado, la foto que se estaba trayendo)
+   * ya no lo pisa al terminar. Si lo hizo el dueño (propia), la foto pasa a ser suya y otro link ya no la cambia.
+   */
+  function nuevaAccion(propia = true) {
     setProbandoPegado(false)
+    setTrayendo(false)
+    if (propia) setDePropuesta(false)
     return ++ultima.current
   }
 
@@ -140,6 +164,63 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     setAviso(null)
   }
 
+  /**
+   * La foto que propuso la lectura del link: el servidor la baja y la guarda como una subida (el deseo no depende de que la
+   * tienda la siga sirviendo). Si no puede (el cupo, el tope, no es una imagen, no la dejan bajar), se prueba el link en el
+   * navegador, como un link de foto: el CDN que bloquea al servidor suele cargar desde el teléfono. Si tampoco, no queda
+   * ninguna, sin aviso: no la eligió el dueño.
+   */
+  async function traer(src: string) {
+    const n = nuevaAccion(false)
+    setTrayendo(true)
+    setAviso(null)
+    const hasta = Date.now() + TRAER_FOTO_MS
+    const corte = new AbortController()
+    const reloj = setTimeout(() => corte.abort(), TRAER_FOTO_MS)
+    try {
+      const r = await fetch('/api/deseo/foto/desde-link', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: src }), signal: corte.signal,
+      }).catch(() => null)
+      const nueva: unknown = r?.ok ? (await r.json().catch(() => null))?.url : null
+      if (n !== ultima.current) return
+      if (typeof nueva === 'string' && esUrlFotoDeseo(nueva)) {
+        setSubida(nueva)
+        setUrl('')
+        return setDePropuesta(true)
+      }
+      const l = linkHttp(src)
+      const ok = !!l && (probados[l] ?? await cargaComoFoto(l, hasta - Date.now()))
+      if (n !== ultima.current) return
+      if (l && ok) anotar(l, true)
+      setSubida(null)
+      setUrl(l && ok ? l : '')
+      setDePropuesta(ok)
+    } finally {
+      clearTimeout(reloj)
+      if (n === ultima.current) setTrayendo(false)
+    }
+  }
+
+  const alProponer = useEffectEvent((src: string | null) => {
+    const hayFoto = !!subida || !!url.trim()
+    if (!aceptaFotoPropuesta({ hayFoto, dePropuesta, subiendo: enCurso.current, probandoPegado })) return
+    // la misma que ya está o que se está trayendo (el mismo link pegado de nuevo)
+    if (src === propuesta.current && (trayendo || hayFoto)) return
+    propuesta.current = src
+    if (src) return void traer(src)
+    // el producto nuevo no tiene foto: la del anterior no es de este
+    nuevaAccion(false)
+    setDePropuesta(false)
+    setSubida(null)
+    setUrl('')
+  })
+  useEffect(() => {
+    const form = raiz.current?.closest('form')
+    const escuchar = (e: Event) => alProponer(e instanceof CustomEvent && typeof e.detail === 'string' ? e.detail : null)
+    form?.addEventListener(PROPUESTA, escuchar)
+    return () => form?.removeEventListener(PROPUESTA, escuchar)
+  }, [])
+
   // Pegar una imagen en cualquier campo (por ejemplo en "¿Qué querés?") también la sube; si trae texto, el texto va al
   // campo (ver alPegarImagen).
   const alPegar = useEffectEvent((e: ClipboardEvent) => {
@@ -162,19 +243,20 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }, [])
 
   // el formulario no se manda hasta que la foto esté, ni con un link que no es una foto (ver porQueEsperar)
-  const frena = porQueEsperar({ subiendo, probandoPegado, subida: !!subida, estado: delLink.estado })
+  const frena = porQueEsperar({ subiendo, probandoPegado, trayendo, subida: !!subida, estado: delLink.estado })
   const bloqueo = frena === 'subiendo' ? 'Esperá que termine de subir la foto.'
-    : frena === 'probando' ? 'Esperá que cargue la foto.'
+    : frena === 'probando' || frena === 'trayendo' ? 'Esperá que cargue la foto.'
       : frena ? AVISOS[frena] : ''
   useEffect(() => {
     link.current?.setCustomValidity(bloqueo)
   }, [bloqueo])
 
+  // lo que hizo el dueño mientras se trae la del link (un Pegar sin nada copiado) se dice antes
   const mensaje = subiendo ? 'subiendo'
-    : aviso ?? (subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
+    : aviso ?? (trayendo ? 'trayendo' : subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
   const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] border-[2.5px] border-dashed border-gr-ink text-xs font-bold'
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={raiz} className="flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
         {foto && rota !== foto && (
           <div className="relative flex-none">
@@ -204,7 +286,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
       <input ref={elegir} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
              onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
       {mensaje && (
-        <p role={mensaje === 'subiendo' || mensaje === 'probando' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
+        <p role={mensaje === 'subiendo' || mensaje === 'probando' || mensaje === 'trayendo' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
       )}
       <input ref={link} value={url} placeholder="O el link de una foto (opcional)" aria-label="Link de una foto"
              inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}

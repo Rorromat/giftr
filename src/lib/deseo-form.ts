@@ -29,9 +29,10 @@ export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'r
 /**
  * El link del título que pasa a "Link a la tienda" (con lo que queda del título), o null si se queda en el título: pasa si
  * ese campo vino vacío o con el mismo link (lo pegó en los dos lados). Con uno distinto, o con algo que no es un link (un
- * link de antes que hoy no vale, que al editar se conserva), se queda: si no, se perdía ese otro link.
+ * link de antes que hoy no vale, que al editar se conserva), se queda: si no, se perdía ese otro link. El formulario usa la
+ * misma regla en el navegador (ver linkParaCompletar), así los dos no mueven links distintos.
  */
-function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
+export function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
   const enTitulo = linkTienda === undefined ? null : linkEnTexto(titulo)
   return enTitulo && (linkTienda === null || enTitulo.link === linkTienda) ? enTitulo : null
 }
