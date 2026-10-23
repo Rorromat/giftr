@@ -5,15 +5,16 @@ import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
+import { miFoto } from '@/lib/perfil'
 import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { Icon, LogoSticker, Seccion, Starburst } from '@/components/ui'
+import { AvatarSticker, Icon, Seccion, Starburst } from '@/components/ui'
 
 export default async function MiLista() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida, grupos] = await Promise.all([
-    getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId),
+  const [lista, bienvenida, grupos, foto] = await Promise.all([
+    getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), miFoto(db, session.userId),
   ])
   if (!lista) redirect('/')
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
@@ -22,12 +23,21 @@ export default async function MiLista() {
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
   const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
+  const nombre = session.user?.name ?? session.user?.email ?? 'Vos'
 
   return (
     <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
-      <div className="flex items-center justify-between">
-        <LogoSticker />
-        <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 rounded-[14px]">+ Agregar</Link>
+      {/* Vos: tu lista y, tocando tu nombre, tu perfil. La fila mide 44 (lo que mide el botón): el contador queda donde lo
+          busca la animación de inicio. */}
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/perfil" aria-label="Tu perfil" className="flex min-w-0 items-center gap-2.5">
+          <AvatarSticker nombre={nombre} foto={foto} size={44} />
+          <span className="flex min-w-0 items-center gap-1 text-[17px] font-semibold">
+            <span className="truncate">{nombre.split(' ')[0]}</span>
+            <Icon name="chevron" size={16} strokeWidth={2.6} className="flex-none" />
+          </span>
+        </Link>
+        <Link href="/agregar" className="gr-btn-primary gr-btn--sm min-h-11 flex-none rounded-[14px]">+ Agregar</Link>
       </div>
 
       {/* con deseos, la estrella de la animación de inicio termina en el contador (ver Arranque) */}

@@ -8,7 +8,7 @@ import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAc
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { AvatarSticker, BackLink, Icon, QuizasLink, Seccion } from '@/components/ui'
+import { AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (
@@ -154,12 +154,9 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
 
   return (
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
-      <div className="flex items-center gap-3.5">
-        <BackLink href="/perfil" label="Volver a Perfil" />
-        <div className="flex flex-col gap-0.5">
-          <h1 className="gr-title">Cuentas</h1>
-          <p className="text-[15px] font-medium">Los regalos grupales: quién le debe a quién.</p>
-        </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="gr-title">Cuentas</h1>
+        <p className="text-[15px] font-medium">Los regalos grupales: quién le debe a quién.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

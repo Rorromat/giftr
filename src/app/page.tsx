@@ -12,8 +12,8 @@ const FOTOS = [
 export default async function Home() {
   const session = await auth()
   // Solo si la sesión tiene lista (si le faltaba, se crea): una sesión de un usuario que ya no existe
-  // ve la portada y vuelve a entrar, en vez de rebotar entre / y /mi-lista.
-  if (session?.userId && await asegurarListaPropia(db, session.userId)) redirect('/mi-lista')
+  // ve la portada y vuelve a entrar, en vez de rebotar entre / e /inicio.
+  if (session?.userId && await asegurarListaPropia(db, session.userId)) redirect('/inicio')
   return (
     <main className="flex min-h-screen flex-col pb-10">
       <div className="grid h-[340px] grid-cols-2 grid-rows-2 gap-2.5 pt-[18px]">
@@ -29,7 +29,7 @@ export default async function Home() {
           Pedí lo que querés sin pedirlo.
         </h1>
         <p className="text-base leading-snug font-medium">Tu gente coordina los regalos sin arruinarte la sorpresa.</p>
-        <form action={async () => { 'use server'; await signIn('google', { redirectTo: '/mi-lista' }) }} className="mt-2.5 w-full">
+        <form action={async () => { 'use server'; await signIn('google', { redirectTo: '/inicio' }) }} className="mt-2.5 w-full">
           <button className="gr-btn-primary h-[56px] w-full gap-3">
             <span aria-hidden className="flex size-[30px] items-center justify-center rounded-full bg-gr-surface font-sans text-base font-bold">G</span>
             Entrar con Google
