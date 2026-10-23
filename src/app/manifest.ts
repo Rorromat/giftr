@@ -18,5 +18,19 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
       { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
+    // GiftR al compartir desde otra app (Android): links, textos y fotos. Lo recibe el service worker (public/sw.js) y, si
+    // no está, el route src/app/compartir/route.ts: los dos leen estos nombres de campo.
+    share_target: {
+      action: '/compartir',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        title: 'title',
+        text: 'text',
+        url: 'url',
+        // Solo tipos MIME (Chrome filtra con eso). Sin HEIC: no se puede achicar en el teléfono ni leer en el servidor
+        files: [{ name: 'foto', accept: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'] }],
+      },
+    },
   }
 }

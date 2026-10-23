@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { confirmarAvisosAction, desuscribirAvisosAction, probarAvisoAction, suscribirAvisosAction } from '@/app/actions'
+import { esIOS, instalada, registrarSW } from '@/lib/app-instalable'
 import { estadoAlAbrir, trasPedirPermiso, type EstadoAvisos } from '@/lib/avisos-del-navegador'
 
 /** La clave pública VAPID viene en base64url; el navegador la quiere en bytes. */
@@ -9,9 +10,6 @@ function bytes(base64url: string): Uint8Array<ArrayBuffer> {
   const b64 = (base64url + '='.repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/')
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
 }
-
-const esIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-const instalada = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
 
 /** "Avisos": para que los codazos lleguen como notificación. En iPhone solo anda con GiftR agregado a inicio. */
 export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
@@ -24,7 +22,7 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
       soporta,
       pedirInstalar: esIOS() && !instalada(),
       permiso: soporta ? Notification.permission : 'default',
-      suscripcion: async () => (await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })).pushManager.getSubscription(),
+      suscripcion: async () => (await registrarSW()).pushManager.getSubscription(),
     }, confirmarAvisosAction).then(setEstado, () => setEstado('no-soportado'))
   }, [])
 

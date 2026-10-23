@@ -55,6 +55,12 @@ export function aconsejarFoto(form: HTMLFormElement, texto: string | null) {
   form.dispatchEvent(new CustomEvent<string | null>(CONSEJO, { detail: texto }))
 }
 
+const COMPARTIDA = 'deseo:foto-compartida'
+/** La foto compartida a GiftR desde otra app (ver RecibirCompartido): se sube como una elegida con Foto, y es del dueño. */
+export function entregarFoto(form: HTMLFormElement, foto: Blob) {
+  form.dispatchEvent(new CustomEvent<Blob>(COMPARTIDA, { detail: foto }))
+}
+
 /**
  * La foto del deseo, que es lo que más ayuda a que acierten: de la galería o la cámara, pegada (con el botón
  * o pegando una imagen en cualquier campo del formulario) o con el link de una foto. Lo elegido viaja en el
@@ -269,6 +275,14 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
       form?.removeEventListener(PROPUESTA, escuchar)
       form?.removeEventListener(CONSEJO, aconsejar)
     }
+  }, [])
+  // la compartida desde otra app (ver entregarFoto): el mismo camino que Foto
+  const alCompartir = useEffectEvent((foto: Blob) => void subir(foto))
+  useEffect(() => {
+    const form = raiz.current?.closest('form')
+    const compartida = (e: Event) => { if (e instanceof CustomEvent && e.detail instanceof Blob) alCompartir(e.detail) }
+    form?.addEventListener(COMPARTIDA, compartida)
+    return () => form?.removeEventListener(COMPARTIDA, compartida)
   }, [])
 
   // Pegar una imagen en cualquier campo (por ejemplo en "¿Qué querés?") también la sube; si trae texto, el texto va al

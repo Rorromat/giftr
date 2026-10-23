@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
+import { RegistrarSW } from '@/components/RegistrarSW'
+import { ATRAPAR_PEDIDO_INSTALAR } from '@/lib/app-instalable'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
@@ -31,9 +33,15 @@ export const viewport: Viewport = { themeColor: '#F6F0E5' }
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${bricolage.variable} ${instrument.variable}`}>
+      <head>
+        {/* el pedido de instalar de Chrome, si llega antes de que hidrate (texto fijo, no viene del pedido) */}
+        <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />
+      </head>
       <body className="min-h-screen font-sans">
         <div className="mx-auto max-w-md px-[18px]">{children}</div>
         <Arranque />
+        {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}
+        <RegistrarSW />
       </body>
     </html>
   )

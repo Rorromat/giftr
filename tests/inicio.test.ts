@@ -31,7 +31,7 @@ test('al entrar con sesión va a Inicio; la primera vez, a la bienvenida; sin se
   const { owner } = await seedOwnerAndGiver(h.db)
   expect(await redirige(Inicio())).toBe('/')
   h.session = { userId: owner.id }
-  expect(await redirige(Home())).toBe('/inicio')
+  expect(await redirige(Home({ searchParams: Promise.resolve({}) }))).toBe('/inicio')
   expect(await redirige(Inicio())).toBe('/bienvenida')
   await saltearBienvenida(h.db, owner.id)
   expect(await redirige(Inicio())).toBeNull()
