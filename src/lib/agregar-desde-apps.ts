@@ -79,6 +79,7 @@ export const pasosAtajo = (base: string): string[] => [
   'Arriba, en “Cualquiera”, dejá solo Direcciones URL, Texto y Páginas web de Safari.',
   'Sumá “Obtener URL de la entrada” y “Obtener elemento de la lista” (Primer elemento).',
   'Sumá “Codificar URL”.',
-  `Sumá “Texto” con ${entradaAtajo(base)} y la variable “Texto codificado”.`,
+  // la dirección al final: la pantalla la pone en su renglón, con Copiar (ver AgregarDesdeApps)
+  `Sumá “Texto” con esta dirección y, justo al final, la variable “Texto codificado”: ${entradaAtajo(base)}`,
   'Sumá “Abrir URL”. Listo: compartí un link y elegí GiftR.',
 ]

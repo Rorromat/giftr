@@ -10,7 +10,7 @@ import { guardarGustos, misGustos } from '@/lib/bienvenida'
 import { sanitizarGustos } from '@/lib/gustos'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { CumpleCampos } from '@/components/CumpleCampos'
-import { ATAJO_IPHONE, TEXTOS_APPS } from '@/lib/agregar-desde-apps'
+import { TEXTOS_APPS } from '@/lib/agregar-desde-apps'
 
 // Perfil, la bienvenida y el perfil público tal cual, con la base en PGlite y la sesión, el user-agent y las redirecciones
 // de Next simulados.
@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   session: null as { userId: string; user?: { name: string } } | null,
   ua: '',
+  atajo: null as string | null,
 }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
 vi.mock('@/auth', () => ({ auth: async () => h.session, signIn: vi.fn(), signOut: vi.fn() }))
@@ -26,6 +27,11 @@ vi.mock('next/headers', () => ({
   headers: async () => new Headers(h.ua ? { 'user-agent': h.ua } : {}),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
+// el link del atajo del iPhone, sin depender del de verdad (el dueño lo pega en ATAJO_IPHONE cuando lo arma)
+vi.mock('@/lib/agregar-desde-apps', async (original) => ({
+  ...await original<typeof import('@/lib/agregar-desde-apps')>(),
+  get ATAJO_IPHONE() { return h.atajo },
+}))
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
   notFound: () => { throw new Error('NEXT_NOT_FOUND') },
@@ -55,6 +61,7 @@ async function preparar() {
   const seed = await seedOwnerAndGiver(h.db)
   h.session = { userId: seed.owner.id, user: { name: 'Euge' } }
   h.ua = ''
+  h.atajo = null
   return seed
 }
 
@@ -206,13 +213,21 @@ test('"Agregar desde otras apps" en Perfil: en Android y en iPhone (con la recet
   expect(android).toContain(TEXTOS_APPS['android-manual'].texto)
   expect(android).not.toContain(TEXTOS_APPS.receta.sinAtajo)
 
-  expect(ATAJO_IPHONE).toBeNull()
-  const iphone = await perfil('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1')
+  const uaIPhone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1'
+  const iphone = await perfil(uaIPhone)
   expect(iphone).toContain(TEXTOS_APPS.titulo)
   expect(iphone).toContain(TEXTOS_APPS.ios.texto)
   expect(iphone).toContain(`<details open=""`)
   expect(iphone).toContain(`>${TEXTOS_APPS.receta.sinAtajo}</summary>`)
   expect(iphone).toContain('/compartir?url=')
+  expect(iphone).not.toContain(`>${TEXTOS_APPS.ios.boton}</a>`)
+  // con el link en ATAJO_IPHONE: el botón, y la receta cerrada
+  h.atajo = 'https://www.icloud.com/shortcuts/abc123'
+  const conAtajo = await perfil(uaIPhone)
+  expect(conAtajo).toContain(`href="https://www.icloud.com/shortcuts/abc123"`)
+  expect(conAtajo).toContain(`>${TEXTOS_APPS.ios.boton}</a>`)
+  expect(conAtajo).not.toContain('<details open')
+  expect(conAtajo).toContain(`>${TEXTOS_APPS.receta.conAtajo}</summary>`)
 
   for (const ua of ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', '']) {
     const compu = await perfil(ua)

@@ -53,10 +53,25 @@ export async function instalarGiftR(): Promise<boolean> {
 }
 
 /**
- * Guarda el pedido de instalar cuando llega y lo borra al instalarse. Sin preventDefault: Chrome sigue ofreciendo instalar
- * por su cuenta como siempre, y el botón de Perfil abre el mismo diálogo.
+ * Va inline en el <head> del layout raíz, así escucha mientras se lee el HTML: Chrome puede mandar el pedido antes de que
+ * React hidrate y RegistrarSW se ponga a escuchar, y ese se perdía (sin botón en Perfil). Lo deja en window para
+ * escucharPedidoInstalar.
  */
-export function escucharPedidoInstalar(w: Pick<Window, 'addEventListener' | 'removeEventListener'> = window) {
+export const ATRAPAR_PEDIDO_INSTALAR =
+  "window.addEventListener('beforeinstallprompt',function(e){window.__pedidoInstalar=e});" +
+  "window.addEventListener('appinstalled',function(){window.__pedidoInstalar=null})"
+
+/**
+ * Guarda el pedido de instalar cuando llega y lo borra al instalarse. Arranca con el que haya atrapado antes
+ * ATRAPAR_PEDIDO_INSTALAR. Sin preventDefault: Chrome sigue ofreciendo instalar por su cuenta como siempre, y el botón de
+ * Perfil abre el mismo diálogo.
+ */
+export function escucharPedidoInstalar(
+  w: Pick<Window, 'addEventListener' | 'removeEventListener'> & { __pedidoInstalar?: PedidoInstalar | null } = window,
+) {
+  // se levanta una vez: si después se usa, no tiene que volver
+  if (w.__pedidoInstalar) guardarPedidoInstalar(w.__pedidoInstalar)
+  w.__pedidoInstalar = null
   const guardar = (e: Event) => guardarPedidoInstalar(e as PedidoInstalar)
   const borrar = () => guardarPedidoInstalar(null)
   w.addEventListener('beforeinstallprompt', guardar)

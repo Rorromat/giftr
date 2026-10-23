@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { alCambiarPedido, instalada, instalarGiftR, puedeInstalar } from '@/lib/app-instalable'
 import { comoAgregar, entradaAtajo, pasosAtajo, TEXTOS_APPS, type Plataforma } from '@/lib/agregar-desde-apps'
+import { CopyLinkButton } from '@/components/CopyLinkButton'
 
 // En el servidor no se sabe si está instalada ni si Chrome ofrece instalar: se pinta lo de una pestaña sin el ofrecimiento.
 const enElServidor = () => false
@@ -10,6 +11,9 @@ const enElServidor = () => false
 const sinCambios = () => () => {}
 
 const ANDROID = ['android-manual', 'android-boton', 'android-app', 'android-recien'] as const
+
+const EN_APP_SI = '[@media(display-mode:standalone)]:visible'
+const EN_APP_NO = '[@media(display-mode:standalone)]:hidden'
 
 const texto = 'text-[13px] font-medium leading-snug'
 const chico = 'text-xs font-medium leading-snug text-gr-muted'
@@ -50,11 +54,14 @@ export function AgregarDesdeApps({ plataforma, base, atajo }: { plataforma: Plat
 
   if (plataforma === 'android') {
     return (
-      // Todas en la misma celda y solo una visible: mide siempre lo de la más alta, así lo que se sabe recién en el navegador
-      // (si está instalada, y el ofrecimiento de Chrome, que llega cuando quiere) no corre lo de abajo.
+      // En una pestaña, todas en la misma celda y solo una visible: mide siempre lo de la más alta, así el ofrecimiento de
+      // Chrome, que llega cuando quiere, no corre lo de abajo. En la app abierta desde el ícono ese ofrecimiento no llega, y
+      // el servidor no sabe que está instalada: el CSS muestra la suya antes de pintar y saca las otras (sin hueco abajo).
       <div className="grid">
         {ANDROID.map((v) => (
-          <div key={v} className={`col-start-1 row-start-1 flex flex-col gap-2${v === estado ? '' : ' invisible'}`}>{android(v)}</div>
+          <div key={v} className={`col-start-1 row-start-1 flex flex-col gap-2${v === estado ? '' : ' invisible'} ${v === 'android-app' ? EN_APP_SI : EN_APP_NO}`}>
+            {android(v)}
+          </div>
         ))}
       </div>
     )
@@ -77,11 +84,18 @@ export function AgregarDesdeApps({ plataforma, base, atajo }: { plataforma: Plat
         </summary>
         <ol className={`${texto} flex list-decimal flex-col gap-1 pl-5`}>
           {pasosAtajo(base).map((paso) => {
-            // la dirección, de un toque entera para copiarla y pegarla en Atajos
+            // La dirección, en su renglón y con Copiar, para pegarla en Atajos sin escribirla. Se corta en cualquier letra:
+            // cortada en el guion de giftr-seven parecía un corte de palabra. Manteniéndola apretada se selecciona entera.
             const [antes, despues] = paso.split(entrada)
+            if (despues === undefined) return <li key={paso}>{paso}</li>
             return (
               <li key={paso}>
-                {despues === undefined ? paso : <>{antes}<code className="select-all font-sans font-bold [overflow-wrap:anywhere]">{entrada}</code>{despues}</>}
+                {antes.trim()}
+                <span className="mt-1 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 select-all break-all font-sans font-bold">{entrada}</code>
+                  <CopyLinkButton url={entrada} />
+                </span>
+                {despues.trim()}
               </li>
             )
           })}

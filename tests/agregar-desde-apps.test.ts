@@ -1,9 +1,11 @@
 import { afterEach, expect, test, vi } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { comoAgregar, entradaAtajo, pasosAtajo, plataformaDe, TEXTOS_APPS, type Plataforma } from '@/lib/agregar-desde-apps'
 import {
-  alCambiarPedido, escucharPedidoInstalar, guardarPedidoInstalar, instalarGiftR, puedeInstalar, type PedidoInstalar,
+  alCambiarPedido, ATRAPAR_PEDIDO_INSTALAR, escucharPedidoInstalar, guardarPedidoInstalar, instalarGiftR, puedeInstalar,
+  type PedidoInstalar,
 } from '@/lib/app-instalable'
 import { AgregarDesdeApps } from '@/components/AgregarDesdeApps'
 import { GET } from '@/app/compartir/route'
@@ -110,12 +112,58 @@ test('el pedido de instalar de Chrome: se guarda sin preventDefault, sirve una v
   expect(avisos).not.toHaveBeenCalled()
 })
 
-/** Lo que se ve de la sección en Android (las demás variantes están en la misma celda, invisibles, para que no corra nada). */
+test('el pedido que llega antes de hidratar lo atrapa el script del <head>, y escucharPedidoInstalar lo levanta una vez', async () => {
+  // el script corre solo, como en el HTML: sin módulos ni nada de afuera más que window
+  const pagina = (w: EventTarget) => runInNewContext(ATRAPAR_PEDIDO_INSTALAR, { window: w })
+  const pedido = () => Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+    prompt: vi.fn(async () => {}), userChoice: Promise.resolve({ outcome: 'accepted' as const }),
+  }) as PedidoInstalar
+
+  // llega mientras React hidrata: RegistrarSW todavía no escucha
+  const w = new EventTarget() as EventTarget & { __pedidoInstalar?: PedidoInstalar | null }
+  pagina(w)
+  const p = pedido()
+  w.dispatchEvent(p)
+  expect(p.defaultPrevented).toBe(false)
+  expect(puedeInstalar()).toBe(false)
+  let dejar = escucharPedidoInstalar(w as unknown as Window)
+  expect(puedeInstalar()).toBe(true)
+  // usado, no vuelve aunque se vuelva a montar (StrictMode, Fast Refresh)
+  expect(await instalarGiftR()).toBe(true)
+  dejar()
+  dejar = escucharPedidoInstalar(w as unknown as Window)
+  expect(puedeInstalar()).toBe(false)
+  // los de después llegan como siempre
+  w.dispatchEvent(pedido())
+  expect(puedeInstalar()).toBe(true)
+  dejar()
+
+  // si se instaló antes de hidratar, no queda nada
+  guardarPedidoInstalar(null)
+  const otra = new EventTarget()
+  pagina(otra)
+  otra.dispatchEvent(pedido())
+  otra.dispatchEvent(new Event('appinstalled'))
+  escucharPedidoInstalar(otra as unknown as Window)()
+  expect(puedeInstalar()).toBe(false)
+
+  // sin el script (la página de antes), igual
+  escucharPedidoInstalar(new EventTarget() as unknown as Window)()
+  expect(puedeInstalar()).toBe(false)
+})
+
+const EN_APP_SI = '[@media(display-mode:standalone)]:visible'
+const EN_APP_NO = '[@media(display-mode:standalone)]:hidden'
+
+/** Las variantes de Android, con sus clases (van todas en la misma celda para que no corra nada). */
+const variantes = (html: string) =>
+  [...html.matchAll(/<div class="col-start-1 row-start-1 flex flex-col gap-2([^"]*)">(.*?)<\/div>/g)].map((m) => ({ clases: m[1], html: m[2] }))
+
+/** Lo que se ve de la sección en una pestaña de Android (las demás variantes están invisibles). */
 function visible(html: string): string {
-  const variantes = [...html.matchAll(/<div class="col-start-1 row-start-1 flex flex-col gap-2( invisible)?">(.*?)<\/div>/g)]
-  const vistas = variantes.filter((m) => !m[1])
+  const vistas = variantes(html).filter((v) => !v.clases.split(' ').includes('invisible'))
   expect(vistas).toHaveLength(1)
-  return vistas[0][2]
+  return vistas[0].html
 }
 
 const pintar = (plataforma: Plataforma, atajo: string | null = null) =>
@@ -133,6 +181,21 @@ test('la sección viene pintada desde el servidor: Android en una pestaña sin e
   expect(html).not.toContain('<details')
 })
 
+test('en la GiftR instalada de Android, el CSS muestra lo suyo antes de hidratar y saca las otras variantes (sin hueco)', () => {
+  const vs = variantes(pintar('android'))
+  expect(vs).toHaveLength(4)
+  // lo pinta el servidor como una pestaña, pero con display-mode: standalone gana "elegí GiftR"
+  const app = vs.filter((v) => v.html.includes(TEXTOS_APPS['android-app'].texto))
+  expect(app).toHaveLength(1)
+  expect(app[0].clases.split(' ')).toEqual(expect.arrayContaining(['invisible', EN_APP_SI]))
+  expect(app[0].clases).not.toContain(EN_APP_NO)
+  // las otras tres, fuera del todo (display: none): ahí no llega el ofrecimiento de Chrome
+  for (const v of vs.filter((x) => x !== app[0])) {
+    expect(v.clases).toContain(EN_APP_NO)
+    expect(v.clases).not.toContain(EN_APP_SI)
+  }
+})
+
 test('iPhone sin el link del atajo: la receta abierta, con la dirección de GiftR entera para copiar; con el link, el botón', () => {
   const sin = pintar('ios')
   expect(sin).toContain(TEXTOS_APPS.ios.texto)
@@ -142,7 +205,9 @@ test('iPhone sin el link del atajo: la receta abierta, con la dirección de Gift
   expect(sin).not.toContain('<a ')
   expect(sin).toContain('<details open=""')
   expect(sin).toContain(`>${TEXTOS_APPS.receta.sinAtajo}</summary>`)
-  expect(sin).toContain('<code class="select-all font-sans font-bold [overflow-wrap:anywhere]">https://giftr.test/compartir?url=</code>')
+  // la dirección, en su renglón y con Copiar (al lado del texto se cortaba en el guion de giftr-seven)
+  expect(sin).toContain('<span class="mt-1 flex items-center gap-2"><code class="min-w-0 flex-1 select-all break-all font-sans font-bold">https://giftr.test/compartir?url=</code><button type="button"')
+  expect(sin).toContain('>Copiar</span></button></span></li>')
   expect(sin.match(/<li>/g)).toHaveLength(pasosAtajo('').length)
   expect(sin).toContain(TEXTOS_APPS.receta.alFinal)
 
