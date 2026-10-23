@@ -43,7 +43,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
                        className="bg-transparent font-display text-xl font-bold outline-none placeholder:text-gr-muted" />
         </label>
         {/* con el link del producto (acá o en "Link a la tienda") completa el nombre, el precio y la foto que estén vacíos */}
-        <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} />
+        <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} tituloGuardado={deseo?.titulo ?? null} />
         <FotoField inicial={deseo?.fotoUrl} />
       </div>
 

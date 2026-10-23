@@ -53,6 +53,21 @@ export function aceptaFotoPropuesta(p: { hayFoto: boolean; dePropuesta: boolean;
 }
 
 /**
+ * Qué hace el campo de foto con lo que propone la lectura del link (src; null: el producto no tiene foto). anterior: la
+ * última propuesta que tomó. Si no la acepta (aceptaFotoPropuesta), nada. La misma que ya está o que se está trayendo
+ * (el mismo producto, pegado de nuevo) no se trae dos veces: cada una gasta un pedido del tope y una foto del cupo. Una
+ * nueva se trae. Null saca la que vino de otra propuesta (o la que se estaba trayendo): no es de este producto.
+ */
+export function queHacerConPropuesta(p: {
+  src: string | null; anterior: string | null; trayendo: boolean; hayFoto: boolean; dePropuesta: boolean; subiendo: boolean
+}): 'traer' | 'sacar' | 'nada' {
+  if (!aceptaFotoPropuesta(p)) return 'nada'
+  if (p.src === p.anterior && (p.trayendo || p.hayFoto)) return 'nada'
+  if (p.src) return 'traer'
+  return p.hayFoto || p.trayendo ? 'sacar' : 'nada'
+}
+
+/**
  * Un pegado que trae una imagen, en cualquier campo del formulario. Una planilla o una nota copian el texto y además una
  * imagen de cómo se ve: el texto se pega normal en el campo y la imagen se sube solo si todavía no hay foto. Una imagen
  * sola ("Copiar imagen") es la foto: sin texto, o con su link y sin HTML (Safari) o con el HTML de la imagen (Chrome). Una

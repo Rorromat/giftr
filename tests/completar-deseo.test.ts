@@ -3,9 +3,10 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { deseoDesdeForm } from '@/lib/deseo-form'
 import {
-  AVISO_MUCHOS, avisoBuscando, completador, CONSEJO_FOTO_ML, ESPERA_ESCRITO_MS, LEER_LINK_MS, linkParaCompletar, loDelAnterior,
-  mismoProducto, queCompletar, respuestaLink, type Contestado, type Puesto, type RespuestaLink, type Valores,
+  AVISO_MUCHOS, avisoBuscando, completador, CONSEJO_FOTO_ML, LEER_LINK_MS, linkParaCompletar, linksGuardados, loDelAnterior,
+  loQueEntro, mismoProducto, queCompletar, respuestaLink, traeElLink, type Contestado, type Puesto, type RespuestaLink, type Valores,
 } from '@/lib/completar-deseo'
+import { queHacerConPropuesta } from '@/lib/foto-del-form'
 import { DeseoForm } from '@/components/DeseoForm'
 import { FotoField } from '@/components/FotoField'
 
@@ -43,35 +44,51 @@ describe('linkParaCompletar', () => {
     for (const [titulo, linkTienda] of filas) {
       const servidor = deseoDesdeForm(fd({ titulo: titulo.trim() ? titulo : 'x', linkTienda }))!.linkTienda
       const esperado = titulo.trim() && typeof servidor === 'string' ? servidor : null
-      expect(linkParaCompletar(valores({ titulo, linkTienda }), null), `${titulo} | ${linkTienda}`).toBe(esperado)
+      expect(linkParaCompletar(valores({ titulo, linkTienda }), []), `${titulo} | ${linkTienda}`).toBe(esperado)
     }
   })
 
   test('al editar, el link guardado no se busca (al abrir la pantalla no se pide nada); uno nuevo sí', () => {
     const guardado = 'https://www.zara.com/ar/campera-1234.html'
-    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: guardado }), guardado)).toBeNull()
-    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: guardado.replace('https://', '') }), guardado)).toBeNull()
-    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: ML }), guardado)).toBe(ML)
+    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: guardado }), [guardado])).toBeNull()
+    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: guardado.replace('https://', '') }), [guardado])).toBeNull()
+    expect(linkParaCompletar(valores({ titulo: 'Campera', linkTienda: ML }), [guardado])).toBe(ML)
     // un link pegado en el título con el guardado a la tienda se queda en el título (ver deseoDesdeForm)
-    expect(linkParaCompletar(valores({ titulo: ML, linkTienda: guardado }), guardado)).toBeNull()
+    expect(linkParaCompletar(valores({ titulo: ML, linkTienda: guardado }), [guardado])).toBeNull()
     // si borró el guardado y pegó otro en el título, ese
-    expect(linkParaCompletar(valores({ titulo: ML, linkTienda: '' }), guardado)).toBe(ML)
+    expect(linkParaCompletar(valores({ titulo: ML, linkTienda: '' }), [guardado])).toBe(ML)
+  })
+
+  test('al editar, el link del título igual al guardado, o al que tenía el título al abrir, tampoco', () => {
+    const guardado = 'https://www.zara.com/ar/campera-1234.html'
+    // un deseo de antes con el link en el título y también a la tienda: corregir una letra del título pedía el guardado
+    const conLosDos = linksGuardados(guardado, `Campera ${guardado}`)
+    expect(conLosDos).toEqual([guardado, guardado])
+    expect(linkParaCompletar(valores({ titulo: `Campera negra ${guardado}`, linkTienda: guardado }), conLosDos)).toBeNull()
+    // uno con el link solo en el título (sin link a la tienda)
+    const enElTitulo = linksGuardados(null, `Campera ${guardado}`)
+    expect(enElTitulo).toEqual([guardado])
+    expect(linkParaCompletar(valores({ titulo: `Campera negra ${guardado}` }), enElTitulo)).toBeNull()
+    // otro link, sí
+    expect(linkParaCompletar(valores({ titulo: `Campera negra ${ML}` }), enElTitulo)).toBe(ML)
+    expect(linkParaCompletar(valores({ titulo: `Campera ${guardado}`, linkTienda: ML }), enElTitulo)).toBe(ML)
+    expect(linksGuardados(null, 'Campera')).toEqual([])
   })
 
   test('lo que el servidor no va a buscar no se pide: localhost, una IP, otro puerto, nombres internos', () => {
     for (const l of ['https://localhost/x', 'https://10.0.0.1/x', 'https://tienda.com:8443/x', 'https://db.internal/x', 'https://[::1]/x']) {
-      expect(linkParaCompletar(valores({ titulo: l }), null), l).toBeNull()
-      expect(linkParaCompletar(valores({ linkTienda: l }), null), l).toBeNull()
+      expect(linkParaCompletar(valores({ titulo: l }), []), l).toBeNull()
+      expect(linkParaCompletar(valores({ linkTienda: l }), []), l).toBeNull()
     }
     // http:// sí (el servidor lo pide por https), tal como está escrito
-    expect(linkParaCompletar(valores({ titulo: 'http://tienda.com.ar/x' }), null)).toBe('http://tienda.com.ar/x')
+    expect(linkParaCompletar(valores({ titulo: 'http://tienda.com.ar/x' }), [])).toBe('http://tienda.com.ar/x')
   })
 
   test('el link a la tienda que puso el autocompletado cuenta como vacío: otro link pegado en el título lo reemplaza', () => {
     const puesto: Puesto = { link: ML, titulo: 'Mate imperial', linkTienda: ML }
-    expect(linkParaCompletar(valores({ titulo: OTRO, linkTienda: ML }), null, puesto)).toBe(OTRO)
+    expect(linkParaCompletar(valores({ titulo: OTRO, linkTienda: ML }), [], puesto)).toBe(OTRO)
     // sin puesto (lo escribió el dueño), el del título se queda: se busca el de la tienda
-    expect(linkParaCompletar(valores({ titulo: OTRO, linkTienda: ML }), null)).toBe(ML)
+    expect(linkParaCompletar(valores({ titulo: OTRO, linkTienda: ML }), [])).toBe(ML)
   })
 })
 
@@ -106,15 +123,23 @@ describe('queCompletar', () => {
     expect(c.aviso).toBe('Completamos el precio: revisalo.')
   })
 
-  test('si está escribiendo al lado del link, el título no se toca: el link pasa a la tienda y al mandar sale del título', () => {
+  test('con el dueño en el título, el título no se toca: el link pasa a la tienda, el precio se completa y al mandar sale del título', () => {
     // pegó el link y escribió " Para " justo cuando volvió: con el título reescrito quedaba "Para" y seguía "Paramamá"
     const v = valores({ titulo: `${ML} Para ` })
     const c = queCompletar(v, ML, ok(), null, true)!
     expect(c.titulo).toBeUndefined()
     expect(c).toMatchObject({ linkTienda: ML, precio: '$88.990', puesto: { link: ML, linkTienda: ML } })
+    expect(c.aviso).toBe('Completamos el precio: revisalo.')
     expect(deseoDesdeForm(fd({ ...v, linkTienda: ML }))).toMatchObject({ titulo: 'Para', linkTienda: ML })
-    // si es solo el link, va el nombre aunque esté en el campo (no escribió nada al lado)
-    expect(queCompletar(valores({ titulo: ML }), ML, ok(), null, true)!.titulo).toBe('Mate imperial de calabaza')
+    // tampoco con el link solo, con un espacio atrás (va a escribir) o vacío: el nombre se pone al dejar el campo
+    for (const titulo of [ML, `${ML} `, '']) {
+      const d = queCompletar(valores({ titulo, linkTienda: titulo ? '' : ML }), ML, ok(), null, true)!
+      expect(d.titulo, titulo).toBeUndefined()
+      expect(d.precio, titulo).toBe('$88.990')
+    }
+    // lo que puso antes el autocompletado sigue siendo suyo (se cambia al dejar el título)
+    const puesto: Puesto = { link: ML, titulo: 'Mate imperial' }
+    expect(queCompletar(valores({ titulo: 'Mate imperial', linkTienda: ML }), ML, ok(), puesto, true)!.puesto.titulo).toBe('Mate imperial')
   })
 
   test('sin nombre, si era solo el link, queda el link (el servidor pone el del link o el sitio)', () => {
@@ -148,7 +173,7 @@ describe('queCompletar', () => {
   test('lo que puso el primer link y el segundo no trae se vacía: no es de este producto (el título, al del link)', () => {
     const primero = queCompletar(valores({ titulo: ML }), ML, ok(), null)!
     const despues = valores({ titulo: primero.titulo, linkTienda: OTRO, precio: primero.precio })
-    const sinNada = { estado: 'bloqueado', titulo: null, precio: null, foto: null, sitio: 'otra.com' } as const
+    const sinNada = ok({ titulo: null, precio: null, foto: null, sitio: 'otra.com' })
     const c = queCompletar(despues, OTRO, sinNada, primero.puesto)!
     // el título es obligatorio: vacío frenaba el envío. Va el nombre del link (o el sitio), como lo pone el servidor
     expect(c).toMatchObject({ titulo: 'Termo stanley', precio: '', foto: null })
@@ -157,13 +182,36 @@ describe('queCompletar', () => {
     expect(queCompletar({ ...despues, linkTienda: zara }, zara, sinNada, primero.puesto)!.titulo).toBe('zara.com')
   })
 
+  test('una respuesta que no es ok no vacía nada ni propone foto: solo pone el nombre del link y avisa', () => {
+    const puesto: Puesto = { link: ML, titulo: 'Mate imperial', linkTienda: ML, precio: '$88.990' }
+    const v = valores({ titulo: 'Mate imperial', linkTienda: ML, precio: '$88.990' })
+    const fallas: Contestado[] = [null, 'muchos', ...(['no-carga', 'no-esta', 'sin-datos', 'bloqueado'] as const).map(
+      (estado): RespuestaLink => ({ estado, titulo: 'Mate imperial', precio: null, foto: null, sitio: 'mercadolibre.com.ar' }))]
+    for (const r of fallas) {
+      const c = queCompletar(v, ML, r, puesto)!
+      const cual = String(r && typeof r === 'object' ? r.estado : r)
+      expect(c.precio, cual).toBeUndefined()
+      expect('foto' in c, cual).toBe(false)
+      expect(c.titulo, cual).toBe('Mate imperial')
+      expect(c.aviso, cual).toBeTruthy()
+    }
+    // con un título vacío o que es solo el link, el nombre del link
+    expect(queCompletar(valores({ titulo: `${ML}  ` }), ML, null, null)).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+    expect(queCompletar(valores({ linkTienda: ML, precio: '$1' }), ML, 'muchos', null)).toMatchObject({ titulo: 'Mate imperial' })
+    // con 'ok', lo que puso y este producto no trae sí se vacía
+    expect(queCompletar(v, ML, ok({ precio: null, foto: null }), puesto)).toMatchObject({ precio: '', foto: null })
+  })
+
   test('un bloqueado de MercadoLibre aplica el nombre del link, y cómo poner la foto va al lado de Pegar', () => {
     const r: RespuestaLink = { estado: 'bloqueado', titulo: 'Mate imperial', precio: null, foto: null, sitio: 'mercadolibre.com.ar' }
-    expect(queCompletar(valores({ titulo: ML }), ML, r, null)).toMatchObject({
-      titulo: 'Mate imperial', linkTienda: ML, foto: null,
+    const c = queCompletar(valores({ titulo: ML }), ML, r, null)!
+    expect(c).toMatchObject({
+      titulo: 'Mate imperial', linkTienda: ML,
       aviso: 'MercadoLibre no deja ver la publicación.',
       consejoFoto: CONSEJO_FOTO_ML,
     })
+    // no propone foto: no dice nada del producto (la que haya queda)
+    expect('foto' in c).toBe(false)
     // el nombre del link se ve en el campo; con el escrito por el dueño, el mismo aviso
     expect(queCompletar(valores({ titulo: 'Mate', linkTienda: ML }), ML, r, null)!.aviso).toBe('MercadoLibre no deja ver la publicación.')
     const zara = queCompletar(valores({ titulo: 'Remera', linkTienda: 'https://www.zara.com/ar/x' }), 'https://www.zara.com/ar/x',
@@ -216,6 +264,15 @@ describe('queCompletar', () => {
 
 describe('loDelAnterior', () => {
   const puesto: Puesto = { link: ML, titulo: 'Mate imperial', linkTienda: ML, precio: '$88.990' }
+
+  test('con el dueño en el título, lo del anterior sale de los otros campos; el título queda (y sigue como puesto)', () => {
+    const v = valores({ titulo: `Mate imperial ${OTRO}`, linkTienda: ML, precio: '$88.990' })
+    expect(loDelAnterior(v, OTRO, puesto, true)).toEqual({ campos: { linkTienda: '', precio: '' }, puesto: { link: OTRO, titulo: 'Mate imperial' } })
+    const w = valores({ titulo: 'Mate imperial', linkTienda: OTRO, precio: '$88.990' })
+    expect(loDelAnterior(w, OTRO, puesto, true)).toEqual({ campos: { precio: '' }, puesto: { link: OTRO, titulo: 'Mate imperial' } })
+    // sin el dueño ahí, sí
+    expect(loDelAnterior(w, OTRO, puesto)!.campos).toEqual({ titulo: 'Termo stanley', precio: '' })
+  })
 
   test('al buscar otro link, lo que puso el anterior y nadie tocó se saca enseguida', () => {
     expect(loDelAnterior(valores({ titulo: OTRO }), OTRO, null)).toBeNull()
@@ -287,12 +344,39 @@ test('la respuesta del servidor se toma solo con la forma de RespuestaLink', () 
   }
 })
 
+describe('qué cuenta como pegado', () => {
+  test('lo pegado, o lo que el teclado escribió de una vez (la tira del portapapeles de Gboard); letra por letra, no', () => {
+    expect(loQueEntro({ inputType: 'insertFromPaste', data: ML })).toBe(ML)
+    // el navegador que no lo da en data: lo tiene el paste de antes
+    expect(loQueEntro({ inputType: 'insertFromPaste', data: null }, ML)).toBe(ML)
+    expect(loQueEntro({ inputType: 'insertFromPaste', data: null })).toBe('')
+    // Gboard manda el link de la tira del portapapeles como insertText, todo junto
+    expect(loQueEntro({ inputType: 'insertText', data: ML })).toBe(ML)
+    expect(loQueEntro({ inputType: 'insertText', data: 'x' })).toBeNull()
+    // lo que el teclado va armando trae la palabra entera, también un link a medio escribir
+    expect(loQueEntro({ inputType: 'insertCompositionText', data: 'https://tienda.com.ar/producto/mate-imp' })).toBeNull()
+    expect(loQueEntro({ inputType: 'insertReplacementText', data: 'calabaza' })).toBeNull()
+    expect(loQueEntro({ inputType: 'deleteContentBackward', data: null })).toBeNull()
+  })
+
+  test('lo pegado trae el link también con la puntuación de la oración al final', () => {
+    const link = 'https://tienda.com.ar/producto/mate-imperial'
+    // en el título se toma sin el punto (linkEnTexto); en "Link a la tienda", tal cual (como el servidor)
+    expect(traeElLink(`${link}.`, link)).toBe(true)
+    expect(traeElLink(`Mirá este mate: ${link}.`, link)).toBe(true)
+    expect(traeElLink(`${link}.`, `${link}.`)).toBe(true)
+    expect(traeElLink('tienda.com.ar/producto/mate-imperial', link)).toBe(true)
+    expect(traeElLink(' para papá', link)).toBe(false)
+    expect(traeElLink(OTRO, link)).toBe(false)
+  })
+})
+
 describe('completador: cuándo se pide', () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { vi.useRealTimers() })
 
   /** El formulario de mentira: los tres campos, la línea de estado, las fotos propuestas y los pedidos sin contestar. */
-  function armar(inicial: Partial<Valores> = {}, guardado: string | null = null) {
+  function armar(inicial: Partial<Valores> = {}, guardado: string | null = null, tituloGuardado: string | null = null) {
     const v = valores(inicial)
     const fotos: (string | null)[] = []
     const linea: { texto: string; consejoFoto?: string } = { texto: '' }
@@ -303,7 +387,7 @@ describe('completador: cuándo se pide', () => {
       signal.addEventListener('abort', () => fallar(new Error('cortado')))
     }))
     const c = completador({
-      guardado, pedir, leer: () => ({ ...v }), escribiendo: () => foco.enTitulo,
+      guardado, tituloGuardado, pedir, leer: () => ({ ...v }), escribiendo: () => foco.enTitulo,
       mostrar: (l) => { Object.assign(linea, { texto: l.aviso, consejoFoto: l.consejoFoto }) },
       escribir: (campos, foto) => {
         for (const k of ['titulo', 'linkTienda', 'precio'] as const) if (campos[k] !== undefined) v[k] = campos[k]
@@ -320,10 +404,16 @@ describe('completador: cuándo se pide', () => {
       v[campo] = valor
       c.alCambiar(texto)
     }
-    return { v, fotos, linea, foco, pedidos, pedir, cambiar, pegar, dejar: c.alDejar, cerrar: c.cerrar }
+    /** Dejar un campo (por defecto, la tienda); alTitulo: el foco va al título. */
+    const dejar = (campo: 'titulo' | 'linkTienda' = 'linkTienda', alTitulo = false) => {
+      if (campo === 'titulo') foco.enTitulo = false
+      c.alDejar(campo, alTitulo)
+      if (alTitulo) foco.enTitulo = true
+    }
+    return { v, fotos, linea, foco, pedidos, pedir, cambiar, pegar, dejar, mandar: c.alMandar, cerrar: c.cerrar }
   }
 
-  /** Pegar ML en el título y que vuelva completo. */
+  /** Pegar ML en el título y que vuelva completo (sin el foco en el título, como si hubiera vuelto después de dejarlo). */
   async function completado(f: ReturnType<typeof armar>, r = ok()) {
     f.pegar('titulo', ML)
     f.pedidos.at(-1)!.contestar(r)
@@ -343,40 +433,33 @@ describe('completador: cuándo se pide', () => {
     expect(f.linea.texto).toBe('Completamos nombre y precio: revisalos.')
     // seguir escribiendo en el título no vuelve a pedir
     f.cambiar('titulo', 'Mate imperial de calabaza grande')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS * 2)
+    f.dejar('titulo')
     expect(f.pedir).toHaveBeenCalledTimes(1)
   })
 
-  test('lo escrito a mano espera a que deje de escribir un rato, o a que deje el campo', async () => {
-    const f = armar()
-    f.cambiar('linkTienda', 'tienda.com.ar/producto/mate-de-calabaza')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS - 50)
-    f.cambiar('linkTienda', 'tienda.com.ar/producto/mate-de-calabaza-grande')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS - 50)
-    expect(f.pedir).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(50)
-    expect(f.pedidos.map((p) => p.link)).toEqual(['https://tienda.com.ar/producto/mate-de-calabaza-grande'])
-  })
-
-  test('escribir un link en el teléfono, con pausas, no pide cada pedazo; la home no se pide nunca', async () => {
-    const f = armar()
-    // las pausas de cambiar al teclado de símbolos (unos 400 ms): con 400 ms de espera salían 7 pedidos
-    for (const pedazo of ['lacasadelmate.com', 'lacasadelmate.com.ar', 'lacasadelmate.com.ar/producto', 'lacasadelmate.com.ar/producto/mate',
-      'lacasadelmate.com.ar/producto/mate-imperial', 'lacasadelmate.com.ar/producto/mate-imperial-de-calabaza']) {
-      f.cambiar('linkTienda', pedazo)
-      await vi.advanceTimersByTimeAsync(500)
+  test('lo escrito a mano se busca solo al dejar el campo, nunca con un reloj: no se lee un pedazo del link', async () => {
+    for (const campo of ['linkTienda', 'titulo'] as const) {
+      const f = armar()
+      f.foco.enTitulo = campo === 'titulo'
+      // con pausas largas (cambiar al teclado de símbolos, buscar el "-"): antes salía un pedido por pedazo
+      for (const pedazo of ['lacasadelmate.com', 'lacasadelmate.com.ar', 'lacasadelmate.com.ar/producto', 'lacasadelmate.com.ar/producto/mate',
+        'lacasadelmate.com.ar/producto/mate-imp', 'lacasadelmate.com.ar/producto/mate-imperial-de-calabaza']) {
+        f.cambiar(campo, campo === 'titulo' ? `https://${pedazo}` : pedazo)
+        await vi.advanceTimersByTimeAsync(60_000)
+      }
+      expect(f.pedir, campo).not.toHaveBeenCalled()
+      expect(f.v, campo).toMatchObject({ precio: '' })
+      // dejar el campo lo busca ya
+      f.dejar(campo)
+      expect(f.pedidos.map((p) => p.link), campo).toEqual(['https://lacasadelmate.com.ar/producto/mate-imperial-de-calabaza'])
+      f.dejar(campo)
+      expect(f.pedir, campo).toHaveBeenCalledTimes(1)
     }
-    expect(f.pedir).not.toHaveBeenCalled()
-    // dejar el campo lo busca ya
-    f.dejar()
-    expect(f.pedidos.map((p) => p.link)).toEqual(['https://lacasadelmate.com.ar/producto/mate-imperial-de-calabaza'])
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
-    expect(f.pedir).toHaveBeenCalledTimes(1)
+  })
 
-    // la home de una tienda no tiene un producto (el servidor contesta sin-datos): ni escrita ni pegada
+  test('la home de una tienda no se pide nunca, ni escrita ni pegada', async () => {
     const g = armar()
     g.cambiar('linkTienda', 'lacasadelmate.com')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
     g.dejar()
     g.cambiar('linkTienda', '')
     g.pegar('titulo', 'https://www.zara.com/')
@@ -385,6 +468,15 @@ describe('completador: cuándo se pide', () => {
     // con un ?… sí (hay tiendas con el producto ahí)
     g.pegar('titulo', 'https://tienda.com.ar/?product=mate')
     expect(g.pedir).toHaveBeenCalledTimes(1)
+  })
+
+  test('un pegado con la puntuación de la oración al final se busca en el momento', async () => {
+    const f = armar()
+    f.pegar('titulo', 'Mirá este mate: https://tienda.com.ar/producto/mate-imperial.')
+    expect(f.pedidos.map((p) => p.link)).toEqual(['https://tienda.com.ar/producto/mate-imperial'])
+    const g = armar()
+    g.pegar('linkTienda', 'https://tienda.com.ar/producto/mate-imperial.')
+    expect(g.pedidos.map((p) => p.link)).toEqual(['https://tienda.com.ar/producto/mate-imperial.'])
   })
 
   test('el mismo link pegado de nuevo no se pide otra vez (se completa con lo leído), salvo que no haya cargado', async () => {
@@ -463,9 +555,9 @@ describe('completador: cuándo se pide', () => {
 
   test('al editar no se pide nada hasta que cambie el link guardado', async () => {
     const guardado = 'https://www.zara.com/ar/campera-1234.html'
-    const f = armar({ titulo: 'Campera', linkTienda: guardado, precio: '$50.000' }, guardado)
+    const f = armar({ titulo: 'Campera', linkTienda: guardado, precio: '$50.000' }, guardado, 'Campera')
     f.cambiar('titulo', 'Campera negra')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
+    f.dejar('titulo')
     expect(f.pedir).not.toHaveBeenCalled()
     f.pegar('linkTienda', ML)
     f.pedidos[0].contestar(ok())
@@ -473,6 +565,27 @@ describe('completador: cuándo se pide', () => {
     // ya hay título y precio: solo la foto, que FotoField toma si no hay una
     expect(f.v).toEqual({ titulo: 'Campera negra', linkTienda: ML, precio: '$50.000' })
     expect(f.fotos).toEqual([FOTO])
+  })
+
+  test('al editar, el link del título igual al guardado o al que tenía al abrir no dispara nada', async () => {
+    const G = 'https://www.zara.com/ar/campera-1234.html'
+    // un deseo de antes con el link en el título y también a la tienda: corregir una letra del título pedía G
+    const f = armar({ titulo: `Camprea ${G}`, linkTienda: G }, G, `Camprea ${G}`)
+    f.cambiar('titulo', `Campera ${G}`)
+    f.dejar('titulo')
+    f.pegar('titulo', `Campera ${G}`, G)
+    // con el link solo en el título
+    const g = armar({ titulo: `Camprea ${G}` }, null, `Camprea ${G}`)
+    g.cambiar('titulo', `Campera ${G}`)
+    g.dejar('titulo')
+    for (const x of [f, g]) {
+      expect(x.pedir).not.toHaveBeenCalled()
+      expect(x.v.precio).toBe('')
+      expect(x.v.titulo).toBe(`Campera ${G}`)
+    }
+    // otro link, sí
+    g.pegar('linkTienda', ML)
+    expect(g.pedidos.map((p) => p.link)).toEqual([ML])
   })
 
   test('con otro link, lo del anterior se saca apenas se pide (si manda antes, no se guarda con lo del otro)', async () => {
@@ -490,23 +603,67 @@ describe('completador: cuándo se pide', () => {
     expect(f.v).toEqual({ titulo: 'Termo Stanley', linkTienda: OTRO, precio: '$120.000' })
   })
 
-  test('al mandar o cerrarse el formulario se corta lo que esté en curso, y lo que llega no se aplica', async () => {
+  test('al cerrarse el formulario se corta lo que esté en curso, y lo que llega no se aplica', async () => {
     const f = armar()
     f.cambiar('linkTienda', ML)
     f.cerrar()
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
+    f.dejar()
     expect(f.pedir).not.toHaveBeenCalled()
     f.pegar('linkTienda', OTRO)
     expect(f.linea.texto).toBe(avisoBuscando(OTRO))
     f.cerrar()
     expect(f.pedidos[0].signal.aborted).toBe(true)
-    // mientras dice "Guardando…" ya no dice que busca (parecía que guardar esperaba a la búsqueda)
+    // ya no dice que busca
     expect(f.linea.texto).toBe('')
     f.pedidos[0].contestar(ok())
     await vi.advanceTimersByTimeAsync(0)
     expect(f.fotos).toEqual([])
     // queda el nombre del link que se puso mientras buscaba
     expect(f.v).toEqual(valores({ titulo: 'Termo stanley', linkTienda: OTRO }))
+  })
+
+  test('al mandar se corta lo que esté en curso: mientras dice "Guardando…" ya no dice que busca, y lo que llega no va', async () => {
+    const f = armar()
+    f.pegar('linkTienda', OTRO)
+    f.mandar()
+    expect(f.pedidos[0].signal.aborted).toBe(true)
+    expect(f.linea.texto).toBe('')
+    f.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.fotos).toEqual([])
+    expect(f.v).toEqual(valores({ titulo: 'Termo stanley', linkTienda: OTRO }))
+  })
+
+  test('al mandar con un link escrito sin buscar, no se pide: lo del producto anterior sale antes de armar lo que se manda', async () => {
+    for (const titulo of [OTRO, `Mate imperial de calabaza ${OTRO}`]) {
+      const f = armar()
+      await completado(f)
+      // escribe otro link en el título y aprieta Enter (sin dejar el campo)
+      f.foco.enTitulo = true
+      f.cambiar('titulo', titulo)
+      f.mandar()
+      expect(f.pedir, titulo).toHaveBeenCalledTimes(1)
+      // la tienda tenía el link de ML que puso el autocompletado: el servidor dejaba el del título en el título, con el
+      // precio y la foto del mate
+      expect(f.v, titulo).toEqual(valores({ titulo: OTRO }))
+      expect(f.fotos, titulo).toEqual([FOTO, null])
+      expect(deseoDesdeForm(fd({ ...f.v })), titulo).toMatchObject({ titulo: 'Termo stanley', linkTienda: OTRO, precio: null })
+    }
+    // escrito en la tienda: el nombre del mate tampoco va
+    const g = armar()
+    await completado(g)
+    g.cambiar('linkTienda', OTRO)
+    g.mandar()
+    expect(g.pedir).toHaveBeenCalledTimes(1)
+    expect(g.v).toEqual({ titulo: 'Termo stanley', linkTienda: OTRO, precio: '' })
+    // lo que escribió el dueño queda
+    const h = armar()
+    await completado(h)
+    h.v.titulo = 'Mate para papá'
+    h.v.precio = '$90.000'
+    h.cambiar('linkTienda', OTRO)
+    h.mandar()
+    expect(h.v).toEqual({ titulo: 'Mate para papá', linkTienda: OTRO, precio: '$90.000' })
   })
 
   test('pegar algo que no es el link, después de completar, no cambia nada ni vuelve a proponer la foto', async () => {
@@ -517,7 +674,8 @@ describe('completador: cuándo se pide', () => {
     const linea = f.linea.texto
     f.pegar('titulo', 'Mate imperial de calabaza para papá', ' para papá')
     f.pegar('linkTienda', `${ML}`, 'algo')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
+    f.dejar('titulo')
+    f.dejar()
     expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza para papá', linkTienda: ML, precio: '' })
     expect(f.fotos).toEqual([FOTO])
     expect(f.linea.texto).toBe(linea)
@@ -573,9 +731,7 @@ describe('completador: cuándo se pide', () => {
     await vi.advanceTimersByTimeAsync(0)
     const completo = { ...f.v }
     f.cambiar('linkTienda', `${ML}?tracking_id=`)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
     f.cambiar('linkTienda', ML)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
     f.dejar()
     expect(f.pedir).toHaveBeenCalledTimes(1)
     expect(f.v).toEqual({ ...completo, linkTienda: ML })
@@ -593,8 +749,9 @@ describe('completador: cuándo se pide', () => {
     f.pegar('linkTienda', `${ML}?tracking_id=abc123&matt_tool=7#position=2`)
     expect(f.pedir).toHaveBeenCalledTimes(1)
     expect(f.v).toEqual({ ...completo, linkTienda: `${ML}?tracking_id=abc123&matt_tool=7#position=2` })
-    // la foto no se saca ni se vuelve a traer: se propone la misma, que FotoField ya tiene
+    // la foto no se saca: se propone la misma, que FotoField no vuelve a traer (ver queHacerConPropuesta)
     expect(f.fotos).toEqual([FOTO, FOTO])
+    expect(queHacerConPropuesta({ src: FOTO, anterior: FOTO, trayendo: false, hayFoto: true, dePropuesta: true, subiendo: false })).toBe('nada')
   })
 
   test('un link con otro valor en el ?…, aunque sea un pedazo del anterior, es otro producto', async () => {
@@ -618,47 +775,52 @@ describe('completador: cuándo se pide', () => {
     }
   })
 
-  test('borrar a mano el link que completó, y parar a la mitad o dejar el campo, no busca el pedazo ni saca nada', async () => {
+  test('borrar a mano parte del link: mientras borra no pasa nada; al dejar el campo es otro link y se busca', async () => {
+    const A = 'https://tienda.com.ar/item?id=1245'
     const f = armar()
-    await completado(f)
-    const completo = { ...f.v }
-    // borra de a una letra: 20 letras, con una pausa larga, y deja el campo (por ejemplo para tocar "Agregar")
-    for (let n = 1; n <= 20; n++) f.cambiar('linkTienda', ML.slice(0, -n))
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS * 2)
-    f.dejar()
-    expect(f.pedir).toHaveBeenCalledTimes(1)
-    expect(f.v).toEqual({ ...completo, linkTienda: ML.slice(0, -20) })
-    expect(f.fotos).toEqual([FOTO])
-    // lo borra entero: tampoco
-    f.cambiar('linkTienda', '')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
-    expect(f.v).toEqual({ ...completo, linkTienda: '' })
-    // lo que escribe después, que ya no es un pedazo, sí se busca
-    f.cambiar('linkTienda', OTRO)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
-    expect(f.pedidos.map((p) => p.link)).toEqual([ML, OTRO])
-  })
-
-  test('una letra de más al final del link no saca nada mientras busca; borrarla no vuelve a pedir', async () => {
-    const f = armar()
-    await completado(f)
-    const completo = { ...f.v }
-    f.cambiar('linkTienda', `${ML}x`)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
-    expect(f.pedidos.map((p) => p.link)).toEqual([ML, `${ML}x`])
-    // si toca "Agregar" ahora, se guarda con lo que el dueño ya veía
-    expect(f.v).toEqual({ ...completo, linkTienda: `${ML}x` })
-    expect(f.fotos).toEqual([FOTO])
-    // MercadoLibre la lee por el id: vuelve igual y queda igual (la foto es la misma, FotoField no la vuelve a traer)
-    f.pedidos[1].contestar(ok())
+    f.pegar('titulo', A)
+    f.pedidos[0].contestar(ok({ titulo: 'Producto A', precio: '$1.000', foto: FOTO, sitio: 'tienda.com.ar' }))
     await vi.advanceTimersByTimeAsync(0)
-    expect(f.v).toEqual({ ...completo, linkTienda: `${ML}x` })
-    expect(f.fotos).toEqual([FOTO, FOTO])
-    f.cambiar('linkTienda', ML)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
+    const completo = { ...f.v }
+    // borra el último número de a una letra, con una pausa larga: no se busca ni se saca nada
+    f.cambiar('linkTienda', A.slice(0, -1))
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(f.pedir).toHaveBeenCalledTimes(1)
+    expect(f.v).toEqual({ ...completo, linkTienda: A.slice(0, -1) })
+    expect(f.fotos).toEqual([FOTO])
+    // al dejarlo (por ejemplo para tocar "Agregar"), ?id=124 es otro producto: no se guarda con el nombre, el precio y la
+    // foto de ?id=1245
+    f.dejar()
+    expect(f.pedidos.map((p) => p.link)).toEqual([A, A.slice(0, -1)])
+    expect(f.v).toEqual({ titulo: 'tienda.com.ar', linkTienda: A.slice(0, -1), precio: '' })
+    expect(f.fotos).toEqual([FOTO, null])
+    // lo borra entero: nada que buscar
+    f.cambiar('linkTienda', '')
     f.dejar()
     expect(f.pedir).toHaveBeenCalledTimes(2)
-    expect(f.v).toEqual(completo)
+  })
+
+  test('una letra de más es otro link: al dejar el campo saca lo del anterior y se busca; si falla, no vacía nada más', async () => {
+    const fallas: Contestado[] = [null, 'muchos', { estado: 'no-esta', titulo: 'Mate imperial', precio: null, foto: null, sitio: 'mercadolibre.com.ar' }]
+    for (const r of fallas) {
+      const f = armar()
+      await completado(f)
+      f.cambiar('linkTienda', `${ML}x`)
+      // mientras escribe, nada
+      expect(f.pedir).toHaveBeenCalledTimes(1)
+      expect(f.fotos).toEqual([FOTO])
+      f.dejar()
+      expect(f.pedidos.map((p) => p.link)).toEqual([ML, `${ML}x`])
+      const mientras = { titulo: 'Mate imperial', linkTienda: `${ML}x`, precio: '' }
+      expect(f.v).toEqual(mientras)
+      expect(f.fotos).toEqual([FOTO, null])
+      f.pedidos[1].contestar(r)
+      await vi.advanceTimersByTimeAsync(0)
+      // solo el aviso: nada se vacía ni se vuelve a proponer
+      expect(f.v).toEqual(mientras)
+      expect(f.fotos).toEqual([FOTO, null])
+      expect(f.linea.texto).not.toBe('')
+    }
   })
 
   test('pegado en la tienda con el título vacío, el nombre del link va enseguida (se puede mandar) y la respuesta lo cambia', async () => {
@@ -679,16 +841,125 @@ describe('completador: cuándo se pide', () => {
     expect(g.v.titulo).toBe('Campera negra')
   })
 
+  test('el nombre provisorio no va en un título que tiene el foco o que lo va a tener; se pone al dejarlo', async () => {
+    // escribió el link en la tienda y toca "¿Qué querés?" para escribir el título: se busca al dejar la tienda
+    const f = armar()
+    f.cambiar('linkTienda', ML)
+    f.dejar('linkTienda', true)
+    expect(f.pedidos.map((p) => p.link)).toEqual([ML])
+    // "Mate imperial" en el título justo cuando entraba el foco: lo que escribía quedaba "Mate imperialTermo"
+    expect(f.v.titulo).toBe('')
+    f.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v).toEqual({ titulo: '', linkTienda: ML, precio: '$88.990' })
+    // si no escribe nada y lo deja, el nombre
+    f.dejar('titulo')
+    expect(f.v.titulo).toBe('Mate imperial de calabaza')
+    // si escribe el suyo, queda
+    const g = armar()
+    g.cambiar('linkTienda', ML)
+    g.dejar('linkTienda', true)
+    g.cambiar('titulo', 'Termo')
+    g.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    g.dejar('titulo')
+    expect(g.v).toEqual({ titulo: 'Termo', linkTienda: ML, precio: '$88.990' })
+    // si lo deja antes de que vuelva, el nombre del link mientras busca (vacío, "Agregar" quedaba frenado)
+    const h = armar()
+    h.cambiar('linkTienda', ML)
+    h.dejar('linkTienda', true)
+    h.dejar('titulo')
+    expect(h.v.titulo).toBe('Mate imperial')
+    // lo que ya se puso no se vuelve a poner: si después lo vacía a propósito y lo deja, queda vacío
+    f.foco.enTitulo = true
+    f.cambiar('titulo', '')
+    f.dejar('titulo')
+    expect(f.v.titulo).toBe('')
+  })
+
+  test('con el foco en el título, el título no se toca: ni con el link solo, ni con un espacio, ni con un link a medio escribir', async () => {
+    // pega el link y aprieta espacio para escribir "para mamá"; la respuesta llega justo después del espacio
+    const f = armar()
+    f.foco.enTitulo = true
+    f.pegar('titulo', ML)
+    f.cambiar('titulo', `${ML} `)
+    f.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v).toEqual({ titulo: `${ML} `, linkTienda: ML, precio: '$88.990' })
+    expect(f.linea.texto).toBe('Completamos el precio: revisalo.')
+    f.cambiar('titulo', `${ML} para mamá`)
+    f.dejar('titulo')
+    expect(f.v.titulo).toBe('para mamá')
+    // si al dejarlo sigue siendo solo el link (con espacios o no), el nombre de la página
+    for (const titulo of [ML, `${ML}  `]) {
+      const g = armar()
+      g.foco.enTitulo = true
+      g.pegar('titulo', ML)
+      g.pedidos[0].contestar(ok())
+      await vi.advanceTimersByTimeAsync(0)
+      g.cambiar('titulo', titulo)
+      expect(g.v.titulo).toBe(titulo)
+      g.dejar('titulo')
+      expect(g.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '$88.990' })
+    }
+    // un link escrito a mano en el título no se busca hasta dejarlo: no se lee ni se mueve un pedazo
+    const h = armar()
+    h.foco.enTitulo = true
+    h.cambiar('titulo', 'https://www.tienda.com.ar/productos/mate-imp')
+    await vi.advanceTimersByTimeAsync(60_000)
+    h.cambiar('titulo', 'https://www.tienda.com.ar/productos/mate-imperial')
+    expect(h.pedir).not.toHaveBeenCalled()
+    expect(h.v.linkTienda).toBe('')
+    h.dejar('titulo')
+    expect(h.pedidos.map((p) => p.link)).toEqual(['https://www.tienda.com.ar/productos/mate-imperial'])
+  })
+
+  test('otro link pegado al lado del nombre anterior con el foco en el título: queda hasta dejarlo o mandar', async () => {
+    for (const cuando of ['al volver', 'si falla', 'antes de volver'] as const) {
+      const f = armar()
+      await completado(f)
+      f.foco.enTitulo = true
+      f.pegar('titulo', `Mate imperial de calabaza ${OTRO}`, OTRO)
+      // el título no se toca; lo del mate sale de los otros campos
+      expect(f.v).toEqual(valores({ titulo: `Mate imperial de calabaza ${OTRO}` }))
+      expect(f.fotos).toEqual([FOTO, null])
+      if (cuando === 'al volver') {
+        f.pedidos[1].contestar(ok({ titulo: 'Termo Stanley', precio: '$120.000' }))
+        await vi.advanceTimersByTimeAsync(0)
+        expect(f.v).toEqual({ titulo: `Mate imperial de calabaza ${OTRO}`, linkTienda: OTRO, precio: '$120.000' })
+      }
+      if (cuando === 'si falla') {
+        f.pedidos[1].contestar('muchos')
+        await vi.advanceTimersByTimeAsync(0)
+        expect(f.v).toEqual({ titulo: `Mate imperial de calabaza ${OTRO}`, linkTienda: OTRO, precio: '' })
+      }
+      // aprieta Enter: el servidor dejaba "Mate imperial de calabaza" (el nombre del otro) con el link del termo
+      f.mandar()
+      const esperado = cuando === 'al volver' ? 'Termo Stanley' : 'Termo stanley'
+      expect(deseoDesdeForm(fd({ ...f.v })), cuando).toMatchObject({ titulo: esperado, linkTienda: OTRO })
+    }
+    // al dejarlo, igual
+    const g = armar()
+    await completado(g)
+    g.foco.enTitulo = true
+    g.pegar('titulo', `Mate imperial de calabaza ${OTRO}`, OTRO)
+    g.dejar('titulo')
+    expect(g.v).toEqual(valores({ titulo: OTRO }))
+    g.pedidos[1].contestar(ok({ titulo: 'Termo Stanley', precio: '$120.000' }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(g.v).toEqual({ titulo: 'Termo Stanley', linkTienda: OTRO, precio: '$120.000' })
+  })
+
   test('si un cambio corta lo que se estaba buscando, la línea ya no dice "Buscando…"', async () => {
     const f = armar()
     await completado(f)
     f.pegar('linkTienda', OTRO)
     expect(f.linea.texto).toBe(avisoBuscando(OTRO))
-    // escribe al lado: se corta y se espera a que deje de escribir
+    // escribe al lado: se corta y se busca al dejar el campo
     f.cambiar('linkTienda', `${OTRO}z`)
     expect(f.pedidos[1].signal.aborted).toBe(true)
     expect(f.linea.texto).toBe('')
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
+    f.dejar()
     expect(f.linea.texto).toBe(avisoBuscando(`${OTRO}z`))
   })
 
@@ -714,22 +985,34 @@ describe('completador: cuándo se pide', () => {
     expect(f.v).toEqual({ titulo: `${ML} Para `, linkTienda: ML, precio: '$88.990' })
     expect(f.linea.texto).toBe('Completamos el precio: revisalo.')
     f.cambiar('titulo', `${ML} Para mamá`)
-    await vi.advanceTimersByTimeAsync(ESPERA_ESCRITO_MS)
     expect(f.pedir).toHaveBeenCalledTimes(1)
     // si manda así, el servidor saca el link del título (es el mismo de la tienda)
     expect(deseoDesdeForm(fd({ ...f.v }))).toMatchObject({ titulo: 'Para mamá', linkTienda: ML })
-    f.foco.enTitulo = false
-    f.dejar()
+    f.dejar('titulo')
     expect(f.v.titulo).toBe('Para mamá')
     // un link que el dueño escribió en los dos lados (no lo movió el autocompletado) no se toca al dejar
     const g = armar({ titulo: `Para mamá ${OTRO}`, linkTienda: OTRO })
-    g.dejar()
+    g.dejar('titulo')
     expect(g.v.titulo).toBe(`Para mamá ${OTRO}`)
+  })
+
+  test('una home o un link que no se busca, pegado en el título después de completar, igual saca lo del anterior', async () => {
+    for (const [link, titulo] of [['https://www.zara.com/', 'zara.com'], ['https://10.0.0.1/mate', '10.0.0.1']] as const) {
+      const f = armar()
+      await completado(f)
+      f.pegar('titulo', link)
+      expect(f.pedir, link).toHaveBeenCalledTimes(1)
+      // la tienda tenía el link de ML que puso el autocompletado: el servidor dejaba el nuevo en el título, con el link,
+      // el precio y la foto del mate
+      expect(f.v, link).toEqual(valores({ titulo: link }))
+      expect(f.fotos, link).toEqual([FOTO, null])
+      expect(deseoDesdeForm(fd({ ...f.v })), link).toMatchObject({ titulo, linkTienda: link, precio: null })
+    }
   })
 
   test('al editar, volver al link guardado saca lo que puso el otro y nadie tocó', async () => {
     const guardado = 'https://www.zara.com/ar/campera-1234.html'
-    const f = armar({ titulo: 'Campera', linkTienda: guardado }, guardado)
+    const f = armar({ titulo: 'Campera', linkTienda: guardado }, guardado, 'Campera')
     f.pegar('linkTienda', ML)
     f.pedidos[0].contestar(ok())
     await vi.advanceTimersByTimeAsync(0)
@@ -738,6 +1021,7 @@ describe('completador: cuándo se pide', () => {
     expect(f.v).toEqual({ titulo: 'Campera', linkTienda: guardado, precio: '' })
     expect(f.fotos).toEqual([FOTO, null])
     expect(f.linea.texto).toBe('')
+    expect(f.pedir).toHaveBeenCalledTimes(1)
   })
 
   test('el consejo para la foto de MercadoLibre se va con la línea', async () => {
@@ -748,6 +1032,29 @@ describe('completador: cuándo se pide', () => {
     f.cambiar('titulo', 'Mate')
     expect(f.linea).toMatchObject({ texto: '', consejoFoto: undefined })
   })
+})
+
+test('la foto que propone el link: se trae una nueva, null saca la que vino así, y la misma no se trae dos veces', () => {
+  const OTRA = 'https://http2.mlstatic.com/D_9-O.jpg'
+  const sin = { src: FOTO, anterior: null, trayendo: false, hayFoto: false, dePropuesta: false, subiendo: false }
+  expect(queHacerConPropuesta(sin)).toBe('traer')
+  // la misma que ya está (el mismo producto pegado de nuevo) o que se está trayendo: otro pedido del tope y otra foto del cupo
+  expect(queHacerConPropuesta({ ...sin, anterior: FOTO, hayFoto: true, dePropuesta: true })).toBe('nada')
+  expect(queHacerConPropuesta({ ...sin, anterior: FOTO, trayendo: true })).toBe('nada')
+  // la misma, pero la quitó: si pega el link otra vez, se trae
+  expect(queHacerConPropuesta({ ...sin, anterior: FOTO })).toBe('traer')
+  // la de otro producto reemplaza la que vino así, o la que se estaba trayendo
+  expect(queHacerConPropuesta({ ...sin, src: OTRA, anterior: FOTO, hayFoto: true, dePropuesta: true })).toBe('traer')
+  expect(queHacerConPropuesta({ ...sin, src: OTRA, anterior: FOTO, trayendo: true })).toBe('traer')
+  // null: el producto nuevo no tiene foto, la del anterior se saca (si no hay ninguna, nada)
+  expect(queHacerConPropuesta({ ...sin, src: null, anterior: FOTO, hayFoto: true, dePropuesta: true })).toBe('sacar')
+  expect(queHacerConPropuesta({ ...sin, src: null, anterior: FOTO, trayendo: true })).toBe('sacar')
+  expect(queHacerConPropuesta({ ...sin, src: null, anterior: FOTO })).toBe('nada')
+  // la que eligió el dueño, o mientras sube una, nunca (ver aceptaFotoPropuesta)
+  for (const src of [OTRA, null]) {
+    expect(queHacerConPropuesta({ ...sin, src, anterior: FOTO, hayFoto: true }), String(src)).toBe('nada')
+    expect(queHacerConPropuesta({ ...sin, src, anterior: FOTO, hayFoto: true, dePropuesta: true, subiendo: true }), String(src)).toBe('nada')
+  }
 })
 
 test('el formulario lleva la línea de estado entre el título y la foto, vacía hasta que haya algo que decir', () => {

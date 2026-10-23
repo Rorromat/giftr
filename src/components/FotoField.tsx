@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Icon } from '@/components/ui'
 import { achicarFoto } from '@/lib/achicar-foto'
-import { aceptaFotoPropuesta, alPegarImagen, estadoDelLink, porQueEsperar, TRAER_FOTO_MS } from '@/lib/foto-del-form'
+import { alPegarImagen, estadoDelLink, porQueEsperar, queHacerConPropuesta, TRAER_FOTO_MS } from '@/lib/foto-del-form'
 import { esUrlFotoDeseo, linkHttp } from '@/lib/links'
 
 const ES_LINK = /^https?:\/\/\S+$/i
@@ -37,7 +38,7 @@ const SIN_FOTO = 'La foto es lo que más ayuda a que acierten.'
 
 /**
  * La foto del producto que encontró la lectura del link (ver CompletarDesdeLink), para el campo de foto de ese formulario;
- * null si el producto no tiene: se saca la que había propuesto otro link. El campo decide si la toma (aceptaFotoPropuesta).
+ * null si el producto no tiene: se saca la que había propuesto otro link. El campo decide qué hace (queHacerConPropuesta).
  */
 export function proponerFoto(form: HTMLFormElement, src: string | null) {
   form.dispatchEvent(new CustomEvent<string | null>(PROPUESTA, { detail: src }))
@@ -234,17 +235,20 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }
 
   const alProponer = useEffectEvent((src: string | null) => {
-    const hayFoto = !!subida || !!url.trim()
-    if (!aceptaFotoPropuesta({ hayFoto, dePropuesta, subiendo: enCurso.current })) return
-    // la misma que ya está o que se está trayendo (el mismo link pegado de nuevo)
-    if (src === propuesta.current && (trayendo || hayFoto)) return
+    const que = queHacerConPropuesta({
+      src, anterior: propuesta.current, trayendo, hayFoto: !!subida || !!url.trim(), dePropuesta, subiendo: enCurso.current,
+    })
+    if (que === 'nada') return
     propuesta.current = src
-    if (src) return void traer(src)
-    // el producto nuevo no tiene foto: la del anterior no es de este
-    nuevaAccion(false)
-    setDePropuesta(false)
-    setSubida(null)
-    setUrl('')
+    if (que === 'traer' && src) return void traer(src)
+    // El producto nuevo no tiene foto: la del anterior no es de este. Ya, sin esperar al próximo render: se saca también
+    // al mandar (ver CompletarDesdeLink), justo antes de que se arme lo que se manda.
+    flushSync(() => {
+      nuevaAccion(false)
+      setDePropuesta(false)
+      setSubida(null)
+      setUrl('')
+    })
   })
   useEffect(() => {
     const form = raiz.current?.closest('form')
