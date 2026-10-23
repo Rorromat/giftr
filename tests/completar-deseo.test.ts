@@ -1174,6 +1174,31 @@ describe('completador: cuándo se pide', () => {
     expect(j.v.titulo).toBe('Mirá este producto en Mercado Libre para papá')
   })
 
+  test('un link solo pegado en el título reemplaza al que había en la tienda (también al editar), y se busca', async () => {
+    const VIEJO = 'https://otra.com/x'
+    // al editar un deseo con otro link guardado: antes se quedaba en el título, no se buscaba y se guardaba la URL de nombre
+    const f = armar({ titulo: 'Mate', linkTienda: VIEJO, precio: '$1' }, VIEJO, 'Mate')
+    f.pegar('titulo', ML)
+    expect(f.v.linkTienda).toBe('')
+    expect(f.pedidos.map((p) => p.link)).toEqual([ML])
+    f.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '$1' })
+    // si manda antes de que vuelva, el servidor lo pasa igual a la tienda
+    const g = armar({ titulo: 'Mate', linkTienda: VIEJO }, VIEJO, 'Mate')
+    g.pegar('titulo', ML)
+    expect(deseoDesdeForm(fd({ ...g.v }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+    // con texto además del link, el de la tienda queda como estaba
+    const h = armar({ titulo: 'Para mamá ', linkTienda: VIEJO }, VIEJO, 'Mate')
+    h.pegar('titulo', `Para mamá ${ML}`, ML)
+    expect(h.v.linkTienda).toBe(VIEJO)
+    // un deseo de antes con el link solo en el título: pegar otro link en la tienda se busca (el del título no lo tapa)
+    const i = armar({ titulo: OTRO, linkTienda: VIEJO }, VIEJO, OTRO)
+    i.pegar('linkTienda', ML)
+    expect(i.pedidos.map((p) => p.link)).toEqual([ML])
+    expect(i.v.linkTienda).toBe(ML)
+  })
+
   test('una home o un link que no se busca, pegado en el título después de completar, igual saca lo del anterior', async () => {
     for (const [link, titulo] of [['https://www.zara.com/', 'zara.com'], ['https://10.0.0.1/mate', '10.0.0.1']] as const) {
       const f = armar()

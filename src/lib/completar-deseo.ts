@@ -546,6 +546,19 @@ export function completador(o: {
     if (enTitulo) diferido = { link, r: leido, campos: ['titulo', 'linkTienda'] }
   }
 
+  /**
+   * Un link solo pegado en el título es el producto: reemplaza al que había en "Link a la tienda" (escrito por el dueño o
+   * guardado al editar), como hace el servidor (ver linkQuePasa). Si no, se quedaba en el título, no se buscaba, y el deseo
+   * se guardaba con la URL de nombre.
+   */
+  function soloLinkPegado(pegado: string) {
+    const v = o.leer()
+    const t = linkEnTexto(v.titulo.trim())
+    if (!t || t.resto || !traeElLink(pegado, t.link)) return
+    const tienda = v.linkTienda.trim()
+    if (tienda && tienda !== puesto?.linkTienda && linkHttp(tienda) !== t.link) o.escribir({ linkTienda: '' })
+  }
+
   function antesDeMandar() {
     // lo escrito del mismo producto ya leído queda como al dejar el campo (sin pedir nada: si está en el título, pasa a la
     // tienda con el nombre); otro link no se busca, pero lo del anterior sale
@@ -561,6 +574,7 @@ export function completador(o: {
 
   return {
     alCambiar(pegado) {
+      if (pegado !== null) soloLinkPegado(pegado)
       const link = linkDelForm(o.leer(), puesto)
       const trajo = !!link && pegado !== null && traeElLink(pegado, link)
       // el mismo link: nada (escribió o pegó otra cosa); pegado de nuevo, se completa otra vez si no se está buscando

@@ -156,6 +156,32 @@ test('el formulario de un deseo: el link pegado en el título pasa a "Link a la 
   expect(deseoDesdeForm(form({ titulo: '   ' }))).toBeNull()
 })
 
+test('un título que es solo un link gana sobre otro link en la tienda: al agregar, o al editar si cambió el título', () => {
+  const OTRA = 'https://otra.com/x'
+  // al agregar, el link solo es el producto (se guardaba la URL de título y el otro link en la tienda)
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: OTRA }), true)).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: 'zara campera' }), true)).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+  // al editar, si el título pasó a ser el link solo
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: OTRA }), false, 'Mate')).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+  // un deseo de antes con el link solo en el título, sin tocarlo, queda como estaba (ni cambia el título ni pierde el otro)
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: OTRA }), false, ML)).toMatchObject({ titulo: ML, linkTienda: OTRA })
+  // con texto además del link, el otro link de la tienda se respeta, como siempre
+  expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: OTRA }), true)).toMatchObject({ titulo: `Mate ${ML}`, linkTienda: OTRA })
+  expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: OTRA }), false, 'Mate')).toMatchObject({ titulo: `Mate ${ML}`, linkTienda: OTRA })
+  // y en el navegador un link solo, por largo que sea (los de Instagram traen fbclid y utm), no frena el envío
+  const deInstagram = `https://invictvs.com.ar/tienda/juegosdemesa/19088-magical-athlete.html?fbclid=${'a'.repeat(300)}&utm_source=ig`
+  expect(avisoDelTitulo(deInstagram, OTRA)).toBe('')
+  expect(deseoDesdeForm(form({ titulo: deInstagram }), true)).toMatchObject({ titulo: 'Magical athlete', linkTienda: deInstagram })
+})
+
+test('editar: cambiar el título por el link solo de otro producto lo pasa a la tienda (y el nombre sale del link)', async () => {
+  const { owner } = await preparar()
+  const item = (await createItem(h.db, owner.id, { tipo: 'exacto', titulo: 'Mate', linkTienda: 'https://otra.com/x' }))!
+  expect(await redirigeA(updateItemAction(form({ itemId: item.id, titulo: ML, linkTienda: 'https://otra.com/x', prioridad: 'mucho' }))))
+    .toBe(`/deseo/${item.id}`)
+  expect((await h.db.select().from(items).where(eq(items.id, item.id)))[0]).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+})
+
 test('el link pegado en el título no se lleva la puntuación de la oración (la tienda daba una página que no existe)', () => {
   const casos: [string, { titulo: string; linkTienda: string }][] = [
     ['Mate, https://a.com/m, el negro', { titulo: 'Mate, el negro', linkTienda: 'https://a.com/m' }],

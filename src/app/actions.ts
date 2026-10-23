@@ -95,7 +95,7 @@ export async function updateItemAction(formData: FormData) {
   const itemId = str(formData, 'itemId') ?? ''
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
-  const data = deseoDesdeForm(formData)
+  const data = deseoDesdeForm(formData, false, editable.deseo.titulo)
   if (!data) redirect(`/editar/${itemId}`)
   // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
   await updateItem(db, itemId, session.userId, data)

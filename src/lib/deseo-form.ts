@@ -31,10 +31,14 @@ export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'r
  * ese campo vino vacío o con el mismo link (lo pegó en los dos lados). Con uno distinto, o con algo que no es un link (un
  * link de antes que hoy no vale, que al editar se conserva), se queda: si no, se perdía ese otro link. El formulario usa la
  * misma regla en el navegador (ver linkParaCompletar), así los dos no mueven links distintos.
+ * soloLinkGana: un título que es solo un link (lo que se pega para cargar un producto) pasa igual y reemplaza al de la
+ * tienda: si no, el deseo se guardaba con la URL de título y el producto de antes en la tienda.
  */
-export function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
-  const enTitulo = linkTienda === undefined ? null : linkEnTexto(titulo)
-  return enTitulo && (linkTienda === null || enTitulo.link === linkTienda) ? enTitulo : null
+export function linkQuePasa(titulo: string, linkTienda: string | null | undefined, soloLinkGana = false) {
+  const enTitulo = linkEnTexto(titulo)
+  if (!enTitulo) return null
+  if (soloLinkGana && !enTitulo.resto) return enTitulo
+  return linkTienda !== undefined && (linkTienda === null || enTitulo.link === linkTienda) ? enTitulo : null
 }
 
 /**
@@ -50,12 +54,15 @@ export function linkQuePasa(titulo: string, linkTienda: string | null | undefine
  *   los que lo reservaron.
  * - alAgregar: no hay link guardado que conservar, así que algo que no es link en "Link a la tienda" cuenta como vacío y
  *   el del título pasa igual (llega sin JS o antes de que hidrate: si no, se quedaba en el título y createItem lo cortaba).
+ * - Un título que es solo un link pasa aunque en la tienda haya otro (ver linkQuePasa): al agregar, o al editar si el
+ *   título cambió (tituloAntes); uno de antes que no se tocó queda como estaba.
  */
-export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | null {
+export function deseoDesdeForm(fd: FormData, alAgregar = false, tituloAntes?: string | null): DeseoDelForm | null {
   let titulo = campo(fd, 'titulo')
   if (!titulo) return null
   let linkTienda = link(fd, 'linkTienda')
-  const enTitulo = linkQuePasa(titulo, alAgregar ? linkTienda ?? null : linkTienda)
+  const soloLinkGana = alAgregar || (tituloAntes !== undefined && titulo !== tituloAntes?.trim())
+  const enTitulo = linkQuePasa(titulo, alAgregar ? linkTienda ?? null : linkTienda, soloLinkGana)
   if (enTitulo) {
     titulo = enTitulo.resto || tituloDelLink(enTitulo.link) || sitioDeLink(enTitulo.link)
     linkTienda = enTitulo.link
@@ -99,7 +106,8 @@ export const AVISO_NO_ES_LINK = 'Eso no parece un link. Copiá el de la página 
 export function avisoDelTitulo(escrito: string, linkTienda: string | null | undefined): string {
   const v = escrito.trim()
   if (v.split(/\s+/).some((p) => p.length > LARGO.link)) return AVISO_LINK_LARGO
-  const n = largo(linkQuePasa(v, linkTienda)?.resto ?? v)
+  // un link solo pasa a la tienda (ver linkQuePasa): no cuenta, por largo que sea
+  const n = largo(linkQuePasa(v, linkTienda, true)?.resto ?? v)
   return n > LARGO.titulo ? `Hasta ${LARGO.titulo} letras: sobran ${n - LARGO.titulo}. Lo demás va en Notas.` : ''
 }
 
