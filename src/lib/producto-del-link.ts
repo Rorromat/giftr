@@ -1,5 +1,5 @@
 import { LARGO, largo, recortar, sinControl } from '@/lib/limites'
-import { esUrlPublica } from '@/lib/links'
+import { esHome, esUrlPublica } from '@/lib/links'
 import { pesos } from '@/lib/pesos'
 
 // Qué producto hay en una página de afuera: nombre, foto y precio. Puro (sin red) y sin dependencias: solo <title>,
@@ -60,16 +60,6 @@ export function urlTrasElMuro(url: string): string | null {
 export function esPaginaBloqueada(html: string, urlFinal: string): boolean {
   const inicio = html.slice(0, MURO_HTML_BYTES)
   return esUrlDeMuro(urlFinal) || MURO_EN_HTML.some((m) => inicio.includes(m))
-}
-
-/** La home: path "/" sin nada más. Ahí no hay un producto (y a la home manda un link corto roto). */
-export function esHome(url: string): boolean {
-  try {
-    const u = new URL(url)
-    return u.pathname === '/' && !u.search
-  } catch {
-    return false
-  }
 }
 
 // ---------------------------------------------------------------- texto

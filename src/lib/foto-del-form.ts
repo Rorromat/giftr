@@ -43,12 +43,13 @@ export const TRAER_FOTO_MS = 9000
 
 /**
  * Si el campo de foto toma la que propone la lectura del link del producto: solo si no hay una que eligió el dueño (subida,
- * pegada, un link escrito o la que ya estaba guardada al editar) y no está subiendo una ni probando lo copiado con Pegar.
- * La que vino de una propuesta anterior y nadie tocó (dePropuesta) sí se cambia: si no, al cambiar de link quedaba la
- * foto del producto anterior.
+ * pegada, un link escrito o la que ya estaba guardada al editar) y no está subiendo una. La que vino de una propuesta
+ * anterior y nadie tocó (dePropuesta) sí se cambia: si no, al cambiar de link quedaba la foto del producto anterior.
+ * Mientras se prueba lo copiado con Pegar, también: si resulta ser una foto gana esa, y si no (lo más común es que sea el
+ * link del producto), queda la propuesta.
  */
-export function aceptaFotoPropuesta(p: { hayFoto: boolean; dePropuesta: boolean; subiendo: boolean; probandoPegado: boolean }): boolean {
-  return !p.subiendo && !p.probandoPegado && (!p.hayFoto || p.dePropuesta)
+export function aceptaFotoPropuesta(p: { hayFoto: boolean; dePropuesta: boolean; subiendo: boolean }): boolean {
+  return !p.subiendo && (!p.hayFoto || p.dePropuesta)
 }
 
 /**

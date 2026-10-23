@@ -1,7 +1,7 @@
 import { aHttps, bajarDeAfuera, pedirPagina, UA_GIFTR, type Corte, type Falla, type Pedir } from '@/lib/bajar-foto'
-import { esUrlPublica, tituloDelLink } from '@/lib/links'
+import { esHome, esUrlPublica, tituloDelLink } from '@/lib/links'
 import { esPublicacionDeMarketplace, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
-import { esHome, esUrlDeMuro, leerProducto, urlTrasElMuro, type Estado, type Producto } from '@/lib/producto-del-link'
+import { esUrlDeMuro, leerProducto, urlTrasElMuro, type Estado, type Producto } from '@/lib/producto-del-link'
 
 // La página del producto que pegó el usuario, bajada desde el servidor: con nuestro User-Agent, siguiendo a mano las
 // redirecciones (cada una revisada, como la foto de la vista previa), con topes de tiempo y de bytes. Lo de afuera nunca

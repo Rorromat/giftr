@@ -42,6 +42,16 @@ export function esUrlPublica(url: string): boolean {
   return true
 }
 
+/** La home: path "/" sin nada más. Ahí no hay un producto (y a la home manda un link corto roto). */
+export function esHome(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.pathname === '/' && !u.search
+  } catch {
+    return false
+  }
+}
+
 /** Para el título de un deseo que era solo un link: el sitio, legible ("mercadolibre.com.ar"), para que el dueño lo cambie. */
 export function sitioDeLink(link: string): string {
   try {

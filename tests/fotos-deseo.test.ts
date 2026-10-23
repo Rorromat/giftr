@@ -118,17 +118,17 @@ test('el formulario no se manda mientras sube una foto o prueba un link, tambié
   expect(porQueEsperar({ ...sin, trayendo: true, probandoPegado: true })).toBe('probando')
 })
 
-test('la foto del link del producto se toma solo si no hay una que eligió el dueño, ni una subida o un Pegar en curso', () => {
-  const nada = { hayFoto: false, dePropuesta: false, subiendo: false, probandoPegado: false }
+test('la foto del link del producto se toma solo si no hay una que eligió el dueño, ni una subida en curso', () => {
+  const nada = { hayFoto: false, dePropuesta: false, subiendo: false }
   expect(aceptaFotoPropuesta(nada)).toBe(true)
   // una subida propia, un link escrito o la guardada al editar: todas son hayFoto sin dePropuesta
   expect(aceptaFotoPropuesta({ ...nada, hayFoto: true })).toBe(false)
   // la que trajo otro link y nadie tocó se cambia (si no, quedaba la del producto anterior)
   expect(aceptaFotoPropuesta({ ...nada, hayFoto: true, dePropuesta: true })).toBe(true)
-  // mientras sube una foto o prueba lo copiado con Pegar, gana eso
+  // mientras sube una foto, gana esa
   expect(aceptaFotoPropuesta({ ...nada, subiendo: true })).toBe(false)
-  expect(aceptaFotoPropuesta({ ...nada, probandoPegado: true })).toBe(false)
   expect(aceptaFotoPropuesta({ ...nada, hayFoto: true, dePropuesta: true, subiendo: true })).toBe(false)
+  // mientras se prueba lo copiado con Pegar ya no se rechaza (se perdía): si era una foto, Pegar la pone después y gana
 })
 
 test('la subida: con el cupo lleno, 429 antes de procesar la foto', async () => {
