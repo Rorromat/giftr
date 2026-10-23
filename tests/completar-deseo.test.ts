@@ -211,18 +211,18 @@ describe('queCompletar', () => {
       const falla = (estado: RespuestaLink['estado'], sitio: string): RespuestaLink => ({ estado, titulo: null, precio: null, foto: null, sitio })
       for (const [link, r, aviso] of [
         [CATALOGO, bloqueado, 'MercadoLibre no la deja ver: escribí qué es.'],
-        [tienda, falla('bloqueado', 'tienda.com.ar'), 'La tienda no deja ver la página: escribí qué es.'],
+        [tienda, falla('bloqueado', 'tienda.com.ar'), 'La tienda no la deja ver: escribí qué es.'],
         [tienda, falla('sin-datos', 'tienda.com.ar'), 'No encontramos los datos: escribí qué es.'],
-        [tienda, falla('no-carga', 'tienda.com.ar'), 'No pudimos abrir esa página: escribí qué es.'],
+        [tienda, falla('no-carga', 'tienda.com.ar'), 'No pudimos abrir el link: escribí qué es.'],
         // ya dice qué hacer
         [CATALOGO, falla('no-esta', 'mercadolibre.com.ar'), 'Esa publicación ya no existe: revisá el link.'],
         // sin respuesta o con el tope, el nombre lo saca el navegador del link, y este no trae
-        [tienda, null, 'No pudimos abrir esa página: escribí qué es.'],
+        [tienda, null, 'No pudimos abrir el link: escribí qué es.'],
         [tienda, 'muchos', 'Buscaste muchos links: escribí qué es.'],
       ] as [string, Contestado, string][]) {
         const cual = `${link} ${r && typeof r === 'object' ? r.estado : r}`
         expect(queCompletar(valores({ titulo: link }), link, r, null), cual).toMatchObject({ titulo: '', linkTienda: link, aviso })
-        expect(aviso.length, aviso).toBeLessThanOrEqual(48)
+        expect(aviso.length, aviso).toBeLessThanOrEqual(45)
       }
       // con el nombre del link, ese nombre y el aviso de siempre
       expect(queCompletar(valores({ titulo: ML }), ML, null, null)).toMatchObject({ titulo: 'Mate imperial', aviso: 'No pudimos abrir esa página.' })
@@ -949,7 +949,7 @@ describe('completador: cuándo se pide', () => {
     // si no contesta, el nombre del link; sin nombre en el link, vacío: que el dueño escriba qué es (se guardaba "zara.com")
     for (const [link, nombre, aviso] of [
       [ML, 'Mate imperial', 'No pudimos abrir esa página.'],
-      ['https://www.zara.com/ar/campera', '', 'No pudimos abrir esa página: escribí qué es.'],
+      ['https://www.zara.com/ar/campera', '', 'No pudimos abrir el link: escribí qué es.'],
     ]) {
       const g = armar()
       g.pegar('linkTienda', link)

@@ -385,6 +385,20 @@ async function conectada(m: Modulos, n: number, venceEn: number) {
 const HORA = 3600_000
 /** El 401 de la API con un token que no acepta. */
 const no = () => respuesta({ message: 'invalid access token', error: 'not_found', status: 401, cause: [] }, 401)
+const SIN_GUARDAR =
+  'MercadoLibre: se renovó el acceso pero no se pudo guardar; si en un rato se desconecta, volvé a conectarlo en /api/mercadolibre/conectar'
+/**
+ * La base de verdad, pero cada transacción falla al terminar (se cae la conexión al guardar): vuelve atrás lo que hizo.
+ * actualizar: el update de afuera de la transacción (por defecto, el de verdad).
+ */
+const sinCommit = (actualizar: unknown = h.db.update.bind(h.db)) => ({
+  select: h.db.select.bind(h.db),
+  update: actualizar,
+  transaction: (fn: (tx: unknown) => Promise<unknown>) => h.db.transaction(async (tx) => {
+    await fn(tx)
+    throw new Error('Connection terminated unexpectedly')
+  }),
+}) as unknown as Db
 
 describe('leerDeLaApi con la cuenta conectada', () => {
   test('una publicación, con el token de la conexión (sin el de la aplicación); mientras no vence, no se vuelve a leer la base', async () => {
@@ -456,6 +470,9 @@ describe('leerDeLaApi con la cuenta conectada', () => {
   })
 
   test('dos renovaciones a la vez (en esta instancia o en otra) hacen un solo pedido a ML: la fila se bloquea y adentro se vuelve a mirar', async () => {
+    // PGlite corre las transacciones de a una: las otras dos esperan a la primera y adentro ven la fila ya renovada (lo que
+    // fija este test: que adentro se vuelve a mirar). Con Neon no esperan: la fila tomada se saltea y esos links siguen sin
+    // la conexión, con el acceso vencido (ver 'la fila tomada por otra renovación'). Lo que vale igual: un solo POST.
     const m = await cargar()
     await conectada(m, 1, -HORA)
     // otra instancia: los mismos módulos cargados aparte, con su propia memoria
@@ -618,8 +635,9 @@ describe('leerDeLaApi con la cuenta conectada', () => {
     const m = await cargar()
     await conectada(m, 1, -HORA)
     const quien = new AbortController()
-    const llamadas = ml({ [`POST ${API}/oauth/token`]: [lento(() => respuesta(tokens(2)), 30)], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
-    setTimeout(() => quien.abort(), 5)
+    // se va apenas sale el pedido a ML
+    const seVa = (init: RequestInit) => { setTimeout(() => quien.abort(), 5); return lento(() => respuesta(tokens(2)), 30)(init) }
+    const llamadas = ml({ [`POST ${API}/oauth/token`]: [seVa], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
     expect(await m.leerDeLaApi(h.db, ARTICULO, quien.signal)).toBeNull()
     expect(quien.signal.aborted).toBe(true)
     expect(posts(llamadas)).toHaveLength(1)
@@ -649,7 +667,7 @@ describe('leerDeLaApi con la cuenta conectada', () => {
     expect(posts(llamadas)).toHaveLength(1)
   })
 
-  test('un cuerpo que no termina de llegar se corta a su tope, sin colgar la fila; la conexión no se pierde', async () => {
+  test('un cuerpo que no termina de llegar se corta a su tope y no cuelga la fila; queda el refresh de antes, que ML quizás ya gastó (riesgo aceptado)', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const m = await cargar()
     await conectada(m, 1, -HORA)
@@ -681,6 +699,80 @@ describe('leerDeLaApi con la cuenta conectada', () => {
     expect(posts(llamadas).map((l) => l.cuerpo.refresh_token ?? l.cuerpo.grant_type)).toEqual([
       tokens(1).refresh_token, 'client_credentials', tokens(2).refresh_token,
     ])
+  })
+
+  test('con el tiempo del link ya cortado no se empieza a renovar (no se cortaría y podría pasarse del maxDuration): el acceso de antes si vale, y el link que sigue renueva', async () => {
+    const m = await cargar()
+    await conectada(m, 1, 4 * 60_000)
+    const llamadas = ml({
+      [`POST ${API}/oauth/token`]: [() => respuesta(tokens(2))],
+      [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+    })
+    // se le acabó el tiempo (expandir un meli.la, una base que tardó en despertar): sin renovar; el acceso de antes (el GET
+    // con la señal cortada ni sale)
+    expect(await m.leerDeLaApi(h.db, ARTICULO, AbortSignal.abort())).toBeNull()
+    expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual([`Bearer ${tokens(1).access_token}`])
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(1).refresh_token)
+    // vencido del todo, tampoco; y no deja el minuto sin mirar la conexión
+    await h.db.delete(mercadolibreConexion)
+    await conectada(m, 1, -HORA)
+    llamadas.length = 0
+    expect(await m.leerDeLaApi(h.db, ARTICULO, AbortSignal.abort())).toBeNull()
+    expect(posts(llamadas).filter((l) => l.cuerpo.grant_type === 'refresh_token')).toEqual([])
+    expect(m.conexionPosible()).toBe(true)
+    // el link que sigue, con tiempo, renueva
+    llamadas.length = 0
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual(['refresh_token', `Bearer ${tokens(2).access_token}`])
+  })
+
+  test('ML dio el par nuevo y la transacción falla al guardarlo (se cae la conexión): se guarda otra vez, fuera de ella', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // un 200 con el par entero, y uno con el refresh token nuevo pero sin un acceso que sirva
+    for (const dio of [tokens(2), { ...tokens(2), expires_in: undefined }]) {
+      await h.db.delete(mercadolibreConexion)
+      const m = await cargar()
+      await conectada(m, 1, -HORA)
+      const llamadas = ml({
+        [`POST ${API}/oauth/token`]: [() => respuesta(dio), () => respuesta({ error: 'invalid_client' }, 400)],
+        [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+      })
+      const entero = dio.expires_in !== undefined
+      const r = await m.leerDeLaApi(sinCommit(), ARTICULO)
+      expect(posts(llamadas)[0].cuerpo.refresh_token).toBe(tokens(1).refresh_token)
+      const f = await fila()
+      expect(descifrar(f.refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
+      if (entero) {
+        expect(r).toMatchObject({ estado: 'ok' })
+        expect(gets(llamadas)[0].headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
+        expect(descifrar(f.accessToken, USO_ACCESS)).toBe(tokens(2).access_token)
+        expect(f.expiraAt!.getTime()).toBeGreaterThan(Date.now() + 5 * HORA)
+      } else {
+        expect(r).toBeNull()
+        expect(descifrar(f.accessToken, USO_ACCESS)).toBe(tokens(1).access_token)
+      }
+    }
+    expect(warn.mock.calls.map((c) => c[0])).not.toContain(SIN_GUARDAR)
+  })
+
+  test('si tampoco se puede guardar fuera de la transacción: un aviso propio sin secretos, y esta instancia sigue con el acceso nuevo mientras vale', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = await cargar()
+    await conectada(m, 1, -HORA)
+    const llamadas = ml({ [`POST ${API}/oauth/token`]: [() => respuesta(tokens(2))], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+    const caida = sinCommit(() => { throw new Error('Connection terminated unexpectedly') })
+    expect(await m.leerDeLaApi(caida, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(gets(llamadas)[0].headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
+    expect(warn.mock.calls.map((c) => c[0])).toEqual([SIN_GUARDAR])
+    sinSecretos(warn)
+    // en la base sigue el par de antes (su refresh ya no vale: por eso el aviso)
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(1).refresh_token)
+    // los links que siguen usan el nuevo, sin la base ni renovar
+    const { db, consultas } = conConsultas(h.db)
+    expect(await m.leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(consultas).toEqual([])
+    expect(posts(llamadas)).toHaveLength(1)
+    expect(gets(llamadas).at(-1)!.headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
   })
 
   test('la fila tomada por otra renovación (en otra instancia): no se la espera; el acceso de antes si todavía vale, si no la página', async () => {

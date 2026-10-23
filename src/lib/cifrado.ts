@@ -2,8 +2,9 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
 import { secretoDeLaApp } from '@/lib/cookie-invitado'
 
 // Cifrar lo que se guarda en la base y no puede quedar a la vista (los tokens de la cuenta de MercadoLibre): AES-256-GCM,
-// con una clave que sale del secreto de la app por HKDF con una etiqueta propia. No es la clave que firma las cookies: si
-// una se filtrara, no da la otra. Cada valor lleva para qué es (uso): uno no se descifra en el lugar de otro.
+// con una clave que sale del secreto de la app por HKDF con una etiqueta propia. No es la clave que firma las cookies (el
+// secreto mismo): con esta no se saca el secreto ni se firma una cookie, pero quien tenga AUTH_SECRET sí la puede sacar
+// y descifrar los tokens. Cada valor lleva para qué es (uso): uno no se descifra en el lugar de otro.
 
 const ETIQUETA = 'giftr:cifrado-en-la-base:v1'
 const VERSION = 'v1'

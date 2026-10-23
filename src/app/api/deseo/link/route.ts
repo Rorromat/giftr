@@ -16,11 +16,16 @@ import { esUrlDeMuro, urlTrasElMuro, type Estado, type RespuestaLink } from '@/l
 
 // node:https, node:dns y zlib
 export const runtime = 'nodejs'
-export const maxDuration = 10
+/**
+ * Más de lo que espera el cliente (9 s): una renovación del acceso de MercadoLibre empieza solo antes de TIEMPO_MS, pero
+ * ya empezada no se corta (cortada a la mitad perdería el refresh token nuevo, ver mercadolibre-conexion.ts) y tarda hasta
+ * 7 s más, con la base. Lo que sobra solo lo usa ella: lo demás corta a TIEMPO_MS.
+ */
+export const maxDuration = 30
 
 /**
  * Para todo junto, desde que llega el pedido (la sesión, el tope, la API de ML y la página con sus saltos): el cliente
- * corta a los 9 s y maxDuration es 10. Una base que tarda en despertar se descuenta de acá.
+ * corta a los 9 s. Una base que tarda en despertar se descuenta de acá.
  */
 const TIEMPO_MS = 8000
 

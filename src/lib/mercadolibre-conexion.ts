@@ -233,10 +233,15 @@ export const MARGEN_ML_MS = 5 * 60_000
 /**
  * Para renovar, hasta que ML contesta: aparte del tope de la lectura (API_ML_TIEMPO_MS) y más largo, porque cortado a la
  * mitad ML pudo haber dado el par nuevo y el refresh token de la base ya no valdría. Los otros pedidos no lo esperan (la
- * fila tomada se saltea, ver renovar). Con RENOVAR_ML_CUERPO_MS, por debajo del maxDuration del route.
+ * fila tomada se saltea, ver renovar). Una renovación empieza solo mientras el link tiene tiempo (antes de los 8 s del
+ * route de deseo/link, ver tokenDeLaConexion): con RENOVAR_ML_CUERPO_MS y la base, termina antes de su maxDuration (30 s).
  */
 export const RENOVAR_ML_TIEMPO_MS = 5000
-/** Con la respuesta en la mano (ML ya dio el par nuevo): lo que tiene el cuerpo para terminar de llegar. */
+/**
+ * Con la respuesta en la mano (ML ya dio el par nuevo): lo que tiene el cuerpo para terminar de llegar. Si no llega, el
+ * par se pierde y la próxima renovación desconecta: un cuerpo de unos cientos de bytes que no llega tras los encabezados
+ * es raro, y esperarlo más tendría tomada la fila y la función.
+ */
 export const RENOVAR_ML_CUERPO_MS = 2000
 /** Sin conexión (o con la base o la renovación fallando), cuánto no se vuelve a mirar. */
 const SIN_CONEXION_MS = 60_000
@@ -350,46 +355,77 @@ async function renovarEnML(refresh: string): Promise<DelOAuth> {
 }
 
 type Renovado = { valor: string; expiraAt: Date } | 'tomada' | 'caida' | 'fallo' | typeof OTRO_SECRETO
+/** Lo que dio ML y va a la fila, y lo que contesta renovar una vez guardado. */
+type PorGuardar = { valores: Partial<typeof mercadolibreConexion.$inferInsert>; listo: Renovado }
+
+const MENSAJE_SIN_GUARDAR =
+  'MercadoLibre: se renovó el acceso pero no se pudo guardar; si en un rato se desconecta, volvé a conectarlo en /api/mercadolibre/conectar'
+
+/**
+ * ML ya dio el par nuevo (y el refresh token de la base ya no vale), pero la transacción que lo guardaba falló (la base,
+ * o la conexión que se cayó mientras esperaba a ML): una vez más, ya sin la fila tomada. Si tampoco, un aviso propio, y
+ * el acceso nuevo sigue en la memoria de esta instancia mientras vale (lo recuerda renovar); las otras no van a poder
+ * renovar.
+ */
+async function guardarFuera(db: Db, p: PorGuardar): Promise<Renovado> {
+  try {
+    await db.update(mercadolibreConexion).set(p.valores).where(eq(mercadolibreConexion.id, 1))
+  } catch {
+    console.warn(MENSAJE_SIN_GUARDAR)
+  }
+  return p.listo
+}
 
 /**
  * Renueva el access token con la fila bloqueada (select … for update): si dos pedidos vencidos llegan a la vez (en esta
  * instancia o en otra), uno solo gasta el refresh token. El otro no lo espera (skip locked: la renovación puede tardar
  * segundos y cada link esperaría a la fila): sigue con el access token de antes si todavía vale de verdad, o sin la API
  * en este link. Adentro se vuelve a mirar (otro pudo haberla renovado entre que se leyó y se tomó) y el par nuevo se
- * guarda antes de soltarla. invalid_grant desconecta; otra falla deja la fila como estaba (salvo un refresh token nuevo).
- * antes: la conexión que se leyó sin bloquear.
+ * guarda antes de soltarla (si falla, ver guardarFuera). invalid_grant desconecta; otra falla deja la fila como estaba
+ * (salvo un refresh token nuevo). antes: la conexión que se leyó sin bloquear.
  */
 async function renovar(db: Db, antes: Conexion, rechazado?: string): Promise<string | null> {
-  const r = await db.transaction(async (tx): Promise<Renovado> => {
-    const t = tx as unknown as Db
-    const [fila] = await t.select().from(mercadolibreConexion).where(eq(mercadolibreConexion.id, 1)).for('update', { skipLocked: true })
-    if (!fila) return 'tomada'
-    const c = descifrarFila(fila)
-    // la volvieron a conectar desde un entorno con otro secreto
-    if (c === OTRO_SECRETO) return c
-    const ya = usable(c, rechazado)
-    if (ya) return { valor: ya, expiraAt: c.expiraAt! }
-    if (!c.refresh) return 'caida'
-    const nuevo = await renovarEnML(c.refresh)
-    if ('error' in nuevo) {
-      if (nuevo.error === 'invalid_grant') {
-        await desconectar(t)
-        return 'caida'
+  // lo que dio ML, afuera de la transacción: si ella falla después, no se pierde
+  const dio: { porGuardar?: PorGuardar } = {}
+  let r: Renovado
+  try {
+    r = await db.transaction(async (tx): Promise<Renovado> => {
+      const t = tx as unknown as Db
+      const [fila] = await t.select().from(mercadolibreConexion).where(eq(mercadolibreConexion.id, 1)).for('update', { skipLocked: true })
+      if (!fila) return 'tomada'
+      const c = descifrarFila(fila)
+      // la volvieron a conectar desde un entorno con otro secreto
+      if (c === OTRO_SECRETO) return c
+      const ya = usable(c, rechazado)
+      if (ya) return { valor: ya, expiraAt: c.expiraAt! }
+      if (!c.refresh) return 'caida'
+      const nuevo = await renovarEnML(c.refresh)
+      if ('error' in nuevo) {
+        if (nuevo.error === 'invalid_grant') {
+          await desconectar(t)
+          return 'caida'
+        }
+        if (!nuevo.refresh) return 'fallo'
+        // un 200 sin un acceso que sirva, pero con el refresh token nuevo: es el único que vale ahora
+        dio.porGuardar = { valores: { refreshToken: cifrar(nuevo.refresh, USO_REFRESH), updatedAt: new Date() }, listo: 'fallo' }
+      } else {
+        dio.porGuardar = {
+          valores: {
+            // si no dio otro refresh token, sigue valiendo el de antes
+            accessToken: cifrar(nuevo.access, USO_ACCESS), refreshToken: nuevo.refresh ? cifrar(nuevo.refresh, USO_REFRESH) : fila.refreshToken,
+            expiraAt: nuevo.expiraAt, mlUserId: nuevo.mlUserId ?? fila.mlUserId, updatedAt: new Date(),
+          },
+          listo: { valor: nuevo.access, expiraAt: nuevo.expiraAt },
+        }
       }
-      // un 200 sin un acceso que sirva, pero con el refresh token nuevo: es el único que vale ahora
-      if (nuevo.refresh) {
-        await t.update(mercadolibreConexion).set({ refreshToken: cifrar(nuevo.refresh, USO_REFRESH), updatedAt: new Date() })
-          .where(eq(mercadolibreConexion.id, 1))
-      }
-      return 'fallo'
-    }
-    // si no dio otro refresh token, sigue valiendo el de antes
-    await t.update(mercadolibreConexion).set({
-      accessToken: cifrar(nuevo.access, USO_ACCESS), refreshToken: nuevo.refresh ? cifrar(nuevo.refresh, USO_REFRESH) : fila.refreshToken,
-      expiraAt: nuevo.expiraAt, mlUserId: nuevo.mlUserId ?? fila.mlUserId, updatedAt: new Date(),
-    }).where(eq(mercadolibreConexion.id, 1))
-    return { valor: nuevo.access, expiraAt: nuevo.expiraAt }
-  })
+      await t.update(mercadolibreConexion).set(dio.porGuardar.valores).where(eq(mercadolibreConexion.id, 1))
+      return dio.porGuardar.listo
+    })
+  } catch (e) {
+    // antes de que ML diera algo: como cualquier falla de la base (ver tokenDeLaConexion)
+    if (!dio.porGuardar) throw e
+    r = await guardarFuera(db, dio.porGuardar)
+  }
   if (typeof r === 'object') return recordar(r.valor, r.expiraAt)
   if (r === OTRO_SECRETO) return otroSecreto()
   if (r === 'caida') return sinConexion()
@@ -404,11 +440,13 @@ async function renovar(db: Db, antes: Conexion, rechazado?: string): Promise<str
  * El access token de la conexión para leer la API, renovado si vence en menos de MARGEN_ML_MS (solo en producción, ver
  * renuevaEsteEntorno). rechazado: el que ML acaba de contestar con un 401 aunque lo creíamos vigente, que se trata como
  * vencido; tras renovar por un 401, otro 401 no renueva por un minuto (si el nuevo también da 401, cada link, y dos veces
- * un catálogo, renovaría, y cada vez se arriesga el refresh token). Null si no hay conexión, se cayó o falló algo (la
- * base, la renovación): entonces no se vuelve a mirar por un minuto, y sigue el token de la aplicación o la página. Nunca
- * tira.
+ * un catálogo, renovaría, y cada vez se arriesga el refresh token). signal: la del link; si ya se cortó (se le acabó el
+ * tiempo o se fue quien preguntó), no se empieza a renovar: la renovación no se corta y tardaría hasta
+ * RENOVAR_ML_TIEMPO_MS + RENOVAR_ML_CUERPO_MS más, quizás pasado el maxDuration; queda para el link que sigue, y en este
+ * va el acceso de antes si todavía vale de verdad. Null si no hay conexión, se cayó o falló algo (la base, la
+ * renovación): entonces no se vuelve a mirar por un minuto, y sigue el token de la aplicación o la página. Nunca tira.
  */
-export async function tokenDeLaConexion(db: Db, rechazado?: string): Promise<string | null> {
+export async function tokenDeLaConexion(db: Db, rechazado?: string, signal?: AbortSignal): Promise<string | null> {
   const enUso = vigente()
   if (enUso && enUso !== rechazado) return enUso
   if (!enUso && Date.now() < sinMirarHasta) return null
@@ -420,6 +458,8 @@ export async function tokenDeLaConexion(db: Db, rechazado?: string): Promise<str
     const ya = usable(c, rechazado)
     if (ya) return recordar(ya, c.expiraAt!)
     if (c.refresh && renuevaEsteEntorno()) {
+      // sin recordar nada: el link que sigue la vuelve a leer y renueva
+      if (signal?.aborted) return usable(c, rechazado, 0)
       if (rechazado) sinRenovarPor401Hasta = Date.now() + SIN_CONEXION_MS
       return await renovar(db, c, rechazado)
     }

@@ -123,12 +123,13 @@ export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app de MercadoLibre y to
 
 const esOk = (r: Contestado) => (r !== null && r !== 'muchos' && r.estado === 'ok' ? r : null)
 
-// Cortos, para que entren en la línea (una sola, con su lugar guardado) en un teléfono de 320 px: unas 40 letras. Lo que
-// falta completar se ve en los campos. escribir: no hay nombre y el título quedó vacío (ver queCompletar), así que lo
-// dice: que escriba qué es.
+// Cortos, para que entren en la línea (una sola, con su lugar guardado) en un teléfono de 320 px, con lugar para la letra
+// un poco agrandada: hasta unas 45 letras. La línea tiene 284 px y el más ancho ("MercadoLibre no la deja ver: escribí qué
+// es.") mide unos 242 en Instrument Sans de 12 px en negrita. Lo que falta completar se ve en los campos. escribir: no
+// hay nombre y el título quedó vacío (ver queCompletar), así que lo dice: que escriba qué es.
 function avisoDe(r: Contestado, nombre: boolean, precio: boolean, escribir = false): string | null {
   if (r === 'muchos') return escribir ? 'Buscaste muchos links: escribí qué es.' : AVISO_MUCHOS
-  if (!r || r.estado === 'no-carga') return escribir ? 'No pudimos abrir esa página: escribí qué es.' : AVISO_NO_CARGA
+  if (!r || r.estado === 'no-carga') return escribir ? 'No pudimos abrir el link: escribí qué es.' : AVISO_NO_CARGA
   const ml = esHostDeMercadoLibre(r.sitio)
   switch (r.estado) {
     case 'ok': {
@@ -138,7 +139,7 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean, escribir = fal
     }
     case 'bloqueado':
       // el nombre del link ya se ve en el campo, y cómo poner la foto va en el lugar de la foto (CONSEJO_FOTO_ML)
-      if (escribir) return ml ? 'MercadoLibre no la deja ver: escribí qué es.' : 'La tienda no deja ver la página: escribí qué es.'
+      if (escribir) return ml ? 'MercadoLibre no la deja ver: escribí qué es.' : 'La tienda no la deja ver: escribí qué es.'
       return ml ? 'MercadoLibre no deja ver la publicación.' : 'La tienda no deja ver la página.'
     case 'no-esta':
       // ya dice qué hacer: con otro link, se busca de nuevo

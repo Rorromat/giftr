@@ -8,7 +8,7 @@ import { pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
 import { API_ML_TIEMPO_MS, leerDeLaApi } from '@/lib/mercadolibre'
-import { guardarConexion, olvidarConexion } from '@/lib/mercadolibre-conexion'
+import { guardarConexion, olvidarConexion, RENOVAR_ML_CUERPO_MS, RENOVAR_ML_TIEMPO_MS } from '@/lib/mercadolibre-conexion'
 import { PAGINA_TIEMPO_MS } from '@/lib/pagina-de-afuera'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
@@ -37,7 +37,7 @@ vi.mock('@/lib/mercadolibre', async (original) => ({
   ...await original<typeof import('@/lib/mercadolibre')>(), get ML_PEDIR_MARKETPLACE() { return h.pedirMarketplace },
 }))
 
-import { POST } from '@/app/api/deseo/link/route'
+import { maxDuration, POST } from '@/app/api/deseo/link/route'
 
 const html = { 'content-type': 'text/html; charset=utf-8' }
 const pagina = (titulo: string) => `<html><head><meta property="og:type" content="product"><meta property="og:title" content="${titulo}"></head></html>`
@@ -299,6 +299,11 @@ test('los 8 s cuentan desde que llega el pedido: si la sesión tardó 3 s (una b
   expect(await (await leer({ url: 'https://tienda.com.ar/products/mate' })).json()).toMatchObject({ estado: 'ok' })
   // el del route y el de la página
   expect(ms).toEqual([5000, PAGINA_TIEMPO_MS])
+})
+
+test('maxDuration deja terminar una renovación de MercadoLibre que empezó al final de los 8 s (cortada, se perdería el refresh token nuevo)', () => {
+  // la renovación solo empieza mientras el link tiene tiempo (ver tokenDeLaConexion); con 10 s de lugar para la base
+  expect(maxDuration * 1000).toBeGreaterThanOrEqual(8000 + RENOVAR_ML_TIEMPO_MS + RENOVAR_ML_CUERPO_MS + 10_000)
 })
 
 describe('con la API de MercadoLibre configurada', () => {

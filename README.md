@@ -86,6 +86,10 @@ link hasta que repitas el paso 3. Si cambió `AUTH_SECRET`, la conexión guardad
 descifrar: los logs dicen *MercadoLibre: no se pudo descifrar la conexión (¿otro AUTH_SECRET?)* y
 también hay que repetir el paso 3. Lo mismo dicen los logs de un entorno con otro `AUTH_SECRET` (un
 `npm run dev` con la base de producción y su propio secreto), pero ese entorno no toca la conexión.
+Si la base falla justo al guardar una renovación (y otra vez al reintentarlo), los logs dicen
+*MercadoLibre: se renovó el acceso pero no se pudo guardar*: esa instancia sigue con el acceso nuevo
+unas horas, pero el refresh token guardado ya no vale; cuando aparezca *MercadoLibre se desconectó*,
+repetí el paso 3.
 
 **Previews y migraciones.** `DATABASE_URL` es la misma en todos los entornos, así que los previews
 (cada push a una rama que no es `main`) **no** migran: si lo hicieran, cambiarían la base de
