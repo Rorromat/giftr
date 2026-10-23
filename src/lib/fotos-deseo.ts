@@ -76,30 +76,47 @@ const NO_DISPONIBLE = '/img-not-available/'
 
 export type FotoImportada = { url: string } | { error: 'muchas' | 'muchos' | 'no_carga' | 'no_es_imagen' }
 
+/** El cuerpo tal como llega, sumando los bytes de cada pedazo. */
+async function* contado(cuerpo: AsyncIterable<Uint8Array>, sumar: (bytes: number) => void): AsyncGenerator<Uint8Array> {
+  for await (const trozo of cuerpo) {
+    sumar(trozo.byteLength)
+    yield trozo
+  }
+}
+
 /**
  * Trae la foto de un link (la que encontró la lectura del producto) y la guarda como una subida: así el deseo no depende
- * de que la tienda la siga sirviendo. Primero la versión grande (ver fotoGrande) y si no, la del link; en 6 s y 6 MB, como
- * una subida. Sin cupo de fotos no se baja nada; el pedido cuenta en el tope de pedidos de afuera aunque después falle (si
- * no, se podría pedir sin fin un link que no es una foto). no_es_imagen: lo que hay en el link no es una foto.
+ * de que la tienda la siga sirviendo. Primero la versión grande (ver fotoGrande) y si no, la del link; en 6 s y 6 MB en
+ * total, como una subida: lo que bajó la grande, aunque no sirviera, se descuenta de lo que puede bajar la del link. Sin
+ * cupo de fotos no se baja nada; el pedido cuenta en el tope de pedidos de afuera aunque después falle (si no, se podría
+ * pedir sin fin un link que no es una foto). no_es_imagen: lo que hay en el link no es una foto. no_carga también si
+ * falla la base (que no conteste, o la tabla de pedidos sin migrar): el formulario prueba la foto en el navegador.
  */
 export async function importarFotoDeseo(db: Db, userId: string, src: string, o: {
   pedir?: Pedir; signal?: AbortSignal; tiempoMs?: number
 } = {}): Promise<FotoImportada> {
   const { pedir = pedirFoto, signal, tiempoMs: total = FOTO_DESDE_LINK_TIEMPO_MS } = o
-  if (!(await quedanFotos(db, userId))) return { error: 'muchas' }
   try {
+    if (!(await quedanFotos(db, userId))) return { error: 'muchas' }
     if (!(await anotarPedidoAfuera(db, userId))) return { error: 'muchos' }
-  } catch {
-    // sin la tabla de pedidos (un preview con la base sin migrar): no se sale a la red
+  } catch (e) {
+    // sin base, o sin la tabla de pedidos (un preview con la base sin migrar): no se sale a la red
+    console.error('deseo/foto/desde-link: no se pudo mirar el cupo ni anotar el pedido', e)
     return { error: 'no_carga' }
   }
   const fin = Date.now() + total
+  let bajados = 0
+  const contando: Pedir = async (url, s) => {
+    const r = await pedir(url, s)
+    return { ...r, cuerpo: contado(r.cuerpo, (bytes) => { bajados += bytes }) }
+  }
   let error: 'no_carga' | 'no_es_imagen' = 'no_carga'
   for (const candidata of new Set([fotoGrande(src), src])) {
     const tiempoMs = fin - Date.now()
     if (tiempoMs <= 0 || signal?.aborted) return { error: 'no_carga' }
-    const r = await bajarFotoConUrl(candidata, pedir, esUrlPublica, {
-      max: FOTO_DESEO_MAX_BYTES, tiempoMs, aceptar: imagenOBinario, signal,
+    if (bajados >= FOTO_DESEO_MAX_BYTES) break
+    const r = await bajarFotoConUrl(candidata, contando, esUrlPublica, {
+      max: FOTO_DESEO_MAX_BYTES - bajados, tiempoMs, aceptar: imagenOBinario, signal,
     })
     if (!('datos' in r)) {
       error = r.falla === 'otro-tipo' ? 'no_es_imagen' : 'no_carga'
@@ -116,7 +133,13 @@ export async function importarFotoDeseo(db: Db, userId: string, src: string, o: 
       error = 'no_es_imagen'
       continue
     }
-    const url = await guardarFotoDeseo(db, userId, jpeg)
+    let url: string | null
+    try {
+      url = await guardarFotoDeseo(db, userId, jpeg)
+    } catch (e) {
+      console.error('deseo/foto/desde-link: no se pudo guardar la foto', e)
+      return { error: 'no_carga' }
+    }
     return url ? { url } : { error: 'muchas' }
   }
   return { error }

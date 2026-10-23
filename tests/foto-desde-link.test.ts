@@ -3,7 +3,7 @@ import http from 'node:http'
 import https from 'node:https'
 import { count, eq, sql } from 'drizzle-orm'
 import sharp from 'sharp'
-import { conConsultas, createTestDb, seedOwnerAndGiver, servidor, tiempos } from './helpers'
+import { conConsultas, createTestDb, MB, seedOwnerAndGiver, servidor, tiempos } from './helpers'
 import { fotosDeseo, pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
@@ -143,6 +143,25 @@ test('el pedido cuenta en el tope aunque la descarga falle: 422; una página o a
   expect(await fotos()).toBe(0)
 })
 
+test('los 6 MB son para las dos: lo que bajó la grande se descuenta de lo que puede bajar la del link', async () => {
+  const comoJpeg = { 'content-type': 'image/jpeg' }
+  // la grande manda 7 MB (se corta pasados los 6): la del link ya no se pide
+  const pasada = afuera({ [ML_GRANDE]: { headers: comoJpeg, trozos: 7 }, [ML]: { headers: comoJpeg, cuerpo: png } })
+  const r = await traer(ML)
+  expect([r.status, await r.json()]).toEqual([422, { error: 'no_carga' }])
+  expect(pasada.urls()).toEqual([ML_GRANDE])
+  // 4 MB que no son una foto: a la del link le quedan menos de 2, y manda 3 (antes bajaba hasta 6 más y daba no_es_imagen)
+  const basura = afuera({ [ML_GRANDE]: { headers: comoJpeg, trozos: 4 }, [ML]: { headers: comoJpeg, trozos: 3 } })
+  const r2 = await traer(ML)
+  expect([r2.status, await r2.json()]).toEqual([422, { error: 'no_carga' }])
+  expect(basura.urls()).toEqual([ML_GRANDE, ML])
+  expect(basura.entregados()).toBeLessThan(7 * MB)
+  // si la del link entra en lo que queda, se guarda
+  afuera({ [ML_GRANDE]: { headers: comoJpeg, trozos: 4 }, [ML]: { headers: comoJpeg, cuerpo: png } })
+  expect((await traer(ML)).status).toBe(200)
+  expect(await fotos()).toBe(1)
+})
+
 test('lo que no es una foto de afuera pública: 400, sin bajar nada; sin sesión, 401', async () => {
   const s = afuera({})
   for (const url of ['https://localhost/x.jpg', 'https://10.0.0.1/x.jpg', 'https://x.com:8443/x.jpg', 'data:image/png;base64,AAAA', '/foto/deseo/x', 42]) {
@@ -193,8 +212,29 @@ test('toca solo users (el lock), pedidos_afuera y fotos_deseo: nada de deseos, r
 })
 
 test('sin la tabla de pedidos (un preview con la base sin migrar): 422, sin salir a la red', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
   await h.db.execute(sql`drop table pedidos_afuera`)
   const s = afuera({})
   expect((await traer(ML)).status).toBe(422)
   expect(s.urls()).toEqual([])
+  expect(error).toHaveBeenCalledTimes(1)
+})
+
+test('si falla la base al mirar el cupo o al guardar: 422 no_carga (el formulario la prueba en el navegador), nunca un 500', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  // al guardar: una columna nueva sin valor hace fallar el insert, y el cupo y el tope andan
+  await h.db.execute(sql`alter table fotos_deseo add column rota int not null`)
+  const s = afuera({ [ML_GRANDE]: { headers: { 'content-type': 'image/webp' }, cuerpo: png } })
+  const r = await traer(ML)
+  expect([r.status, await r.json()]).toEqual([422, { error: 'no_carga' }])
+  expect(s.urls()).toEqual([ML_GRANDE])
+  expect(await pedidos()).toBe(1)
+  // el cupo: sin la tabla de fotos (o sin base), ni se gasta el tope ni se sale a la red
+  await h.db.execute(sql`drop table fotos_deseo`)
+  const sinBase = afuera({})
+  const r2 = await traer(ML)
+  expect([r2.status, await r2.json()]).toEqual([422, { error: 'no_carga' }])
+  expect(sinBase.urls()).toEqual([])
+  expect(await pedidos()).toBe(1)
+  expect(error).toHaveBeenCalledTimes(2)
 })

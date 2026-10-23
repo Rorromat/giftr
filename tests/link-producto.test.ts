@@ -231,6 +231,23 @@ describe('MercadoLibre', () => {
   })
 })
 
+describe('un muro pegado', () => {
+  test('el que vio el dueño en su navegador: bloqueado con el nombre de go=, sin red y sin gastar el tope', async () => {
+    const s = afuera({})
+    const muro = `https://www.mercadolibre.com.ar/gz/account-verification?go=${encodeURIComponent(ARTICULO)}`
+    expect(await (await leer({ url: muro })).json()).toEqual({
+      estado: 'bloqueado', titulo: 'Mate de algarrobo premium artesanal con bombilla', precio: null, foto: null, sitio: 'mercadolibre.com.ar',
+    })
+    // el "sorry" de Google, con continue=
+    const sorry = `https://www.google.com/sorry/index?continue=${encodeURIComponent('https://tienda.com.ar/products/mate-imperial')}`
+    expect(await (await leer({ url: sorry })).json()).toEqual({
+      estado: 'bloqueado', titulo: 'Mate imperial', precio: null, foto: null, sitio: 'tienda.com.ar',
+    })
+    expect(s.urls()).toEqual([])
+    expect(await pedidos()).toBe(0)
+  })
+})
+
 describe('el tope por usuario', () => {
   const hace = (ms: number) => new Date(Date.now() - ms)
 
@@ -380,10 +397,13 @@ describe('con la API de MercadoLibre configurada', () => {
   test(`todo junto en 8 s: si la API no contesta, la página a los ${API_ML_TIEMPO_MS / 1000}; si tampoco, no-carga a los 8`, async () => {
     vi.stubEnv('MELI_CLIENT_ID', '123')
     vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
-    // la API y la página no contestan nunca, pero respetan la señal (como las de verdad); los tiempos, cien veces más cortos
-    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
-      init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
-    })))
+    // la API (después del token: uno que no contesta deja un minuto sin pedirlo, y los tests que siguen usan la API) y la
+    // página no contestan nunca, pero respetan la señal (como las de verdad); los tiempos, cien veces más cortos
+    vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit = {}) => (url === `${API}/oauth/token`
+      ? Promise.resolve(Response.json({ access_token: 'APP_USR-1', token_type: 'Bearer', expires_in: 60 }))
+      : new Promise<Response>((_ok, mal) => {
+        init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
+      }))))
     const s = afuera({ [ARTICULO]: { headers: html, cuerpo: pagina('Mate'), demora: 60_000 } })
     const ms = tiempos(100)
     const antes = Date.now()
@@ -396,6 +416,16 @@ describe('con la API de MercadoLibre configurada', () => {
     expect(ms[0]).toBeLessThanOrEqual(8000)
     expect(ms.slice(1)).toEqual([API_ML_TIEMPO_MS, PAGINA_TIEMPO_MS])
     expect(s.urls()).toEqual([ARTICULO])
+  })
+
+  test('un muro de ML pegado: se le pregunta a la API por la publicación de go= (y eso cuenta)', async () => {
+    const urls = api(() => Response.json(ITEM))
+    const s = afuera({})
+    const muro = `https://www.mercadolibre.com.ar/gz/account-verification?go=${encodeURIComponent(ARTICULO)}`
+    expect(await (await leer({ url: muro })).json()).toMatchObject({ estado: 'ok', titulo: ITEM.title, precio: '$88.990' })
+    expect(urls).toEqual([`${API}/oauth/token`, `${API}/items/MLA1418506688`])
+    expect(s.urls()).toEqual([])
+    expect(await pedidos()).toBe(1)
   })
 
   test('un link que no es de ML no le pregunta a la API', async () => {

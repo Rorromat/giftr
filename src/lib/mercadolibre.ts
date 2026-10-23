@@ -107,12 +107,33 @@ const esJson = (v: unknown): v is Json => typeof v === 'object' && v !== null &&
 
 /** El token de la aplicación, en memoria hasta un minuto antes de que venza. */
 let token: { valor: string; vence: number } | null = null
+/** Tras un token que no se pudo sacar, hasta cuándo no se vuelve a pedir (ver tokenDeLaApp). */
+let sinTokenHasta = 0
+const TOKEN_ESPERA_MS = 60_000
 
 /** Una respuesta que no se va a leer: se suelta la conexión. */
 const descartar = (r: Response) => r.body?.cancel().catch(() => {})
 
-async function tokenDeLaApp(signal: AbortSignal): Promise<string | null> {
+/**
+ * El token. Si no lo dan (credenciales mal, el OAuth caído, colgado o con un JSON raro), null por un minuto sin volver a
+ * pedirlo: si no, cada link de ML esperaba lo mismo antes de ir a la página (hasta los 4 s, con el OAuth colgado) y dejaba
+ * una línea en el log. Si lo que se cortó fue el pedido de quien pregunta (deQuienPide), no es culpa del token.
+ */
+async function tokenDeLaApp(signal: AbortSignal, deQuienPide?: AbortSignal): Promise<string | null> {
   if (token && Date.now() < token.vence) return token.valor
+  if (Date.now() < sinTokenHasta) return null
+  try {
+    token = await pedirToken(signal)
+  } catch (e) {
+    if (!deQuienPide?.aborted) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
+    throw e
+  }
+  if (!token) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
+  return token?.valor ?? null
+}
+
+/** Un token nuevo; null si no lo dan o si no tiene la forma. */
+async function pedirToken(signal: AbortSignal): Promise<{ valor: string; vence: number } | null> {
   const r = await fetch(`${API}/oauth/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', 'user-agent': UA_GIFTR },
@@ -131,14 +152,13 @@ async function tokenDeLaApp(signal: AbortSignal): Promise<string | null> {
   const j: unknown = await r.json()
   const segundos = esJson(j) ? Number(j.expires_in) : NaN
   if (!esJson(j) || typeof j.access_token !== 'string' || !j.access_token || !Number.isFinite(segundos)) return null
-  token = { valor: j.access_token, vence: Date.now() + Math.max(0, segundos - 60) * 1000 }
-  return token.valor
+  return { valor: j.access_token, vence: Date.now() + Math.max(0, segundos - 60) * 1000 }
 }
 
 /** GET a la API con el token; si da 401 (vencido antes de tiempo, revocado), se pide otro una sola vez. Null si no da 200. */
-async function deLaApi(ruta: string, signal: AbortSignal): Promise<unknown> {
+async function deLaApi(ruta: string, signal: AbortSignal, deQuienPide?: AbortSignal): Promise<unknown> {
   for (let intento = 0; intento < 2; intento++) {
-    const t = await tokenDeLaApp(signal)
+    const t = await tokenDeLaApp(signal, deQuienPide)
     if (!t) return null
     const r = await fetch(`${API}${ruta}`, {
       headers: { authorization: `Bearer ${t}`, accept: 'application/json', 'user-agent': UA_GIFTR }, redirect: 'error', signal,
@@ -191,7 +211,7 @@ export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Le
   const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
   const leer = async (ruta: string, de: (j: unknown, host: string) => Lectura | null) => {
     try {
-      return de(await deLaApi(ruta, s), host)
+      return de(await deLaApi(ruta, s, signal), host)
     } catch {
       // red, tiempo o un JSON roto
       return null

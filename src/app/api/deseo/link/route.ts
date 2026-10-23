@@ -4,7 +4,7 @@ import { sitioDeLink, tituloDelLink } from '@/lib/links'
 import { esPublicacionDeMarketplace, hayApiDeMercadoLibre, leerDeLaApi, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
 import { expandirLinkCorto, leerPagina, type PaginaLeida } from '@/lib/pagina-de-afuera'
 import { anotarPedidoAfuera, urlDelPedido } from '@/lib/pedidos-afuera'
-import type { Estado, RespuestaLink } from '@/lib/producto-del-link'
+import { esUrlDeMuro, urlTrasElMuro, type Estado, type RespuestaLink } from '@/lib/producto-del-link'
 
 // Leer el producto del link que pegó el dueño en el formulario de un deseo (nombre, foto y precio), para completar lo que
 // esté vacío. Un route handler y no una Server Action: Next despacha las actions de a una por cliente, y "Agregar"
@@ -28,6 +28,17 @@ type Leido = PaginaLeida & { api?: boolean }
 const delLink = (estado: Estado, url: string): Leido => ({
   estado, producto: { titulo: tituloDelLink(url), precio: null, foto: null }, urlProducto: url,
 })
+
+/**
+ * Lo que se contesta sin salir a la red ni gastar el tope: una publicación de ML que no se pide, o un muro pegado (el que
+ * vio el dueño en su navegador, copiado con su go=), que bajarPagina tampoco pide. Con el nombre del link, o del que dice
+ * el muro. Con la API configurada, a los de ML se les pregunta a ella: eso sí cuenta.
+ */
+function sinPedir(link: string): Leido | null {
+  if (hayApiDeMercadoLibre() && linkDeMercadoLibre(link)) return null
+  if (esUrlDeMuro(link)) return delLink('bloqueado', urlTrasElMuro(link) ?? link)
+  return !ML_PEDIR_MARKETPLACE && esPublicacionDeMarketplace(linkDeMercadoLibre(link)) ? delLink('bloqueado', link) : null
+}
 
 /**
  * El orden de MercadoLibre: con la API configurada, un link corto se sigue hasta su destino (sin pedirlo) y, si es una
@@ -74,10 +85,8 @@ export async function POST(request: Request) {
   const pedido = await urlDelPedido(request)
   if ('error' in pedido) return Response.json({ error: pedido.error }, { status: pedido.error === 'muy_grande' ? 413 : 400 })
   const link = pedido.url
-  // una publicación de ML que no se pide (y sin API): el nombre del link, sin salir a la red ni gastar el tope
-  if (!ML_PEDIR_MARKETPLACE && !hayApiDeMercadoLibre() && esPublicacionDeMarketplace(linkDeMercadoLibre(link))) {
-    return responder(delLink('bloqueado', link), inicio)
-  }
+  const sin = sinPedir(link)
+  if (sin) return responder(sin, inicio)
   try {
     if (!(await anotarPedidoAfuera(db, session.userId))) return Response.json({ error: 'muchos' }, { status: 429 })
   } catch (e) {

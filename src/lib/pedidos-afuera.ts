@@ -5,8 +5,8 @@ import { aHttps } from '@/lib/bajar-foto'
 import { esUrlPublica, linkHttp } from '@/lib/links'
 
 // Lo que un usuario nos hace pedir afuera (leer la página del link de un producto, traer su foto): el tope por usuario y
-// lo que llega en el pedido. Cada uno puede ser 4 MB y 6 s de un servidor nuestro, así que hay un máximo por día y otro
-// por rato, contando lecturas y fotos juntas.
+// lo que llega en el pedido. Cada uno puede ser 4 MB (una página) o 6 MB (una foto, la grande y la del link juntas) y 6 s
+// de un servidor nuestro, así que hay un máximo por día y otro por rato, contando lecturas y fotos juntas.
 
 /** Una tarde de diciembre cargando 30 deseos son unos 60. */
 export const PEDIDOS_AFUERA_POR_DIA = 120

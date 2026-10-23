@@ -270,6 +270,49 @@ describe('el token', () => {
       expect(await (await api()).leerDeLaApi(ARTICULO), JSON.stringify(raro)).toBeNull()
     }
   })
+
+  test('si no lo dan, un minuto sin pedirlo: cada link va directo a la página, sin otra línea en el log', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const llamadas = apiDeMentira({
+      [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client', status: 400 }, 400), token],
+      [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+    })
+    const { leerDeLaApi } = await api()
+    const ahora = Date.now()
+    const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora)
+    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    reloj.mockReturnValue(ahora + 59_000)
+    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(llamadas.map((l) => l.metodo)).toEqual(['POST'])
+    expect(warn).toHaveBeenCalledTimes(1)
+    // pasado el minuto, se pide de nuevo
+    reloj.mockReturnValue(ahora + 61_000)
+    expect(await leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'POST', 'GET'])
+  })
+
+  test('si no contesta, también un minuto sin pedirlo; si el que se fue es el que pidió, no', async () => {
+    // fetch que no contesta nunca pero respeta la señal; los tiempos, cien veces más cortos
+    const colgado = vi.fn((_url: string | URL, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
+      init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
+    }))
+    vi.stubGlobal('fetch', colgado)
+    tiempos(100)
+    const { leerDeLaApi } = await api()
+    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    const antes = Date.now()
+    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(Date.now() - antes).toBeLessThan(20)
+    expect(colgado).toHaveBeenCalledTimes(1)
+    // el que pidió se va mientras se espera el token: el próximo lo pide
+    const otra = await api()
+    const usuario = new AbortController()
+    setTimeout(() => usuario.abort(), 5)
+    expect(await otra.leerDeLaApi(ARTICULO, usuario.signal)).toBeNull()
+    const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+    expect(await otra.leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'GET'])
+  })
 })
 
 test('cualquier falla (red, status, JSON raro, tiempo): null, para seguir por la página; nunca tira', async () => {
