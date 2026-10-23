@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import http from 'node:http'
 import https from 'node:https'
+import { inspect } from 'node:util'
 import { count, eq, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { conConsultas, createTestDb, MB, seedOwnerAndGiver, servidor, tiempos } from './helpers'
@@ -229,6 +230,10 @@ test('si falla la base al mirar el cupo o al guardar: 422 no_carga (el formulari
   expect([r.status, await r.json()]).toEqual([422, { error: 'no_carga' }])
   expect(s.urls()).toEqual([ML_GRANDE])
   expect(await pedidos()).toBe(1)
+  // en el log, el error de la base: no el de drizzle, que trae en el mensaje los parámetros (la foto, como texto)
+  const log = inspect(error.mock.calls[0])
+  expect(log).toContain('null value in column "rota"')
+  expect(log).not.toContain('\ufffd')
   // el cupo: sin la tabla de fotos (o sin base), ni se gasta el tope ni se sale a la red
   await h.db.execute(sql`drop table fotos_deseo`)
   const sinBase = afuera({})

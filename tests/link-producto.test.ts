@@ -7,7 +7,7 @@ import { cuerpo, fixture } from './fixtures/links/leer'
 import { pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
-import { API_ML_TIEMPO_MS } from '@/lib/mercadolibre'
+import { API_ML_TIEMPO_MS, leerDeLaApi } from '@/lib/mercadolibre'
 import { PAGINA_TIEMPO_MS } from '@/lib/pagina-de-afuera'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
@@ -426,6 +426,47 @@ describe('con la API de MercadoLibre configurada', () => {
     expect(urls).toEqual([`${API}/oauth/token`, `${API}/items/MLA1418506688`])
     expect(s.urls()).toEqual([])
     expect(await pedidos()).toBe(1)
+  })
+
+  test('un muro de ML cuyo go= no tiene un id para la API (un listado, una tienda, un /up/ sin item, un link corto, sin go=): bloqueado sin red ni tope', async () => {
+    const urls = api(() => Response.json(ITEM))
+    const s = afuera({})
+    const muro = (go?: string) => `https://www.mercadolibre.com.ar/gz/account-verification${go ? `?go=${encodeURIComponent(go)}` : ''}`
+    for (const [go, titulo] of [
+      ['https://listado.mercadolibre.com.ar/mate', null],
+      ['https://www.mercadolibre.com.ar/tienda/laska', null],
+      ['https://www.mercadolibre.com.ar/canasta-matera-eco-cuero/up/MLAU3409701436', 'Canasta matera eco cuero'],
+      ['https://meli.la/2abcXYZ', null],
+      [undefined, null],
+    ] as const) {
+      expect(await (await leer({ url: muro(go) })).json(), go).toMatchObject({ estado: 'bloqueado', titulo })
+    }
+    expect(urls).toEqual([])
+    expect(s.urls()).toEqual([])
+    expect(await pedidos()).toBe(0)
+  })
+
+  test('en el minuto sin token, a un muro con id tampoco se le pregunta: bloqueado sin red ni tope', async () => {
+    vi.stubEnv('MELI_CLIENT_ID', '123')
+    vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // un token que no se pudo sacar, con el reloj una hora atrás: así el minuto sin token no llega a los tests que siguen.
+    // El 401 de /items saca antes el token que dejó otro test (que con el reloj atrás todavía no venció)
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() - 3_600_000)
+    const urls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      urls.push(url)
+      return new Response('error', { status: url.startsWith(`${API}/items/`) ? 401 : 500 })
+    }))
+    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(urls.at(-1)).toBe(`${API}/oauth/token`)
+    urls.length = 0
+    const s = afuera({})
+    const muro = `https://www.mercadolibre.com.ar/gz/account-verification?go=${encodeURIComponent(ARTICULO)}`
+    expect(await (await leer({ url: muro })).json()).toMatchObject({ estado: 'bloqueado', titulo: 'Mate de algarrobo premium artesanal con bombilla' })
+    expect(urls).toEqual([])
+    expect(s.urls()).toEqual([])
+    expect(await pedidos()).toBe(0)
   })
 
   test('un link que no es de ML no le pregunta a la API', async () => {

@@ -277,18 +277,40 @@ describe('el token', () => {
       [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client', status: 400 }, 400), token],
       [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
     })
-    const { leerDeLaApi } = await api()
+    const { apiDeMercadoLibreLista, leerDeLaApi } = await api()
     const ahora = Date.now()
     const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora)
+    expect(apiDeMercadoLibreLista()).toBe(true)
     expect(await leerDeLaApi(ARTICULO)).toBeNull()
     reloj.mockReturnValue(ahora + 59_000)
     expect(await leerDeLaApi(ARTICULO)).toBeNull()
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST'])
     expect(warn).toHaveBeenCalledTimes(1)
+    // el route no le pregunta (ver sinPedir)
+    expect(apiDeMercadoLibreLista()).toBe(false)
     // pasado el minuto, se pide de nuevo
     reloj.mockReturnValue(ahora + 61_000)
+    expect(apiDeMercadoLibreLista()).toBe(true)
     expect(await leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'POST', 'GET'])
+  })
+
+  test('si dos links lo piden a la vez y a uno no se lo dan, el que llegó no se pisa ni deja el minuto sin API', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // al primero se lo dan; al segundo, un 500 un rato después
+    const tarde = () => new Promise<Response>((ok) => setTimeout(() => ok(respuesta('error', 500)), 30))
+    const llamadas = apiDeMentira({
+      [`POST ${API}/oauth/token`]: [token, tarde],
+      [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+    })
+    const { apiDeMercadoLibreLista, leerDeLaApi } = await api()
+    // el que falló sigue con el del otro
+    expect(await Promise.all([leerDeLaApi(ARTICULO), leerDeLaApi(ARTICULO)])).toMatchObject([{ estado: 'ok' }, { estado: 'ok' }])
+    expect(warn).toHaveBeenCalledTimes(1)
+    // y el que viene después también, sin pedir otro
+    expect(apiDeMercadoLibreLista()).toBe(true)
+    expect(await leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'POST', 'GET', 'GET', 'GET'])
   })
 
   test('si no contesta, también un minuto sin pedirlo; si el que se fue es el que pidió, no', async () => {

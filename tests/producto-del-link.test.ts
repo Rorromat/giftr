@@ -409,6 +409,17 @@ describe('leerProducto con HTML armado', () => {
       '<meta itemprop="image" content="?"><img data-large_image="?">'
     // un Location con 15 mil espacios, que pasan a %20: la urlFinal queda de 45 KB
     const urlFinalLarga = `https://evil.com/${'%20'.repeat(15_000)}/x`
+    // casi 1 MB (el tope de un bloque) de objetos con claves distintas, con un salto de línea e inválido al final: JSON.parse
+    // arma todo antes de fallar, y sin los controles se volvía a intentar
+    const objetos = (clave: (i: number) => string) => {
+      let s = '[\n'
+      for (let i = 0; s.length < 990_000; i++) s += `{"${clave(i)}":{"b":0}},`
+      return `${s}x]`
+    }
+    const ldCrudo = (s: string) => `<script type="application/ld+json">${s}</script>`
+    const estadoDe4MB = `{${Array.from({ length: 300_000 }, (_, i) => `"Product:${i}.x":${i}`).join(',')}}`
+    // un <meta> de 8 KB de "&amp", repetido: cada content decodificado (dos veces, con el " content=" adentro del property)
+    const metaAmp = (clave: string) => cuatroMB(`<meta property="${clave}" content="${'&amp'.repeat(2000)}">`)
     for (const [que, hostil, urlFinal = 'https://x.com/p'] of [
       ['un meta enorme y un <title> sin cerrar', `<meta ${'a='.repeat(200_000)}><title>${'<'.repeat(100_000)}`],
       ['miles de JSON-LD sin </script>', '<script type="application/ld+json">'.repeat(100_000)],
@@ -435,11 +446,52 @@ describe('leerProducto con HTML armado', () => {
       ['og:image con "&amp" sin ";"', `<meta property="og:type" content="product"><meta property="og:image" content="${cuatroMB('&amp')}">`],
       ['un canonical con "&amp" sin ";"', `<link rel="canonical" href="${cuatroMB('&amp')}">`],
       ['og:image con "&#1"', `<meta property="og:type" content="product"><meta property="og:image" content="${cuatroMB('&#1')}">`],
+      ['metas de 8 KB de "&amp"', metaAmp('og:image')],
+      ['metas de 8 KB de "&#1"', cuatroMB(`<meta name="twitter:image" content="${'&#1'.repeat(2700)}">`)],
+      ['metas con un " content=" adentro del property', cuatroMB(`<meta property="a content=${'&amp'.repeat(2000)}">`)],
+      // JSON-LD y __STATE__: entre todos, 1 MB de JSON.parse
+      ['4 JSON-LD de casi 1 MB inválidos, con claves distintas', ldCrudo(objetos((i) => `a${i}`)).repeat(4)],
+      ['4 JSON-LD de casi 1 MB inválidos, con claves cortas', ldCrudo(objetos((i) => `k${i.toString(36)}`)).repeat(4)],
+      ['un __STATE__ de 4 MB', `<template data-varname="__STATE__"><script>${estadoDe4MB}</script></template>`],
+      ['un __STATE__ que es también el primer JSON-LD', `<template data-varname=__STATE__><script type=application/ld+json>${objetos((i) => `a${i}`)}</script>${ldCrudo(objetos((i) => `a${i}`)).repeat(3)}`],
     ] as const) {
       const antes = Date.now()
       leerProducto(hostil, urlFinal)
       expect(Date.now() - antes, que).toBeLessThan(1000)
     }
+  })
+
+  test('los JSON-LD y el __STATE__ comparten 1 MB de JSON.parse: lo que ya no entra no se lee, y lo demás sigue', () => {
+    // con un salto de línea crudo adentro de un string (Samsung): se reintenta sin los controles
+    expect(leerProducto('<script type="application/ld+json">{"@type": "Product", "name": "Mate\ncon bombilla"}</script>', 'https://x.com/p'))
+      .toMatchObject({ estado: 'ok', producto: { titulo: 'Mate con bombilla' } })
+    // el __STATE__ de VTEX se lee; si los JSON-LD ya gastaron el presupuesto, no
+    const vtex = `<template data-varname="__STATE__"><script>${JSON.stringify({ 'Product:1': { productName: 'Termo' }, relleno: 'x'.repeat(500_000) })}</script></template>`
+    expect(leerProducto(vtex, 'https://x.com/p')).toMatchObject({ estado: 'ok', producto: { titulo: 'Termo' } })
+    expect(leerProducto(ld({ '@type': 'WebSite', name: 'x'.repeat(600_000) }) + vtex, 'https://x.com/p')).toEqual({ estado: 'sin-datos' })
+    // un bloque que ya no entra no corta los que siguen: un producto chico después de uno enorme se lee
+    const enorme = ld({ '@type': 'WebSite', name: 'x'.repeat(600_000) })
+    expect(leerProducto(enorme + enorme + ld({ '@type': 'Product', name: 'Mate' }), 'https://x.com/p'))
+      .toMatchObject({ estado: 'ok', producto: { titulo: 'Mate' } })
+    // lo que se le pasa a JSON.parse, sumado: 4 bloques de casi 1 MB inválidos al final (con un salto de línea, que hacía
+    // intentar de nuevo) y un __STATE__ que es también el primero eran 9 MB
+    const invalido = `[\n${'{"a":0},'.repeat(120_000)}x]`
+    const html = `<template data-varname=__STATE__><script type=application/ld+json>${invalido}</script>` +
+      `<script type="application/ld+json">${invalido}</script>`.repeat(3)
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      expect(leerProducto(html, 'https://x.com/p')).toEqual({ estado: 'sin-datos' })
+      expect(parse.mock.calls.reduce((n, [texto]) => n + texto.length, 0)).toBeLessThanOrEqual(1_000_000)
+    } finally {
+      parse.mockRestore()
+    }
+  })
+
+  test('las <meta>: solo las que se leen, por property, name o itemprop, y la primera de cada una', () => {
+    const html = '<meta property="og:type" content="product"><meta property="fb:app_id" name="og:title" content="No">' +
+      '<meta name="OG:TITLE" content="Mate"><meta name="og:title" content="Otro"><meta itemprop="price" content="1.500">' +
+      '<meta itemprop="price" content="9">'
+    expect(leerProducto(html, 'https://www.tienda.com.ar/p')).toEqual({ estado: 'ok', producto: { titulo: 'Mate', precio: '$1.500', foto: null } })
   })
 
   test('una URL de más de 2000 no es la de esta página ni una foto: no se resuelve, y lo demás se lee igual', () => {

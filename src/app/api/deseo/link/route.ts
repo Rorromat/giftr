@@ -1,7 +1,9 @@
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { sitioDeLink, tituloDelLink } from '@/lib/links'
-import { esPublicacionDeMarketplace, hayApiDeMercadoLibre, leerDeLaApi, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
+import {
+  apiDeMercadoLibreLista, esPublicacionDeMarketplace, hayApiDeMercadoLibre, leerDeLaApi, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE,
+} from '@/lib/mercadolibre'
 import { expandirLinkCorto, leerPagina, type PaginaLeida } from '@/lib/pagina-de-afuera'
 import { anotarPedidoAfuera, urlDelPedido } from '@/lib/pedidos-afuera'
 import { esUrlDeMuro, urlTrasElMuro, type Estado, type RespuestaLink } from '@/lib/producto-del-link'
@@ -30,14 +32,18 @@ const delLink = (estado: Estado, url: string): Leido => ({
 })
 
 /**
- * Lo que se contesta sin salir a la red ni gastar el tope: una publicación de ML que no se pide, o un muro pegado (el que
- * vio el dueño en su navegador, copiado con su go=), que bajarPagina tampoco pide. Con el nombre del link, o del que dice
- * el muro. Con la API configurada, a los de ML se les pregunta a ella: eso sí cuenta.
+ * Lo que se contesta sin salir a la red ni gastar el tope: un muro pegado (el que vio el dueño en su navegador, copiado
+ * con su go=), que bajarPagina no pide, o una publicación de ML que no se pide. Con el nombre del link, o del que dice el
+ * muro. Con la API lista, a un link de ML con un id se le pregunta a ella, y uno corto se sigue hasta uno: eso sí cuenta.
+ * A un muro, solo si su go= trae el id: un listado, una tienda o un /up/ sin item no tienen nada que preguntarle, y el
+ * muro no se sigue.
  */
 function sinPedir(link: string): Leido | null {
-  if (hayApiDeMercadoLibre() && linkDeMercadoLibre(link)) return null
-  if (esUrlDeMuro(link)) return delLink('bloqueado', urlTrasElMuro(link) ?? link)
-  return !ML_PEDIR_MARKETPLACE && esPublicacionDeMarketplace(linkDeMercadoLibre(link)) ? delLink('bloqueado', link) : null
+  const muro = esUrlDeMuro(link)
+  const ml = linkDeMercadoLibre(link)
+  if (apiDeMercadoLibreLista() && ml && (ml.itemId || ml.productId || (ml.tipo === 'corto' && !muro))) return null
+  if (muro) return delLink('bloqueado', urlTrasElMuro(link) ?? link)
+  return !ML_PEDIR_MARKETPLACE && esPublicacionDeMarketplace(ml) ? delLink('bloqueado', link) : null
 }
 
 /**

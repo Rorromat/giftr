@@ -116,13 +116,13 @@ const VALOR_MAX_CHARS = 8192
 
 /**
  * Un atributo de un tag, con comillas dobles, simples o sin comillas (Megatone), con las entidades decodificadas. Null
- * si no está o si pasa de VALOR_MAX_CHARS (cortado, un href sería otra URL).
+ * si no está o si pasa de max (cortado, un href sería otra URL).
  */
-function atributo(tag: string, nombre: string): string | null {
+function atributo(tag: string, nombre: string, max = VALOR_MAX_CHARS): string | null {
   let rx = ATRIBUTOS.get(nombre)
   if (!rx) ATRIBUTOS.set(nombre, (rx = new RegExp(`[\\s<]${nombre}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, 'i')))
   const v = rx.exec(tag)?.slice(1).find((x) => x !== undefined)
-  return v === undefined || v.length > VALOR_MAX_CHARS ? null : decodificar(v)
+  return v === undefined || v.length > max ? null : decodificar(v)
 }
 
 type Tag = { tag: string; inicio: number; fin: number }
@@ -148,13 +148,28 @@ function* tags(html: string, nombre: string): Generator<Tag> {
   for (let t = tagDesde(html, nombre, 0); t; t = tagDesde(html, nombre, t.fin)) yield t
 }
 
-/** Los <meta> por property, name o itemprop (en minúsculas): el primero de cada uno. */
+// Las <meta> que se leen (ver leer; si se lee otra, va acá): el content de las demás no se decodifica
+const METAS = new Set([
+  'og:type', 'og:title', 'og:site_name', 'og:image', 'og:image:secure_url', 'og:price:amount', 'og:price:currency',
+  'twitter:title', 'twitter:image', 'twitter:image:src', 'product:price:amount', 'product:price:currency', 'image',
+  'price', 'pricecurrency',
+])
+// "og:image:secure_url" entra de sobra: una clave más larga no es de METAS y no se decodifica
+const CLAVE_MAX_CHARS = 64
+
+/**
+ * Los <meta> de METAS por property, name o itemprop (en minúsculas): el primero de cada uno. El content se decodifica
+ * solo si es de una de esas claves y la primera vez: con cada content de 8 KB de "&amp" decodificado (dos veces, si el
+ * property traía un " content=" adentro), 4 MB de <meta> se llevaban la mitad del segundo.
+ */
 function metas(html: string): Map<string, string> {
   const r = new Map<string, string>()
   for (const { tag } of tags(html, 'meta')) {
-    const clave = atributo(tag, 'property') ?? atributo(tag, 'name') ?? atributo(tag, 'itemprop')
+    const clave = (atributo(tag, 'property', CLAVE_MAX_CHARS) ?? atributo(tag, 'name', CLAVE_MAX_CHARS) ??
+      atributo(tag, 'itemprop', CLAVE_MAX_CHARS))?.toLowerCase()
+    if (!clave || !METAS.has(clave) || r.has(clave)) continue
     const valor = atributo(tag, 'content')
-    if (clave && valor !== null && !r.has(clave.toLowerCase())) r.set(clave.toLowerCase(), valor)
+    if (valor !== null) r.set(clave, valor)
   }
   return r
 }
@@ -211,6 +226,24 @@ const ARRAY_MAX = 100
 // Una página de verdad trae unas decenas por bloque (Tiendanube: el de la página y 8 recomendados)
 const NODOS_MAX = 1000
 const ES_LD = /\btype\s*=\s*["']?application\/ld\+json/i
+const CONTROL = /[\u0000-\u001f]/
+const CONTROLES = /[\u0000-\u001f]/g
+// Lo que se le pasa a JSON.parse en una página, sumando los JSON-LD, sus reintentos y el __STATE__ (el más grande de
+// los fixtures suma 268 KB de JSON-LD; el __STATE__ más grande, 67 KB): sin tope, 4 bloques de 1 MB inválidos al final,
+// cada uno parseado dos veces, pasaban del segundo con el event loop trabado
+const PARSEO_MAX_CHARS = 1_000_000
+type Presupuesto = { quedan: number }
+
+/** JSON.parse, si el texto entra en lo que queda del presupuesto (y se descuenta, se pueda leer o no); si no, undefined. */
+function parsear(texto: string, p: Presupuesto): unknown {
+  if (texto.length > p.quedan) return undefined
+  p.quedan -= texto.length
+  try {
+    return JSON.parse(texto)
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * Lo que hay desde donde termina un tag que abre hasta el primer </script>, y dónde termina ese cierre. Sin cierre, null:
@@ -223,7 +256,7 @@ function hastaElCierre(html: string, desde: number): { texto: string; fin: numbe
   return c ? { texto: html.slice(desde, c.index), fin: c.index + c[0].length } : null
 }
 
-function jsonLd(html: string): Bloque[] {
+function jsonLd(html: string, p: Presupuesto): Bloque[] {
   const finHead = html.search(/<\/head\s*>/i)
   const r: Bloque[] = []
   for (let n = 0, desde = 0; n < BLOQUES_MAX;) {
@@ -237,13 +270,11 @@ function jsonLd(html: string): Bloque[] {
     desde = bloque.fin
     const crudo = bloque.texto.trim()
     if (crudo.length > BLOQUE_MAX_CHARS) continue
-    // Samsung tiene JSON-LD inválidos: con un salto de línea crudo adentro de un string, por ejemplo
-    for (const intento of [crudo, crudo.replace(/[\u0000-\u001f]/g, ' ')]) {
-      try {
-        r.push({ enHead: finHead < 0 || t.inicio < finHead, json: JSON.parse(intento) })
-        break
-      } catch { /* el siguiente intento, o nada */ }
-    }
+    // Samsung tiene JSON-LD inválidos: con un salto de línea crudo adentro de un string, por ejemplo. Sin los controles,
+    // se reintenta solo si los tiene (y si entra en el presupuesto, que cuenta los dos intentos)
+    let json = parsear(crudo, p)
+    if (json === undefined && CONTROL.test(crudo)) json = parsear(crudo.replace(CONTROLES, ' '), p)
+    if (json !== undefined) r.push({ enHead: finHead < 0 || t.inicio < finHead, json })
   }
   return r
 }
@@ -383,9 +414,9 @@ const SCRIPT_PEGADO = /\s*<script\b/iy
 
 /**
  * El caché de Apollo de VTEX IO (<template data-varname="__STATE__">): Carrefour no trae nada más en el HTML. Null si no
- * hay o no tiene un Product.
+ * hay, si no tiene un Product o si no entra (en BLOQUE_MAX_CHARS o en lo que queda del presupuesto de los JSON-LD).
  */
-function estadoVtex(html: string): Vtex | null {
+function estadoVtex(html: string, p: Presupuesto): Vtex | null {
   let bloque: { texto: string } | null = null
   for (const { tag, fin } of tags(html, 'template')) {
     if (!ES_STATE.test(tag)) continue
@@ -397,9 +428,8 @@ function estadoVtex(html: string): Vtex | null {
     bloque = cierra < 0 ? null : hastaElCierre(html, cierra + 1)
     break
   }
-  if (!bloque) return null
-  let st: unknown
-  try { st = JSON.parse(bloque.texto) } catch { return null }
+  if (!bloque || bloque.texto.length > BLOQUE_MAX_CHARS) return null
+  const st = parsear(bloque.texto, p)
   if (!esNodo(st)) return null
   const clave = Object.keys(st).find((k) => k.startsWith('Product:') && !k.includes('.'))
   const producto = clave && st[clave]
@@ -624,10 +654,11 @@ function leer(html: string, urlFinal: string): Lectura {
   const me = metas(html)
   const base = baseDe(urlFinal)
   const canon = canonical(html, base)
-  const nodo = elegir(jsonLd(html), canon, urlFinal, base)
+  const presupuesto: Presupuesto = { quedan: PARSEO_MAX_CHARS }
+  const nodo = elegir(jsonLd(html, presupuesto), canon, urlFinal, base)
   const esProducto = !!nodo && esDe(nodo, PRODUCTO)
   let vtex: Vtex | null | undefined
-  const deVtex = () => (vtex === undefined ? (vtex = estadoVtex(html)) : vtex)
+  const deVtex = () => (vtex === undefined ? (vtex = estadoVtex(html, presupuesto)) : vtex)
 
   const ogType = (me.get('og:type') ?? '').toLowerCase()
   const senal = esProducto || (ogType.includes('product') && ogType !== 'product.group') || !!me.get('product:price:amount') ||

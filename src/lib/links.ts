@@ -89,8 +89,9 @@ const SLUG_TIENDA = [
 ]
 // La extensión, con el idioma que algunas le ponen antes (Booking: "alvear-palace.es-ar.html")
 const EXTENSION = /(?:\.[a-z]{2}(?:[-_][a-z]{2})?)?\.[a-z0-9]{1,5}$/i
-// El idioma o el país de la tienda ("en_us" en H&M, "es-ar", "ar"): no es el nombre de nada
-const IDIOMA_O_PAIS = /^[a-z]{2}(?:[-_][a-z]{2,3})?$/i
+// El idioma o el país de la tienda ("en_us" en H&M, "es-ar", "ar"): no es el nombre de nada. Dos letras después del
+// separador, como el país: con tres, "el-sur" o "la-paz" (el nombre de un libro o de un vino) dejaban el link sin nombre
+const IDIOMA_O_PAIS = /^[a-z]{2}(?:[-_][a-z]{2})?$/i
 
 /** Un token que no es parte del nombre: un código o número largo (MKT0278BGH, cw2288, 2014), el JM de ML o algo enorme. */
 function esCodigo(t: string): boolean {

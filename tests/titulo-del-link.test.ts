@@ -34,6 +34,10 @@ test('las formas de cada tienda', () => {
     ['https://www.booking.com/hotel/ar/alvear-palace.es-ar.html?label=gen173nr&sid=x', 'Alvear palace'],
     // los pedazos del idioma o el país no cuentan: se sube del código al nombre igual
     ['https://www.tienda.com/es-ar/mate-imperial-de-calabaza/AB12345.html', 'Mate imperial de calabaza'],
+    // dos palabras cortas no son un idioma ni un país: con tres letras después del guion, es el nombre
+    ['https://www.libreria.com/libros/el-sur', 'El sur'],
+    ['https://www.vinoteca.com/vinos/la-paz.html', 'La paz'],
+    ['https://www.jugueteria.com/juegos/el-mar/1234.html', 'El mar'],
   ] as const) expect(tituloDelLink(link), link).toBe(titulo)
 })
 

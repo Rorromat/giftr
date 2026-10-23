@@ -137,7 +137,8 @@ export async function importarFotoDeseo(db: Db, userId: string, src: string, o: 
     try {
       url = await guardarFotoDeseo(db, userId, jpeg)
     } catch (e) {
-      console.error('deseo/foto/desde-link: no se pudo guardar la foto', e)
+      // el error de la base y no el de drizzle, que trae en el mensaje los parámetros: la foto, como texto
+      console.error('deseo/foto/desde-link: no se pudo guardar la foto', e instanceof Error ? e.cause ?? e.message.slice(0, 300) : e)
       return { error: 'no_carga' }
     }
     return url ? { url } : { error: 'muchas' }

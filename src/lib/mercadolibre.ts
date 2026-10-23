@@ -105,11 +105,18 @@ export const hayApiDeMercadoLibre = () => !!(process.env.MELI_CLIENT_ID && proce
 type Json = Record<string, unknown>
 const esJson = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
 
+type Token = { valor: string; vence: number }
 /** El token de la aplicación, en memoria hasta un minuto antes de que venza. */
-let token: { valor: string; vence: number } | null = null
+let token: Token | null = null
 /** Tras un token que no se pudo sacar, hasta cuándo no se vuelve a pedir (ver tokenDeLaApp). */
 let sinTokenHasta = 0
 const TOKEN_ESPERA_MS = 60_000
+
+/** El token en memoria, si todavía sirve. */
+const tokenVigente = () => (token && Date.now() < token.vence ? token.valor : null)
+
+/** Si se le puede preguntar a la API ahora: configurada, y no en el minuto sin token (ver tokenDeLaApp). */
+export const apiDeMercadoLibreLista = () => hayApiDeMercadoLibre() && (!!tokenVigente() || Date.now() >= sinTokenHasta)
 
 /** Una respuesta que no se va a leer: se suelta la conexión. */
 const descartar = (r: Response) => r.body?.cancel().catch(() => {})
@@ -117,23 +124,28 @@ const descartar = (r: Response) => r.body?.cancel().catch(() => {})
 /**
  * El token. Si no lo dan (credenciales mal, el OAuth caído, colgado o con un JSON raro), null por un minuto sin volver a
  * pedirlo: si no, cada link de ML esperaba lo mismo antes de ir a la página (hasta los 4 s, con el OAuth colgado) y dejaba
- * una línea en el log. Si lo que se cortó fue el pedido de quien pregunta (deQuienPide), no es culpa del token.
+ * una línea en el log. Si lo que se cortó fue el pedido de quien pregunta (deQuienPide), no es culpa del token. Se guarda
+ * solo el que llega: si dos links lo piden a la vez y a uno se lo dan, el otro que falla no lo pisa ni deja el minuto
+ * sin API (y sigue con ese).
  */
 async function tokenDeLaApp(signal: AbortSignal, deQuienPide?: AbortSignal): Promise<string | null> {
-  if (token && Date.now() < token.vence) return token.valor
+  const vigente = tokenVigente()
+  if (vigente) return vigente
   if (Date.now() < sinTokenHasta) return null
+  let nuevo: Token | null
   try {
-    token = await pedirToken(signal)
+    nuevo = await pedirToken(signal)
   } catch (e) {
-    if (!deQuienPide?.aborted) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
+    if (!deQuienPide?.aborted && !tokenVigente()) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
     throw e
   }
-  if (!token) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
-  return token?.valor ?? null
+  if (nuevo) token = nuevo
+  else if (!tokenVigente()) sinTokenHasta = Date.now() + TOKEN_ESPERA_MS
+  return nuevo?.valor ?? tokenVigente()
 }
 
 /** Un token nuevo; null si no lo dan o si no tiene la forma. */
-async function pedirToken(signal: AbortSignal): Promise<{ valor: string; vence: number } | null> {
+async function pedirToken(signal: AbortSignal): Promise<Token | null> {
   const r = await fetch(`${API}/oauth/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', 'user-agent': UA_GIFTR },
