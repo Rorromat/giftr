@@ -1,0 +1,31 @@
+{
+ "tienda": "spotify",
+ "caso": "open.spotify.com/track/<id>: og completos + JSON-LD MusicRecording",
+ "urlPegadaPorElUsuario": "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+ "urlFinal": "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-compra",
+  "title": "Never Gonna Give You Up",
+  "subtitulo": "Rick Astley · Whenever You Need Somebody · Song · 1987",
+  "image": "https://i.scdn.co/image/ab67616d0000b273baf89eb11ec7c657805d2da0",
+  "price": null,
+  "currency": null,
+  "canonicalUrl": "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+  "generico": {
+   "title": "Never Gonna Give You Up",
+   "image": "https://i.scdn.co/image/ab67616d0000b273baf89eb11ec7c657805d2da0",
+   "price": null
+  }
+ }
+}

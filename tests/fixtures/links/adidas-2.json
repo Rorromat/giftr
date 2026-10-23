@@ -1,0 +1,24 @@
+{
+ "tienda": "adidas",
+ "caso": "adidas.com: 403 variante 'CPR 403 ERROR' con utag_data",
+ "urlPegadaPorElUsuario": "https://www.adidas.com/us/samba-og-shoes/B75806",
+ "urlFinal": "https://www.adidas.com/us/samba-og-shoes/B75806",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-waf-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

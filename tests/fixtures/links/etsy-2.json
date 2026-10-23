@@ -1,0 +1,24 @@
+{
+ "tienda": "etsy",
+ "caso": "etsy.com/listing: 403 DataDome",
+ "urlPegadaPorElUsuario": "https://www.etsy.com/listing/1628224217/animals-puzzle-with-custom-baby-name",
+ "urlFinal": "https://www.etsy.com/listing/1628224217/animals-puzzle-with-custom-baby-name",
+ "status": 403,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "datadome",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

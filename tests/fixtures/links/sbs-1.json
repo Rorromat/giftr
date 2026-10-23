@@ -1,0 +1,27 @@
+{
+ "tienda": "sbs",
+ "caso": "librería VTEX sin og:*",
+ "urlPegadaPorElUsuario": "https://www.sbs.com.ar/amigos-por-el-viento---liliana-bodoc-9877383898/p",
+ "urlFinal": "https://www.sbs.com.ar/amigos-por-el-viento---liliana-bodoc-9877383898/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "AMIGOS POR EL VIENTO - LILIANA BODOC",
+  "image": "https://sbslibreria.vtexassets.com/arquivos/ids/5063102/jxujCQl3n4WAsOl6yIIZpy-E52w-.jpg?v=638853293394770000",
+  "imageHiRes": "https://sbslibreria.vtexassets.com/arquivos/ids/5063102/jxujCQl3n4WAsOl6yIIZpy-E52w-.jpg?v=638853293394770000",
+  "price": 25999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

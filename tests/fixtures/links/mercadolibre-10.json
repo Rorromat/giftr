@@ -1,0 +1,35 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "MURO DE LOGIN (account-verification / suspicious-traffic) en Argentina, siguiendo el redirect",
+ "urlPegadaPorElUsuario": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM",
+ "urlFinal": "https://www.mercadolibre.com.ar/gz/account-verification?go=https%3A%2F%2Farticulo.mercadolibre.com.ar%2FMLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM&tid=1da1c36a-3c6c-4b77-adc7-be3a8f1cae40",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 302,
+   "location": "https://www.mercadolibre.com.ar/gz/account-verification?go=https%3A%2F%2Farticulo.mercadolibre.com.ar%2FMLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM&tid=1da1c36a-3c6c-4b77-adc7-be3a8f1cae40",
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "account-verification",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "fallbackFromUrl": {
+   "site": "MLA",
+   "itemId": "MLA1418506688",
+   "slugTitle": "mate de algarrobo premium artesanal con bombilla"
+  }
+ }
+}

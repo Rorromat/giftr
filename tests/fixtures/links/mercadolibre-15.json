@@ -1,0 +1,29 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "página de video \"clips\" (shorts) de un producto: og de video + JSON polycard con el producto",
+ "urlPegadaPorElUsuario": "https://www.mercadolibre.com.ar/shorts/clips/QdsnCh/termo-stanley-mate-system-12-litros-rosa",
+ "urlFinal": "https://www.mercadolibre.com.ar/shorts/clips/QdsnCh/termo-stanley-mate-system-12-litros-rosa",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Termo Original Stanley Mate System 1.2 Litros Rosa",
+  "ogTitle": "Termo Stanley Mate System 1.2 Litros Rosa",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_890900-MLA99920915325_112025-O.webp",
+  "ogImage": "https://http2.mlstatic.com/D_NQ_NP_900749-MLA85160086562_052025-B.webp",
+  "price": 189990,
+  "currency": "ARS",
+  "itemId": "MLA3070371712",
+  "catalogProductId": "MLA39939183",
+  "userProductId": "MLAU3001199867",
+  "productUrl": "https://www.mercadolibre.com.ar/termo-original-stanley-mate-system-12-litros-rosa/p/MLA39939183"
+ }
+}

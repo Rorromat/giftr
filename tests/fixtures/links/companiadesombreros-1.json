@@ -1,0 +1,27 @@
+{
+ "tienda": "companiadesombreros",
+ "caso": "tienda chica; mainEntity + 8 relacionados",
+ "urlPegadaPorElUsuario": "https://www.companiadesombreros.com.ar/productos/bandolera-macrame/",
+ "urlFinal": "https://www.companiadesombreros.com.ar/productos/bandolera-macrame/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "BANDOLERA MACRAME",
+  "image": "https://acdn-us.mitiendanube.com/stores/834/306/products/_dsc1685-72e6de75b36a7f010917880299974343-480-0.webp",
+  "imageHiRes": "https://acdn-us.mitiendanube.com/stores/834/306/products/_dsc1685-72e6de75b36a7f010917880299974343-1024-1024.webp",
+  "price": 53500,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

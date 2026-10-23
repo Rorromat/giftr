@@ -1,0 +1,26 @@
+{
+ "tienda": "musimundo",
+ "caso": "sitio en mantenimiento",
+ "urlPegadaPorElUsuario": "https://www.musimundo.com/",
+ "urlFinal": "https://www.musimundo.com/",
+ "status": 200,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html",
+   "server": "AmazonS3"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": true,
+  "title": null,
+  "image": null,
+  "imageHiRes": null,
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

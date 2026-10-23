@@ -1,0 +1,24 @@
+{
+ "tienda": "steam",
+ "caso": "API publica sin clave: /api/appdetails?appids=1145360&cc=ar&l=spanish (JSON)",
+ "urlPegadaPorElUsuario": "https://store.steampowered.com/api/appdetails?appids=1145360&cc=ar&l=spanish",
+ "urlFinal": "https://store.steampowered.com/api/appdetails?appids=1145360&cc=ar&l=spanish",
+ "status": 200,
+ "contentType": "application/json; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "application/json; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "api-json",
+  "title": "Hades",
+  "image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145360/header.jpg?t=1758127023",
+  "price": 4.99,
+  "currency": "USD"
+ }
+}

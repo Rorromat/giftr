@@ -1,0 +1,24 @@
+{
+ "tienda": "decathlon",
+ "caso": "Shopify: /products/<handle>.js (JSON publico del producto)",
+ "urlPegadaPorElUsuario": "https://www.decathlon.com/products/arpenaz-50-10-l-hiking-backpack-beige.js",
+ "urlFinal": "https://www.decathlon.com/products/arpenaz-50-10-l-hiking-backpack-beige.js",
+ "status": 200,
+ "contentType": "text/javascript; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/javascript; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "api-json",
+  "title": "Quechua NH50 Arpenaz 10 L Hiking Backpack",
+  "image": "https://cdn.shopify.com/s/files/1/1330/6287/files/default_2f8cdb2a-0e7d-4686-b513-c659c5ecf4d7.jpg?v=1791745132",
+  "price": 9.99,
+  "currency": null
+ }
+}

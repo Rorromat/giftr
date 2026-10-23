@@ -1,0 +1,27 @@
+{
+ "tienda": "carrefour",
+ "caso": "403 de Cloudflare",
+ "urlPegadaPorElUsuario": "https://www.carrefour.com.ar/lomito-de-atun-al-natural-carrefour-classic-170-grs-122140/p",
+ "urlFinal": "https://www.carrefour.com.ar/lomito-de-atun-al-natural-carrefour-classic-170-grs-122140/p",
+ "status": 403,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 403,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "cloudflare-403",
+  "genericPage": false,
+  "title": null,
+  "image": null,
+  "imageHiRes": null,
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

@@ -1,0 +1,31 @@
+{
+ "tienda": "apple",
+ "caso": "apple.com/shop/buy-airpods/airpods-4 -> 301 a airpods-5: JSON-LD Product con precio",
+ "urlPegadaPorElUsuario": "https://www.apple.com/shop/buy-airpods/airpods-4",
+ "urlFinal": "https://www.apple.com/shop/buy-airpods/airpods-5",
+ "status": 200,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "AirPods 5",
+  "image": "https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/airpods-5-og-202609?wid=1200&hei=630&fmt=jpeg&qlt=90&.v=1786382353126",
+  "price": 129.0,
+  "currency": "USD",
+  "canonicalUrl": "https://www.apple.com/shop/buy-airpods/airpods-5",
+  "generico": {
+   "title": "AirPods 5",
+   "image": "https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/airpods-5-og-202609?wid=1200&hei=630&fmt=jpeg&qlt=90&.v=1786382353126",
+   "price": "129.0",
+   "currency": "USD"
+  }
+ }
+}

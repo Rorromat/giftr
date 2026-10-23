@@ -1,0 +1,28 @@
+{
+ "tienda": "puma",
+ "caso": "og:description con HTML; price numérico",
+ "urlPegadaPorElUsuario": "https://ar.puma.com/pd/chatitas-speedcat-gamuza-para-mujer/401287.html?color=02",
+ "urlFinal": "https://ar.puma.com/pd/chatitas-speedcat-gamuza-para-mujer/401287.html?color=02",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Chatitas Speedcat Gamuza para mujer",
+  "image": "https://images.puma.com/image/upload/f_auto,q_auto,w_2000,b_rgb:FAFAFA/global/401287/02/sv01/fnd/ARG/fmt/png",
+  "imageHiRes": "https://images.puma.com/image/upload/f_auto,q_auto,w_2000,b_rgb:FAFAFA/global/401287/02/sv01/fnd/ARG/fmt/png",
+  "price": 149999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "PUMA"
+ }
+}

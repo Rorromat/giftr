@@ -1,0 +1,38 @@
+{
+ "tienda": "coto",
+ "caso": "shell sin datos del producto",
+ "urlPegadaPorElUsuario": "https://www.cotodigital.com.ar/sitios/cdigi/productos/bourbon-finish-7-a%C3%B1os-ballantines-bot-700-ml/_/R-00528755-00528755-200",
+ "urlFinal": "https://www.coto.com.ar/productos/bourbon-finish-7-a%c3%b1os-ballantines-bot-700-ml/_/R-00528755-00528755-200",
+ "status": 200,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://www.coto.com.ar/sitios/cdigi/productos/bourbon-finish-7-a%C3%B1os-ballantines-bot-700-ml/_/R-00528755-00528755-200",
+   "contentType": "text/html",
+   "server": null
+  },
+  {
+   "status": 301,
+   "location": "/productos/bourbon-finish-7-aÃ±os-ballantines-bot-700-ml/_/R-00528755-00528755-200",
+   "contentType": "text/html",
+   "server": "nginx/1.31.2"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html",
+   "server": "nginx/1.31.2"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": true,
+  "title": null,
+  "image": null,
+  "imageHiRes": null,
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

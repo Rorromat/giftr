@@ -1,0 +1,28 @@
+{
+ "tienda": "farmacity",
+ "caso": "sin og:*; JSON-LD Product",
+ "urlPegadaPorElUsuario": "https://www.farmacity.com/edt-nautica-voyage-x-100-ml/p",
+ "urlFinal": "https://www.farmacity.com/edt-nautica-voyage-x-100-ml/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "EDT Nautica Voyage x 100 ml",
+  "image": "https://farmacityar.vtexassets.com/arquivos/ids/230178/230420_edt-nautica-voyage-x-100-ml_imagen-1.jpg?v=638016354627630000",
+  "imageHiRes": "https://farmacityar.vtexassets.com/arquivos/ids/230178/230420_edt-nautica-voyage-x-100-ml_imagen-1.jpg?v=638016354627630000",
+  "price": 41540,
+  "currency": "ARS",
+  "originalPrice": 63907,
+  "availability": "InStock",
+  "brand": "Nautica"
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "tienda": "spotify",
+ "caso": "open.spotify.com: 302 a /intl-es/track/... y SPA 'Spotify – Web Player' SIN og:*",
+ "urlPegadaPorElUsuario": "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+ "urlFinal": "https://open.spotify.com/intl-es/track/4cOdK2wGLETKBW3PvgPWqT",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-compra",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "Spotify – Web Player",
+   "image": null
+  }
+ }
+}

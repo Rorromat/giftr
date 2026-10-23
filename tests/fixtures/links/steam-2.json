@@ -1,0 +1,34 @@
+{
+ "tienda": "steam",
+ "caso": "Juego con restriccion de edad (Cyberpunk 2077): 302 a /agecheck/app/<id>/, sin precio",
+ "urlPegadaPorElUsuario": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/",
+ "urlFinal": "https://store.steampowered.com/agecheck/app/1091500/",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 302,
+   "location": "https://store.steampowered.com/agecheck/app/1091500/",
+   "contentType": "text/html; charset=UTF-8",
+   "server": "nginx"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "agecheck",
+  "title": "Cyberpunk 2077",
+  "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1091500/48a93d6445a67520ea49833c93dae8f2e68fc540/header_alt_assets_9.jpg?t=1792663801",
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "Cyberpunk 2077",
+   "price": null
+  }
+ }
+}

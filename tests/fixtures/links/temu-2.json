@@ -1,0 +1,30 @@
+{
+ "tienda": "temu",
+ "caso": "temu.com mismo producto: CSR, sin rawData, og:title en espanol con huecos, sin imagen ni precio",
+ "urlPegadaPorElUsuario": "https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-stainless-steel-yerba-mate-cup-double-wall--cup-drinkware-g-601099538564934.html",
+ "urlFinal": "https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-stainless-steel-yerba-mate-cup-double-wall--cup-drinkware-g-601099538564934.html",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "Server"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "1   mate yerba bombilla taza acero inoxidable mate taza",
+  "image": null,
+  "price": null,
+  "currency": null,
+  "canonicalUrl": "https://www.temu.com/us-es/1--mate-de-yerba-con-bombilla-taza-de-acero-inoxidable-para-mate-taza-de-te-tradicional-de--pared-vajilla-g-601099538564934.html",
+  "generico": {
+   "title": "1   mate yerba bombilla taza acero inoxidable mate taza - Temu",
+   "image": null,
+   "price": null
+  }
+ }
+}

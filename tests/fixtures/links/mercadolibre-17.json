@@ -1,0 +1,36 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "página de tienda oficial (sin muro): tarjetas polycard con título, precio, imagen",
+ "urlPegadaPorElUsuario": "https://www.mercadolibre.com.ar/tienda/laska",
+ "urlFinal": "https://www.mercadolibre.com.ar/tienda/laska",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "pageKind": "store",
+  "title": "LASKA | Tienda Oficial",
+  "ogTitle": "LASKA en Mercado Libre",
+  "ogImage": "https://http2.mlstatic.com/D_NQ_NP_635815-MLA76616216368_062024-O.webp",
+  "image": null,
+  "price": null,
+  "currency": null,
+  "primerasTarjetas": [
+   {
+    "title": "Canasta Matera Eco Cuero Portatermo Practica Y Resistente Negro",
+    "priceNow": 14920,
+    "pricePrev": 23000,
+    "currency": "ARS",
+    "image": "https://http2.mlstatic.com/D_Q_NP_2X_624791-MLA110418098269_042026-AB.webp",
+    "url": "https://www.mercadolibre.com.ar/canasta-matera-eco-cuero-portatermo-practica-y-resistente/up/MLAU3409701436?pdp_filters=item_id%3AMLA2324526514"
+   }
+  ]
+ }
+}

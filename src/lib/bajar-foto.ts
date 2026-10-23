@@ -1,13 +1,20 @@
-import { lookup } from 'node:dns'
+import dns from 'node:dns'
+import type { IncomingMessage } from 'node:http'
 import https from 'node:https'
 import { BlockList, isIP, type LookupFunction } from 'node:net'
+import { pipeline, Transform } from 'node:stream'
+import zlib from 'node:zlib'
+import { UA_GIFTR } from '@/lib/giftrbot'
 
-// Bajar desde el servidor la foto de un deseo (para la vista previa de WhatsApp). Las fotos las carga cualquiera:
-// nada de pedidos a la red interna ni descargas sin fin.
+// Bajar desde el servidor algo de afuera: la foto de un deseo (para la vista previa de WhatsApp, o para guardarla) o la
+// página de un producto. Los links los pega cualquiera: nada de pedidos a la red interna ni descargas sin fin.
 
 export const FOTO_MAX_BYTES = 8_000_000
 /** Tiempo total, con las redirecciones y la descarga (antes eran 4 s por salto, hasta 16 s). */
 export const FOTO_TIEMPO_MS = 5000
+
+// cómo nos presentamos afuera (ver giftrbot.ts)
+export { UA_GIFTR }
 
 /** Direcciones que no son de internet: loopback, privadas, link-local, CGNAT, de documentación, multicast, reservadas. */
 const NO_PUBLICAS = new BlockList()
@@ -30,14 +37,40 @@ export function esIpPublica(ip: string): boolean {
 
 type Direccion = { address: string; family: number }
 export type Resolver = (host: string, cb: (err: NodeJS.ErrnoException | null, dirs: Direccion[]) => void) => void
-const resolverDelSistema: Resolver = (host, cb) => lookup(host, { all: true }, cb)
+
+/** Lo que se espera cada respuesta del DNS, por servidor y por intento. */
+const DNS_TIEMPO_MS = 2000
+
+/**
+ * Resuelve preguntándole al DNS (c-ares) y no con dns.lookup: getaddrinfo ocupa uno de los 4 hilos del threadpool de
+ * libuv (los mismos de zlib y sharp) hasta que el DNS conteste, y cortar el pedido no lo suelta, así que unos links a
+ * dominios cuyo DNS no contesta dejaban esperando a todo lo demás. Esto no usa el threadpool, tiene su tiempo y se cancela
+ * con la señal del pedido. IPv4 primero: es la que seguro anda desde el servidor (si hay IPv6, net la prueba después).
+ */
+export function resolverDeAfuera(signal?: AbortSignal): Resolver {
+  return (host, cb) => {
+    const consulta = new dns.promises.Resolver({ timeout: DNS_TIEMPO_MS, tries: 2 })
+    const cancelar = () => consulta.cancel()
+    signal?.addEventListener('abort', cancelar, { once: true })
+    if (signal?.aborted) cancelar()
+    void Promise.allSettled([consulta.resolve4(host), consulta.resolve6(host)]).then(([v4, v6]) => {
+      signal?.removeEventListener('abort', cancelar)
+      const dirs = [
+        ...(v4.status === 'fulfilled' ? v4.value.map((address) => ({ address, family: 4 })) : []),
+        ...(v6.status === 'fulfilled' ? v6.value.map((address) => ({ address, family: 6 })) : []),
+      ]
+      const error = [v4, v6].find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason
+      cb(dirs.length ? null : error ?? Object.assign(new Error(`${host} no resuelve`), { code: 'ENOTFOUND' }), dirs)
+    })
+  }
+}
 
 /**
  * El lookup de la conexión: resuelve el nombre y, si alguna dirección no es pública, no se conecta. Un nombre público
  * puede apuntar a una IP privada (127.0.0.1.nip.io). Va en la conexión misma, y cada redirección es otra conexión:
  * revisar antes y conectar después dejaría que el DNS conteste otra cosa la segunda vez.
  */
-export function lookupPublico(resolver: Resolver = resolverDelSistema): LookupFunction {
+export function lookupPublico(resolver: Resolver = resolverDeAfuera()): LookupFunction {
   return (host, opciones, cb) => {
     resolver(host, (err, todas = []) => {
       const familia = opciones.family === 4 || opciones.family === 6 ? opciones.family : 0
@@ -55,59 +88,185 @@ export function lookupPublico(resolver: Resolver = resolverDelSistema): LookupFu
 export type Respuesta = { status: number; header: (nombre: string) => string | null; cuerpo: AsyncIterable<Uint8Array> }
 export type Pedir = (url: string, signal: AbortSignal) => Promise<Respuesta>
 
-/**
- * Una foto de afuera: por https, conectándose solo a direcciones públicas (ver lookupPublico) y sin reusar conexiones.
- * Con User-Agent: https.get no manda ninguno (fetch mandaba "node") y hay hosts de fotos, como Wikimedia, que sin él dan 403.
- */
-export const pedirAfuera: Pedir = (url, signal) => new Promise((resolve, reject) => {
-  const headers = { accept: 'image/*', 'user-agent': 'GiftR (vista previa)' }
-  https.get(url, { signal, lookup: lookupPublico(), agent: false, headers }, (res) => resolve({
-    status: res.statusCode ?? 0,
-    header: (nombre) => {
-      const v = res.headers[nombre.toLowerCase()]
-      return (Array.isArray(v) ? v[0] : v) ?? null
-    },
-    cuerpo: res,
-  })).on('error', reject)
-})
+function encabezado(res: IncomingMessage, nombre: string): string | null {
+  const v = res.headers[nombre.toLowerCase()]
+  return (Array.isArray(v) ? v[0] : v) ?? null
+}
 
 /**
- * Baja una foto: sigue a mano hasta 3 redirecciones (cada destino tiene que estar permitido), con un tiempo total, y corta
- * apenas pasa el máximo de bytes: si dice que es más grande, sin bajar nada; si no lo dice o miente, a medida que llega
- * (antes se bajaba entera a memoria y recién ahí se miraba el tamaño). Null si algo no va.
+ * Lo que puede llegar comprimido. Una página de verdad llega más chica de lo que pesa descomprimida, así que antes se
+ * llega al tope de lo descomprimido; esto es para lo que viaja sin descomprimir en nada (un gzip de bloques vacíos), que
+ * si no solo lo frenaba el tiempo.
  */
-export async function bajarFoto(
-  src: string, pedir: Pedir, permitida: (url: string) => boolean, max = FOTO_MAX_BYTES, tiempoMs = FOTO_TIEMPO_MS,
-): Promise<Buffer | null> {
-  if (!permitida(src)) return null
-  const total = AbortSignal.timeout(tiempoMs)
+const COMPRIMIDO_MAX_BYTES = 4_000_000
+
+/**
+ * El cuerpo ya descomprimido. Se lee de a pedazos, como el original: lo que cuenta para el tope de quien lee es lo que
+ * se va a leer, no lo que viajó, así una bomba gzip se corta igual; lo que viaja tiene su propio tope (si se pasa, es
+ * un error). Al dejar de leerlo se cierran los dos. Un gzip trunco en una respuesta que terminó bien se descomprime
+ * hasta donde llegó, como hace un navegador; si se corta la conexión o se vence el tiempo, no se lee nada (bajarDeAfuera
+ * da no-carga).
+ */
+async function* descomprimido(res: IncomingMessage, codificacion: string): AsyncGenerator<Uint8Array> {
+  const flush = { finishFlush: zlib.constants.Z_SYNC_FLUSH }
+  const d = codificacion === 'gzip' || codificacion === 'x-gzip' ? zlib.createGunzip(flush)
+    : codificacion === 'deflate' ? zlib.createInflate(flush)
+      : codificacion === 'br' ? zlib.createBrotliDecompress({ finishFlush: zlib.constants.BROTLI_OPERATION_FLUSH })
+        : null
+  if (!d && codificacion && codificacion !== 'identity') {
+    res.destroy()
+    throw new Error(`codificación desconocida: ${codificacion}`)
+  }
+  if (!d) return yield* res
+  let crudos = 0
+  const contar = new Transform({
+    transform(trozo: Buffer, _codificacion, listo) {
+      crudos += trozo.byteLength
+      listo(crudos > COMPRIMIDO_MAX_BYTES ? new Error('demasiado comprimido') : null, trozo)
+    },
+  })
+  yield* pipeline(res, contar, d, () => {})
+}
+
+/**
+ * Un pedido a afuera con estos headers: por https, conectándose solo a direcciones públicas (ver lookupPublico) y sin
+ * reusar conexiones, así cada salto es otra conexión que se revisa de nuevo. Nada de cookies ni Referer: no se guarda
+ * nada entre un pedido y otro. Con descomprimir, el cuerpo llega descomprimido (gzip, deflate o br) y sin los headers del
+ * comprimido.
+ */
+export function pedidoAfuera(headers: Record<string, string>, o: { descomprimir?: boolean } = {}): Pedir {
+  return (url, signal) => new Promise((resolve, reject) => {
+    https.get(url, { signal, lookup: lookupPublico(resolverDeAfuera(signal)), agent: false, headers }, (res) => resolve({
+      status: res.statusCode ?? 0,
+      header: (nombre) => (o.descomprimir && /^content-(length|encoding)$/i.test(nombre) ? null : encabezado(res, nombre)),
+      cuerpo: o.descomprimir ? descomprimido(res, (encabezado(res, 'content-encoding') ?? '').trim().toLowerCase()) : res,
+    })).on('error', reject)
+  })
+}
+
+/**
+ * La foto de la vista previa (og.tsx). Con User-Agent: https.get no manda ninguno y hay hosts de fotos, como Wikimedia,
+ * que sin él dan 403.
+ */
+export const pedirAfuera: Pedir = pedidoAfuera({ accept: 'image/*', 'user-agent': UA_GIFTR })
+/** La foto que se trae para guardarla en un deseo. */
+export const pedirFoto: Pedir = pedidoAfuera({ accept: 'image/webp,image/*;q=0.9,*/*;q=0.1', 'user-agent': UA_GIFTR })
+/** La página de un producto: HTML, en castellano de Argentina si la hay, comprimida si quiere. */
+export const pedirPagina: Pedir = pedidoAfuera({
+  'user-agent': UA_GIFTR,
+  accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+  'accept-language': 'es-AR,es;q=0.9,en;q=0.5',
+  'accept-encoding': 'gzip, deflate, br',
+}, { descomprimir: true })
+
+/** Por qué no se bajó: lo de afuera nunca vuelve al usuario (ni el status ni el HTML), solo esto. */
+export type Falla = 'no-permitida' | 'bloqueada' | 'no-esta' | 'no-carga' | 'otro-tipo' | 'sin-datos'
+/** Un corte, con la URL de la que sale el nombre del producto (la última que se pidió, o la que dice el muro). */
+export type Corte = { falla: Falla; urlProducto: string | null }
+export type Bajado = { datos: Buffer; tipo: string; urlFinal: string; cortado: boolean }
+
+// 202 es el challenge de un WAF (Booking): para fetch() no es un error, pero no trae la página
+const BLOQUEADA = new Set([202, 401, 403, 418, 429, 451, 503])
+const NO_ESTA = new Set([404, 410])
+
+/** Nunca se conecta por http: un link o una redirección a http:// se pide por https (si el host no tiene TLS, falla). */
+export const aHttps = (url: string) => url.replace(/^\s*http:\/\//i, 'https://')
+
+export type OpcionesBajar = {
+  max: number
+  /** Para todo: los saltos y la descarga. */
+  tiempoMs: number
+  /** Cuántas redirecciones se siguen. */
+  saltos: number
+  aceptar: (tipo: string) => boolean
+  /** Si pasa del máximo: 'nada' no devuelve nada (una foto a medias no sirve), 'cortar' devuelve lo que llegó. */
+  siSePasa: 'nada' | 'cortar'
+  /** Destinos que no se piden (un muro, la home a la que manda un link roto): con qué se corta. desde es null en el primero. */
+  noPedir?: (url: string, desde: string | null) => Corte | null
+  /** La del pedido que la origina: si el usuario se va, se corta también lo de afuera. */
+  signal?: AbortSignal
+}
+
+/**
+ * Baja algo de afuera: sigue a mano las redirecciones (cada destino tiene que estar permitido; uno a http:// se pide por
+ * https), con un tiempo total, y corta apenas pasa el máximo de bytes: si dice que es más grande, sin bajar nada; si no
+ * lo dice o miente, a medida que llega. Un error de red, de TLS o de tiempo es 'no-carga'. src va tal cual (la foto
+ * http:// de la vista previa sigue sin pedirse, como antes): bajarPagina lo pasa antes por aHttps.
+ */
+export async function bajarDeAfuera(src: string, pedir: Pedir, permitida: (url: string) => boolean, o: OpcionesBajar):
+  Promise<Bajado | Corte> {
+  const tiempo = AbortSignal.timeout(o.tiempoMs)
+  const total = o.signal ? AbortSignal.any([tiempo, o.signal]) : tiempo
   let url = src
-  for (let saltos = 0; saltos < 4; saltos++) {
+  const corte = o.noPedir?.(url, null)
+  if (corte) return corte
+  if (!permitida(url)) return { falla: 'no-permitida', urlProducto: null }
+  for (let salto = 0; ; salto++) {
     // cada pedido se corta aparte al terminar con él (una redirección no deja la conexión colgada), todos con el tiempo total
     const pedido = new AbortController()
     try {
       const r = await pedir(url, AbortSignal.any([total, pedido.signal]))
       const destino = r.header('location')
       if (r.status >= 300 && r.status < 400 && destino) {
-        url = new URL(destino, url).toString()
-        if (!permitida(url)) return null
+        if (salto >= o.saltos) return { falla: 'no-carga', urlProducto: url }
+        const siguiente = aHttps(new URL(destino, url).toString())
+        const corte = o.noPedir?.(siguiente, url)
+        if (corte) return corte
+        if (!permitida(siguiente)) return { falla: 'no-permitida', urlProducto: url }
+        url = siguiente
         continue
       }
-      if (r.status < 200 || r.status >= 300 || !(r.header('content-type') ?? '').startsWith('image/')) return null
-      if (Number(r.header('content-length')) > max) return null
+      if (BLOQUEADA.has(r.status)) return { falla: 'bloqueada', urlProducto: url }
+      if (NO_ESTA.has(r.status)) return { falla: 'no-esta', urlProducto: url }
+      if (r.status !== 200) return { falla: 'no-carga', urlProducto: url }
+      const tipo = r.header('content-type') ?? ''
+      if (!o.aceptar(tipo)) return { falla: 'otro-tipo', urlProducto: url }
+      if (o.siSePasa === 'nada' && Number(r.header('content-length')) > o.max) return { falla: 'no-carga', urlProducto: url }
       const trozos: Uint8Array[] = []
       let bytes = 0
+      let cortado = false
       for await (const trozo of r.cuerpo) {
-        bytes += trozo.byteLength
-        if (bytes > max) return null
+        if (bytes + trozo.byteLength > o.max) {
+          if (o.siSePasa === 'nada') return { falla: 'no-carga', urlProducto: url }
+          trozos.push(trozo.subarray(0, o.max - bytes))
+          bytes = o.max
+          cortado = true
+          break
+        }
         trozos.push(trozo)
+        bytes += trozo.byteLength
       }
-      return Buffer.concat(trozos, bytes)
+      return { datos: Buffer.concat(trozos, bytes), tipo, urlFinal: url, cortado }
     } catch {
-      return null
+      return { falla: 'no-carga', urlProducto: url }
     } finally {
       pedido.abort()
     }
   }
-  return null
+}
+
+const esImagen = (tipo: string) => tipo.startsWith('image/')
+
+/**
+ * Baja una foto: hasta 3 redirecciones, con un tiempo total, y nada si pasa del máximo (ver bajarDeAfuera). Además de la
+ * foto, la URL de la que vino (el placeholder de "imagen no disponible" de ML se reconoce por ahí). Si algo no va, por
+ * qué: otro-tipo es que lo que hay en el link no es una foto (una página, por ejemplo).
+ */
+export async function bajarFotoConUrl(src: string, pedir: Pedir, permitida: (url: string) => boolean, o: {
+  max?: number; tiempoMs?: number; aceptar?: (tipo: string) => boolean; signal?: AbortSignal
+} = {}): Promise<{ datos: Buffer; urlFinal: string } | Corte> {
+  const r = await bajarDeAfuera(src, pedir, permitida, {
+    max: o.max ?? FOTO_MAX_BYTES, tiempoMs: o.tiempoMs ?? FOTO_TIEMPO_MS, saltos: 3, aceptar: o.aceptar ?? esImagen,
+    siSePasa: 'nada', signal: o.signal,
+  })
+  return 'datos' in r ? { datos: r.datos, urlFinal: r.urlFinal } : r
+}
+
+/** Baja una foto (ver bajarFotoConUrl). Null si algo no va. */
+export async function bajarFoto(
+  src: string, pedir: Pedir, permitida: (url: string) => boolean, max = FOTO_MAX_BYTES, tiempoMs = FOTO_TIEMPO_MS,
+  aceptar: (tipo: string) => boolean = esImagen,
+): Promise<Buffer | null> {
+  const r = await bajarFotoConUrl(src, pedir, permitida, { max, tiempoMs, aceptar })
+  return 'datos' in r ? r.datos : null
 }

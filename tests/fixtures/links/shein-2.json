@@ -1,0 +1,24 @@
+{
+ "tienda": "shein",
+ "caso": "us.shein.com: 302 a /risk/action/limit (bloqueo duro)",
+ "urlPegadaPorElUsuario": "https://us.shein.com/x-p-77671994.html",
+ "urlFinal": "https://us.shein.com/risk/action/limit?risk-id=E4936323129900409345",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "shein-risk-limit",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "tienda": "temu",
+ "caso": "temu.com producto activo: SSR con window.rawData (nombre, imagen, precios por SKU), og sin imagen",
+ "urlPegadaPorElUsuario": "https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-stainless-steel-yerba-mate-cup-double-wall--cup-drinkware-g-601099538564934.html",
+ "urlFinal": "https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-stainless-steel-yerba-mate-cup-double-wall--cup-drinkware-g-601099538564934.html",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "Server"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "1pc, Yerba Mate Gourd With Bombilla, Stainless Steel Yerba Mate Cup, Double Wall Traditional Tea Cup, Drinkware",
+  "image": "https://img.kwcdn.com/product/Fancyalgo/VirtualModelMatting/df94c6f34c1fe72c5273db3a2f7397c8.jpg",
+  "price": 7.93,
+  "priceMax": 8.47,
+  "currency": "USD",
+  "goodsId": "601099538564934",
+  "canonicalUrl": "https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-stainless-steel-yerba-mate-cup-double-wall--cup-drinkware-g-601099538564934.html",
+  "generico": {
+   "title": "1pc yerba mate gourd bombilla stainless steel yerba mate cup - Temu",
+   "image": null,
+   "price": null
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "tienda": "samsung",
+ "caso": "página de marketing: JSON-LD inválidos y sin precio",
+ "urlPegadaPorElUsuario": "https://www.samsung.com/ar/smartphones/galaxy-s26-ultra/?modelCode=SM-S948BZKVARO",
+ "urlFinal": "https://www.samsung.com/ar/smartphones/galaxy-s26-ultra/?modelCode=SM-S948BZKVARO",
+ "status": 200,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Samsung Galaxy S26 Ultra",
+  "image": "https://www.samsung.com/ar/smartphones/galaxy-s26-ultra/images/galaxy-s26-ultra-share-image.jpg",
+  "imageHiRes": "https://www.samsung.com/ar/smartphones/galaxy-s26-ultra/images/galaxy-s26-ultra-share-image.jpg",
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

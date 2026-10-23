@@ -1,5 +1,6 @@
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CampoLink } from '@/components/CamposDeseo'
+import { CompletarDesdeLink } from '@/components/CompletarDesdeLink'
 import { FotoField } from '@/components/FotoField'
 import { QueQueres } from '@/components/QueQueres'
 import { Hearts, Icon, PRIORIDADES } from '@/components/ui'
@@ -39,6 +40,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
         </div>
       )}
       <QueQueres defaultValue={deseo?.titulo} agregando={!deseo} />
+      {/* con el link del producto (en "¿Qué querés?" o en "Link a la tienda") completa el nombre, el precio y la foto que estén vacíos */}
+      <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} tituloGuardado={deseo?.titulo ?? null} />
       <FotoField inicial={deseo?.fotoUrl} />
 
       <div role="radiogroup" aria-label="Tipo de deseo" className="gr-segmented">

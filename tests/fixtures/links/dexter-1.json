@@ -1,0 +1,28 @@
+{
+ "tienda": "dexter",
+ "caso": "sin og:title; JSON-LD con image nulls",
+ "urlPegadaPorElUsuario": "https://www.dexter.com.ar/pantalon-nike-sportswear-club-mujer/NIIM8409-010.html",
+ "urlFinal": "https://www.dexter.com.ar/pantalon-nike-sportswear-club-mujer/NIIM8409-010.html",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Pantalón Nike Sportswear Club Mujer",
+  "image": "https://www.dexter.com.ar/on/demandware.static/-/Sites-365-dabra-catalog/default/dwb2e3f88c/products/NIIM8409-010/NIIM8409-010-1.JPG",
+  "imageHiRes": "https://www.dexter.com.ar/on/demandware.static/-/Sites-365-dabra-catalog/default/dwb2e3f88c/products/NIIM8409-010/NIIM8409-010-1.JPG?sw=1600",
+  "price": 169999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "Nike"
+ }
+}

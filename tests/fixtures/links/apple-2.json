@@ -1,0 +1,29 @@
+{
+ "tienda": "apple",
+ "caso": "apple.com/shop/product/<parte> discontinuado: 2 redirects hasta una pagina de BUSQUEDA (no es producto)",
+ "urlPegadaPorElUsuario": "https://www.apple.com/shop/product/MXP63LL/A/airpods-4",
+ "urlFinal": "https://www.apple.com/us/search/AirPods-4?rdt=redirectionFromProductPage&tab=accessories",
+ "status": 200,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-producto",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "Apple",
+   "image": null,
+   "price": null
+  }
+ }
+}

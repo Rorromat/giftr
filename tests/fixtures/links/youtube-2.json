@@ -1,0 +1,24 @@
+{
+ "tienda": "youtube",
+ "caso": "oEmbed publico: https://www.youtube.com/oembed?url=<url>&format=json (JSON)",
+ "urlPegadaPorElUsuario": "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&format=json",
+ "urlFinal": "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&format=json",
+ "status": 200,
+ "contentType": "application/json",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "api-json",
+  "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+  "image": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+  "price": null,
+  "currency": null
+ }
+}

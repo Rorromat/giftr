@@ -1,0 +1,31 @@
+{
+ "tienda": "aliexpress",
+ "caso": "aliexpress.com: 302 a aliexpress.us con OTRO itemId (3256...), og:title + og:image",
+ "urlPegadaPorElUsuario": "https://www.aliexpress.com/item/1005006338930024.html",
+ "urlFinal": "https://www.aliexpress.us/item/3256806152615272.html?gatewayAdapt=glo2usa4itemAdapt&_randl_shipto=US",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "PUAIA Print Men's Pants Autumn/Winter New Sport Jogging Trousers Fitness Loose Fit Clothing Solid Color Outfit Streetwear Pants",
+  "image": "https://ae-pic-a1.aliexpress-media.com/kf/S7807a7a3732b4b23b9ad44b60ba72df2G.png",
+  "price": null,
+  "currency": null,
+  "itemIdPedido": "1005006338930024",
+  "itemIdFinal": "3256806152615272",
+  "generico": {
+   "title": "PUAIA Print Men's Pants Autumn/Winter New Sport Jogging Trousers Fitness Loose Fit Clothing Solid Color Outfit Streetwear Pants - AliExpress 200000343",
+   "image": "https://ae-pic-a1.aliexpress-media.com/kf/S7807a7a3732b4b23b9ad44b60ba72df2G.png",
+   "price": null
+  }
+ }
+}

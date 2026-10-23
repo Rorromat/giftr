@@ -1,0 +1,24 @@
+{
+ "tienda": "aliexpress",
+ "caso": "aliexpress.com: captcha x5 'punish' (200 OK, 2,4 KB, redireccion por JS)",
+ "urlPegadaPorElUsuario": "https://www.aliexpress.com/item/1005006338930024.html",
+ "urlFinal": "https://www.aliexpress.com/item/1005006338930024.html",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "aliexpress-x5-punish",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

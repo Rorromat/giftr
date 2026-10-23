@@ -1,0 +1,30 @@
+{
+ "tienda": "etsy",
+ "caso": "etsy.com/listing: pagina solo con metadatos (og:title + og:image)",
+ "urlPegadaPorElUsuario": "https://www.etsy.com/listing/1628224217/animals-puzzle-with-custom-baby-name",
+ "urlFinal": "https://www.etsy.com/listing/1628224217/animals-puzzle-with-custom-baby-name",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "Animals Puzzle With Custom Baby Name, Personalized Name Puzzle, Zuzu Puzzle Licensed Puzzle, Baby Girl Gift, Baby Boy Gift, Handmade Wooden",
+  "image": "https://i.etsystatic.com/34040842/r/il/a189ac/7166371423/il_1080xN.7166371423_i6n9.jpg",
+  "price": null,
+  "currency": null,
+  "listingId": "1628224217",
+  "generico": {
+   "title": "Animals Puzzle With Custom Baby Name, Personalized Name Puzzle, Zuzu Puzzle Licensed Puzzle, Baby Girl Gift, Baby Boy Gift, Handmade Wooden - Etsy",
+   "image": "https://i.etsystatic.com/34040842/r/il/a189ac/7166371423/il_1080xN.7166371423_i6n9.jpg",
+   "price": null
+  }
+ }
+}

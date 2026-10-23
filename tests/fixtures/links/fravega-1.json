@@ -1,0 +1,26 @@
+{
+ "tienda": "fravega",
+ "caso": "HTML genérico: og de la tienda, nada del producto",
+ "urlPegadaPorElUsuario": "https://www.fravega.com/p/bateria-tramontina-allegra-7pz-661608/",
+ "urlFinal": "https://www.fravega.com/p/bateria-tramontina-allegra-7pz-661608/",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": true,
+  "title": null,
+  "image": null,
+  "imageHiRes": null,
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

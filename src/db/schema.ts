@@ -53,6 +53,15 @@ export const fotosDeseo = pgTable('fotos_deseo', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('fotos_deseo_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
+// Cada vez que un usuario nos hace pedir algo afuera (leer la página del link de un producto, traer su foto): solo
+// para el tope por día y por rato (ver anotarPedidoAfuera). No se guarda el link. Índice por usuario y fecha: el conteo
+// y la limpieza de las de más de un día.
+export const pedidosAfuera = pgTable('pedidos_afuera', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('pedidos_afuera_user_id_created_at_idx').on(t.userId, t.createdAt)])
+
 // Dos tipos de lista:
 // - personal: una por usuario, su dueño es owner_id (único).
 // - grupo: una lista en común ("Nuestra casa"); owner_id queda vacío y sus dueños están en list_members.

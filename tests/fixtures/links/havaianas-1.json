@@ -1,0 +1,39 @@
+{
+ "tienda": "havaianas",
+ "caso": "og:price:amount formateado \"38,999\" (coma de miles)",
+ "urlPegadaPorElUsuario": "https://www.havaianas.com.ar/products/414989top-warner-classics",
+ "urlFinal": "https://havaianas.com.ar/products/414989top-warner-classics",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://havaianas.com.ar/products/414989top-warner-classics",
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  },
+  {
+   "status": 103,
+   "location": null,
+   "contentType": null,
+   "server": null
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Ojotas Havaianas Top Warner Classics Unisex",
+  "image": "https://havaianas.com.ar/cdn/shop/files/4149890-top-warner-classics-0090-0.png?v=1789147993&width=1920",
+  "imageHiRes": "https://havaianas.com.ar/cdn/shop/files/4149890-top-warner-classics-0090-0.png?v=1789147993&width=1920",
+  "price": 38999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

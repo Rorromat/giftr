@@ -1,0 +1,24 @@
+{
+ "tienda": "airbnb",
+ "caso": "airbnb.com: 200 'Redirigiendo a es.airbnb.com' (form POST autoenviado)",
+ "urlPegadaPorElUsuario": "https://www.airbnb.com/rooms/5931067",
+ "urlFinal": "https://www.airbnb.com/rooms/5931067",
+ "status": 200,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion-form",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

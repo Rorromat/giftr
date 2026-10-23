@@ -1,0 +1,25 @@
+{
+ "tienda": "acortador",
+ "caso": "youtu.be/<id>: 303 a youtube.com/watch?v=<id>&feature=youtu.be",
+ "urlPegadaPorElUsuario": "https://youtu.be/dQw4w9WgXcQ",
+ "urlFinal": "https://youtu.be/dQw4w9WgXcQ",
+ "status": 303,
+ "contentType": "application/binary",
+ "cadenaDeRespuestas": [
+  {
+   "status": 303,
+   "location": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be",
+   "contentType": "application/binary",
+   "server": "ESF"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be"
+ }
+}

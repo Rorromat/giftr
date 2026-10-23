@@ -6,7 +6,7 @@ import { fotosDeseo, items, lists } from '@/db/schema'
 import { createItem } from '@/lib/items'
 import { getListForViewer } from '@/lib/lists'
 import { esUrlFotoDeseo, FOTOS_POR_DIA, guardarFotoDeseo, leerFotoDeseo, procesarFotoDeseo, quedanFotos } from '@/lib/fotos-deseo'
-import { alPegarImagen, estadoDelLink, porQueEsperar } from '@/lib/foto-del-form'
+import { aceptaFotoPropuesta, alPegarImagen, estadoDelLink, porQueEsperar } from '@/lib/foto-del-form'
 
 // La subida (POST /api/deseo/foto) con la base en PGlite y la sesión simulada.
 const h = vi.hoisted(() => ({ db: undefined as unknown as Db, session: null as { userId: string } | null }))
@@ -97,7 +97,7 @@ test('al subir se borran las fotos propias de más de un día que ningún deseo 
 })
 
 test('el formulario no se manda mientras sube una foto o prueba un link, también el pegado con el botón Pegar', () => {
-  const sin = { subiendo: false, probandoPegado: false, subida: false, estado: null }
+  const sin = { subiendo: false, probandoPegado: false, trayendo: false, subida: false, estado: null }
   expect(porQueEsperar(sin)).toBeNull()
   expect(porQueEsperar({ ...sin, subiendo: true })).toBe('subiendo')
   // el link copiado todavía no está en el campo (se pone si carga como foto): antes se mandaba sin la foto
@@ -109,6 +109,26 @@ test('el formulario no se manda mientras sube una foto o prueba un link, tambié
   expect(porQueEsperar({ ...sin, estado: 'ok' })).toBeNull()
   // con una foto subida, lo escrito en el link no cuenta
   expect(porQueEsperar({ ...sin, subida: true, estado: 'no-es-foto' })).toBeNull()
+  // la foto del producto del link que se está trayendo (9 s como mucho) también frena, aunque haya una de antes
+  expect(porQueEsperar({ ...sin, trayendo: true })).toBe('trayendo')
+  expect(porQueEsperar({ ...sin, trayendo: true, subida: true })).toBe('trayendo')
+  expect(porQueEsperar({ ...sin, trayendo: true, estado: 'ok' })).toBe('trayendo')
+  // lo que hizo el dueño se dice primero
+  expect(porQueEsperar({ ...sin, trayendo: true, subiendo: true })).toBe('subiendo')
+  expect(porQueEsperar({ ...sin, trayendo: true, probandoPegado: true })).toBe('probando')
+})
+
+test('la foto del link del producto se toma solo si no hay una que eligió el dueño, ni una subida en curso', () => {
+  const nada = { hayFoto: false, dePropuesta: false, subiendo: false }
+  expect(aceptaFotoPropuesta(nada)).toBe(true)
+  // una subida propia, un link escrito o la guardada al editar: todas son hayFoto sin dePropuesta
+  expect(aceptaFotoPropuesta({ ...nada, hayFoto: true })).toBe(false)
+  // la que trajo otro link y nadie tocó se cambia (si no, quedaba la del producto anterior)
+  expect(aceptaFotoPropuesta({ ...nada, hayFoto: true, dePropuesta: true })).toBe(true)
+  // mientras sube una foto, gana esa
+  expect(aceptaFotoPropuesta({ ...nada, subiendo: true })).toBe(false)
+  expect(aceptaFotoPropuesta({ ...nada, hayFoto: true, dePropuesta: true, subiendo: true })).toBe(false)
+  // mientras se prueba lo copiado con Pegar ya no se rechaza (se perdía): si era una foto, Pegar la pone después y gana
 })
 
 test('la subida: con el cupo lleno, 429 antes de procesar la foto', async () => {

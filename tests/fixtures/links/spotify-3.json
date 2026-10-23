@@ -1,0 +1,24 @@
+{
+ "tienda": "spotify",
+ "caso": "oEmbed publico: https://open.spotify.com/oembed?url=<url> (JSON)",
+ "urlPegadaPorElUsuario": "https://open.spotify.com/oembed?url=https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+ "urlFinal": "https://open.spotify.com/oembed?url=https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
+ "status": 200,
+ "contentType": "application/json",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "api-json",
+  "title": "Never Gonna Give You Up",
+  "image": "https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02baf89eb11ec7c657805d2da0",
+  "price": null,
+  "currency": null
+ }
+}

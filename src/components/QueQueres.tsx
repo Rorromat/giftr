@@ -5,6 +5,7 @@ import { CampoTitulo } from '@/components/CamposDeseo'
 import { ID_ELEGIR_FOTO } from '@/components/FotoField'
 import { Icon } from '@/components/ui'
 import { avisoDelTitulo } from '@/lib/deseo-form'
+import { linkEnTexto, linkHttp } from '@/lib/links'
 
 /** Para arrancar sin link: el título de la idea y la categoría que le va. */
 const IDEAS = [
@@ -27,12 +28,12 @@ export function QueQueres({ defaultValue, agregando }: { defaultValue?: string; 
   const [vacio, setVacio] = useState(!defaultValue)
   const [sinCopiar, setSinCopiar] = useState(false)
 
-  function poner(titulo: string) {
+  function poner(titulo: string, enfocar = true) {
     const input = campo.current!
     input.value = titulo
     input.setCustomValidity(avisoDelTitulo(titulo, null))
     setVacio(!titulo.trim())
-    input.focus()
+    if (enfocar) input.focus()
   }
 
   async function pegar() {
@@ -43,7 +44,13 @@ export function QueQueres({ defaultValue, agregando }: { defaultValue?: string; 
       // sin permiso o sin soporte: el mismo aviso que sin nada copiado
     }
     setSinCopiar(!copiado)
-    if (copiado) poner(copiado)
+    if (!copiado) return
+    // Con un link no se enfoca: el autocompletado no escribe el título mientras el dueño está ahí, y el nombre del producto
+    // quedaba esperando a que lo dejara (además de abrir el teclado sin que haga falta).
+    const conLink = !!(linkHttp(copiado) ?? linkEnTexto(copiado))
+    poner(copiado, !conLink)
+    // como un pegado: el autocompletado busca el link en el momento (ver CompletarDesdeLink)
+    campo.current!.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: copiado }))
   }
 
   function idea(titulo: string, categoria: string) {

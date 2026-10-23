@@ -1,0 +1,24 @@
+{
+ "tienda": "youtube",
+ "caso": "youtube.com/watch desde IP de datacenter: 302 a google.com/sorry -> 429",
+ "urlPegadaPorElUsuario": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+ "urlFinal": "https://www.google.com/sorry/index?continue=https://www.youtube.com/watch%3Fv%3DdQw4w9WgXcQ&q=x",
+ "status": 429,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "google-sorry-429",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

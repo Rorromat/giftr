@@ -1,0 +1,25 @@
+{
+ "tienda": "acortador",
+ "caso": "s.click.aliexpress.com/e/_<code>: 302 a star.aliexpress.com/share/share.htm?...&redirectUrl=<url del item>",
+ "urlPegadaPorElUsuario": "https://s.click.aliexpress.com/e/_EuGprMV",
+ "urlFinal": "https://s.click.aliexpress.com/e/_EuGprMV",
+ "status": 302,
+ "contentType": null,
+ "cadenaDeRespuestas": [
+  {
+   "status": 302,
+   "location": "https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&shareId=60833475765&redirectUrl=https%3A%2F%2Fwww.aliexpress.com%2Fitem%2F1005007519345794.html%3FbusinessType%3DProductDetail%26srcSns%3Dsns_Copy%26spreadType%3DsocialShare%26bizType%3DProductDetail%26social_params%3D60833475765&aff_fcid=e19fd8a788e5482e9e0f83090aa41556-1792677920139-05921-_EuGprMV&tt=CPS_NORMAL&aff_fsk=_EuGprMV&aff_platform=shareComponent-detail&sk=_EuGprMV&aff_trace_key=e19fd8a788e5482e9e0f83090aa41556-1792677920139-05921-_EuGprMV&terminal_id=16f9b921c042404a8003ee828bb76f16",
+   "contentType": null,
+   "server": "Tengine"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://www.aliexpress.com/item/1005007519345794.html"
+ }
+}

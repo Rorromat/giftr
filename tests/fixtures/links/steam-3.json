@@ -1,0 +1,31 @@
+{
+ "tienda": "steam",
+ "caso": "Cyberpunk 2077 con ?cc=ar: pagina completa con precio regional de Argentina (USD, en oferta -70%)",
+ "urlPegadaPorElUsuario": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/",
+ "urlFinal": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/?cc=ar",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "Cyberpunk 2077",
+  "image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1091500/f5283a1d1a2a44b9b67a861cc2e047859557a872/capsule_616x353_alt_assets_9.jpg?t=1792663801",
+  "price": 13.49,
+  "currency": "USD",
+  "discountPercent": 70,
+  "appId": "1091500",
+  "generico": {
+   "title": "Ahorra un 70 % en «Cyberpunk 2077» en Steam",
+   "price": "13.49",
+   "currency": "USD"
+  }
+ }
+}

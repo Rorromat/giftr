@@ -1,0 +1,27 @@
+{
+ "tienda": "romaobjetos",
+ "caso": "tienda chica; relacionado con nombre casi igual y mismo precio",
+ "urlPegadaPorElUsuario": "https://www.romaobjetos.com/productos/maceta-duomo-grande/",
+ "urlFinal": "https://www.romaobjetos.com/productos/maceta-duomo-grande/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "MACETA DUOMO GRANDE",
+  "image": "https://acdn-us.mitiendanube.com/stores/116/506/products/roma-x-paar_2103247478-3ec64337d62a7aa96117123279187195-480-0.webp",
+  "imageHiRes": "https://acdn-us.mitiendanube.com/stores/116/506/products/roma-x-paar_2103247478-3ec64337d62a7aa96117123279187195-1024-1024.webp",
+  "price": 88000,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

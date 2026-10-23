@@ -25,14 +25,46 @@ export function estadoDelLink(escrito: string, guardado: string | null, probados
 /**
  * Por qué el formulario todavía no se puede mandar (null si se puede). Mientras sube una foto o se prueba un link, escrito o
  * copiado con Pegar, el deseo se guardaría sin la foto; con un link que no es una foto, se mandaría sin foto y el que lo
- * escribió no se entera. Con una foto subida, lo escrito en el link ya no cuenta (la subida lo vacía).
+ * escribió no se entera. Con una foto subida, lo escrito en el link ya no cuenta (la subida lo vacía). Mientras se trae la
+ * foto del producto del link (trayendo), también: son 9 s como mucho (TRAER_FOTO_MS). La lectura del link, en cambio,
+ * nunca frena.
  */
-export function porQueEsperar(p: { subiendo: boolean; probandoPegado: boolean; subida: boolean; estado: EstadoLink | null }):
-  'subiendo' | Exclude<EstadoLink, 'ok'> | null {
+export function porQueEsperar(p: { subiendo: boolean; probandoPegado: boolean; trayendo: boolean; subida: boolean; estado: EstadoLink | null }):
+  'subiendo' | 'trayendo' | Exclude<EstadoLink, 'ok'> | null {
   if (p.subiendo) return 'subiendo'
   if (p.probandoPegado) return 'probando'
+  if (p.trayendo) return 'trayendo'
   if (p.subida || p.estado === 'ok') return null
   return p.estado
+}
+
+/** Traer la foto del producto del link: el pedido al servidor y, si no pudo, la prueba en el navegador, todo junto. */
+export const TRAER_FOTO_MS = 9000
+
+/**
+ * Si el campo de foto toma la que propone la lectura del link del producto: solo si no hay una que eligió el dueño (subida,
+ * pegada, un link escrito o la que ya estaba guardada al editar) y no está subiendo una. La que vino de una propuesta
+ * anterior y nadie tocó (dePropuesta) sí se cambia: si no, al cambiar de link quedaba la foto del producto anterior.
+ * Mientras se prueba lo copiado con Pegar, también: si resulta ser una foto gana esa, y si no (lo más común es que sea el
+ * link del producto), queda la propuesta.
+ */
+export function aceptaFotoPropuesta(p: { hayFoto: boolean; dePropuesta: boolean; subiendo: boolean }): boolean {
+  return !p.subiendo && (!p.hayFoto || p.dePropuesta)
+}
+
+/**
+ * Qué hace el campo de foto con lo que propone la lectura del link (src; null: el producto no tiene foto). anterior: la
+ * última propuesta que tomó. Si no la acepta (aceptaFotoPropuesta), nada. La misma que ya está o que se está trayendo
+ * (el mismo producto, pegado de nuevo) no se trae dos veces: cada una gasta un pedido del tope y una foto del cupo. Una
+ * nueva se trae. Null saca la que vino de otra propuesta (o la que se estaba trayendo): no es de este producto.
+ */
+export function queHacerConPropuesta(p: {
+  src: string | null; anterior: string | null; trayendo: boolean; hayFoto: boolean; dePropuesta: boolean; subiendo: boolean
+}): 'traer' | 'sacar' | 'nada' {
+  if (!aceptaFotoPropuesta(p)) return 'nada'
+  if (p.src === p.anterior && (p.trayendo || p.hayFoto)) return 'nada'
+  if (p.src) return 'traer'
+  return p.hayFoto || p.trayendo ? 'sacar' : 'nada'
 }
 
 /**

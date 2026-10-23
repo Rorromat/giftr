@@ -1,0 +1,24 @@
+{
+ "tienda": "zara",
+ "caso": "zara.com: challenge Akamai Bot Manager (200 OK, meta refresh a ?bm-verify=...)",
+ "urlPegadaPorElUsuario": "https://www.zara.com/us/en/basic-heavyweight-t-shirt--03-p01887410.html",
+ "urlFinal": "https://www.zara.com/us/en/basic-heavyweight-t-shirt--03-p01887410.html",
+ "status": 200,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-bm-verify",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

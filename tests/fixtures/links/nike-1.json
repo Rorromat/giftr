@@ -1,0 +1,30 @@
+{
+ "tienda": "nike",
+ "caso": "nike.com/t/<slug>/<estilo>: 301 al slug nuevo, JSON-LD ProductGroup con precio + __NEXT_DATA__",
+ "urlPegadaPorElUsuario": "https://www.nike.com/t/air-force-1-07-mens-shoes-jBrhbr/CW2288-111",
+ "urlFinal": "https://www.nike.com/t/air-force-1-07-mens-shoes-DZejrQoC/CW2288-111",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "Nike Air Force 1 '07 Men's Shoes",
+  "image": "https://static.nike.com/a/images/t_default/u_9ddf04c7-2a9a-4d76-add1-d15af8f0263d,c_scale,fl_relative,w_1.0,h_1.0,fl_layer_apply/b7d9211c-26e7-431a-ac24-b0540fb3c00f/AIR+FORCE+1+%2707.png",
+  "price": 115,
+  "currency": "USD",
+  "canonicalUrl": "https://www.nike.com/t/air-force-1-07-mens-shoes-DZejrQoC",
+  "generico": {
+   "title": "Nike Air Force 1 '07 Men's Shoes",
+   "price": "115",
+   "currency": "USD"
+  }
+ }
+}

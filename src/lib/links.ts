@@ -1,4 +1,4 @@
-import { LARGO } from '@/lib/limites'
+import { LARGO, recortar } from '@/lib/limites'
 
 // Links escritos o pegados a mano (el de la tienda, el de una foto, uno pegado en el título). Sin dependencias: lo usan
 // también los formularios en el navegador.
@@ -26,6 +26,49 @@ export function linkHttp(valor: string): string | null {
   }
 }
 
+/**
+ * Sin las c del final ("/p//" → "/p"). Letra por letra desde el final: con /\/+$/, una racha larga que no está al final
+ * ("a////b") hacía que la regex, desde cada una, recorriera todas las que siguen (el cuadrado del largo).
+ */
+export function sinAlFinal(s: string, c: string): string {
+  let fin = s.length
+  while (fin > 0 && s[fin - 1] === c) fin--
+  return s.slice(0, fin)
+}
+
+/** El host en minúsculas y sin los puntos del final: "localhost." y "db.internal." son los mismos nombres que sin el punto. */
+export const hostSinPunto = (host: string) => sinAlFinal(host.toLowerCase(), '.')
+
+// Lo más largo que puede ser un nombre en el DNS
+const HOST_MAX_CHARS = 253
+
+/**
+ * ¿Se puede ir a buscar esto desde el servidor (una foto, la página de un producto)? Solo https al puerto 443 de un host
+ * con nombre (nada de IPs, localhost ni nombres internos, tampoco con un punto al final): los links los pega cualquiera y
+ * no queremos pedidos a la red interna. Esto mira el texto; al conectarse, bajarDeAfuera revisa además a qué IP resuelve.
+ */
+export function esUrlPublica(url: string): boolean {
+  let u: URL
+  try { u = new URL(url) } catch { return false }
+  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
+  const h = hostSinPunto(u.hostname)
+  // URL acepta "a....b" y un host de cualquier largo: ninguno se resuelve, y así nada de lo que sigue los recorre
+  if (h.length > HOST_MAX_CHARS || h.includes('..')) return false
+  if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
+  if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
+  return true
+}
+
+/** La home: path "/" sin nada más. Ahí no hay un producto (y a la home manda un link corto roto). */
+export function esHome(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.pathname === '/' && !u.search
+  } catch {
+    return false
+  }
+}
+
 /** Para el título de un deseo que era solo un link: el sitio, legible ("mercadolibre.com.ar"), para que el dueño lo cambie. */
 export function sitioDeLink(link: string): string {
   try {
@@ -33,6 +76,86 @@ export function sitioDeLink(link: string): string {
   } catch {
     return link
   }
+}
+
+// MercadoLibre de cada país (con o sin subdominio), MercadoLivre de Brasil y los links cortos. Con $: un host parecido
+// (mercadolibre.com.ar.otro.com) no es de MercadoLibre.
+const HOST_ML = /^(?:[a-z0-9-]+\.)?mercadoli(?:bre\.(?:com\.ar|com\.mx|cl|com\.co|com\.uy|com\.pe|com\.ve|com\.ec|com)|vre\.com\.br)$|^(?:www\.)?meli\.la$/
+
+/** Si el host es de MercadoLibre (o de sus links cortos). Sin el punto final ni mayúsculas que cambien el nombre. */
+export const esHostDeMercadoLibre = (host: string) => HOST_ML.test(hostSinPunto(host))
+
+// Dónde está el nombre en el link de cada tienda. En MercadoLibre, solo sus formas: el resto de sus links (tiendas,
+// listados, clips) no traen el nombre de un producto.
+const SLUG_ML = [
+  /\/M[A-Z]{2}-?\d+-(.+?)-_JM/i, // publicación: /MLA-1418506688-mate-de-algarrobo-_JM
+  /\/([^/]+)\/p\/M[A-Z]{2}\d+/i, // catálogo
+  /\/([^/]+)\/up\/M[A-Z]{2}U\d+/i, // user product
+]
+const SLUG_TIENDA = [
+  /\/products\/([^/]+)/, // Shopify
+  /\/productos\/([^/]+)/, // Tiendanube
+  /\/producto\/([^/_]+)/, // WooCommerce y Megatone (que sigue con _MKT0278BGH)
+  /\/([^/]+)\/p\/?$/, // VTEX
+  /\/p\/([^/]+)/, // Frávega
+  /\/t\/([^/]+)/, // Nike
+  /\/listing\/\d+\/([^/]+)/, // Etsy
+  /\/([^/]+)\/dp\/[A-Z0-9]{10}/i, // Amazon
+  /\/([^/]+)-p-\d+\.html$/, // Shein
+  /\/([^/]+)-g-\d+\.html$/, // Temu
+]
+// La extensión, con el idioma que algunas le ponen antes (Booking: "alvear-palace.es-ar.html")
+const EXTENSION = /(?:\.[a-z]{2}(?:[-_][a-z]{2})?)?\.[a-z0-9]{1,5}$/i
+// El idioma o el país de la tienda ("en_us" en H&M, "es-ar", "ar"): no es el nombre de nada. Dos letras después del
+// separador, como el país: con tres, "el-sur" o "la-paz" (el nombre de un libro o de un vino) dejaban el link sin nombre
+const IDIOMA_O_PAIS = /^[a-z]{2}(?:[-_][a-z]{2})?$/i
+
+/** Un token que no es parte del nombre: un código o número largo (MKT0278BGH, cw2288, 2014), el JM de ML o algo enorme. */
+function esCodigo(t: string): boolean {
+  const digitos = t.replace(/\D/g, '').length
+  return digitos >= 4 || (digitos > 0 && /\p{L}/u.test(t) && t.length >= 6) || t.toLowerCase() === 'jm' || t.length > 30
+}
+
+/**
+ * El nombre del producto que trae el link, para el título mientras no haya otro ("…/MLA-123-mate-imperial-_JM" → "Mate
+ * imperial"). Es un borrador que el dueño corrige: sale sin tildes ni puntos ("12 litros"). Null si el link no lo trae
+ * (la home, un link que es solo un id, una sola palabra). Sin regex que tarden más que el largo del link.
+ */
+export function tituloDelLink(link: string): string | null {
+  let u: URL
+  try { u = new URL(link) } catch { return null }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+  const ml = esHostDeMercadoLibre(u.hostname)
+  for (const patron of ml ? SLUG_ML : SLUG_TIENDA) {
+    const slug = patron.exec(u.pathname)?.[1]
+    if (slug) return nombreDeSlug(slug)
+  }
+  if (ml) return null
+  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión (sin contar los del idioma o el
+  // país). Si ese es el código del producto, con letras y números o un número con extensión ("…/pantalon-nike-club-mujer/
+  // NIIM8409-010.html", "…/chatitas/401287.html"), el de antes. Un número suelto ("…/electrodomesticos-cocina/123456") o
+  // una palabra ("…/heladeras-y-freezers/whirlpool.html") no: el de antes suele ser la categoría, y es mejor el nombre del
+  // sitio que el de otra cosa.
+  const pedazos = u.pathname.split('/').filter((p) => p && !IDIOMA_O_PAIS.test(p.replace(EXTENSION, '')))
+  const ultimo = pedazos[pedazos.length - 1] ?? ''
+  const sinExtension = ultimo.replace(EXTENSION, '')
+  const nombre = nombreDeSlug(sinExtension)
+  const esCodigoDelProducto = /\d/.test(sinExtension) && (/\p{L}/u.test(sinExtension) || sinExtension !== ultimo)
+  if (nombre || pedazos.length < 2 || !esCodigoDelProducto) return nombre
+  return nombreDeSlug(pedazos[pedazos.length - 2].replace(EXTENSION, ''))
+}
+
+/** "mate-imperial-de-calabaza-MKT0278" → "Mate imperial de calabaza"; null si no quedan al menos dos palabras. */
+function nombreDeSlug(slug: string): string | null {
+  let texto = slug
+  try { texto = decodeURIComponent(slug) } catch { /* un % suelto: queda como vino */ }
+  const tokens = texto.replace(/[-_+]/g, ' ').split(/\s+/).filter(Boolean)
+  const quedan = tokens.filter((t) => !esCodigo(t))
+  const palabras = quedan.filter((t) => (t.match(/\p{L}/gu)?.length ?? 0) >= 2).length
+  // si se descartó más de la mitad, lo que queda no es el nombre
+  if (palabras < 2 || (tokens.length - quedan.length) * 2 > tokens.length) return null
+  const nombre = quedan.join(' ')
+  return recortar(nombre.charAt(0).toUpperCase() + nombre.slice(1), LARGO.titulo) || null
 }
 
 const LINK_EN_TEXTO = /(?:https?:\/\/|www\.)\S+/i

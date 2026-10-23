@@ -1,0 +1,31 @@
+{
+ "tienda": "steam",
+ "caso": "store.steampowered.com/app/<id>/<slug>/: og + meta itemprop price (precio segun IP: EE.UU.)",
+ "urlPegadaPorElUsuario": "https://store.steampowered.com/app/1145360/Hades/",
+ "urlFinal": "https://store.steampowered.com/app/1145360/Hades/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "Hades",
+  "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1145360/capsule_616x353.jpg?t=1758127023",
+  "price": 24.99,
+  "currency": "USD",
+  "appId": "1145360",
+  "canonicalUrl": "https://store.steampowered.com/app/1145360/Hades/",
+  "generico": {
+   "title": "«Hades» en Steam",
+   "price": "24.99",
+   "currency": "USD"
+  }
+ }
+}

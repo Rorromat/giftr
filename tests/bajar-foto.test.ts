@@ -1,40 +1,25 @@
-import { expect, test, vi } from 'vitest'
-import type { LookupAddress } from 'node:dns'
+import { afterEach, expect, test, vi } from 'vitest'
+import dns, { type LookupAddress } from 'node:dns'
 import https from 'node:https'
-import { bajarFoto, esIpPublica, lookupPublico, pedirAfuera, type Pedir, type Resolver, type Respuesta } from '@/lib/bajar-foto'
+import {
+  bajarFoto, bajarFotoConUrl, esIpPublica, lookupPublico, pedirAfuera, resolverDeAfuera, UA_GIFTR, type Resolver,
+} from '@/lib/bajar-foto'
 import { esFotoPublica } from '@/lib/compartir'
+import { MB, servidor } from './helpers'
 
 // La foto de la vista previa la baja el servidor desde un link que carga cualquiera.
 
-const MB = 1024 * 1024
 const permitida = () => true
 
-/** Un servidor de mentira: contesta lo que le digan y cuenta los bytes que entregó. Respeta la señal, como el de verdad. */
-function servidor(respuestas: Record<string, { status?: number; headers?: Record<string, string>; trozos?: number; demora?: number }>) {
-  const pedidos: { url: string; signal: AbortSignal }[] = []
-  let entregados = 0
-  const pedir: Pedir = async (url, signal) => {
-    pedidos.push({ url, signal })
-    const r = respuestas[url]
-    if (!r) throw new Error(`no esperaba ${url}`)
-    if (r.demora) {
-      await new Promise<void>((ok, mal) => {
-        const t = setTimeout(ok, r.demora)
-        signal.addEventListener('abort', () => { clearTimeout(t); mal(signal.reason) })
-      })
-    }
-    async function* cuerpo() {
-      for (let n = 0; n < (r!.trozos ?? Infinity); n++) {
-        if (signal.aborted) throw signal.reason
-        await new Promise((ok) => setTimeout(ok, 0))
-        entregados += MB
-        yield new Uint8Array(MB)
-      }
-    }
-    const headers = Object.fromEntries(Object.entries(r.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]))
-    return { status: r.status ?? 200, header: (k) => headers[k.toLowerCase()] ?? null, cuerpo: cuerpo() } satisfies Respuesta
-  }
-  return { pedir, pedidos, entregados: () => entregados }
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** El DNS de mentira (c-ares): lo que contesta a A y a AAAA por host; lo que no conoce no existe. */
+function dnsDeMentira(v4: Record<string, string[]>, v6: Record<string, string[]> = {}) {
+  const sinDatos = (host: string) => Promise.reject(Object.assign(new Error(`sin datos para ${host}`), { code: 'ENODATA' }))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve4').mockImplementation(async (host: string) => v4[host] ?? sinDatos(host))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve6').mockImplementation(async (host: string) => v6[host] ?? sinDatos(host))
 }
 
 const jpg = { 'content-type': 'image/jpeg' }
@@ -83,6 +68,27 @@ test('las redirecciones: cada destino se revisa, como mucho 3, y el tiempo es un
   expect(Date.now() - antes).toBeLessThan(450)
 })
 
+test('una redirección a http:// se sigue por https; solo un 200 es la foto; y se sabe de dónde vino', async () => {
+  const s = servidor({
+    'https://cdn.com/a.jpg': { status: 302, headers: { location: 'http://fotos.cdn.com/a.jpg' } },
+    'https://fotos.cdn.com/a.jpg': { headers: jpg, trozos: 1 },
+    'https://cdn.com/parcial.jpg': { status: 206, headers: jpg, trozos: 1 },
+    'https://cdn.com/binario': { headers: { 'content-type': 'application/octet-stream' }, trozos: 1 },
+  })
+  expect(await bajarFotoConUrl('https://cdn.com/a.jpg', s.pedir, esFotoPublica)).toMatchObject({ urlFinal: 'https://fotos.cdn.com/a.jpg' })
+  expect(s.pedidos.map((p) => p.url)).not.toContain('http://fotos.cdn.com/a.jpg')
+  // una foto http:// de entrada sigue como antes: no es pública, no se pide (ni por https)
+  const antes = s.pedidos.length
+  expect(await bajarFoto('http://fotos.cdn.com/a.jpg', s.pedir, esFotoPublica)).toBeNull()
+  expect(s.pedidos).toHaveLength(antes)
+  expect(await bajarFoto('https://cdn.com/parcial.jpg', s.pedir, esFotoPublica)).toBeNull()
+  // lo que no dice image/* no es una foto, salvo que quien llama acepte más (después lo decide sharp)
+  expect(await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica)).toBeNull()
+  expect(await bajarFotoConUrl('https://cdn.com/binario', s.pedir, esFotoPublica)).toEqual({ falla: 'otro-tipo', urlProducto: 'https://cdn.com/binario' })
+  const binario = (t: string) => t.startsWith('image/') || t === 'application/octet-stream'
+  expect((await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica, 8 * MB, 5000, binario))?.length).toBe(MB)
+})
+
 test('fotos de afuera: el host con un punto al final es el mismo nombre', () => {
   for (const no of [
     'https://localhost./a.jpg', 'https://LOCALHOST./a.jpg', 'https://metadata.google.internal./x', 'https://foo.local./a.jpg',
@@ -125,8 +131,33 @@ test('al conectarse se revisa a qué IP resuelve el nombre (un nombre público q
 })
 
 test('la descarga de afuera usa ese control en la conexión misma', async () => {
-  // localhost resuelve sin red: sin el control sería "conexión rechazada"; con él, ni se conecta
-  await expect(pedirAfuera('https://localhost:1/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('no es una dirección pública')
+  // un nombre que el DNS manda a 127.0.0.1: sin el control sería "conexión rechazada"; con él, ni se conecta
+  dnsDeMentira({ 'fotos.ejemplo.com': ['127.0.0.1'] })
+  await expect(pedirAfuera('https://fotos.ejemplo.com:1/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('no es una dirección pública')
+})
+
+test('el DNS se pregunta sin dns.lookup (que ocupa el threadpool): IPv4 primero, y con una familia alcanza', async () => {
+  const sistema = vi.spyOn(dns, 'lookup')
+  dnsDeMentira({ 'a.com': ['200.45.12.3'], 'b.com': ['8.8.8.8'] }, { 'a.com': ['2800:3f0:4002:80b::200e'], 'c.com': ['2800:3f0:4002:80b::200e'] })
+  const resolver = (host: string) => new Promise((ok) => resolverDeAfuera()(host, (err, dirs) => ok(err ? err.code : dirs)))
+  expect(await resolver('a.com')).toEqual([{ address: '200.45.12.3', family: 4 }, { address: '2800:3f0:4002:80b::200e', family: 6 }])
+  expect(await resolver('b.com')).toEqual([{ address: '8.8.8.8', family: 4 }])
+  expect(await resolver('c.com')).toEqual([{ address: '2800:3f0:4002:80b::200e', family: 6 }])
+  expect(await resolver('no-existe.com')).toBe('ENODATA')
+  expect(sistema).not.toHaveBeenCalled()
+})
+
+test('si el pedido se corta, la pregunta al DNS se cancela (no queda esperando a un DNS que no contesta)', async () => {
+  const colgadas: (() => void)[] = []
+  const colgada = () => new Promise<string[]>((_, mal) => colgadas.push(() => mal(Object.assign(new Error('cancelada'), { code: 'ECANCELLED' }))))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve4').mockImplementation(colgada)
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve6').mockImplementation(colgada)
+  const cancelar = vi.spyOn(dns.promises.Resolver.prototype, 'cancel').mockImplementation(() => colgadas.splice(0).forEach((f) => f()))
+  const pedido = new AbortController()
+  const respuesta = new Promise((ok) => resolverDeAfuera(pedido.signal)('lento.com', (err) => ok(err?.code)))
+  pedido.abort()
+  expect(await respuesta).toBe('ECANCELLED')
+  expect(cancelar).toHaveBeenCalledTimes(1)
 })
 
 test('la descarga de afuera se presenta: sin User-Agent hay hosts de fotos (Wikimedia) que contestan 403', async () => {
@@ -137,7 +168,8 @@ test('la descarga de afuera se presenta: sin User-Agent hay hosts de fotos (Wiki
   })
   try {
     await expect(pedirAfuera('https://upload.wikimedia.org/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('sin red')
-    expect(opciones?.headers).toMatchObject({ 'user-agent': expect.stringMatching(/\S/), accept: 'image/*' })
+    // el mismo bot que lee las páginas de producto (ver pagina-de-afuera.test.ts)
+    expect(opciones?.headers).toMatchObject({ 'user-agent': UA_GIFTR, accept: 'image/*' })
   } finally {
     espia.mockRestore()
   }

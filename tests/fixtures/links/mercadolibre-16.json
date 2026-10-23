@@ -1,0 +1,25 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "link corto meli.la: 301 con Location (sin muro)",
+ "urlPegadaPorElUsuario": "https://meli.la/2abcXYZ",
+ "urlFinal": "https://meli.la/2abcXYZ",
+ "status": 301,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://auto.mercadolibre.com.mx/MLM-751347026-nissan-altima-25-advance-mt-sedan-2014-_JM",
+   "contentType": "text/html; charset=utf-8",
+   "server": "Tengine"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "redirect": true,
+  "location": "https://auto.mercadolibre.com.mx/MLM-751347026-nissan-altima-25-advance-mt-sedan-2014-_JM",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

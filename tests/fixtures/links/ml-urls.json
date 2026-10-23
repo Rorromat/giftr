@@ -1,0 +1,95 @@
+{
+ "descripcion": "Formas reales de links de MercadoLibre vistas el 2026-10-22 y lo que se puede sacar SIN pedir nada a la red. siteId -> moneda por defecto: MLA=ARS, MLM=MXN, MLB=BRL (en MLA hay publicaciones en USD: inmuebles, algunos autos).",
+ "casos": [
+  {
+   "url": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM",
+   "tipo": "item",
+   "siteId": "MLA",
+   "itemId": "MLA1418506688",
+   "slugTitle": "mate de algarrobo premium artesanal con bombilla"
+  },
+  {
+   "url": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM?searchVariation=177727121268#polycard_client=search-nordic",
+   "tipo": "item",
+   "siteId": "MLA",
+   "itemId": "MLA1418506688"
+  },
+  {
+   "url": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM?matt_tool=12345678&matt_word=giftr&forceInApp=true",
+   "tipo": "item",
+   "siteId": "MLA",
+   "itemId": "MLA1418506688"
+  },
+  {
+   "url": "https://www.mercadolibre.com.ar/termo-original-stanley-mate-system-12-litros-rosa/p/MLA39939183",
+   "tipo": "catalogo",
+   "siteId": "MLA",
+   "catalogProductId": "MLA39939183",
+   "slugTitle": "termo original stanley mate system 12 litros rosa"
+  },
+  {
+   "url": "https://www.mercadolibre.com.ar/canasta-matera-eco-cuero-portatermo-practica-y-resistente/up/MLAU3409701436?pdp_filters=item_id%3AMLA2324526514#polycard_client=mshops-appearance-api&wid=MLA2324526514",
+   "tipo": "user_product",
+   "siteId": "MLA",
+   "userProductId": "MLAU3409701436",
+   "itemId": "MLA2324526514",
+   "slugTitle": "canasta matera eco cuero portatermo practica y resistente"
+  },
+  {
+   "url": "https://departamento.mercadolibre.com.ar/MLA-2042172639-departamento-en-venta-en-miami-florida-estados-unidos-_JM",
+   "tipo": "item (clasificado)",
+   "siteId": "MLA",
+   "itemId": "MLA2042172639"
+  },
+  {
+   "url": "https://auto.mercadolibre.com.ar/MLA-1579719973-toyota-hilux-pick-up-24-cd-dx-150cv-4x4-at-de-_JM",
+   "tipo": "item (clasificado)",
+   "siteId": "MLA",
+   "itemId": "MLA1579719973"
+  },
+  {
+   "url": "https://www.mercadolibre.com.mx/caja-rodante-de-almacenaje-profesional-stanley-033026r-color-negro/p/MLM21025398",
+   "tipo": "catalogo",
+   "siteId": "MLM",
+   "catalogProductId": "MLM21025398"
+  },
+  {
+   "url": "https://www.mercadolivre.com.br/garrafa-termica-stanley-aerolight-transit-354ml-8605-dried-pine-lisa/p/MLB79300621",
+   "tipo": "catalogo",
+   "siteId": "MLB",
+   "catalogProductId": "MLB79300621"
+  },
+  {
+   "url": "https://www.mercadolivre.com.br/copo-termico-quencher-887ml-stanley/up/MLBU3435888552?pdp_filters=item_id%3AMLB5034472453",
+   "tipo": "user_product",
+   "siteId": "MLB",
+   "userProductId": "MLBU3435888552",
+   "itemId": "MLB5034472453"
+  },
+  {
+   "url": "https://meli.la/2abcXYZ",
+   "tipo": "link_corto",
+   "accion": "GET con redirect manual -> 301 Location: https://auto.mercadolibre.com.mx/MLM-751347026-nissan-altima-25-advance-mt-sedan-2014-_JM"
+  },
+  {
+   "url": "https://mercadolibre.com/sec/<codigo>",
+   "tipo": "link_corto",
+   "accion": "GET con redirect manual; con código inexistente responde 404 'Id does not exist' (no se probó uno real)"
+  },
+  {
+   "url": "https://www.mercadolibre.com.ar/shorts/clips/QdsnCh/termo-stanley-mate-system-12-litros-rosa",
+   "tipo": "clip",
+   "accion": "sin muro: bajar y leer el JSON polycard (ver fixture mercadolibre-15)"
+  },
+  {
+   "url": "https://www.mercadolibre.com.ar/gz/account-verification?go=https%3A%2F%2Farticulo.mercadolibre.com.ar%2FMLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM&tid=eb6761a9-bc8c-4834-b698-89ee817006e7",
+   "tipo": "muro",
+   "accion": "si se siguió el redirect, recuperar la URL original desde el parámetro go"
+  },
+  {
+   "url": "meli://item?id=MLA2042172639",
+   "tipo": "deeplink_app",
+   "itemId": "MLA2042172639"
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "tienda": "temu",
+ "caso": "temu.com producto descatalogado: 200 con titulo 'This item was discontinued - Temu'",
+ "urlPegadaPorElUsuario": "https://www.temu.com/---60mg-60--gummies-g-602666235181036.html",
+ "urlFinal": "https://www.temu.com/---60mg-60--gummies-g-602666235181036.html",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "Server"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-disponible",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "This item was discontinued - Temu",
+   "image": null,
+   "price": null
+  }
+ }
+}

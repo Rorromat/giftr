@@ -1,0 +1,24 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "403 del balanceador (awselb)",
+ "urlPegadaPorElUsuario": "https://www.mercadolibre.com.ar/termo-original-stanley-mate-system-12-litros-rosa/p/MLA39939183",
+ "urlFinal": "https://www.mercadolibre.com.ar/termo-original-stanley-mate-system-12-litros-rosa/p/MLA39939183",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 403,
+   "location": null,
+   "contentType": "text/html",
+   "server": "awselb/2.0"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "http-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

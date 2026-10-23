@@ -155,6 +155,13 @@
       "when": 1792637905474,
       "tag": "0021_deseo_ocupa_desde",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792691121631,
+      "tag": "0022_pedidos_afuera",
+      "breakpoints": true
     }
   ]
 }

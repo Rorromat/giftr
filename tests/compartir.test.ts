@@ -81,7 +81,10 @@ test('fotos de afuera: solo https a hosts públicos', () => {
     'http://example.com/a.jpg', 'https://localhost/a.jpg', 'https://127.0.0.1/a.jpg', 'https://10.0.0.5/a.jpg',
     'https://169.254.169.254/latest', 'https://[::1]/a.jpg', 'https://intranet/a.jpg', 'https://db.internal/a.jpg',
     'https://user:pass@example.com/a.jpg', 'https://example.com:8443/a.jpg', 'file:///etc/passwd', 'no es una url',
+    // URL los acepta, pero ninguno es un nombre del DNS: con puntos seguidos o de más de 253
+    'https://cdn..example.com/a.jpg', `https://${'a'.repeat(250)}.com/a.jpg`, 'https://localhost../a.jpg',
   ]) expect(esFotoPublica(no), no).toBe(false)
+  expect(esFotoPublica(`https://${'a'.repeat(249)}.com./a.jpg`)).toBe(true)
 })
 
 test('textos para WhatsApp', () => {

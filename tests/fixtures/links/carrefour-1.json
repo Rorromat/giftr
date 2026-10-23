@@ -1,0 +1,33 @@
+{
+ "tienda": "carrefour",
+ "caso": "SSR sin <title>, sin og:* y sin JSON-LD: solo __STATE__",
+ "urlPegadaPorElUsuario": "https://www.carrefour.com.ar/lomito-de-atun-al-natural-carrefour-classic-170-grs-122140/p",
+ "urlFinal": "https://www.carrefour.com.ar/lomito-de-atun-al-natural-carrefour-classic-170-grs-122140/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 103,
+   "location": null,
+   "contentType": null,
+   "server": null
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Lomito de atún al natural Carrefour Classic 170 grs",
+  "image": "https://carrefourar.vtexassets.com/arquivos/ids/386717/7798033333907_E01.jpg?v=638800900950700000",
+  "imageHiRes": "https://carrefourar.vtexassets.com/arquivos/ids/386717/7798033333907_E01.jpg?v=638800900950700000",
+  "price": 2590,
+  "currency": "ARS",
+  "originalPrice": 3290,
+  "brand": "Carrefour"
+ }
+}
