@@ -125,18 +125,23 @@ export function compartidoAutomatico(o: { sitio: string | null; buzon?: string; 
 }
 
 /**
+ * Si el documento se cargó con una navegación nueva, que el servidor no puede saber. tipo: el de la navegación
+ * (PerformanceNavigationTiming); sin él, cuenta como nueva. Una recarga, o ir atrás y adelante, no: después del
+ * replaceState que hace Next al cargar, Chrome las manda same-origin aunque se haya llegado desde otro sitio (en Android
+ * alcanza con el pull-to-refresh), y compartidoAutomatico daría que sí. Lo que llega de otra app (el compartir del service
+ * worker, el atajo del iPhone, el respaldo del share target) y la vuelta de Google son navegaciones nuevas.
+ */
+export const cargaNueva = (tipo?: string) => tipo !== 'reload' && tipo !== 'back_forward'
+
+/**
  * Si el link que llegó por la URL (?link=) y es automático (ver compartidoAutomatico) se busca solo: si además la llegada es
- * nueva y de afuera de GiftR, que el servidor no puede saber. tipo: el de la navegación (PerformanceNavigationTiming);
- * referrer: el de la página.
- * - Una recarga, o ir atrás y adelante, no: después del replaceState que hace Next al cargar, Chrome las manda same-origin
- *   aunque se haya llegado desde otro sitio (en Android alcanza con el pull-to-refresh).
- * - Desde una página de GiftR, tampoco: un link de adentro con lo que escribió otro ("Ver en la tienda" de un deseo ajeno
- *   que lleva a /agregar?link=… o a /compartir?url=…) llega same-origin.
- * Lo que llega de otra app (el atajo del iPhone, el respaldo del share target) es una navegación nueva y sin referrer. El
- * buzón no necesita esto: otro sitio no conoce el id, y lo de ahí se borra al levantarlo.
+ * nueva (ver cargaNueva) y de afuera de GiftR. referrer: el de la página. Desde una página de GiftR, no: un link de adentro
+ * con lo que escribió otro ("Ver en la tienda" de un deseo ajeno que lleva a /agregar?link=… o a /compartir?url=…) llega
+ * same-origin. Lo que llega de otra app viene sin referrer. Ninguno de los dos cambia cuando Next vuelve a montar la página
+ * sin cargar el documento (ir atrás dentro de GiftR): eso lo cuida RecibirCompartido (ver primeraVezPorLaUrl).
  */
 export function llegadaDeAfuera(o: { tipo?: string; referrer: string; origen: string }): boolean {
-  if (o.tipo === 'reload' || o.tipo === 'back_forward') return false
+  if (!cargaNueva(o.tipo)) return false
   try {
     return !o.referrer || new URL(o.referrer).origin !== o.origen
   } catch {
@@ -162,15 +167,21 @@ export type QueHacer = {
   fotoNoLlego: boolean
 }
 
-/** Lo del buzón, sin pisar lo que ya esté escrito en el título y en las notas. */
-export function queHacerConLoCompartido(r: DelBuzon, o: { automatico: boolean; titulo: string; notas: string }): QueHacer {
+/**
+ * Lo del buzón, sin pisar lo que ya esté escrito en el título y en las notas. Es automático (ver compartidoAutomatico) solo
+ * si además la carga es nueva (tipo, ver cargaNueva): sin sesión el sobre no se levanta, queda en el buzón mientras se
+ * entra, y una recarga de Inicio después de entrar en otra pestaña llega same-origin a /agregar?compartido=<id> aunque el
+ * formulario lo haya mandado otro sitio. El referrer no se mira: el de la vuelta de Google es de Google.
+ */
+export function queHacerConLoCompartido(r: DelBuzon, o: { automatico: boolean; tipo?: string; titulo: string; notas: string }): QueHacer {
+  const automatico = o.automatico && cargaNueva(o.tipo)
   const c = loCompartido(r)
   const titulo = c && !o.titulo.trim() ? c.link ?? c.titulo : undefined
   return {
     titulo,
-    pegar: titulo !== undefined && o.automatico && c?.link !== undefined ? titulo : undefined,
+    pegar: titulo !== undefined && automatico && c?.link !== undefined ? titulo : undefined,
     notas: c?.notas && !o.notas.trim() ? c.notas : undefined,
-    foto: o.automatico && r.foto ? r.foto : undefined,
-    fotoNoLlego: (!!r.foto && !o.automatico) || r.fotoRechazada,
+    foto: automatico && r.foto ? r.foto : undefined,
+    fotoNoLlego: (!!r.foto && !automatico) || r.fotoRechazada,
   }
 }

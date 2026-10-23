@@ -11,9 +11,6 @@ const TEXTO_MAX = 5000
 // Las mismas que acepta el manifest: Chrome ya descarta las demás, esto es por las dudas (un SVG, un PDF). Sin HEIC: Chrome
 // no la puede achicar en el teléfono y el sharp del servidor no la lee (daría "No pudimos subir esa foto")
 const FOTO = /^image\/(jpe?g|png|webp|gif|avif)$/i
-// Un compartir que nadie levantó (compartió y no entró) se saca pasado un día: cuando se actualiza el SW (activate) o se
-// abre GiftR (limpiarBuzon, en src/lib/buzon-compartido.ts, con el mismo tope), y si no, al próximo compartir
-const UN_DIA_MS = 24 * 60 * 60 * 1000
 // Lo que entra en la URL del respaldo, ya codificado: una más larga no llega (Vercel corta en unos 14 KB, y una letra con
 // tilde ocupa 6 caracteres; un emoji, 12). El route usa el primer link (de hasta 2000), 120 letras de título y 500 de notas
 const URL_MAX = 6000
@@ -28,26 +25,22 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => event.waitUntil((async () => {
-  await vaciarBuzon((en) => Date.now() - en > UN_DIA_MS)
+  await sacarFotosSueltas()
   await self.clients.claim()
 })()))
 
-/** Saca del buzón lo que cumpla viejo(en), con su foto; sin fecha legible, o una foto sin sus datos, se saca. */
-async function vaciarBuzon(viejo) {
+/**
+ * Saca del buzón las fotos sin sus datos: quedan si recibir se cortó entre guardar la foto y guardar los datos. La página
+ * no las toca, porque puede ser un compartir que se está guardando; al activarse eso no pasa, porque el SW anterior ya
+ * terminó lo que estaba atendiendo. Lo que nadie levantó (compartió y no entró) lo saca la página pasado un día, cada vez
+ * que se abre GiftR (limpiarBuzon, en src/lib/buzon-compartido.ts), y si no, el próximo compartir.
+ */
+async function sacarFotosSueltas() {
   try {
     const buzon = await caches.open(BUZON)
     const claves = (await buzon.keys()).map((p) => p.url)
     for (const clave of claves) {
-      if (clave.endsWith('/foto')) {
-        if (!claves.includes(clave.slice(0, -'/foto'.length))) await buzon.delete(clave)
-        continue
-      }
-      const r = await buzon.match(clave)
-      const en = r ? await r.json().then((j) => Number(j && j.en), () => NaN) : NaN
-      if (!Number.isFinite(en) || viejo(en)) {
-        await buzon.delete(clave)
-        await buzon.delete(`${clave}/foto`)
-      }
+      if (clave.endsWith('/foto') && !claves.includes(clave.slice(0, -'/foto'.length))) await buzon.delete(clave)
     }
   } catch { /* sin Cache Storage: no hay nada que limpiar */ }
 }

@@ -26,10 +26,10 @@ vi.mock('next/navigation', () => ({
 }))
 
 import Agregar from '@/app/(menu)/agregar/page'
+import { FOTO_NO_LLEGO as NO_LLEGO } from '@/components/RecibirCompartido'
 
 const ML = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-imperial-de-calabaza-_JM'
 const ID = '0b6a3a9e-5d2c-4f1e-9a7b-3c4d5e6f7a8b'
-const NO_LLEGO = 'La foto no llegó: tocá Foto y elegila de nuevo.'
 
 type Busqueda = Record<string, string | string[]>
 

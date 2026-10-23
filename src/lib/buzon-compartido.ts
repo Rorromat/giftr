@@ -41,13 +41,13 @@ export async function borrarCompartido(id: string, c: CacheStorage | undefined =
   } catch { /* queda hasta el próximo compartir, o un día (ver limpiarBuzon) */ }
 }
 
-/** Lo que nadie levantó (compartió y no entró) no queda más que esto. El mismo tope que en public/sw.js (lo fija un test). */
+/** Lo que nadie levantó (compartió y no entró) no queda más que esto. */
 export const BUZON_MAX_MS = 24 * 60 * 60 * 1000
 
 /**
- * Saca del buzón lo de más de un día (o sin fecha legible), con su foto. Lo llama RegistrarSW cada vez que se abre GiftR: el
- * service worker limpia solo al activarse, que es una vez por versión. Una foto sin sus datos no se toca: puede ser la de un
- * compartir que se está guardando (el SW guarda la foto primero), y la saca el SW.
+ * Saca del buzón lo de más de un día (o sin fecha legible), con su foto. Lo llama RegistrarSW cada vez que se abre GiftR, y
+ * es la única limpieza por edad (además, cada compartir vacía el buzón). Una foto sin sus datos no se toca: puede ser la de
+ * un compartir que se está guardando (el SW guarda la foto primero), y la saca el SW al activarse (ver public/sw.js).
  */
 export async function limpiarBuzon(c: CacheStorage | undefined = globalThis.caches, ahora = Date.now()) {
   try {

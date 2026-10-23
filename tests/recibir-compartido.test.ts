@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { completador, loQueEntro, type Valores } from '@/lib/completar-deseo'
 import type { DelBuzon } from '@/lib/buzon-compartido'
 import {
-  compartidoAutomatico, esRutaAgregar, llegadaDeAfuera, loCompartido, queHacerConLoCompartido, rutaAgregar, VUELTA_MAX,
+  cargaNueva, compartidoAutomatico, esRutaAgregar, llegadaDeAfuera, loCompartido, queHacerConLoCompartido, rutaAgregar, VUELTA_MAX,
 } from '@/lib/recibir-compartido'
 import { comoPegado } from '@/components/RecibirCompartido'
 import { esSinBuscar, inputSinBuscar } from '@/components/CompletarDesdeLink'
@@ -210,6 +210,17 @@ describe('queHacerConLoCompartido', () => {
     expect(queHacerConLoCompartido(del({ fotoRechazada: true }), vacio)).toEqual({ fotoNoLlego: true })
     expect(queHacerConLoCompartido(del({ title: 'IMG_20261022_101010.jpg', foto }), vacio)).toEqual({ foto, fotoNoLlego: false })
   })
+
+  test('una recarga, o ir atrás y adelante, no corre sola: sin sesión el sobre de otro sitio queda, y recargar Inicio llega same-origin', () => {
+    const r = del({ text: ML, foto })
+    for (const tipo of ['reload', 'back_forward']) {
+      expect(queHacerConLoCompartido(r, { ...vacio, tipo }), tipo).toEqual({ titulo: ML, fotoNoLlego: true })
+    }
+    // el compartir del service worker y la vuelta de Google son navegaciones nuevas (sin Navigation Timing, también)
+    for (const tipo of ['navigate', undefined]) {
+      expect(queHacerConLoCompartido(r, { ...vacio, tipo }), String(tipo)).toEqual({ titulo: ML, pegar: ML, foto, fotoNoLlego: false })
+    }
+  })
 })
 
 test('lo compartido entra en el título como un pegado: CompletarDesdeLink lo toma como tal y lo busca en el momento', () => {
@@ -241,6 +252,26 @@ test('lo demás entra sin buscarse: un input que ve QueQueres y CompletarDesdeLi
   c.alDejar('titulo', 'precio')
   expect(pedir).toHaveBeenCalledOnce()
   c.cerrar()
+})
+
+test('cargaNueva: una recarga o ir atrás y adelante no; una navegación nueva, o sin Navigation Timing, sí', () => {
+  expect(cargaNueva('reload')).toBe(false)
+  expect(cargaNueva('back_forward')).toBe(false)
+  expect(cargaNueva('navigate')).toBe(true)
+  expect(cargaNueva('prerender')).toBe(true)
+  expect(cargaNueva(undefined)).toBe(true)
+})
+
+test('lo de la URL se atiende una vez por documento: ir atrás dentro de GiftR monta la página de nuevo sin cargarla', async () => {
+  // llegadaDeAfuera no lo ve: el tipo y el referrer siguen siendo los de la llegada
+  vi.resetModules()
+  const { primeraVezPorLaUrl } = await import('@/components/RecibirCompartido')
+  expect(primeraVezPorLaUrl()).toBe(true)
+  expect(primeraVezPorLaUrl()).toBe(false)
+  expect(primeraVezPorLaUrl()).toBe(false)
+  // una carga nueva del documento (otro compartir, una recarga) empieza de cero
+  vi.resetModules()
+  expect((await import('@/components/RecibirCompartido')).primeraVezPorLaUrl()).toBe(true)
 })
 
 describe('llegadaDeAfuera', () => {

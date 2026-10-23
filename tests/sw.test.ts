@@ -207,19 +207,25 @@ describe('el POST de compartir', () => {
   })
 })
 
-test('activate: borra lo de más de un día (y una foto sin sus datos) y toma las pestañas abiertas', async () => {
+test('activate: saca solo las fotos sin sus datos (lo viejo lo saca limpiarBuzon) y toma las pestañas abiertas', async () => {
   const sw = cargar()
   const caja = await sw.caches.open(BUZON)
+  const ahora = Date.now()
   const sobre = (en: number) => new Response(JSON.stringify({ title: '', text: ML, url: '', foto: true, fotoRechazada: false, en }))
-  await caja.put('/compartido/viejo', sobre(Date.now() - 25 * 60 * 60 * 1000))
+  await caja.put('/compartido/viejo', sobre(ahora - BUZON_MAX_MS - 60 * 1000))
   await caja.put('/compartido/viejo/foto', new Response(jpeg()))
-  await caja.put('/compartido/nuevo', sobre(Date.now() - 60 * 1000))
+  await caja.put('/compartido/nuevo', sobre(ahora - 60 * 1000))
   await caja.put('/compartido/nuevo/foto', new Response(jpeg()))
   await caja.put('/compartido/huerfana/foto', new Response(jpeg()))
   await caja.put('/compartido/roto', new Response('no es json'))
   await conEspera(sw.handlers.activate)
-  expect([...sw.cajas.get(BUZON)!.keys()].sort()).toEqual([`${BASE}compartido/nuevo`, `${BASE}compartido/nuevo/foto`])
+  const quedan = () => [...sw.cajas.get(BUZON)!.keys()].sort()
+  expect(quedan()).toEqual([`${BASE}compartido/nuevo`, `${BASE}compartido/nuevo/foto`, `${BASE}compartido/roto`,
+    `${BASE}compartido/viejo`, `${BASE}compartido/viejo/foto`])
   expect(sw.self.clients.claim).toHaveBeenCalledOnce()
+  // con la limpieza de la página (al abrir GiftR) queda solo lo nuevo
+  await limpiarBuzon(sw.caches, ahora)
+  expect(quedan()).toEqual([`${BASE}compartido/nuevo`, `${BASE}compartido/nuevo/foto`])
   // sin Cache Storage, igual toma las pestañas
   const sinCaches = cargar({ caches: { open: async () => { throw new Error('no') } } })
   await conEspera(sinCaches.handlers.activate)
@@ -263,9 +269,6 @@ test('install: skipWaiting y los GET directo a la red si el navegador puede; si 
 
 test('contrato: el buzón se llama igual en sw.js y en el formulario, y el manifest manda lo que leen los dos', () => {
   expect(/const BUZON = '([^']+)'/.exec(CODIGO)?.[1]).toBe(BUZON)
-  // y lo viejo se saca con el mismo tope de los dos lados
-  const unDia = /const UN_DIA_MS = ([\d *]+)\n/.exec(CODIGO)?.[1]
-  expect(unDia?.split('*').reduce((a, n) => a * Number(n), 1)).toBe(BUZON_MAX_MS)
   const st = manifest().share_target!
   expect(st).toMatchObject({ action: '/compartir', method: 'POST', enctype: 'multipart/form-data' })
   expect(st.params).toMatchObject({ title: 'title', text: 'text', url: 'url' })
