@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Pedí lo que querés sin pedirlo.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#FFF6E5',
-    theme_color: '#FFF6E5',
+    background_color: '#F6F0E5',
+    theme_color: '#F6F0E5',
     // Todos a sangre y sin transparencia (como el apple-touch-icon): si un sistema usa estos en vez del
     // apple-touch-icon, no le quedan esquinas transparentes que después pinta de negro.
     icons: [
