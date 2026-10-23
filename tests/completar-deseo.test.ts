@@ -161,16 +161,81 @@ describe('queCompletar', () => {
     expect(queCompletar(valores({ titulo: ML }), ML, ok(), null)!.retenidos).toBeUndefined()
   })
 
-  test('sin nombre, si era solo el link, queda el link (el servidor pone el del link o el sitio); si estaba vacío, el sitio', () => {
+  test('ok sin nombre: si era solo el link, queda el link (el servidor pone el del link o el sitio); si estaba vacío, el sitio', () => {
     const c = queCompletar(valores({ titulo: 'https://tienda.com.ar/x' }), 'https://tienda.com.ar/x', ok({ titulo: null, precio: null }), null)!
     expect(c.titulo).toBeUndefined()
     expect(c.linkTienda).toBe('https://tienda.com.ar/x')
     expect(c.aviso).toBeNull()
     // vacío frenaba "Agregar" ("Completá este campo")
     const zara = 'https://www.zara.com/ar/campera'
-    for (const r of [ok({ titulo: null, precio: null, sitio: 'zara.com' }), null]) {
-      expect(queCompletar(valores({ linkTienda: zara }), zara, r, null)!.titulo, String(r && r.estado)).toBe('zara.com')
-    }
+    expect(queCompletar(valores({ linkTienda: zara }), zara, ok({ titulo: null, precio: null, sitio: 'zara.com' }), null)!.titulo).toBe('zara.com')
+  })
+
+  describe('una falla sin ningún nombre (un catálogo de MercadoLibre sin nombre en el link): el título queda vacío y el aviso pide qué es', () => {
+    // copiado desde la app de MercadoLibre: no trae el nombre en el camino
+    const CATALOGO = 'https://www.mercadolibre.com.ar/p/MLA37631077?pdp_filters=item_id%3AMLA3034341816'
+    const bloqueado: RespuestaLink = { estado: 'bloqueado', titulo: null, precio: null, foto: null, sitio: 'mercadolibre.com.ar' }
+
+    test('solo el link en el título: pasa a la tienda y el título queda vacío (no "mercadolibre.com.ar")', () => {
+      const c = queCompletar(valores({ titulo: CATALOGO }), CATALOGO, bloqueado, null)!
+      expect(c).toMatchObject({
+        titulo: '', linkTienda: CATALOGO, aviso: 'MercadoLibre no la deja ver: escribí qué es.', consejoFoto: CONSEJO_FOTO_ML,
+      })
+      expect(c.puesto.titulo).toBeUndefined()
+      expect('foto' in c).toBe(false)
+      // pegado con el texto de la app: tampoco es del dueño
+      const app = `Mirá este producto en Mercado Libre ${CATALOGO}`
+      expect(queCompletar(valores({ titulo: app }), CATALOGO, bloqueado, null, null, 'Mirá este producto en Mercado Libre')).toMatchObject({
+        titulo: '', linkTienda: CATALOGO,
+      })
+    })
+
+    test('con el link en la tienda, el título vacío (o el nombre provisorio que puso el autocompletado) queda vacío', () => {
+      expect(queCompletar(valores({ linkTienda: CATALOGO }), CATALOGO, bloqueado, null)).toMatchObject({
+        titulo: '', aviso: 'MercadoLibre no la deja ver: escribí qué es.',
+      })
+      const provisorio: Puesto = { link: CATALOGO, titulo: 'mercadolibre.com.ar' }
+      const c = queCompletar(valores({ titulo: 'mercadolibre.com.ar', linkTienda: CATALOGO }), CATALOGO, bloqueado, provisorio)!
+      expect(c.titulo).toBe('')
+      expect(c.puesto.titulo).toBeUndefined()
+      // lo que escribió el dueño queda, con el aviso de siempre
+      const suyo = queCompletar(valores({ titulo: 'Termo', linkTienda: CATALOGO }), CATALOGO, bloqueado, null)!
+      expect(suyo.titulo).toBeUndefined()
+      expect(suyo.aviso).toBe('MercadoLibre no deja ver la publicación.')
+      const conTexto = queCompletar(valores({ titulo: `Termo ${CATALOGO}` }), CATALOGO, bloqueado, null)!
+      expect(conTexto).toMatchObject({ titulo: 'Termo', aviso: 'MercadoLibre no deja ver la publicación.' })
+    })
+
+    test('cada falla lo dice, corto; con un nombre (de la página o del link) sigue como siempre', () => {
+      const tienda = 'https://tienda.com.ar/item?id=1245'
+      const falla = (estado: RespuestaLink['estado'], sitio: string): RespuestaLink => ({ estado, titulo: null, precio: null, foto: null, sitio })
+      for (const [link, r, aviso] of [
+        [CATALOGO, bloqueado, 'MercadoLibre no la deja ver: escribí qué es.'],
+        [tienda, falla('bloqueado', 'tienda.com.ar'), 'La tienda no deja ver la página: escribí qué es.'],
+        [tienda, falla('sin-datos', 'tienda.com.ar'), 'No encontramos los datos: escribí qué es.'],
+        [tienda, falla('no-carga', 'tienda.com.ar'), 'No pudimos abrir esa página: escribí qué es.'],
+        // ya dice qué hacer
+        [CATALOGO, falla('no-esta', 'mercadolibre.com.ar'), 'Esa publicación ya no existe: revisá el link.'],
+        // sin respuesta o con el tope, el nombre lo saca el navegador del link, y este no trae
+        [tienda, null, 'No pudimos abrir esa página: escribí qué es.'],
+        [tienda, 'muchos', 'Buscaste muchos links: escribí qué es.'],
+      ] as [string, Contestado, string][]) {
+        const cual = `${link} ${r && typeof r === 'object' ? r.estado : r}`
+        expect(queCompletar(valores({ titulo: link }), link, r, null), cual).toMatchObject({ titulo: '', linkTienda: link, aviso })
+        expect(aviso.length, aviso).toBeLessThanOrEqual(48)
+      }
+      // con el nombre del link, ese nombre y el aviso de siempre
+      expect(queCompletar(valores({ titulo: ML }), ML, null, null)).toMatchObject({ titulo: 'Mate imperial', aviso: 'No pudimos abrir esa página.' })
+      expect(queCompletar(valores({ titulo: ML }), ML, 'muchos', null)).toMatchObject({ titulo: 'Mate imperial', aviso: AVISO_MUCHOS })
+    })
+
+    test('con el foco en el título, el título no se toca hasta dejarlo (el aviso ya pide qué es)', () => {
+      const c = queCompletar(valores({ titulo: CATALOGO }), CATALOGO, bloqueado, null, 'titulo')!
+      expect(c.titulo).toBeUndefined()
+      expect(c).toMatchObject({ linkTienda: CATALOGO, retenidos: ['titulo'], aviso: 'MercadoLibre no la deja ver: escribí qué es.' })
+      // y si mandara con el link solo, el servidor lo pasa a la tienda (el título queda el sitio, como siempre sin JS)
+      expect(deseoDesdeForm(fd({ titulo: CATALOGO, linkTienda: CATALOGO }))).toMatchObject({ linkTienda: CATALOGO })
+    })
   })
 
   test('lo que puso el primer link se reemplaza con el segundo; lo que corrigió el dueño, no', () => {
@@ -881,13 +946,17 @@ describe('completador: cuándo se pide', () => {
       expect(g.agregar(conEnter)).toBe(true)
       expect(deseoDesdeForm(fd({ ...g.v }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
     }
-    // si no contesta, el nombre del link; sin nombre en el link, el sitio (vacío, "Agregar" quedaba frenado)
-    for (const [link, nombre] of [[ML, 'Mate imperial'], ['https://www.zara.com/ar/campera', 'zara.com']]) {
+    // si no contesta, el nombre del link; sin nombre en el link, vacío: que el dueño escriba qué es (se guardaba "zara.com")
+    for (const [link, nombre, aviso] of [
+      [ML, 'Mate imperial', 'No pudimos abrir esa página.'],
+      ['https://www.zara.com/ar/campera', '', 'No pudimos abrir esa página: escribí qué es.'],
+    ]) {
       const g = armar()
       g.pegar('linkTienda', link)
       g.pedidos[0].contestar(null)
       await vi.advanceTimersByTimeAsync(0)
       expect(g.v.titulo, link).toBe(nombre)
+      expect(g.linea.texto, link).toBe(aviso)
     }
     // lo que escribe en el título mientras busca queda
     const g = armar()
@@ -1140,6 +1209,52 @@ describe('completador: cuándo se pide', () => {
     f.cambiar('linkTienda', '')
     f.cambiar('titulo', 'Mate')
     expect(f.linea).toMatchObject({ texto: '', consejoFoto: undefined })
+  })
+
+  test('un catálogo de MercadoLibre sin nombre que no se deja ver: el título queda vacío para que escriba qué es', async () => {
+    const CATALOGO = 'https://www.mercadolibre.com.ar/p/MLA37631077?pdp_filters=item_id%3AMLA3034341816'
+    const bloqueado: RespuestaLink = { estado: 'bloqueado', titulo: null, precio: null, foto: null, sitio: 'mercadolibre.com.ar' }
+    // pegado en el título, ya fuera de él cuando vuelve: el link pasa a la tienda y "Agregar" pide el nombre
+    const f = armar()
+    f.pegar('titulo', CATALOGO)
+    f.pedidos[0].contestar(bloqueado)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v).toEqual(valores({ linkTienda: CATALOGO }))
+    expect(f.linea).toEqual({ texto: 'MercadoLibre no la deja ver: escribí qué es.', consejoFoto: CONSEJO_FOTO_ML })
+    expect(f.agregar()).toBe(false)
+    f.foco.campo = 'titulo'
+    f.cambiar('titulo', 'Termo Stanley rosa')
+    expect(f.agregar()).toBe(true)
+    expect(f.v).toEqual(valores({ titulo: 'Termo Stanley rosa', linkTienda: CATALOGO }))
+    // con el foco en el título no se toca: el link queda ahí hasta dejarlo, y lo que escriba queda
+    const g = armar()
+    g.foco.campo = 'titulo'
+    g.pegar('titulo', CATALOGO)
+    g.pedidos[0].contestar(bloqueado)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(g.v).toEqual(valores({ titulo: CATALOGO, linkTienda: CATALOGO }))
+    expect(g.linea.texto).toBe('MercadoLibre no la deja ver: escribí qué es.')
+    g.dejar('titulo', 'precio')
+    expect(g.v).toEqual(valores({ linkTienda: CATALOGO }))
+    const h = armar()
+    h.foco.campo = 'titulo'
+    h.pegar('titulo', CATALOGO)
+    h.pedidos[0].contestar(bloqueado)
+    await vi.advanceTimersByTimeAsync(0)
+    h.cambiar('titulo', `${CATALOGO} Termo`)
+    h.dejar('titulo')
+    expect(h.v).toEqual(valores({ titulo: 'Termo', linkTienda: CATALOGO }))
+    // en la tienda, con el nombre provisorio que se puso al dejar el título mientras buscaba: se va
+    const i = armar()
+    i.foco.campo = 'linkTienda'
+    i.pegar('linkTienda', CATALOGO)
+    i.dejar('linkTienda', 'titulo')
+    i.dejar('titulo', 'precio')
+    expect(i.v.titulo).toBe('mercadolibre.com.ar')
+    i.pedidos[0].contestar(bloqueado)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(i.v).toEqual(valores({ linkTienda: CATALOGO }))
+    expect(i.linea.texto).toBe('MercadoLibre no la deja ver: escribí qué es.')
   })
 
   test('lo que completó un link no cambia al dejar el título ni al mandar: queda el nombre de la página', async () => {

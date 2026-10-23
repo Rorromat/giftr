@@ -162,6 +162,13 @@
       "when": 1792691121631,
       "tag": "0022_pedidos_afuera",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792755450905,
+      "tag": "0023_mercadolibre_conexion",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
 import { API_ML_TIEMPO_MS, leerDeLaApi } from '@/lib/mercadolibre'
+import { guardarConexion, olvidarConexion } from '@/lib/mercadolibre-conexion'
 import { PAGINA_TIEMPO_MS } from '@/lib/pagina-de-afuera'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
@@ -458,7 +459,7 @@ describe('con la API de MercadoLibre configurada', () => {
       urls.push(url)
       return new Response('error', { status: url.startsWith(`${API}/items/`) ? 401 : 500 })
     }))
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(h.db, ARTICULO)).toBeNull()
     expect(urls.at(-1)).toBe(`${API}/oauth/token`)
     urls.length = 0
     const s = afuera({})
@@ -474,5 +475,33 @@ describe('con la API de MercadoLibre configurada', () => {
     afuera({ 'https://tienda.com.ar/products/mate': { headers: html, cuerpo: pagina('Mate') } })
     expect(await (await leer({ url: 'https://tienda.com.ar/products/mate' })).json()).toMatchObject({ estado: 'ok', titulo: 'Mate' })
     expect(urls).toEqual([])
+  })
+
+  test('con la cuenta de ML conectada: un catálogo copiado de la app (sin nombre en el link) trae nombre, foto y precio con su token', async () => {
+    vi.stubEnv('MELI_CLIENT_ID', '123')
+    vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
+    await guardarConexion(h.db, { access: 'APP_USR-conectada', refresh: 'TG-conectada', expiraAt: new Date(Date.now() + 3600_000), mlUserId: '1' }, ownerId)
+    const pedidosAApi: { url: string; authorization: string | null }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+      pedidosAApi.push({ url, authorization: new Headers(init.headers).get('authorization') })
+      if (url === `${API}/items/MLA3034341816`) {
+        return Response.json({ ...ITEM, id: 'MLA3034341816', title: 'Termo Stanley Classic 1.4 Litros Verde', price: 145000 })
+      }
+      throw new Error(`no esperaba ${url}`)
+    }))
+    const s = afuera({})
+    try {
+      const catalogo = 'https://www.mercadolibre.com.ar/p/MLA37631077?pdp_filters=item_id:MLA3034341816&from=share_eshop_android'
+      expect(await (await leer({ url: catalogo })).json()).toEqual({
+        estado: 'ok', titulo: 'Termo Stanley Classic 1.4 Litros Verde', precio: '$145.000',
+        foto: 'https://http2.mlstatic.com/D_931470-MLA89297118039_082025-O.jpg', sitio: 'mercadolibre.com.ar',
+      })
+      expect(pedidosAApi).toEqual([{ url: `${API}/items/MLA3034341816`, authorization: 'Bearer APP_USR-conectada' }])
+      expect(s.urls()).toEqual([])
+      expect(await pedidos()).toBe(1)
+    } finally {
+      // el token queda en memoria del módulo: los tests que siguen no tienen la cuenta conectada
+      olvidarConexion()
+    }
   })
 })

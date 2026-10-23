@@ -1,10 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import { mercadolibreConexion } from '@/db/schema'
+import type { Db } from '@/db/types'
 import { UA_GIFTR } from '@/lib/giftrbot'
 import { API_ML_TIEMPO_MS } from '@/lib/mercadolibre'
-import { tiempos } from './helpers'
+import { createTestDb, tiempos } from './helpers'
 
 // La API oficial de MercadoLibre (leerDeLaApi): fetch es de mentira, con las formas de las respuestas de la API. Nada sale
-// a la red. Cada test carga el módulo de nuevo: el token queda en memoria del módulo.
+// a la red. Cada test carga el módulo de nuevo: el token queda en memoria del módulo. Acá no hay una cuenta conectada
+// (ver mercadolibre-conexion.test.ts): se usa el token de la aplicación.
+
+let db: Db
+beforeAll(async () => { db = await createTestDb() })
 
 const ARTICULO = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM'
 const CATALOGO = 'https://www.mercadolibre.com.ar/termo-original-stanley-mate-system-12-litros-rosa/p/MLA39939183'
@@ -76,7 +82,8 @@ async function api() {
   return import('@/lib/mercadolibre')
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.delete(mercadolibreConexion)
   vi.stubEnv('MELI_CLIENT_ID', '1234567890123456')
   vi.stubEnv('MELI_CLIENT_SECRET', 'clave-secreta-de-la-app')
 })
@@ -99,7 +106,7 @@ test('sin las dos credenciales no se usa: null, sin ningún pedido', async () =>
     vi.stubEnv('MELI_CLIENT_SECRET', clave)
     const { hayApiDeMercadoLibre, leerDeLaApi } = await api()
     expect(hayApiDeMercadoLibre()).toBe(false)
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(db, ARTICULO)).toBeNull()
   }
   expect(llamadas).toEqual([])
 })
@@ -108,7 +115,7 @@ describe('una publicación', () => {
   test('token de la aplicación y /items/{id}: nombre, foto y precio, limpios como los de la página', async () => {
     const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
     const { leerDeLaApi } = await api()
-    expect(await leerDeLaApi(ARTICULO)).toEqual({
+    expect(await leerDeLaApi(db, ARTICULO)).toEqual({
       estado: 'ok',
       producto: { titulo: 'Mate De Algarrobo Premium Artesanal Con Bombilla', precio: '$88.990', foto: `https://${foto('931470-MLA89297118039_082025', 'O')}` },
     })
@@ -129,7 +136,7 @@ describe('una publicación', () => {
     for (const [status, estado] of [['closed', 'no-esta'], ['paused', 'ok'], ['under_review', 'ok'], ['active', 'ok']]) {
       conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ ...ITEM, status })] })
       const { leerDeLaApi } = await api()
-      expect((await leerDeLaApi(ARTICULO))?.estado, status).toBe(estado)
+      expect((await leerDeLaApi(db, ARTICULO))?.estado, status).toBe(estado)
     }
   })
 
@@ -138,10 +145,10 @@ describe('una publicación', () => {
     for (const pictures of [[], null, [{ id: '1', secure_url: 'https://localhost/x.jpg', url: 'http://10.0.0.1/x.jpg' }], [null], 'raro']) {
       conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ ...ITEM, pictures })] })
       const { leerDeLaApi } = await api()
-      expect(await leerDeLaApi(ARTICULO), JSON.stringify(pictures)).toMatchObject({ producto: { foto: thumb } })
+      expect(await leerDeLaApi(db, ARTICULO), JSON.stringify(pictures)).toMatchObject({ producto: { foto: thumb } })
     }
     conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ ...ITEM, pictures: [], thumbnail: 'javascript:alert(1)' })] })
-    expect(await (await api()).leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok', producto: { foto: null } })
+    expect(await (await api()).leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok', producto: { foto: null } })
   })
 
   test('el precio: pesos o dólares; otra moneda o un precio raro, sin precio', async () => {
@@ -151,14 +158,14 @@ describe('una publicación', () => {
     ] as const) {
       conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ ...ITEM, price, currency_id })] })
       const { leerDeLaApi } = await api()
-      expect(await leerDeLaApi(ARTICULO), `${price} ${currency_id}`).toMatchObject({ estado: 'ok', producto: { precio } })
+      expect(await leerDeLaApi(db, ARTICULO), `${price} ${currency_id}`).toMatchObject({ estado: 'ok', producto: { precio } })
     }
   })
 
   test('el título: sin entidades ni tags, y de hasta 120 en una palabra', async () => {
     const largo = `Mate &amp; bombilla <b>premium</b> ${'artesanal '.repeat(20)}`
     conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ ...ITEM, title: largo })] })
-    const r = await (await api()).leerDeLaApi(ARTICULO)
+    const r = await (await api()).leerDeLaApi(db, ARTICULO)
     const titulo = r?.estado === 'ok' ? r.producto.titulo! : ''
     expect(titulo.startsWith('Mate & bombilla premium artesanal')).toBe(true)
     expect(titulo.length).toBeLessThanOrEqual(120)
@@ -169,7 +176,7 @@ describe('una publicación', () => {
 describe('catálogo y /up/', () => {
   test('un catálogo sin item: /products, con el precio de la publicación que gana', async () => {
     const llamadas = conToken({ [`GET ${API}/products/MLA39939183`]: [() => respuesta(PRODUCTO)] })
-    expect(await (await api()).leerDeLaApi(CATALOGO)).toEqual({
+    expect(await (await api()).leerDeLaApi(db, CATALOGO)).toEqual({
       estado: 'ok',
       producto: {
         titulo: 'Termo Original Stanley Mate System 1.2 Litros Rosa', precio: '$189.990',
@@ -179,7 +186,7 @@ describe('catálogo y /up/', () => {
     soloLaApi(llamadas)
     // sin ganadora (nadie lo vende ahora): sin precio, pero con nombre y foto
     conToken({ [`GET ${API}/products/MLA39939183`]: [() => respuesta({ ...PRODUCTO, buy_box_winner: null })] })
-    expect(await (await api()).leerDeLaApi(CATALOGO)).toMatchObject({ estado: 'ok', producto: { titulo: PRODUCTO.name, precio: null } })
+    expect(await (await api()).leerDeLaApi(db, CATALOGO)).toMatchObject({ estado: 'ok', producto: { titulo: PRODUCTO.name, precio: null } })
   })
 
   test('un catálogo o un /up/ con el item elegido: /items de ese item', async () => {
@@ -189,7 +196,7 @@ describe('catálogo y /up/', () => {
       'https://www.mercadolibre.com.ar/canasta-matera/up/MLAU3409701436#polycard_client=x&wid=MLA3070371712',
     ]) {
       const llamadas = conToken({ [`GET ${API}/items/MLA3070371712`]: [() => respuesta({ ...ITEM, id: 'MLA3070371712' })] })
-      expect(await (await api()).leerDeLaApi(url), url).toMatchObject({ estado: 'ok' })
+      expect(await (await api()).leerDeLaApi(db, url), url).toMatchObject({ estado: 'ok' })
       expect(llamadas.at(-1)?.url).toBe(`${API}/items/MLA3070371712`)
     }
   })
@@ -198,7 +205,7 @@ describe('catálogo y /up/', () => {
     const elegido = `${CATALOGO}?pdp_filters=item_id%3AMLA3070371712`
     for (const item of [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' }), () => respuesta({ message: 'not found' }, 404)]) {
       const llamadas = conToken({ [`GET ${API}/items/MLA3070371712`]: [item], [`GET ${API}/products/MLA39939183`]: [() => respuesta(PRODUCTO)] })
-      expect(await (await api()).leerDeLaApi(elegido)).toMatchObject({ estado: 'ok', producto: { titulo: PRODUCTO.name, precio: '$189.990' } })
+      expect(await (await api()).leerDeLaApi(db, elegido)).toMatchObject({ estado: 'ok', producto: { titulo: PRODUCTO.name, precio: '$189.990' } })
       expect(llamadas.filter((l) => l.metodo === 'GET').map((l) => l.url)).toEqual([`${API}/items/MLA3070371712`, `${API}/products/MLA39939183`])
       soloLaApi(llamadas)
     }
@@ -207,13 +214,13 @@ describe('catálogo y /up/', () => {
       [`GET ${API}/items/MLA3070371712`]: [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' })],
       [`GET ${API}/products/MLA39939183`]: [() => respuesta({ message: 'not found' }, 404)],
     })
-    expect(await (await api()).leerDeLaApi(elegido)).toEqual({ estado: 'no-esta' })
+    expect(await (await api()).leerDeLaApi(db, elegido)).toEqual({ estado: 'no-esta' })
     conToken({ [`GET ${API}/items/MLA3070371712`]: [() => respuesta('', 500)], [`GET ${API}/products/MLA39939183`]: [() => respuesta('', 500)] })
-    expect(await (await api()).leerDeLaApi(elegido)).toBeNull()
+    expect(await (await api()).leerDeLaApi(db, elegido)).toBeNull()
     // un /up/ no es un catálogo: su item cerrado es no-esta, sin /products
     const up = conToken({ [`GET ${API}/items/MLA3070371712`]: [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' })] })
     const canasta = 'https://www.mercadolibre.com.ar/canasta-matera/up/MLAU3409701436?pdp_filters=item_id%3AMLA3070371712'
-    expect(await (await api()).leerDeLaApi(canasta)).toEqual({ estado: 'no-esta' })
+    expect(await (await api()).leerDeLaApi(db, canasta)).toEqual({ estado: 'no-esta' })
     expect(up.filter((l) => l.metodo === 'GET')).toHaveLength(1)
   })
 
@@ -223,7 +230,7 @@ describe('catálogo y /up/', () => {
     for (const url of [
       'https://www.mercadolibre.com.ar/canasta-matera/up/MLAU3409701436', 'https://meli.la/2abcXYZ', 'https://www.mercadolibre.com.ar/tienda/laska',
       'https://www.crocs.com.ar/products/x', 'https://mercadolibre.com.ar.evil.com/MLA-1418506688-mate-_JM', 'no es un link',
-    ]) expect(await leerDeLaApi(url), url).toBeNull()
+    ]) expect(await leerDeLaApi(db, url), url).toBeNull()
     expect(llamadas).toEqual([])
   })
 })
@@ -234,23 +241,23 @@ describe('el token', () => {
     const { leerDeLaApi } = await api()
     const ahora = Date.now()
     const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora)
-    await leerDeLaApi(ARTICULO)
-    await leerDeLaApi(ARTICULO)
+    await leerDeLaApi(db, ARTICULO)
+    await leerDeLaApi(db, ARTICULO)
     reloj.mockReturnValue(ahora + (TOKEN.expires_in - 61) * 1000)
-    await leerDeLaApi(ARTICULO)
+    await leerDeLaApi(db, ARTICULO)
     expect(llamadas.filter((l) => l.metodo === 'POST')).toHaveLength(1)
     reloj.mockReturnValue(ahora + (TOKEN.expires_in - 59) * 1000)
-    await leerDeLaApi(ARTICULO)
+    await leerDeLaApi(db, ARTICULO)
     expect(llamadas.filter((l) => l.metodo === 'POST')).toHaveLength(2)
   })
 
   test('si la API dice 401, se pide otro token una sola vez', async () => {
     const no = () => respuesta({ message: 'invalid access token', error: 'not_found', status: 401, cause: [] }, 401)
     const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [no, () => respuesta(ITEM)] })
-    expect(await (await api()).leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(await (await api()).leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'GET', 'POST', 'GET'])
     const siempre = conToken({ [`GET ${API}/items/MLA1418506688`]: [no] })
-    expect(await (await api()).leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await (await api()).leerDeLaApi(db, ARTICULO)).toBeNull()
     expect(siempre.map((l) => l.metodo)).toEqual(['POST', 'GET', 'POST', 'GET'])
   })
 
@@ -259,7 +266,7 @@ describe('el token', () => {
     const llamadas = apiDeMentira({
       [`POST ${API}/oauth/token`]: [() => respuesta({ message: 'invalid client_id or client_secret', error: 'invalid_client', status: 400, cause: [] }, 400)],
     })
-    expect(await (await api()).leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await (await api()).leerDeLaApi(db, ARTICULO)).toBeNull()
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST'])
     expect(warn).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(warn.mock.calls)).toContain('400')
@@ -267,7 +274,7 @@ describe('el token', () => {
     // un token que no tiene la forma: tampoco
     for (const raro of [{}, { access_token: '' }, { access_token: 'x' }, { access_token: 5, expires_in: 100 }, [], 'texto']) {
       apiDeMentira({ [`POST ${API}/oauth/token`]: [() => respuesta(raro)] })
-      expect(await (await api()).leerDeLaApi(ARTICULO), JSON.stringify(raro)).toBeNull()
+      expect(await (await api()).leerDeLaApi(db, ARTICULO), JSON.stringify(raro)).toBeNull()
     }
   })
 
@@ -281,9 +288,9 @@ describe('el token', () => {
     const ahora = Date.now()
     const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora)
     expect(apiDeMercadoLibreLista()).toBe(true)
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(db, ARTICULO)).toBeNull()
     reloj.mockReturnValue(ahora + 59_000)
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(db, ARTICULO)).toBeNull()
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST'])
     expect(warn).toHaveBeenCalledTimes(1)
     // el route no le pregunta (ver sinPedir)
@@ -291,25 +298,26 @@ describe('el token', () => {
     // pasado el minuto, se pide de nuevo
     reloj.mockReturnValue(ahora + 61_000)
     expect(apiDeMercadoLibreLista()).toBe(true)
-    expect(await leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(await leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'POST', 'GET'])
   })
 
   test('si dos links lo piden a la vez y a uno no se lo dan, el que llegó no se pisa ni deja el minuto sin API', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    // al primero se lo dan; al segundo, un 500 un rato después
-    const tarde = () => new Promise<Response>((ok) => setTimeout(() => ok(respuesta('error', 500)), 30))
+    // al primero se lo dan; al segundo, un 500 un rato después. El primero también tarda un poco: antes de pedir el token
+    // cada uno mira la conexión en la base, y así los dos pedidos se cruzan
+    const despues = (r: () => Response, ms: number) => () => new Promise<Response>((ok) => setTimeout(() => ok(r()), ms))
     const llamadas = apiDeMentira({
-      [`POST ${API}/oauth/token`]: [token, tarde],
+      [`POST ${API}/oauth/token`]: [despues(token, 15), despues(() => respuesta('error', 500), 40)],
       [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
     })
     const { apiDeMercadoLibreLista, leerDeLaApi } = await api()
     // el que falló sigue con el del otro
-    expect(await Promise.all([leerDeLaApi(ARTICULO), leerDeLaApi(ARTICULO)])).toMatchObject([{ estado: 'ok' }, { estado: 'ok' }])
+    expect(await Promise.all([leerDeLaApi(db, ARTICULO), leerDeLaApi(db, ARTICULO)])).toMatchObject([{ estado: 'ok' }, { estado: 'ok' }])
     expect(warn).toHaveBeenCalledTimes(1)
     // y el que viene después también, sin pedir otro
     expect(apiDeMercadoLibreLista()).toBe(true)
-    expect(await leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(await leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'POST', 'GET', 'GET', 'GET'])
   })
 
@@ -321,18 +329,18 @@ describe('el token', () => {
     vi.stubGlobal('fetch', colgado)
     tiempos(100)
     const { leerDeLaApi } = await api()
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(db, ARTICULO)).toBeNull()
     const antes = Date.now()
-    expect(await leerDeLaApi(ARTICULO)).toBeNull()
+    expect(await leerDeLaApi(db, ARTICULO)).toBeNull()
     expect(Date.now() - antes).toBeLessThan(20)
     expect(colgado).toHaveBeenCalledTimes(1)
     // el que pidió se va mientras se espera el token: el próximo lo pide
     const otra = await api()
     const usuario = new AbortController()
     setTimeout(() => usuario.abort(), 5)
-    expect(await otra.leerDeLaApi(ARTICULO, usuario.signal)).toBeNull()
+    expect(await otra.leerDeLaApi(db, ARTICULO, usuario.signal)).toBeNull()
     const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
-    expect(await otra.leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(await otra.leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
     expect(llamadas.map((l) => l.metodo)).toEqual(['POST', 'GET'])
   })
 })
@@ -352,13 +360,13 @@ test('cualquier falla (red, status, JSON raro, tiempo): null, para seguir por la
   ]
   for (const [caso, contesta] of casos) {
     conToken({ [`GET ${API}/items/MLA1418506688`]: [contesta] })
-    expect(await (await api()).leerDeLaApi(ARTICULO), caso).toBeNull()
+    expect(await (await api()).leerDeLaApi(db, ARTICULO), caso).toBeNull()
   }
   // si el que pidió se fue, se corta
   const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [() => new Promise<Response>(() => {})] })
   const usuario = new AbortController()
   usuario.abort()
-  expect(await (await api()).leerDeLaApi(ARTICULO, usuario.signal)).toBeNull()
+  expect(await (await api()).leerDeLaApi(db, ARTICULO, usuario.signal)).toBeNull()
   expect(llamadas.filter((l) => l.metodo === 'GET')).toEqual([])
 })
 
@@ -370,7 +378,7 @@ test(`si la API no contesta, se corta a los ${API_ML_TIEMPO_MS / 1000} s: null`,
   vi.stubGlobal('fetch', colgado)
   const ms = tiempos(100)
   const antes = Date.now()
-  expect(await (await api()).leerDeLaApi(ARTICULO)).toBeNull()
+  expect(await (await api()).leerDeLaApi(db, ARTICULO)).toBeNull()
   expect(Date.now() - antes).toBeLessThan(API_ML_TIEMPO_MS / 100 + 500)
   expect(ms).toEqual([API_ML_TIEMPO_MS])
   expect(colgado).toHaveBeenCalledTimes(1)

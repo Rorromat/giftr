@@ -62,7 +62,7 @@ async function leer(link: string, signal: AbortSignal): Promise<Leido> {
       if (!('destino' in corto)) return corto
       url = corto.destino
     }
-    const api = await leerDeLaApi(url, signal)
+    const api = await leerDeLaApi(db, url, signal)
     if (api?.estado === 'ok') return { estado: 'ok', producto: api.producto, urlProducto: url, api: true }
     if (api) return { ...delLink(api.estado, url), api: true }
   }

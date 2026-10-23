@@ -1,5 +1,7 @@
+import type { Db } from '@/db/types'
 import { UA_GIFTR } from '@/lib/giftrbot'
 import { esHostDeMercadoLibre, hostSinPunto } from '@/lib/links'
+import { API_ML as API, conexionPosible, descartar, esJson, hayApiDeMercadoLibre, tokenDeLaConexion } from '@/lib/mercadolibre-conexion'
 import { limpiarFoto, limpiarTitulo, montoDeTexto, precioParaElForm, type Lectura } from '@/lib/producto-del-link'
 
 // Los links de MercadoLibre: qué son y qué ids traen, sin pedir nada a la red. Las publicaciones de marketplace
@@ -90,20 +92,17 @@ export const esPublicacionDeMarketplace = (l: LinkML | null) =>
 
 // ---------------------------------------------------------------- API oficial
 
-// La API oficial de MercadoLibre, con un token de la aplicación (client_credentials): lee las publicaciones que el muro
-// no deja ver, con la foto y el precio. Se prende con dos variables de entorno, las credenciales de una aplicación
-// registrada en developers.mercadolibre.com.ar: MELI_CLIENT_ID (el App ID) y MELI_CLIENT_SECRET (la clave secreta). Sin
-// las dos, no se usa y los links de ML siguen el camino de la página. Siempre a este host (por eso alcanza con fetch):
-// los ids se validan antes de armar la URL.
+// La API oficial de MercadoLibre: lee las publicaciones que el muro no deja ver, con la foto y el precio. Se prende con
+// dos variables de entorno, las credenciales de una aplicación registrada en developers.mercadolibre.com.ar:
+// MELI_CLIENT_ID (el App ID) y MELI_CLIENT_SECRET (la clave secreta). Sin las dos, no se usa y los links de ML siguen el
+// camino de la página. El token es el de la cuenta que conectó el dueño de GiftR (ver mercadolibre-conexion.ts); sin
+// ella, se prueba con uno de la aplicación (client_credentials), que ML no documenta. Siempre a este host (por eso
+// alcanza con fetch): los ids se validan antes de armar la URL.
 
-const API = 'https://api.mercadolibre.com'
 /** Para el token y la publicación juntos: si no contesta en esto, sigue el camino de la página. */
 export const API_ML_TIEMPO_MS = 4000
 
-export const hayApiDeMercadoLibre = () => !!(process.env.MELI_CLIENT_ID && process.env.MELI_CLIENT_SECRET)
-
-type Json = Record<string, unknown>
-const esJson = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
+export { hayApiDeMercadoLibre }
 
 type Token = { valor: string; vence: number }
 /** El token de la aplicación, en memoria hasta un minuto antes de que venza. */
@@ -115,11 +114,12 @@ const TOKEN_ESPERA_MS = 60_000
 /** El token en memoria, si todavía sirve. */
 const tokenVigente = () => (token && Date.now() < token.vence ? token.valor : null)
 
-/** Si se le puede preguntar a la API ahora: configurada, y no en el minuto sin token (ver tokenDeLaApp). */
-export const apiDeMercadoLibreLista = () => hayApiDeMercadoLibre() && (!!tokenVigente() || Date.now() >= sinTokenHasta)
-
-/** Una respuesta que no se va a leer: se suelta la conexión. */
-const descartar = (r: Response) => r.body?.cancel().catch(() => {})
+/**
+ * Si se le puede preguntar a la API ahora: configurada, y con la conexión (o sin saber todavía si hay una) o fuera del
+ * minuto sin token de la aplicación (ver tokenDeLaApp y tokenDeLaConexion).
+ */
+export const apiDeMercadoLibreLista = () =>
+  hayApiDeMercadoLibre() && (conexionPosible() || !!tokenVigente() || Date.now() >= sinTokenHasta)
 
 /**
  * El token. Si no lo dan (credenciales mal, el OAuth caído, colgado o con un JSON raro), null por un minuto sin volver a
@@ -167,10 +167,15 @@ async function pedirToken(signal: AbortSignal): Promise<Token | null> {
   return { valor: j.access_token, vence: Date.now() + Math.max(0, segundos - 60) * 1000 }
 }
 
-/** GET a la API con el token; si da 401 (vencido antes de tiempo, revocado), se pide otro una sola vez. Null si no da 200. */
-async function deLaApi(ruta: string, signal: AbortSignal, deQuienPide?: AbortSignal): Promise<unknown> {
+/**
+ * GET a la API con el token de la conexión o, sin ella, el de la aplicación. Si da 401 (vencido antes de tiempo,
+ * revocado), una sola vez otro: el de la conexión se renueva, y el de la aplicación se pide de nuevo. Null si no da 200.
+ */
+async function deLaApi(db: Db, ruta: string, signal: AbortSignal, deQuienPide?: AbortSignal): Promise<unknown> {
+  let rechazado: string | undefined
   for (let intento = 0; intento < 2; intento++) {
-    const t = await tokenDeLaApp(signal, deQuienPide)
+    const deLaConexion = await tokenDeLaConexion(db, rechazado)
+    const t = deLaConexion ?? await tokenDeLaApp(signal, deQuienPide)
     if (!t) return null
     const r = await fetch(`${API}${ruta}`, {
       headers: { authorization: `Bearer ${t}`, accept: 'application/json', 'user-agent': UA_GIFTR }, redirect: 'error', signal,
@@ -178,7 +183,8 @@ async function deLaApi(ruta: string, signal: AbortSignal, deQuienPide?: AbortSig
     if (r.ok) return r.json()
     await descartar(r)
     if (r.status !== 401) return null
-    if (token?.valor === t) token = null
+    if (deLaConexion) rechazado = deLaConexion
+    else if (token?.valor === t) token = null
   }
   return null
 }
@@ -213,9 +219,10 @@ function deProducto(j: unknown, host: string): Lectura | null {
  * un catálogo con el item elegido) por /items; un catálogo sin item, por /products; un /up/ sin item no tiene API. Un
  * catálogo con el item elegido sigue por /products si ese item se cerró o no se pudo leer: el producto lo puede vender
  * otro. Null si la API no está configurada, si el link no tiene un id para ella o si algo falla (red, tiempo, status,
- * JSON raro): entonces sigue el camino de la página. Nunca tira.
+ * JSON raro, la base): entonces sigue el camino de la página. Nunca tira. La base es para la conexión (su token, y
+ * guardar el par nuevo al renovarlo).
  */
-export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Lectura | null> {
+export async function leerDeLaApi(db: Db, url: string, signal?: AbortSignal): Promise<Lectura | null> {
   const ml = linkDeMercadoLibre(url)
   if (!ml || !hayApiDeMercadoLibre()) return null
   const host = hostSinPunto(new URL(url).hostname)
@@ -223,7 +230,7 @@ export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Le
   const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
   const leer = async (ruta: string, de: (j: unknown, host: string) => Lectura | null) => {
     try {
-      return de(await deLaApi(ruta, s, signal), host)
+      return de(await deLaApi(db, ruta, s, signal), host)
     } catch {
       // red, tiempo o un JSON roto
       return null

@@ -15,7 +15,11 @@ export const OPCIONES_COOKIE_INVITADO = {
 // Solo para tests y desarrollo local: en producción la firma usa el secreto de las sesiones.
 const SECRETO_DE_DESARROLLO = 'giftr-solo-para-desarrollo'
 
-function secreto(): string {
+/**
+ * El secreto de la app (el de las sesiones). Firma las cookies de acá y la del pedido para conectar MercadoLibre, y de él
+ * sale (con otra etiqueta) la clave que cifra los tokens de MercadoLibre (ver cifrado.ts).
+ */
+export function secretoDeLaApp(): string {
   // el mismo que usa Auth.js, que también acepta el nombre viejo: si no, con solo NEXTAUTH_SECRET se entra pero
   // anotarse, reservar como invitado o cerrar sesión darían error
   const s = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
@@ -26,10 +30,10 @@ function secreto(): string {
   return SECRETO_DE_DESARROLLO
 }
 
-const hmac = (mensaje: string) => createHmac('sha256', secreto()).update(mensaje).digest('base64url')
+export const hmac = (mensaje: string) => createHmac('sha256', secretoDeLaApp()).update(mensaje).digest('base64url')
 const firma = (guestId: string) => hmac(`giftr_guest:${guestId}`)
 
-const igualesSinFiltrarTiempo = (a: string, b: string) => {
+export const igualesSinFiltrarTiempo = (a: string, b: string) => {
   const x = Buffer.from(a)
   const y = Buffer.from(b)
   return x.length === y.length && timingSafeEqual(x, y)

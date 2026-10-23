@@ -51,12 +51,32 @@ para el login.
    | `AUTH_GOOGLE_ID` | el *Client ID* de Google |
    | `AUTH_GOOGLE_SECRET` | el *Client secret* de Google |
    | `NEXT_PUBLIC_BASE_URL` | `https://TU-PROYECTO.vercel.app` (arma el link que se comparte) |
-   | `MELI_CLIENT_ID` | opcional: el *App ID* de una aplicación de [developers.mercadolibre.com.ar](https://developers.mercadolibre.com.ar). Con `MELI_CLIENT_SECRET`, al pegar el link de una publicación de MercadoLibre en un deseo, el nombre, la foto y el precio salen de su API oficial (la página tiene un muro para los servidores). Sin las dos, se usa la página |
+   | `MELI_CLIENT_ID` | opcional: el *App ID* de una aplicación de [developers.mercadolibre.com.ar](https://developers.mercadolibre.com.ar). Con `MELI_CLIENT_SECRET` y la cuenta conectada (ver *MercadoLibre* más abajo), al pegar el link de una publicación de MercadoLibre en un deseo, el nombre, la foto y el precio salen de su API oficial (la página tiene un muro para los servidores). Sin las dos, se usa la página |
    | `MELI_CLIENT_SECRET` | opcional: la *Clave secreta* de esa aplicación |
+   | `MELI_ADMIN_EMAILS` | opcional: los emails de Google (separados por coma, sin importar mayúsculas) que pueden conectar la cuenta de MercadoLibre en `/api/mercadolibre/conectar`. Para cualquier otro, esa dirección no existe |
 
 5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) compila y, si
    salió bien y es el deploy a producción, aplica las migraciones: la base queda lista sola en cada
    deploy a producción.
+
+**MercadoLibre.** Desde un servidor, MercadoLibre muestra un muro de login en vez de la publicación, y
+su API pide el token de una cuenta. Se conecta la tuya una sola vez (no la de cada usuario):
+
+1. En [developers.mercadolibre.com.ar](https://developers.mercadolibre.com.ar), *Mis aplicaciones →
+   Crear aplicación*. *Redirect URI*: `https://TU-PROYECTO.vercel.app/api/mercadolibre/callback`
+   (la misma base que `NEXT_PUBLIC_BASE_URL`, con https). Permisos: lectura y `offline_access`
+   (sin ese, el acceso vence a las 6 horas y no se puede renovar).
+2. En Vercel, cargá `MELI_CLIENT_ID` (el *App ID*), `MELI_CLIENT_SECRET` (la *Clave secreta*) y
+   `MELI_ADMIN_EMAILS` (tu email de Google), y hacé *Redeploy*.
+3. Entrá a GiftR con ese email y abrí `https://TU-PROYECTO.vercel.app/api/mercadolibre/conectar`:
+   te lleva a MercadoLibre para autorizar y vuelve a una página que dice *MercadoLibre quedó
+   conectado*. Los tokens quedan cifrados en la base (tabla `mercadolibre_conexion`) y se renuevan
+   solos.
+
+Si MercadoLibre deja de aceptar la renovación (le sacaste el permiso a GiftR desde tu cuenta de
+MercadoLibre) o cambió `AUTH_SECRET`, los logs dicen *MercadoLibre se desconectó: hay que volver a
+conectarlo en /api/mercadolibre/conectar*, y los links de MercadoLibre vuelven a completarse con lo
+que trae el link hasta que repitas el paso 3.
 
 **Previews y migraciones.** `DATABASE_URL` es la misma en todos los entornos, así que los previews
 (cada push a una rama que no es `main`) **no** migran: si lo hicieran, cambiarían la base de

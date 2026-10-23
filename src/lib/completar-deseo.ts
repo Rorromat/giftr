@@ -124,10 +124,11 @@ export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app de MercadoLibre y to
 const esOk = (r: Contestado) => (r !== null && r !== 'muchos' && r.estado === 'ok' ? r : null)
 
 // Cortos, para que entren en la línea (una sola, con su lugar guardado) en un teléfono de 320 px: unas 40 letras. Lo que
-// falta completar se ve en los campos.
-function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null {
-  if (r === 'muchos') return AVISO_MUCHOS
-  if (!r || r.estado === 'no-carga') return AVISO_NO_CARGA
+// falta completar se ve en los campos. escribir: no hay nombre y el título quedó vacío (ver queCompletar), así que lo
+// dice: que escriba qué es.
+function avisoDe(r: Contestado, nombre: boolean, precio: boolean, escribir = false): string | null {
+  if (r === 'muchos') return escribir ? 'Buscaste muchos links: escribí qué es.' : AVISO_MUCHOS
+  if (!r || r.estado === 'no-carga') return escribir ? 'No pudimos abrir esa página: escribí qué es.' : AVISO_NO_CARGA
   const ml = esHostDeMercadoLibre(r.sitio)
   switch (r.estado) {
     case 'ok': {
@@ -137,19 +138,23 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
     }
     case 'bloqueado':
       // el nombre del link ya se ve en el campo, y cómo poner la foto va en el lugar de la foto (CONSEJO_FOTO_ML)
+      if (escribir) return ml ? 'MercadoLibre no la deja ver: escribí qué es.' : 'La tienda no deja ver la página: escribí qué es.'
       return ml ? 'MercadoLibre no deja ver la publicación.' : 'La tienda no deja ver la página.'
     case 'no-esta':
+      // ya dice qué hacer: con otro link, se busca de nuevo
       return `Esa ${ml ? 'publicación' : 'página'} ya no existe: revisá el link.`
     default:
-      return 'No encontramos los datos en esa página.'
+      return escribir ? 'No encontramos los datos: escribí qué es.' : 'No encontramos los datos en esa página.'
   }
 }
 
 /**
  * Qué escribir con lo que contestó la lectura de un link. Lo que escribió el dueño no se toca; lo vacío se llena.
  * - Título: si era solo el link (con espacios o no), vacío o lo que puso el autocompletado, el nombre de la respuesta
- *   (de la página o del link); sin nombre, el link queda y el servidor pone el del link o el sitio, y uno vacío lleva
- *   eso mismo (vacío frenaría el envío). Con texto además del link ("Para mamá https://…"), el texto, sin el nombre.
+ *   (de la página o del link). Sin nombre: con 'ok' el link queda y el servidor pone el del link o el sitio (y uno vacío
+ *   lleva eso mismo); con una falla (un catálogo de MercadoLibre sin nombre en el link que no se deja ver), el título
+ *   queda vacío y el aviso pide que el dueño escriba qué es: si no, se guardaba "mercadolibre.com.ar". Con texto además
+ *   del link ("Para mamá https://…"), el texto, sin el nombre.
  * - El link del título pasa a "Link a la tienda" ya acá, con la regla del servidor: al mandar no hay dos movimientos.
  * - Precio y foto: solo con 'ok'. El precio (solo ARS o USD: otra moneda viene null) va si está vacío o si sigue igual a
  *   lo que puso el autocompletado, y si este producto no tiene, eso se vacía. Una falla (sin respuesta, el tope, no
@@ -172,6 +177,8 @@ export function queCompletar(
   const ok = esOk(r)
   // sin respuesta (tiempo vencido, sin red, el tope), el nombre que trae el link
   const nombre = r && r !== 'muchos' ? r.titulo : tituloDelLink(link)
+  // no se leyó el producto y no hay ningún nombre: el dueño escribe qué es
+  const sinNombre = !ok && !nombre
   // lo que va en cada campo, y lo que de eso es del autocompletado
   const campos: Campos = {}
   const nuevo: Puesto = { link }
@@ -183,13 +190,19 @@ export function queCompletar(
     const resto = enTitulo.resto === puesto?.titulo || enTitulo.resto === pegadoConElLink ? '' : enTitulo.resto
     if (resto) campos.titulo = resto
     else if (nombre) campos.titulo = nuevo.titulo = nombre
+    // sin nombre y sin leer el producto, vacío: el link ya pasa a la tienda
+    else if (sinNombre) campos.titulo = ''
     // sin nombre queda el link solo (el servidor pone el del link o el sitio)
     else if (enTitulo.resto) campos.titulo = link
   } else {
     // el link de la tienda que puso el autocompletado y sigue ahí, también
     if (puesto?.linkTienda && v.linkTienda.trim() === puesto.linkTienda) nuevo.linkTienda = puesto.linkTienda
-    // vacío frenaría el envío: sin nombre, el del link o el sitio, como lo pondría el servidor
-    if (!v.titulo.trim() || v.titulo === puesto?.titulo) campos.titulo = nuevo.titulo = nombre ?? nombreDelLink(link)
+    // vacío frenaría el envío: sin nombre, el del link o el sitio, como lo pondría el servidor; sin leer el producto, vacío
+    // igual, para que el dueño escriba qué es
+    if (!v.titulo.trim() || v.titulo === puesto?.titulo) {
+      if (sinNombre) campos.titulo = ''
+      else campos.titulo = nuevo.titulo = nombre ?? nombreDelLink(link)
+    }
   }
   if (ok && (!v.precio.trim() || v.precio === puesto?.precio)) {
     if (ok.precio) campos.precio = nuevo.precio = ok.precio
@@ -206,7 +219,8 @@ export function queCompletar(
   if (retenidos.includes('titulo')) nuevo.tituloDe = puesto?.tituloDe
   if (retenidos.length) c.retenidos = retenidos
   if (ok) c.foto = ok.foto && esUrlPublica(ok.foto) ? ok.foto : null
-  c.aviso = avisoDe(r, !!nombre && c.titulo !== undefined && nuevo.titulo === nombre, !!c.precio)
+  // el título vacío lo dice aunque espere a que el dueño deje el campo: es ahí donde va a escribir
+  c.aviso = avisoDe(r, !!nombre && c.titulo !== undefined && nuevo.titulo === nombre, !!c.precio, campos.titulo === '')
   if (r && r !== 'muchos' && r.estado === 'bloqueado' && esHostDeMercadoLibre(r.sitio)) c.consejoFoto = CONSEJO_FOTO_ML
   return c
 }

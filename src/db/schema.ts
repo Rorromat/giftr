@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm'
-import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, check, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
 
 export const users = pgTable('users', {
@@ -243,6 +243,20 @@ export const config = pgTable('config', {
   clave: text('clave').primaryKey(),
   valor: text('valor').notNull(),
 })
+
+// La cuenta de MercadoLibre que conectó el dueño de GiftR (una sola vez, desde /api/mercadolibre/conectar): con su token
+// la API lee las publicaciones que el muro no deja ver. Una sola fila (id = 1). Los tokens van cifrados (ver cifrado.ts):
+// quien lea la base no se lleva la cuenta. En null, la conexión se cayó (MercadoLibre no renovó el acceso) y hay que
+// volver a conectarla. El refresh token es de un solo uso: cada renovación guarda el nuevo (ver mercadolibre-conexion.ts).
+export const mercadolibreConexion = pgTable('mercadolibre_conexion', {
+  id: smallint('id').primaryKey().default(1),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  expiraAt: timestamp('expira_at', { withTimezone: true }),
+  mlUserId: text('ml_user_id'),
+  conectadoPor: uuid('conectado_por').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [check('mercadolibre_conexion_una_sola', sql`${t.id} = 1`)])
 
 // Dispositivos donde un usuario activó los avisos (Web Push). Uno por navegador/teléfono, como mucho 10 por usuario.
 // created_at: cuándo se activó o se confirmó por última vez (al abrir Perfil); con el tope se van las más viejas.
