@@ -18,8 +18,9 @@ const esCampoDelLink = (t: EventTarget | null) => t instanceof HTMLInputElement 
 /**
  * Completa el deseo con el link del producto, pegado en "¿Qué querés?" o en "Link a la tienda": el nombre, el precio y la
  * foto (la trae FotoField), sin pisar lo que escribió el dueño (ver queCompletar). Se ve como una sola línea de estado, que
- * está siempre (un role="status" que aparece con el texto no siempre se lee) y con su lugar guardado: mientras busca no
- * corre nada. Nunca frena el envío: si manda antes de que vuelva, se guarda como sin esto (con el nombre que trae el link).
+ * está siempre (un role="status" que aparece con el texto no siempre se lee) y con su lugar guardado: no corre nada, ni
+ * mientras busca ni cuando vuelve. Nunca frena el envío: si manda antes de que vuelva, se guarda como sin esto (con el
+ * nombre que trae el link).
  * guardado: el link a la tienda del deseo que se edita, que no se busca.
  */
 export function CompletarDesdeLink({ guardado }: { guardado: string | null }) {
@@ -74,9 +75,10 @@ export function CompletarDesdeLink({ guardado }: { guardado: string | null }) {
     }
   }, [guardado])
 
-  // una línea siempre: "Buscando…" entra cortado si el sitio es largo; solo lo que vuelve puede ocupar más
+  // Una línea siempre, también vacía: lo que aparece no corre Foto ni Pegar. Los avisos son cortos para entrar en un
+  // teléfono; "Buscando…" con un sitio largo (o con la letra agrandada) entra cortado, y el lector de pantalla lo lee entero.
   return (
-    <p ref={linea} role="status" className={`-mt-1 min-h-4 text-xs font-semibold${estado.buscando ? ' truncate' : ''}`}>
+    <p ref={linea} role="status" className="-mt-1 min-h-4 truncate text-xs font-semibold">
       {estado.aviso || null}
     </p>
   )

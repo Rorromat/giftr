@@ -17,10 +17,8 @@ export type Contestado = RespuestaLink | 'muchos' | null
 export type Campos = { titulo?: string; linkTienda?: string; precio?: string }
 /** Lo que se muestra. */
 export type Linea = {
-  /** La línea de estado ('' la vacía). */
+  /** La línea de estado ('' la vacía): una sola línea, con su lugar guardado. */
   aviso: string
-  /** Mientras busca: entra en una línea, así no corre Foto y Pegar. */
-  buscando?: boolean
   /** Cómo poner la foto si no se pudo traer: lo dice FotoField al lado de Pegar, y solo si no hay una. */
   consejoFoto?: string
 }
@@ -63,20 +61,28 @@ const linkDelTexto = (t: string) => linkHttp(t.trim()) ?? linkEnTexto(t)?.link ?
 const nombreDelLink = (link: string) => tituloDelLink(link) ?? sitioDeLink(link)
 
 /**
- * El mismo producto con menos cosas en el link: sin el #… o con parte del ?… (lo que agregan para seguir de dónde vino,
- * como el tracking_id de MercadoLibre), también a medio borrar. Un valor distinto en el ?… es otro producto (?p=124).
+ * Lo que agregan los links para saber de dónde vino la visita (MercadoLibre, Google, Meta, los mails de las tiendas): no
+ * cambia el producto. Uno que no está acá cuenta como del producto: a lo sumo se lee de nuevo.
  */
-export function mismoProducto(nuevo: string, anterior: string): boolean {
-  let n: URL, a: URL
+const DE_SEGUIMIENTO =
+  /^(?:(?:utm|matt|reco|c|aff|gad)_.*|tracking_id|deal_print_id|polycard_client|gclid|gbraid|wbraid|fbclid|msclkid|igshid|srsltid|ttclid|_gl|mc_cid|mc_eid|spm|ref_)$/i
+
+/**
+ * Si dos links son del mismo producto: el mismo sitio y camino, sin mirar el #… ni lo que se agrega para seguir de dónde
+ * vino (el tracking_id de MercadoLibre, los utm_…), y el resto del ?… igual, en los dos sentidos. Un valor distinto es
+ * otro producto aunque sea un pedazo del otro (?id=124 y ?id=1245, ?product=mate y ?product=mate-grande).
+ */
+export function mismoProducto(uno: string, otro: string): boolean {
+  let a: URL, b: URL
   try {
-    n = new URL(nuevo)
-    a = new URL(anterior)
+    a = new URL(uno)
+    b = new URL(otro)
   } catch {
     return false
   }
   const camino = (u: URL) => u.pathname.replace(/\/+$/, '')
-  if (n.host !== a.host || camino(n) !== camino(a)) return false
-  return a.search.startsWith(n.search) || [...n.searchParams].every(([k, valor]) => a.searchParams.getAll(k).includes(valor))
+  const delProducto = (u: URL) => [...u.searchParams].filter(([k]) => !DE_SEGUIMIENTO.test(k)).map((par) => JSON.stringify(par)).sort().join()
+  return a.host === b.host && camino(a) === camino(b) && delProducto(a) === delProducto(b)
 }
 
 /**
@@ -90,8 +96,8 @@ export function linkParaCompletar(v: Valores, guardado: string | null, puesto: P
   return link && esUrlPublica(link.replace(/^http:\/\//i, 'https://')) ? link : null
 }
 
-export const AVISO_MUCHOS = 'Buscaste muchos links seguidos. Probá en un rato; mientras, completalo a mano.'
-const AVISO_NO_CARGA = 'No pudimos abrir esa página. Completá lo que falte.'
+export const AVISO_MUCHOS = 'Buscaste muchos links. Probá en un rato.'
+const AVISO_NO_CARGA = 'No pudimos abrir esa página.'
 
 export const avisoBuscando = (link: string) => `Buscando el producto en ${sitioDeLink(link)}…`
 
@@ -101,7 +107,8 @@ export const avisoBuscando = (link: string) => `Buscando el producto en ${sitioD
  */
 export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app y tocá Pegar.'
 
-// Cortos: lo que aparece en la línea corre Foto y Pegar para abajo.
+// Cortos, para que entren en la línea (una sola, con su lugar guardado) en un teléfono de 320 px: unas 40 letras. Lo que
+// falta completar se ve en los campos.
 function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null {
   if (r === 'muchos') return AVISO_MUCHOS
   if (!r || r.estado === 'no-carga') return AVISO_NO_CARGA
@@ -109,18 +116,16 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
   switch (r.estado) {
     case 'ok': {
       // nombra solo lo que llenó (la foto avisa en FotoField); si todo estaba escrito, nada
-      const que = [nombre && 'el nombre', precio && 'el precio'].filter(Boolean)
-      return que.length ? `Completamos ${que.join(' y ')}: ${que.length > 1 ? 'revisalos' : 'revisalo'}.` : null
+      if (nombre && precio) return 'Completamos nombre y precio: revisalos.'
+      return nombre || precio ? `Completamos el ${nombre ? 'nombre' : 'precio'}: revisalo.` : null
     }
     case 'bloqueado':
-      // cómo poner la foto va al lado de Pegar (CONSEJO_FOTO_ML)
-      return ml
-        ? `MercadoLibre no nos deja ver la publicación.${nombre ? ' Pusimos el nombre del link: revisalo.' : ''}`
-        : `${r.sitio} no nos deja ver la página. Completá lo que falte.`
+      // el nombre del link ya se ve en el campo, y cómo poner la foto va al lado de Pegar (CONSEJO_FOTO_ML)
+      return ml ? 'MercadoLibre no deja ver la publicación.' : 'La tienda no deja ver la página.'
     case 'no-esta':
-      return `Esa ${ml ? 'publicación' : 'página'} ya no existe. Fijate que el link sea el de ahora.`
+      return `Esa ${ml ? 'publicación' : 'página'} ya no existe: revisá el link.`
     default:
-      return 'No encontramos los datos del producto en esa página. Completá lo que falte.'
+      return 'No encontramos los datos en esa página.'
   }
 }
 
@@ -249,7 +254,8 @@ export type Completador = {
  * a mano, cuando deja de escribir un rato o deja el campo; la home de una tienda, nunca (no tiene un producto, y el
  * servidor contesta sin-datos). Un pedido por vez: un link nuevo corta el anterior, y lo que llegue de ese se descarta.
  * Lo que ya se leyó no se vuelve a pedir (si se pega de nuevo, se vuelve a completar con eso), salvo que no haya cargado;
- * el mismo producto con el link recortado, tampoco. Sin reintentos. Nada de esto frena el envío.
+ * el mismo producto (ver mismoProducto), tampoco. El link leído a medio borrar a mano no se busca. Sin reintentos. Nada de
+ * esto frena el envío.
  */
 export function completador(o: {
   guardado: string | null
@@ -268,11 +274,14 @@ export function completador(o: {
   let enCurso: { link: string; corte: AbortController } | null = null
   let espera: { link: string; reloj: ReturnType<typeof setTimeout> } | null = null
 
+  /** Lo que esperaba y lo que se estaba buscando, cortado; si decía "Buscando…", ya no (no se busca nada). */
   function cortar() {
     if (espera) clearTimeout(espera.reloj)
     espera = null
-    enCurso?.corte.abort()
+    if (!enCurso) return
+    enCurso.corte.abort()
     enCurso = null
+    o.mostrar({ aviso: '' })
   }
 
   function aplicar(link: string, r: Contestado) {
@@ -294,21 +303,43 @@ export function completador(o: {
     o.escribir(antes.campos, null)
   }
 
-  /** Lo ya leído de ese link, o del mismo producto con el link recortado. */
+  /**
+   * Con el link en "Link a la tienda" y el título vacío, mientras se lee: el nombre que trae el link (o el sitio), que la
+   * respuesta reemplaza. Vacío, "Agregar" quedaba frenado ("Completá este campo") hasta que volviera, 9 s como mucho.
+   */
+  function nombreMientrasBusca(link: string) {
+    const v = o.leer()
+    if (v.titulo.trim() || deLaTienda(v) !== link) return
+    const titulo = nombreDelLink(link)
+    puesto = { ...(puesto ?? { link }), titulo }
+    o.escribir({ titulo })
+  }
+
+  /** Lo ya leído de ese link, o del mismo producto. */
   const yaLeido = (link: string) =>
     leidos.get(link) ?? (puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined)
 
-  async function buscar(link: string) {
+  /** El link que está completo en el formulario: el último que se leyó y aplicó. */
+  const leidoPuesto = () => (puesto && leidos.has(puesto.link) ? puesto.link : null)
+
+  /**
+   * pegado: si vino de un pegado. Lo escrito al final del link leído (una letra de más) puede ser el mismo producto: no
+   * saca nada antes de que vuelva la lectura, que decide (si no, se vaciaba todo y, al volver igual, se importaba otra vez
+   * la foto).
+   */
+  async function buscar(link: string, pegado: boolean) {
     espera = null
     const leido = yaLeido(link)
     if (leido) {
       leidos.set(link, leido)
       return aplicar(link, leido)
     }
-    sacarLoDelAnterior(link)
+    const antes = leidoPuesto()
+    if (pegado || !antes || !link.startsWith(antes)) sacarLoDelAnterior(link)
+    nombreMientrasBusca(link)
     const pedido = { link, corte: new AbortController() }
     enCurso = pedido
-    o.mostrar({ aviso: avisoBuscando(link), buscando: true })
+    o.mostrar({ aviso: avisoBuscando(link) })
     const reloj = setTimeout(() => pedido.corte.abort(), LEER_LINK_MS)
     let r: Contestado | undefined
     try {
@@ -349,14 +380,19 @@ export function completador(o: {
         puesto = { ...puesto, link, ...(puesto.linkTienda ? { linkTienda: v.linkTienda.trim() } : {}) }
         return
       }
-      if (trajo) void buscar(link)
-      else espera = { link, reloj: setTimeout(() => void buscar(link), ESPERA_ESCRITO_MS) }
+      // A mano, el link leído a medio borrar (un pedazo del principio): lo está borrando o cambiando, no es otro producto.
+      // Ni se busca ni se saca nada: al parar o al dejar el campo (por ejemplo para tocar "Agregar"), el pedazo se buscaba,
+      // gastaba el tope y sacaba el nombre, el precio y la foto que el dueño ya había aceptado. Lo que escriba después que
+      // ya no sea un pedazo, o un pegado, sí se busca.
+      if (!trajo && leidoPuesto()?.startsWith(link) && !leidos.has(link)) return
+      if (trajo) void buscar(link, true)
+      else espera = { link, reloj: setTimeout(() => void buscar(link, false), ESPERA_ESCRITO_MS) }
     },
     alDejar() {
       // lo escrito que esperaba se busca ya
       if (espera) {
         clearTimeout(espera.reloj)
-        void buscar(espera.link)
+        void buscar(espera.link, false)
       }
       // el link que quedó en el título mientras escribía al lado (ver queCompletar) ya está en la tienda: se saca
       const v = o.leer()

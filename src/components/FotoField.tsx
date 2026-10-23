@@ -289,31 +289,18 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     link.current?.setCustomValidity(bloqueo)
   }, [bloqueo])
 
-  // lo que hizo el dueño mientras se trae la del link (un Pegar sin nada copiado) se dice antes
+  // Abajo, solo lo que hizo el dueño (subir, probar un Pegar, los errores). Lo que llega solo, la foto del link mientras
+  // se trae, va al lado de Pegar en el lugar del texto de siempre: una línea nueva acá corría todo lo de abajo dos veces
+  // (al empezar y al llegar), sin que el dueño hiciera nada.
   const mensaje = subiendo ? 'subiendo'
-    : aviso ?? (trayendo ? 'trayendo' : subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
+    : aviso ?? (subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
   const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] border-[2.5px] border-dashed border-gr-ink text-xs font-bold'
   const vista = !!foto && rota !== foto
   return (
     <div ref={raiz} className="flex flex-col gap-3">
+      {/* Foto y Pegar siempre en el mismo lugar; a la derecha, la foto o el texto. Con la foto a la izquierda, al llegar la
+          del link (sola, quizás mientras el dueño iba a tocar Foto o Pegar) los corría. */}
       <div className="flex items-center gap-2.5">
-        {/* mientras se trae la del link, su lugar: si no, al llegar corría Foto y Pegar, que siguen andando */}
-        {!vista && trayendo && (
-          <div aria-hidden className="size-[72px] flex-none -rotate-4 animate-pulse rounded-[14px] border-[2.5px] border-gr-ink/40 bg-gr-ink/5" />
-        )}
-        {vista && (
-          <div className="relative flex-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
-            <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
-                 // si falló antes de que cargue la página, onError no llega
-                 ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
-                 className="size-[72px] -rotate-4 rounded-[14px] border-[2.5px] border-gr-ink object-cover" />
-            <button type="button" aria-label="Quitar foto" onClick={quitar}
-                    className="absolute -right-2.5 -top-2.5 flex size-7 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface before:absolute before:-inset-2 before:content-['']">
-              <Icon name="close" size={12} strokeWidth={3.2} />
-            </button>
-          </div>
-        )}
         <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
                 aria-label={foto ? 'Cambiar la foto' : 'Subir una foto de la galería o sacar una'}
                 className={`${boton} ${subiendo ? 'animate-pulse' : ''}`}>
@@ -324,12 +311,28 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
           <Icon name="paste" size={20} strokeWidth={2.4} />
           Pegar
         </button>
-        {!foto && !trayendo && <p aria-live="polite" className="text-[13px] leading-snug font-medium">{consejo ?? SIN_FOTO}</p>}
+        {vista ? (
+          <div className="relative flex-none">
+            {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
+            <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
+                 // si falló antes de que cargue la página, onError no llega
+                 ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
+                 // la que vino de otro link, mientras se trae la de este
+                 className={`size-[72px] -rotate-4 rounded-[14px] border-[2.5px] border-gr-ink object-cover${trayendo ? ' animate-pulse' : ''}`} />
+            <button type="button" aria-label="Quitar foto" onClick={quitar}
+                    className="absolute -right-2.5 -top-2.5 flex size-7 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface before:absolute before:-inset-2 before:content-['']">
+              <Icon name="close" size={12} strokeWidth={3.2} />
+            </button>
+          </div>
+        ) : !foto && (
+          // mientras se trae la del link lo dice acá, y al llegar la foto queda en este lugar: no se mueve nada
+          <p role="status" className="text-[13px] leading-snug font-medium">{trayendo ? AVISOS.trayendo : consejo ?? SIN_FOTO}</p>
+        )}
       </div>
       <input ref={elegir} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
              onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
       {mensaje && (
-        <p role={mensaje === 'subiendo' || mensaje === 'probando' || mensaje === 'trayendo' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
+        <p role={mensaje === 'subiendo' || mensaje === 'probando' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
       )}
       <input ref={link} value={url} placeholder="O el link de una foto (opcional)" aria-label="Link de una foto"
              inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
