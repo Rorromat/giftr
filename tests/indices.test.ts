@@ -1,10 +1,11 @@
 import { expect, test } from 'vitest'
-import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, lt, lte, sql } from 'drizzle-orm'
 import type { PGlite } from '@electric-sql/pglite'
 import { createTestDb } from './helpers'
-import { claims, codazos, comments, groupGifts, items, listFollows, notifications } from '@/db/schema'
+import { claims, codazos, comments, groupGifts, items, listFollows, notifications, pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { noEsDeRegaloGrupal } from '@/lib/claims'
+import { contarPedidosAfuera } from '@/lib/pedidos-afuera'
 
 // Las consultas de todas las pantallas filtran por estas columnas: sin índice, cada una recorría la tabla entera.
 
@@ -27,7 +28,7 @@ test('los índices de las consultas frecuentes están', async () => {
     'items_list_id_created_at_idx', 'claims_item_id_estado_idx', 'claims_claimer_user_id_idx', 'claims_claimer_guest_id_idx',
     'claims_vencen_idx', 'comments_item_id_created_at_idx', 'notifications_user_id_idx', 'notifications_guest_id_idx',
     'notifications_item_id_idx', 'group_gifts_item_id_idx', 'group_gifts_organizer_user_id_idx', 'group_gift_members_user_id_idx',
-    'list_follows_list_id_idx', 'codazos_list_id_created_at_idx',
+    'list_follows_list_id_idx', 'codazos_list_id_created_at_idx', 'pedidos_afuera_user_id_created_at_idx',
   ]))
 })
 
@@ -51,6 +52,10 @@ test('cada consulta frecuente usa su índice', async () => {
       .where(and(eq(codazos.listId, UNO), gt(codazos.createdAt, new Date()))).orderBy(desc(codazos.createdAt))],
     // "no es de un regalo grupal" va por el único de group_gifts.claim_id, no recorre todos los regalos
     ['group_gifts_claim_id_unique', db.select().from(claims).where(and(eq(claims.itemId, UNO), noEsDeRegaloGrupal()))],
+    // el tope de pedidos de afuera: el conteo de cada lectura de un link, y la limpieza de los de más de un día
+    ['pedidos_afuera_user_id_created_at_idx', contarPedidosAfuera(db, UNO)],
+    ['pedidos_afuera_user_id_created_at_idx', db.delete(pedidosAfuera)
+      .where(and(eq(pedidosAfuera.userId, UNO), lte(pedidosAfuera.createdAt, sql`now() - interval '24 hours'`)))],
   ]
   for (const [indice, q] of casos) expect(await plan(db, q), indice).toContain(indice)
 })
