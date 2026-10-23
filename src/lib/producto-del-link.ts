@@ -11,6 +11,19 @@ export type Producto = { titulo: string | null; precio: string | null; foto: str
 export type Estado = 'ok' | 'bloqueado' | 'sin-datos' | 'no-esta' | 'no-carga'
 export type Lectura = { estado: 'ok'; producto: Producto } | { estado: 'bloqueado' | 'sin-datos' | 'no-esta' }
 
+/** Lo que contesta POST /api/deseo/link: un estado grueso y lo que se puede completar, limpio. Nada de afuera tal cual. */
+export type RespuestaLink = {
+  estado: Estado
+  /** 'ok': el de la página; si no (o si la página no dio uno), el del link, o null */
+  titulo: string | null
+  /** "$88.990" o "US$ 79,99"; otra moneda, null */
+  precio: string | null
+  /** https pública, sin guardar: la trae FotoField (POST /api/deseo/foto/desde-link) */
+  foto: string | null
+  /** "mercadolibre.com.ar", para los avisos */
+  sitio: string
+}
+
 // ---------------------------------------------------------------- muros
 
 const MURO_EN_URL = ['/gz/account-verification', '/risk/challenge', '/risk/action', '/_____tmd_____/']

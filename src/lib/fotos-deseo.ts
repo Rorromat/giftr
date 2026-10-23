@@ -2,7 +2,11 @@ import { and, count, eq, gt, lt, notExists, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { fotosDeseo, idDeFotoDeseo, items, users } from '@/db/schema'
 import type { Db } from '@/db/types'
+import { bajarFotoConUrl, pedirFoto, type Pedir } from '@/lib/bajar-foto'
 import { esUuid } from '@/lib/groups'
+import { esUrlPublica } from '@/lib/links'
+import { anotarPedidoAfuera } from '@/lib/pedidos-afuera'
+import { fotoGrande } from '@/lib/producto-del-link'
 
 // Fotos de deseos subidas desde el teléfono (galería, cámara o pegadas). Se guardan en la base, como la foto
 // de perfil, y el deseo las usa por su URL /foto/deseo/:id (que nunca cambia: cada subida es una foto nueva).
@@ -61,4 +65,59 @@ export async function leerFotoDeseo(db: Db, id: string): Promise<Buffer | null> 
   if (!esUuid(id)) return null
   const [f] = await db.select({ datos: fotosDeseo.datos }).from(fotosDeseo).where(eq(fotosDeseo.id, id))
   return f?.datos ?? null
+}
+
+/** Para traer la foto de un link: la grande y la original, todo junto (el cliente corta a los 9 s). */
+export const FOTO_DESDE_LINK_TIEMPO_MS = 6000
+// El CDN de Cúspide manda las fotos como octet-stream: lo que decide si es una foto es sharp
+const imagenOBinario = (tipo: string) => /^\s*(image\/|application\/octet-stream\s*(;|$))/i.test(tipo)
+// A donde manda ML una foto que no existe (la -F de una publicación vieja, por ejemplo): una imagen gris, que no sirve
+const NO_DISPONIBLE = '/img-not-available/'
+
+export type FotoImportada = { url: string } | { error: 'muchas' | 'muchos' | 'no_carga' | 'no_es_imagen' }
+
+/**
+ * Trae la foto de un link (la que encontró la lectura del producto) y la guarda como una subida: así el deseo no depende
+ * de que la tienda la siga sirviendo. Primero la versión grande (ver fotoGrande) y si no, la del link; en 6 s y 6 MB, como
+ * una subida. Sin cupo de fotos no se baja nada; el pedido cuenta en el tope de pedidos de afuera aunque después falle (si
+ * no, se podría pedir sin fin un link que no es una foto). no_es_imagen: lo que hay en el link no es una foto.
+ */
+export async function importarFotoDeseo(db: Db, userId: string, src: string, o: {
+  pedir?: Pedir; signal?: AbortSignal; tiempoMs?: number
+} = {}): Promise<FotoImportada> {
+  const { pedir = pedirFoto, signal, tiempoMs: total = FOTO_DESDE_LINK_TIEMPO_MS } = o
+  if (!(await quedanFotos(db, userId))) return { error: 'muchas' }
+  try {
+    if (!(await anotarPedidoAfuera(db, userId))) return { error: 'muchos' }
+  } catch {
+    // sin la tabla de pedidos (un preview con la base sin migrar): no se sale a la red
+    return { error: 'no_carga' }
+  }
+  const fin = Date.now() + total
+  let error: 'no_carga' | 'no_es_imagen' = 'no_carga'
+  for (const candidata of new Set([fotoGrande(src), src])) {
+    const tiempoMs = fin - Date.now()
+    if (tiempoMs <= 0) return { error: 'no_carga' }
+    const r = await bajarFotoConUrl(candidata, pedir, esUrlPublica, {
+      max: FOTO_DESEO_MAX_BYTES, tiempoMs, aceptar: imagenOBinario, signal,
+    })
+    if (!('datos' in r)) {
+      error = r.falla === 'otro-tipo' ? 'no_es_imagen' : 'no_carga'
+      continue
+    }
+    if (r.urlFinal.includes(NO_DISPONIBLE)) {
+      error = 'no_carga'
+      continue
+    }
+    let jpeg: Buffer
+    try {
+      jpeg = await procesarFotoDeseo(r.datos)
+    } catch {
+      error = 'no_es_imagen'
+      continue
+    }
+    const url = await guardarFotoDeseo(db, userId, jpeg)
+    return url ? { url } : { error: 'muchas' }
+  }
+  return { error }
 }

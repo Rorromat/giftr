@@ -1,10 +1,12 @@
 import { and, count, eq, gt, lte, sql } from 'drizzle-orm'
 import { pedidosAfuera, users } from '@/db/schema'
 import type { Db } from '@/db/types'
+import { aHttps } from '@/lib/bajar-foto'
+import { esUrlPublica, linkHttp } from '@/lib/links'
 
-// Lo que un usuario nos hace pedir afuera (leer la página del link de un producto, traer su foto): el tope por usuario.
-// Cada uno puede ser 4 MB y 6 s de un servidor nuestro, así que hay un máximo por día y otro por rato, contando lecturas
-// y fotos juntas.
+// Lo que un usuario nos hace pedir afuera (leer la página del link de un producto, traer su foto): el tope por usuario y
+// lo que llega en el pedido. Cada uno puede ser 4 MB y 6 s de un servidor nuestro, así que hay un máximo por día y otro
+// por rato, contando lecturas y fotos juntas.
 
 /** Una tarde de diciembre cargando 30 deseos son unos 60. */
 export const PEDIDOS_AFUERA_POR_DIA = 120
@@ -38,4 +40,48 @@ export async function anotarPedidoAfuera(db: Db, userId: string): Promise<boolea
     await t.insert(pedidosAfuera).values({ userId })
     return true
   })
+}
+
+/** El cuerpo de los pedidos de los endpoints que salen afuera: {"url": "…"}, que entra de sobra. */
+export const PEDIDO_MAX_BYTES = 4096
+
+/** El cuerpo como texto, leyendo hasta max bytes: null si es más (aunque no diga su largo, no se lee entero). */
+async function cuerpoHasta(request: Request, max: number): Promise<string | null> {
+  if (!request.body) return ''
+  const lector = request.body.getReader()
+  const trozos: Uint8Array[] = []
+  let bytes = 0
+  for (;;) {
+    const { done, value } = await lector.read()
+    if (done) break
+    bytes += value.byteLength
+    if (bytes > max) {
+      await lector.cancel().catch(() => {})
+      return null
+    }
+    trozos.push(value)
+  }
+  return new TextDecoder().decode(Buffer.concat(trozos))
+}
+
+/**
+ * El link que mandó el cliente, listo para pedirlo: un link http(s) (sin esquema, con https; http, por https) de un host
+ * con nombre al puerto 443 (ver esUrlPublica). Esto mira solo el texto: al conectarse se revisa además la IP. Solo JSON:
+ * un formulario de otro sitio no puede mandar application/json sin preflight.
+ */
+export async function urlDelPedido(request: Request): Promise<{ url: string } | { error: 'muy_grande' | 'no_es_link' }> {
+  if (Number(request.headers.get('content-length') ?? 0) > PEDIDO_MAX_BYTES) return { error: 'muy_grande' }
+  if (!/^\s*application\/json\s*(;|$)/i.test(request.headers.get('content-type') ?? '')) return { error: 'no_es_link' }
+  const texto = await cuerpoHasta(request, PEDIDO_MAX_BYTES)
+  if (texto === null) return { error: 'muy_grande' }
+  let url: unknown
+  try {
+    const json: unknown = JSON.parse(texto)
+    url = typeof json === 'object' && json !== null ? (json as { url?: unknown }).url : null
+  } catch {
+    return { error: 'no_es_link' }
+  }
+  const link = typeof url === 'string' ? linkHttp(url) : null
+  const https = link && aHttps(link)
+  return https && esUrlPublica(https) ? { url: https } : { error: 'no_es_link' }
 }

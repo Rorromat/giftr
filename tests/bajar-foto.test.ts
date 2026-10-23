@@ -84,6 +84,7 @@ test('una redirección a http:// se sigue por https; solo un 200 es la foto; y s
   expect(await bajarFoto('https://cdn.com/parcial.jpg', s.pedir, esFotoPublica)).toBeNull()
   // lo que no dice image/* no es una foto, salvo que quien llama acepte más (después lo decide sharp)
   expect(await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica)).toBeNull()
+  expect(await bajarFotoConUrl('https://cdn.com/binario', s.pedir, esFotoPublica)).toEqual({ falla: 'otro-tipo', urlProducto: 'https://cdn.com/binario' })
   const binario = (t: string) => t.startsWith('image/') || t === 'application/octet-stream'
   expect((await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica, 8 * MB, 5000, binario))?.length).toBe(MB)
 })

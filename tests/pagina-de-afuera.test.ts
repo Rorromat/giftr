@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { EventEmitter } from 'node:events'
 import http, { type IncomingMessage } from 'node:http'
 import https from 'node:https'
@@ -9,6 +11,7 @@ import { esUrlPublica } from '@/lib/compartir'
 import { aTexto, bajarPagina, estadoDeFalla, leerPagina, PAGINA_MAX_BYTES, UA_GIFTR } from '@/lib/pagina-de-afuera'
 import { leerProducto } from '@/lib/producto-del-link'
 import { cuerpo, fixture } from './fixtures/links/leer'
+import Bot from '@/app/bot/page'
 import { MB, servidor } from './helpers'
 
 // La página del link que pegó el usuario la baja el servidor: con nuestro User-Agent, siguiendo a mano las redirecciones
@@ -72,6 +75,14 @@ describe('cómo nos presentamos', () => {
       vi.unstubAllEnvs()
       vi.resetModules()
     }
+  })
+
+  test('la página /bot dice qué hace, que no recorre sitios, y con qué User-Agent se presenta', () => {
+    const pagina = renderToStaticMarkup(createElement(Bot)).replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'")
+    expect(pagina).toContain(UA_GIFTR)
+    expect(pagina).toMatch(/una sola vez/)
+    expect(pagina).toMatch(/No sigue otros links ni recorre el sitio/)
+    expect(pagina).toMatch(/doesn't follow links or crawl/)
   })
 })
 

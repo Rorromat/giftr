@@ -4,6 +4,7 @@ import https from 'node:https'
 import { BlockList, isIP, type LookupFunction } from 'node:net'
 import { pipeline, Transform } from 'node:stream'
 import zlib from 'node:zlib'
+import { UA_GIFTR } from '@/lib/giftrbot'
 
 // Bajar desde el servidor algo de afuera: la foto de un deseo (para la vista previa de WhatsApp, o para guardarla) o la
 // página de un producto. Los links los pega cualquiera: nada de pedidos a la red interna ni descargas sin fin.
@@ -12,14 +13,8 @@ export const FOTO_MAX_BYTES = 8_000_000
 /** Tiempo total, con las redirecciones y la descarga (antes eran 4 s por salto, hasta 16 s). */
 export const FOTO_TIEMPO_MS = 5000
 
-/**
- * Cómo nos presentamos afuera: un bot con nombre propio y la página que explica qué hace (/bot). Nunca el de un navegador
- * ni el de otro servicio: sería hacerse pasar por otro.
- */
-export const UA_GIFTR = (() => {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '')
-  return `Mozilla/5.0 (compatible; GiftRBot/1.0${base?.startsWith('https://') ? `; +${base}/bot` : ''})`
-})()
+// cómo nos presentamos afuera (ver giftrbot.ts)
+export { UA_GIFTR }
 
 /** Direcciones que no son de internet: loopback, privadas, link-local, CGNAT, de documentación, multicast, reservadas. */
 const NO_PUBLICAS = new BlockList()
@@ -254,16 +249,17 @@ const esImagen = (tipo: string) => tipo.startsWith('image/')
 
 /**
  * Baja una foto: hasta 3 redirecciones, con un tiempo total, y nada si pasa del máximo (ver bajarDeAfuera). Además de la
- * foto, la URL de la que vino (el placeholder de "imagen no disponible" de ML se reconoce por ahí). Null si algo no va.
+ * foto, la URL de la que vino (el placeholder de "imagen no disponible" de ML se reconoce por ahí). Si algo no va, por
+ * qué: otro-tipo es que lo que hay en el link no es una foto (una página, por ejemplo).
  */
 export async function bajarFotoConUrl(src: string, pedir: Pedir, permitida: (url: string) => boolean, o: {
   max?: number; tiempoMs?: number; aceptar?: (tipo: string) => boolean; signal?: AbortSignal
-} = {}): Promise<{ datos: Buffer; urlFinal: string } | null> {
+} = {}): Promise<{ datos: Buffer; urlFinal: string } | Corte> {
   const r = await bajarDeAfuera(src, pedir, permitida, {
     max: o.max ?? FOTO_MAX_BYTES, tiempoMs: o.tiempoMs ?? FOTO_TIEMPO_MS, saltos: 3, aceptar: o.aceptar ?? esImagen,
     siSePasa: 'nada', signal: o.signal,
   })
-  return 'datos' in r ? { datos: r.datos, urlFinal: r.urlFinal } : null
+  return 'datos' in r ? { datos: r.datos, urlFinal: r.urlFinal } : r
 }
 
 /** Baja una foto (ver bajarFotoConUrl). Null si algo no va. */
@@ -271,5 +267,6 @@ export async function bajarFoto(
   src: string, pedir: Pedir, permitida: (url: string) => boolean, max = FOTO_MAX_BYTES, tiempoMs = FOTO_TIEMPO_MS,
   aceptar: (tipo: string) => boolean = esImagen,
 ): Promise<Buffer | null> {
-  return (await bajarFotoConUrl(src, pedir, permitida, { max, tiempoMs, aceptar }))?.datos ?? null
+  const r = await bajarFotoConUrl(src, pedir, permitida, { max, tiempoMs, aceptar })
+  return 'datos' in r ? r.datos : null
 }
