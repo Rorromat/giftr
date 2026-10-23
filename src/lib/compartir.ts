@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { duenosDeLista, esToken, esUuid, juntarNombres } from '@/lib/groups'
+import { esUrlPublica } from '@/lib/links'
 
 // Lo que se muestra al compartir un link (vista previa de WhatsApp, imagen Open Graph).
 // Es lo mismo que ve cualquiera con el link, y NUNCA incluye reservas, compras ni comentarios:
@@ -69,21 +70,8 @@ export function textoDueno(i: { titulo: string }, url: string) {
   return `Esto es algo que me encantaría: ${i.titulo} 🎁\n${url}`
 }
 
-/**
- * ¿Se puede ir a buscar esto desde el servidor (una foto, la página de un producto)? Solo https al puerto 443 de un host
- * con nombre (nada de IPs, localhost ni nombres internos, tampoco con un punto al final): los links los pega cualquiera y
- * no queremos pedidos a la red interna. Esto mira el texto; al conectarse, bajarDeAfuera revisa además a qué IP resuelve.
- */
-export function esUrlPublica(url: string): boolean {
-  let u: URL
-  try { u = new URL(url) } catch { return false }
-  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
-  // "localhost." y "db.internal." son los mismos nombres que sin el punto
-  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
-  if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
-  if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
-  return true
-}
+// esUrlPublica vive en links.ts, sin dependencias: la usa también producto-del-link.ts, que no tiene por qué traer la base
+export { esUrlPublica }
 
 /** El nombre de antes, para la foto de la vista previa. */
 export const esFotoPublica = esUrlPublica

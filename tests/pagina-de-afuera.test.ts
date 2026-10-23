@@ -123,8 +123,25 @@ describe('tamaño y compresión', () => {
     const r = await bajarPagina('https://x.com/bomba')
     expect(r).toMatchObject({ cortado: true })
     expect('html' in r && r.html.length).toBe(PAGINA_MAX_BYTES)
-    // lo que se pidió de más es lo que el stream lee por adelantado, no lo que se descomprimió
-    expect(entregados).toBeLessThan(20)
+    // lo que se pidió de más es lo que los streams leen por adelantado (unos pocos trozos cada uno), no lo que se descomprimió
+    expect(entregados).toBeLessThan(30)
+  })
+
+  test('lo que viaja comprimido también tiene tope: un gzip de bloques vacíos no se baja sin fin', async () => {
+    // un encabezado gzip y después bloques deflate vacíos: no descomprimen en nada, así que el tope de lo leído no llega
+    const cabecera = Buffer.from([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3])
+    const vacios = Buffer.concat(Array(200_000).fill(Buffer.from([0, 0, 0, 0xff, 0xff]))) // 1 MB
+    let entregados = 0
+    function* goteo() {
+      yield cabecera
+      for (let i = 0; i < 100; i++) {
+        entregados++
+        yield vacios
+      }
+    }
+    httpsDeMentira({ 'https://x.com/vacio': { headers: { ...html, 'content-encoding': 'gzip' }, trozos: goteo() } })
+    expect(await bajarPagina('https://x.com/vacio')).toEqual({ falla: 'no-carga', urlProducto: 'https://x.com/vacio' })
+    expect(entregados).toBeLessThan(10)
   })
 
   test('una codificación que no conocemos no se lee', async () => {

@@ -1,11 +1,11 @@
-import { esUrlPublica } from '@/lib/compartir'
 import { LARGO, largo, recortar, sinControl } from '@/lib/limites'
+import { esUrlPublica } from '@/lib/links'
 import { pesos } from '@/lib/pesos'
 
 // Qué producto hay en una página de afuera: nombre, foto y precio. Puro (sin red) y sin dependencias: solo <title>,
 // <meta>, <link rel=canonical>, los JSON-LD, el __STATE__ de VTEX, itemprop y data-large_image. El HTML lo escribe
 // cualquiera: todo con topes, cada tag se corta con indexOf (ver tagDesde) y ninguna regex vuelve atrás sobre la página,
-// así que el tiempo crece con el largo y no con su cuadrado. Lo peor que puede pasar es que no se lea nada.
+// así que el tiempo crece con el largo y no con su cuadrado. Lo peor que puede pasar es que no se lea nada (sin-datos).
 
 export type Producto = { titulo: string | null; precio: string | null; foto: string | null }
 export type Estado = 'ok' | 'bloqueado' | 'sin-datos' | 'no-esta' | 'no-carga'
@@ -180,6 +180,8 @@ const BLOQUES_MAX = 50
 const BLOQUE_MAX_CHARS = 1_000_000
 const PROFUNDIDAD_MAX = 6
 const ARRAY_MAX = 100
+// Una página de verdad trae unas decenas por bloque (Tiendanube: el de la página y 8 recomendados)
+const NODOS_MAX = 1000
 const ES_LD = /\btype\s*=\s*["']?application\/ld\+json/i
 
 /**
@@ -220,26 +222,45 @@ function jsonLd(html: string): Bloque[] {
 
 const esNodo = (v: unknown): v is Nodo => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-/** Los nodos de un bloque: arrays, @graph y mainEntity, con topes de profundidad y de largo. */
-function* nodos(v: unknown, prof = 0): Generator<Nodo> {
-  if (prof > PROFUNDIDAD_MAX) return
+/** Los nodos de un bloque, en orden: arrays, @graph y mainEntity, con topes de profundidad, de largo y de cantidad. */
+function nodos(v: unknown, prof = 0, r: Nodo[] = []): Nodo[] {
+  if (prof > PROFUNDIDAD_MAX || r.length >= NODOS_MAX) return r
   if (Array.isArray(v)) {
-    for (const x of v.slice(0, ARRAY_MAX)) yield* nodos(x, prof + 1)
+    for (const x of v.slice(0, ARRAY_MAX)) nodos(x, prof + 1, r)
   } else if (esNodo(v)) {
-    yield v
-    for (const k of ['@graph', 'mainEntity']) if (k in v) yield* nodos(v[k], prof + 1)
+    r.push(v)
+    for (const k of ['@graph', 'mainEntity']) if (k in v) nodos(v[k], prof + 1, r)
   }
+  return r
 }
 
+// Un tipo de schema.org, con su URL adelante, entra de sobra
+const TIPO_MAX_CHARS = 100
+const TIPOS = new WeakMap<Nodo, Set<string>>()
+
+/**
+ * Los @type de un nodo ("https://schema.org/Product" → Product). Una vez por nodo y con topes: el @type lo escribe
+ * cualquiera, y un array de cientos de miles armado de nuevo en cada pregunta eran segundos con el event loop trabado.
+ */
 function tipos(n: Nodo): Set<string> {
-  const t = n['@type']
-  return new Set((Array.isArray(t) ? t : [t]).filter((x) => typeof x === 'string').map((x: string) => x.split('/').pop()!))
+  let r = TIPOS.get(n)
+  if (!r) {
+    const t = n['@type']
+    r = new Set((Array.isArray(t) ? t.slice(0, ARRAY_MAX) : [t])
+      .filter((x): x is string => typeof x === 'string' && x.length <= TIPO_MAX_CHARS)
+      .map((x) => x.slice(x.lastIndexOf('/') + 1)))
+    TIPOS.set(n, r)
+  }
+  return r
 }
 
 const PRODUCTO = ['Product', 'ProductGroup', 'IndividualProduct', 'ProductModel', 'Vehicle', 'Car', 'Book', 'VideoGame']
 // Cosas que no son un producto pero sí un regalo posible: dan nombre y foto
 const COSA = ['Hotel', 'LodgingBusiness', 'VacationRental', 'Event', 'MusicRecording', 'MusicAlbum', 'Course', 'TouristTrip']
-const esDe = (n: Nodo, lista: string[]) => lista.some((t) => tipos(n).has(t))
+function esDe(n: Nodo, lista: string[]): boolean {
+  const t = tipos(n)
+  return lista.some((x) => t.has(x))
+}
 
 /** host sin www. y path sin / final, en minúsculas: para ver si un nodo es el de esta página. */
 function comparable(v: unknown, base: string): string | null {
@@ -259,30 +280,34 @@ function comparable(v: unknown, base: string): string | null {
  * pone ahí una ruta interna.
  */
 function elegir(bloques: Bloque[], canon: string | null, urlFinal: string): Nodo | null {
-  for (const b of bloques) {
-    for (const n of nodos(b.json)) {
+  const todos = bloques.map((b) => ({ b, ns: nodos(b.json) }))
+  for (const { ns } of todos) {
+    for (const n of ns) {
       if (esDe(n, ['WebPage', 'ItemPage']) && esNodo(n.mainEntity) && esDe(n.mainEntity, PRODUCTO)) return n.mainEntity
     }
   }
-  const productos = bloques.flatMap((b) => [...nodos(b.json)].filter((n) => esDe(n, PRODUCTO) && n.name).map((n) => ({ n, b })))
+  const productos = todos.flatMap(({ b, ns }) => ns.filter((n) => esDe(n, PRODUCTO) && n.name).map((n) => ({ n, b })))
   const esta = new Set([comparable(canon, urlFinal), comparable(urlFinal, urlFinal)].filter(Boolean))
   const deEsta = productos.find(({ n }) => {
-    const ofertas = (Array.isArray(n.offers) ? n.offers : [n.offers]).filter(esNodo).map((o) => o.url)
+    const ofertas = (Array.isArray(n.offers) ? n.offers.slice(0, ARRAY_MAX) : [n.offers]).filter(esNodo).map((o) => o.url)
     return [n.url, n['@id'], ...ofertas].some((v) => esta.has(comparable(v, urlFinal)))
   })
   const elegido = deEsta ?? productos.find(({ b }) => b.enHead) ?? productos[0]
   if (elegido) return elegido.n
-  for (const b of bloques) for (const n of nodos(b.json)) if (esDe(n, COSA) && n.name) return n
+  for (const { ns } of todos) for (const n of ns) if (esDe(n, COSA) && n.name) return n
   return null
 }
 
-/** La foto de un nodo: string, array o ImageObject (url o contentUrl), salteando null y vacíos (Dexter trae [null…]). */
-function imagenDe(v: unknown, prof = 0): unknown[] {
-  if (prof > 3) return []
-  if (typeof v === 'string') return [v]
-  if (Array.isArray(v)) return v.slice(0, ARRAY_MAX).flatMap((x) => imagenDe(x, prof + 1))
-  if (esNodo(v)) return [v.url, v.contentUrl].flatMap((x) => imagenDe(x, prof + 1))
-  return []
+/**
+ * Las fotos de un nodo: string, array o ImageObject (url o contentUrl), salteando null y vacíos (Dexter trae [null…]).
+ * Las primeras 100: si ninguna sirve, las que siguen tampoco van a servir.
+ */
+function imagenDe(v: unknown, prof = 0, r: unknown[] = []): unknown[] {
+  if (prof > 3 || r.length >= ARRAY_MAX) return r
+  if (typeof v === 'string') r.push(v)
+  else if (Array.isArray(v)) for (const x of v.slice(0, ARRAY_MAX)) imagenDe(x, prof + 1, r)
+  else if (esNodo(v)) for (const x of [v.url, v.contentUrl]) imagenDe(x, prof + 1, r)
+  return r
 }
 
 type Oferta = { monto: number; moneda: string | null; enStock: boolean }
@@ -296,7 +321,9 @@ function ofertas(v: unknown, prof = 0, r: Oferta[] = []): Oferta[] {
     const ps = Array.isArray(v.priceSpecification) ? v.priceSpecification[0] : v.priceSpecification
     const monto = montoDeTexto(v.price ?? v.lowPrice ?? (esNodo(ps) ? ps.price : null))
     const moneda = v.priceCurrency ?? (esNodo(ps) ? ps.priceCurrency : null)
-    if (monto) r.push({ monto, moneda: typeof moneda === 'string' ? moneda : null, enStock: String(v.availability ?? '').includes('InStock') })
+    // availability solo si es texto: String() de un {"toString":1} de la página tira un TypeError
+    const enStock = typeof v.availability === 'string' && v.availability.includes('InStock')
+    if (monto) r.push({ monto, moneda: typeof moneda === 'string' ? moneda : null, enStock })
     if ('offers' in v) ofertas(v.offers, prof + 1, r)
   }
   return r
@@ -385,14 +412,15 @@ const miles = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
 /**
  * El precio para el formulario: "$88.990" o "US$ 79,99". Otra moneda no: el regalo grupal leería un "$" mexicano como
- * pesos. Sin moneda, pesos si la tienda es .ar.
+ * pesos. Sin moneda, pesos si la tienda es .ar. Lo que redondeado da 0 (el 0,01 que algunas tiendas ponen cuando el
+ * precio es a consultar) es "sin precio", como el 0.
  */
 export function precioParaElForm(monto: number | null, moneda: string | null, host: string): string | null {
   if (!monto) return null
   const m = moneda?.trim().toUpperCase() || (host.toLowerCase().replace(/\.+$/, '').endsWith('.ar') ? 'ARS' : null)
   let r: string | null = null
-  if (m === 'ARS') r = pesos(Math.round(monto))
-  else if (m === 'USD') {
+  if (m === 'ARS' && Math.round(monto) > 0) r = pesos(Math.round(monto))
+  else if (m === 'USD' && Math.round(monto * 100) > 0) {
     const centavos = Math.round(monto * 100)
     r = `US$ ${miles(Math.floor(centavos / 100))}${centavos % 100 ? `,${String(centavos % 100).padStart(2, '0')}` : ''}`
   }
@@ -403,7 +431,8 @@ export function precioParaElForm(monto: number | null, moneda: string | null, ho
 
 // El " - $ 88.990" que ML pone al final del og:title
 const SUFIJO_PRECIO = /\s+-\s+(?:US\$|U\$S|R\$|\$)\s?[\d.,]+$/
-const SEPARADORES = [' | ', ' - ', ' – ', ' — ', ' · ', ': ']
+// Entre las partes de un título: " | ", " - ", " – ", " — ", " · " o ": "
+const SEPARADOR = / [|\-–—·] |: /g
 const TITULO_MAX_CHARS = 2000
 
 /** El nombre de la tienda en su host: la etiqueta antes del dominio (www.crocs.com.ar → crocs, store.steampowered.com → steampowered). */
@@ -414,26 +443,56 @@ function nombreDelHost(host: string): string {
   return partes.pop() ?? ''
 }
 
-const comparar = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+/** Las palabras, en minúsculas y sin tildes: "Cúspide" es "cuspide", como en el host. */
+const palabras = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
 
-/** Si esa parte del título es el nombre del sitio ("Samsung Argentina", "AliExpress 18", "Amazon.com"). */
+// Lo que las tiendas le agregan a su nombre y no es del producto: el país, el dominio, "oficial", "Comprar en …"
+const AGREGADOS = new Set([
+  'argentina', 'arg', 'ar', 'latam', 'mexico', 'mx', 'chile', 'cl', 'uruguay', 'uy', 'colombia', 'co', 'peru', 'pe',
+  'espana', 'es', 'brasil', 'br', 'usa', 'us', 'uk', 'united', 'states', 'www', 'com', 'net', 'org', 'oficial', 'official',
+  'sitio', 'site', 'tienda', 'store', 'shop', 'online', 'comprar', 'en', 'libreria', 'librerias',
+])
+const esAgregado = (w: string) => AGREGADOS.has(w) || /^\d+$/.test(w)
+// El nombre de un sitio con lo que se le agrega no es más largo que esto
+const SITIO_MAX_PALABRAS = 8
+
+/**
+ * Si esa parte del título es el sitio: su nombre (og:site_name o el del host) solo o con agregados ("Samsung Argentina",
+ * "AliExpress 18", "Amazon.com", "Comprar en Roma objetos"), o un pedazo del nombre ("Steam" en store.steampowered.com).
+ * Por palabras enteras: en "Nike Pegasus 41" está el nombre, pero lo demás es el modelo; en "Mimosa" no está "mimo".
+ */
 function esElSitio(parte: string, nombres: string[]): boolean {
-  const p = comparar(parte)
-  return !!p && nombres.some((n) => p === n || (n.length >= 3 && p.includes(n)) || (p.length >= 4 && n.includes(p)))
+  const ps = palabras(parte)
+  const p = ps.join('')
+  if (!p || ps.length > SITIO_MAX_PALABRAS) return false
+  return nombres.some((n) => {
+    if (p.length >= 4 && n.includes(p)) return true
+    for (let i = 0; i < ps.length; i++) {
+      for (let j = i + 1; j <= ps.length; j++) {
+        if (ps.slice(i, j).join('') === n && [...ps.slice(0, i), ...ps.slice(j)].every(esAgregado)) return true
+      }
+    }
+    return false
+  })
 }
 
-/** Sin el nombre del sitio al final (" | Sitio", " - Sitio"…) o al principio ("Sitio: …"). Nunca deja el título vacío. */
+/**
+ * Sin el sitio (ver esElSitio): desde la primera parte que lo es hasta el final (" - Jumbo Argentina | Aprovechá las
+ * Ofertas"), o al principio ("Amazon.com: …"). Nunca deja menos de 3 caracteres.
+ */
 function sinSitio(t: string, sitio: string | null, host: string): string {
-  const nombres = [sitio, nombreDelHost(host)].map((n) => comparar(n ?? '')).filter((n) => n.length >= 2)
+  const nombres = [sitio, nombreDelHost(host)].map((n) => palabras(n ?? '').join('')).filter((n) => n.length >= 2)
   if (!nombres.length) return t
-  for (const sep of SEPARADORES) {
-    const i = t.lastIndexOf(sep)
-    if (i < 0) continue
-    const antes = t.slice(0, i).trim()
-    if (largo(antes) >= 3 && esElSitio(t.slice(i + sep.length), nombres)) return antes
-    const j = t.indexOf(sep)
-    const despues = t.slice(j + sep.length).trim()
-    if (sep === ': ' && largo(despues) >= 3 && esElSitio(t.slice(0, j), nombres)) return despues
+  const cortes = Array.from(t.matchAll(SEPARADOR), (m) => ({ inicio: m.index, fin: m.index + m[0].length }))
+  for (const [k, c] of cortes.entries()) {
+    if (!esElSitio(t.slice(c.fin, cortes[k + 1]?.inicio ?? t.length), nombres)) continue
+    const antes = t.slice(0, c.inicio).trim()
+    if (largo(antes) >= 3) return antes
+  }
+  const [primero] = cortes
+  if (primero && t.slice(primero.inicio, primero.fin) === ': ') {
+    const despues = t.slice(primero.fin).trim()
+    if (largo(despues) >= 3 && esElSitio(t.slice(0, primero.inicio), nombres)) return despues
   }
   return t
 }
@@ -442,7 +501,8 @@ function sinSitio(t: string, sitio: string | null, host: string): string {
 function cortarTitulo(t: string): string {
   if (largo(t) <= LARGO.titulo) return t
   const uno = recortar(t, LARGO.titulo + 1)
-  const i = uno.lastIndexOf(' ')
+  // el 121 era un espacio (recortar lo sacó): los primeros 120 terminan justo en una palabra
+  const i = largo(uno) <= LARGO.titulo ? uno.length : uno.lastIndexOf(' ')
   return (i > 60 ? uno.slice(0, i) : recortar(t, LARGO.titulo)).replace(/[\s,\-–—|·:;]+$/, '')
 }
 
@@ -509,9 +569,17 @@ function textoDelTitle(html: string): string | null {
  * Lee el producto de una página ya bajada. Primero si es un muro; después el nodo del producto (JSON-LD), el __STATE__ de
  * VTEX, og/twitter/product:, itemprop. 'sin-datos' si no hay señal de producto ni de otra cosa (la categoría de IKEA, una
  * SPA, la home); 'no-esta' si el título dice que ya no existe. El título del link (si la página no da uno) lo pone quien
- * llama.
+ * llama. Si algo de la página hace fallar la lectura, 'sin-datos': nunca una excepción para quien llama.
  */
 export function leerProducto(html: string, urlFinal: string): Lectura {
+  try {
+    return leer(html, urlFinal)
+  } catch {
+    return { estado: 'sin-datos' }
+  }
+}
+
+function leer(html: string, urlFinal: string): Lectura {
   if (esPaginaBloqueada(html, urlFinal)) return { estado: 'bloqueado' }
   const me = metas(html)
   const canon = canonical(html, urlFinal)

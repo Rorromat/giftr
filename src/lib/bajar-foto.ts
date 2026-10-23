@@ -1,8 +1,8 @@
-import { lookup } from 'node:dns'
+import dns from 'node:dns'
 import type { IncomingMessage } from 'node:http'
 import https from 'node:https'
 import { BlockList, isIP, type LookupFunction } from 'node:net'
-import { pipeline } from 'node:stream'
+import { pipeline, Transform } from 'node:stream'
 import zlib from 'node:zlib'
 
 // Bajar desde el servidor algo de afuera: la foto de un deseo (para la vista previa de WhatsApp, o para guardarla) o la
@@ -42,14 +42,40 @@ export function esIpPublica(ip: string): boolean {
 
 type Direccion = { address: string; family: number }
 export type Resolver = (host: string, cb: (err: NodeJS.ErrnoException | null, dirs: Direccion[]) => void) => void
-const resolverDelSistema: Resolver = (host, cb) => lookup(host, { all: true }, cb)
+
+/** Lo que se espera cada respuesta del DNS, por servidor y por intento. */
+const DNS_TIEMPO_MS = 2000
+
+/**
+ * Resuelve preguntándole al DNS (c-ares) y no con dns.lookup: getaddrinfo ocupa uno de los 4 hilos del threadpool de
+ * libuv (los mismos de zlib y sharp) hasta que el DNS conteste, y cortar el pedido no lo suelta, así que unos links a
+ * dominios cuyo DNS no contesta dejaban esperando a todo lo demás. Esto no usa el threadpool, tiene su tiempo y se cancela
+ * con la señal del pedido. IPv4 primero: es la que seguro anda desde el servidor (si hay IPv6, net la prueba después).
+ */
+export function resolverDeAfuera(signal?: AbortSignal): Resolver {
+  return (host, cb) => {
+    const consulta = new dns.promises.Resolver({ timeout: DNS_TIEMPO_MS, tries: 2 })
+    const cancelar = () => consulta.cancel()
+    signal?.addEventListener('abort', cancelar, { once: true })
+    if (signal?.aborted) cancelar()
+    void Promise.allSettled([consulta.resolve4(host), consulta.resolve6(host)]).then(([v4, v6]) => {
+      signal?.removeEventListener('abort', cancelar)
+      const dirs = [
+        ...(v4.status === 'fulfilled' ? v4.value.map((address) => ({ address, family: 4 })) : []),
+        ...(v6.status === 'fulfilled' ? v6.value.map((address) => ({ address, family: 6 })) : []),
+      ]
+      const error = [v4, v6].find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason
+      cb(dirs.length ? null : error ?? Object.assign(new Error(`${host} no resuelve`), { code: 'ENOTFOUND' }), dirs)
+    })
+  }
+}
 
 /**
  * El lookup de la conexión: resuelve el nombre y, si alguna dirección no es pública, no se conecta. Un nombre público
  * puede apuntar a una IP privada (127.0.0.1.nip.io). Va en la conexión misma, y cada redirección es otra conexión:
  * revisar antes y conectar después dejaría que el DNS conteste otra cosa la segunda vez.
  */
-export function lookupPublico(resolver: Resolver = resolverDelSistema): LookupFunction {
+export function lookupPublico(resolver: Resolver = resolverDeAfuera()): LookupFunction {
   return (host, opciones, cb) => {
     resolver(host, (err, todas = []) => {
       const familia = opciones.family === 4 || opciones.family === 6 ? opciones.family : 0
@@ -73,9 +99,18 @@ function encabezado(res: IncomingMessage, nombre: string): string | null {
 }
 
 /**
- * El cuerpo ya descomprimido. Se lee de a pedazos, como el original: lo que cuenta para el tope es lo que se va a leer,
- * no lo que viajó, así una bomba gzip se corta igual. Al dejar de leerlo se cierran los dos. Una página cortada por la
- * mitad (o un gzip que llega trunco) se descomprime hasta donde llegó, como hace un navegador.
+ * Lo que puede llegar comprimido. Una página de verdad llega más chica de lo que pesa descomprimida, así que antes se
+ * llega al tope de lo descomprimido; esto es para lo que viaja sin descomprimir en nada (un gzip de bloques vacíos), que
+ * si no solo lo frenaba el tiempo.
+ */
+const COMPRIMIDO_MAX_BYTES = 4_000_000
+
+/**
+ * El cuerpo ya descomprimido. Se lee de a pedazos, como el original: lo que cuenta para el tope de quien lee es lo que
+ * se va a leer, no lo que viajó, así una bomba gzip se corta igual; lo que viaja tiene su propio tope (si se pasa, es
+ * un error). Al dejar de leerlo se cierran los dos. Un gzip trunco en una respuesta que terminó bien se descomprime
+ * hasta donde llegó, como hace un navegador; si se corta la conexión o se vence el tiempo, no se lee nada (bajarDeAfuera
+ * da no-carga).
  */
 async function* descomprimido(res: IncomingMessage, codificacion: string): AsyncGenerator<Uint8Array> {
   const flush = { finishFlush: zlib.constants.Z_SYNC_FLUSH }
@@ -87,7 +122,15 @@ async function* descomprimido(res: IncomingMessage, codificacion: string): Async
     res.destroy()
     throw new Error(`codificación desconocida: ${codificacion}`)
   }
-  yield* d ? pipeline(res, d, () => {}) : res
+  if (!d) return yield* res
+  let crudos = 0
+  const contar = new Transform({
+    transform(trozo: Buffer, _codificacion, listo) {
+      crudos += trozo.byteLength
+      listo(crudos > COMPRIMIDO_MAX_BYTES ? new Error('demasiado comprimido') : null, trozo)
+    },
+  })
+  yield* pipeline(res, contar, d, () => {})
 }
 
 /**
@@ -98,7 +141,7 @@ async function* descomprimido(res: IncomingMessage, codificacion: string): Async
  */
 export function pedidoAfuera(headers: Record<string, string>, o: { descomprimir?: boolean } = {}): Pedir {
   return (url, signal) => new Promise((resolve, reject) => {
-    https.get(url, { signal, lookup: lookupPublico(), agent: false, headers }, (res) => resolve({
+    https.get(url, { signal, lookup: lookupPublico(resolverDeAfuera(signal)), agent: false, headers }, (res) => resolve({
       status: res.statusCode ?? 0,
       header: (nombre) => (o.descomprimir && /^content-(length|encoding)$/i.test(nombre) ? null : encabezado(res, nombre)),
       cuerpo: o.descomprimir ? descomprimido(res, (encabezado(res, 'content-encoding') ?? '').trim().toLowerCase()) : res,

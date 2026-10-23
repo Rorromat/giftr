@@ -1,6 +1,5 @@
 import { aHttps, bajarDeAfuera, pedirPagina, UA_GIFTR, type Corte, type Falla, type Pedir } from '@/lib/bajar-foto'
-import { esUrlPublica } from '@/lib/compartir'
-import { tituloDelLink } from '@/lib/links'
+import { esUrlPublica, tituloDelLink } from '@/lib/links'
 import { esPublicacionDeMarketplace, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
 import { esHome, esUrlDeMuro, leerProducto, urlTrasElMuro, type Estado, type Producto } from '@/lib/producto-del-link'
 

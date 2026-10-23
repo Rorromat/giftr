@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { leerPagina } from '@/lib/pagina-de-afuera'
 import {
   esPaginaBloqueada, esUrlDeMuro, fotoGrande, leerProducto, limpiarTitulo, montoDeTexto, precioParaElForm, type Estado,
@@ -63,10 +63,11 @@ const DIFERENCIAS: Record<string, Partial<ReturnType<typeof esperadoDe>> & { por
   'amazon-5': { porque: 'capturada sin og:*, igual que amazon-1', estado: 'sin-datos' },
   'spotify-2': { porque: 'la SPA no trae og ni JSON-LD', estado: 'sin-datos' },
   'steam-2': { porque: 'la página de la edad no tiene señal de producto', estado: 'sin-datos' },
+  'airbnb-3': { porque: 'un form que se manda solo ("Redirigiendo a es.airbnb.com"), sin og ni JSON-LD', estado: 'sin-datos' },
 }
 
 // Redirecciones y respuestas JSON: se prueban en pagina-de-afuera.test.ts o son de la fase 2
-const APARTE = ['redireccion', 'redireccion-js', 'redireccion-form', 'api-json']
+const APARTE = ['redireccion', 'redireccion-js', 'api-json']
 const PAGINAS = casos().filter((c) => !APARTE.includes(fixture(c).expected.tipo ?? '') && !fixture(c).expected.redirect)
 
 /** La página del fixture servida en su URL final, y lo que lee el route de ella (bajarPagina + leerProducto + slug). */
@@ -81,7 +82,7 @@ async function leerFixture(caso: string) {
 describe('cada fixture da lo de su expected, salvo las diferencias aceptadas', () => {
   test('están todos los fixtures', () => {
     expect(casos()).toHaveLength(99)
-    expect(PAGINAS).toHaveLength(85)
+    expect(PAGINAS).toHaveLength(86)
     for (const c of Object.keys(DIFERENCIAS)) expect(PAGINAS, c).toContain(c)
   })
 
@@ -95,7 +96,7 @@ describe('cada fixture da lo de su expected, salvo las diferencias aceptadas', (
       // de una página que no se leyó no queda nada: ni el título del muro ni la foto de la home
       expect(r.precio).toBeNull()
       expect(r.foto).toBeNull()
-      expect(r.titulo ?? '').not.toMatch(/^adidas$|access denied|attention required|just a moment|captcha|robot|web player|amazon\.(com|es)$/i)
+      expect(r.titulo ?? '').not.toMatch(/^adidas$|access denied|attention required|just a moment|captcha|robot|web player|redirigiendo|amazon\.(com|es)$/i)
     }
   })
 })
@@ -171,6 +172,14 @@ describe('precioParaElForm', () => {
     expect(precioParaElForm(null, 'ARS', 'x.com.ar')).toBeNull()
   })
 
+  test('lo que redondeado da 0 es sin precio (el 0,01 de "precio a consultar")', () => {
+    expect(precioParaElForm(0.01, 'ARS', 'x.com.ar')).toBeNull()
+    expect(precioParaElForm(0.49, null, 'x.com.ar')).toBeNull()
+    expect(precioParaElForm(0.004, 'USD', 'x.com')).toBeNull()
+    expect(precioParaElForm(0.5, 'ARS', 'x.com')).toBe('$1')
+    expect(precioParaElForm(0.01, 'USD', 'x.com')).toBe('US$ 0,01')
+  })
+
   test('siempre entra en el campo', () => {
     for (const [n, m] of [[9_999_999_999, 'ARS'], [9_999_999_999.99, 'USD']] as const) {
       expect((precioParaElForm(n, m, 'x.com') ?? '').length).toBeLessThanOrEqual(40)
@@ -199,6 +208,26 @@ describe('limpiarTitulo', () => {
     expect(limpiarTitulo('Remera - M', null, 'www.mimo.com.ar')).toBe('Remera - M')
   })
 
+  test('el sitio con lo que se le agrega, y lo que sigue después', () => {
+    expect(limpiarTitulo('Crocs Classic Moc – Crocs Argentina | Sitio Oficial', 'Crocs Argentina | Sitio Oficial', 'www.crocs.com.ar')).toBe('Crocs Classic Moc')
+    expect(limpiarTitulo('Cerveza Quilmes x 6 - Jumbo Argentina | Aprovechá las Ofertas I Supermercado Online', null, 'www.jumbo.com.ar')).toBe('Cerveza Quilmes x 6')
+    expect(limpiarTitulo('REMERA JR STYLE - Mimo & Co | Ropa y calzado para niñas', null, 'www.mimo.com.ar')).toBe('REMERA JR STYLE')
+    expect(limpiarTitulo('MACETA DUOMO GRANDE - Comprar en Roma objetos', null, 'www.romaobjetos.com.ar')).toBe('MACETA DUOMO GRANDE')
+    expect(limpiarTitulo('AMIGOS POR EL VIENTO - LILIANA BODOC - SBS Librerías', null, 'www.sbs.com.ar')).toBe('AMIGOS POR EL VIENTO - LILIANA BODOC')
+    expect(limpiarTitulo('Basic T-Shirt - Green | ZARA United States', null, 'www.zara.com')).toBe('Basic T-Shirt - Green')
+    // sin tildes, como en el host
+    expect(limpiarTitulo('ANTES DE QUE SE ENFRIE EL CAFE – Cúspide', null, 'cuspide.com')).toBe('ANTES DE QUE SE ENFRIE EL CAFE')
+  })
+
+  test('el nombre de la marca con el modelo no es el sitio: el modelo queda', () => {
+    expect(limpiarTitulo('Zapatillas Running - Nike Pegasus 41', 'Nike.com', 'www.nike.com.ar')).toBe('Zapatillas Running - Nike Pegasus 41')
+    expect(limpiarTitulo('Termo 1L - Stanley Classic Legendary', null, 'www.stanley.com.ar')).toBe('Termo 1L - Stanley Classic Legendary')
+    expect(limpiarTitulo('Smart TV 50 pulgadas - Samsung Crystal UHD', null, 'www.samsung.com')).toBe('Smart TV 50 pulgadas - Samsung Crystal UHD')
+    expect(limpiarTitulo('Cafetera Express: Oster Prima', null, 'www.oster.com.ar')).toBe('Cafetera Express: Oster Prima')
+    // por palabras enteras: "Mimosa" no es "Mimo"
+    expect(limpiarTitulo('Remera - Mimosa', null, 'www.mimo.com.ar')).toBe('Remera - Mimosa')
+  })
+
   test('un título que es solo el nombre del sitio no queda vacío', () => {
     expect(limpiarTitulo('Samsung', 'Samsung', 'www.samsung.com')).toBe('Samsung')
     expect(limpiarTitulo('Samsung | Samsung', 'Samsung', 'www.samsung.com')).toBe('Samsung')
@@ -225,6 +254,9 @@ describe('limpiarTitulo', () => {
     expect(largo[t.length]).toBe(' ')
     // sin espacios después del 60, se corta en el 120
     expect(limpiarTitulo('x'.repeat(200), null, 'x.com')).toBe('x'.repeat(120))
+    // si el 121 es un espacio, entran los 120 justos
+    const justo = `${'x'.repeat(70)} ${'y'.repeat(49)}`
+    expect(limpiarTitulo(`${justo} zzz`, null, 'x.com')).toBe(justo)
   })
 })
 
@@ -324,6 +356,46 @@ describe('leerProducto con HTML armado', () => {
     const hostil = '<script type="application/ld+json">{roto</script>' + ld(anidado) +
       `<script type="application/ld+json">${'['.repeat(100_000)}</script>` + '<meta property="og:type" content="product"><meta property="og:title" content="Sigue">'
     expect(leerProducto(hostil, 'https://x.com/p')).toMatchObject({ estado: 'ok', producto: { titulo: 'Sigue' } })
+  })
+
+  test('un availability que no es texto no rompe la lectura (ni la de la página entera)', async () => {
+    for (const availability of [{ toString: 1 }, { toString: 'x', valueOf: 'y' }, [{ toString: 1, valueOf: 1 }]]) {
+      const html = ld({ '@type': 'Product', name: 'Mate', offers: { price: '10', priceCurrency: 'ARS', availability } })
+      expect(leerProducto(html, 'https://x.com.ar/p')).toEqual({ estado: 'ok', producto: { titulo: 'Mate', precio: '$10', foto: null } })
+      const s = servidor({ 'https://x.com.ar/p': { headers: { 'content-type': 'text/html' }, cuerpo: html } })
+      expect((await leerPagina('https://x.com.ar/p', s.pedir)).estado).toBe('ok')
+    }
+  })
+
+  test('si algo de la lectura tira, sin-datos: nunca una excepción para quien llama', () => {
+    // algo de adentro que tira (acá, normalize, que usa la limpieza del título)
+    const tira = vi.spyOn(String.prototype, 'normalize').mockImplementation(() => { throw new TypeError('roto') })
+    try {
+      expect(leerProducto('<meta property="og:type" content="product"><meta property="og:title" content="Mate - Tienda">', 'https://www.tienda.com/p'))
+        .toEqual({ estado: 'sin-datos' })
+    } finally {
+      tira.mockRestore()
+    }
+  })
+
+  test('un @type enorme o miles de nodos: con topes, y cada tipo se mira una vez', () => {
+    // 4 bloques de casi 1 MB cada uno (el tope de un bloque): armar los tipos en cada pregunta eran segundos
+    const pagina = (tipo: unknown) => ld({ '@type': 'WebPage', mainEntity: { '@type': tipo, name: 'x' } }).repeat(4)
+    for (const [que, tipo] of [['333 mil tipos vacíos', Array(333_000).fill('')], ['un tipo de 980 mil "/"', '/'.repeat(980_000)]] as const) {
+      const html = pagina(tipo)
+      expect(html.length, que).toBeGreaterThan(3_900_000)
+      const antes = Date.now()
+      expect(leerProducto(html, 'https://x.com/p').estado, que).toBe('sin-datos')
+      expect(Date.now() - antes, que).toBeLessThan(1000)
+    }
+    // 50 mil nodos por bloque, en arrays anidados: se miran los primeros
+    const anidados = ld(Array(100).fill(Array(100).fill(Array(5).fill({ '@type': 'Thing' })))).repeat(4)
+    expect(anidados.length).toBeGreaterThan(3_600_000)
+    const antes = Date.now()
+    expect(leerProducto(anidados, 'https://x.com/p').estado).toBe('sin-datos')
+    expect(Date.now() - antes).toBeLessThan(1000)
+    // un tipo con su URL adelante sigue contando
+    expect(leerProducto(ld({ '@type': ['', 'https://schema.org/Product'], name: 'Mate' }), 'https://x.com/p')).toMatchObject({ estado: 'ok', producto: { titulo: 'Mate' } })
   })
 
   test('HTML armado para que una regex tarde: ninguna recorre la página más de una vez', () => {

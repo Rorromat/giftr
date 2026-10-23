@@ -1,13 +1,26 @@
-import { expect, test, vi } from 'vitest'
-import type { LookupAddress } from 'node:dns'
+import { afterEach, expect, test, vi } from 'vitest'
+import dns, { type LookupAddress } from 'node:dns'
 import https from 'node:https'
-import { bajarFoto, bajarFotoConUrl, esIpPublica, lookupPublico, pedirAfuera, UA_GIFTR, type Resolver } from '@/lib/bajar-foto'
+import {
+  bajarFoto, bajarFotoConUrl, esIpPublica, lookupPublico, pedirAfuera, resolverDeAfuera, UA_GIFTR, type Resolver,
+} from '@/lib/bajar-foto'
 import { esFotoPublica } from '@/lib/compartir'
 import { MB, servidor } from './helpers'
 
 // La foto de la vista previa la baja el servidor desde un link que carga cualquiera.
 
 const permitida = () => true
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** El DNS de mentira (c-ares): lo que contesta a A y a AAAA por host; lo que no conoce no existe. */
+function dnsDeMentira(v4: Record<string, string[]>, v6: Record<string, string[]> = {}) {
+  const sinDatos = (host: string) => Promise.reject(Object.assign(new Error(`sin datos para ${host}`), { code: 'ENODATA' }))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve4').mockImplementation(async (host: string) => v4[host] ?? sinDatos(host))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve6').mockImplementation(async (host: string) => v6[host] ?? sinDatos(host))
+}
 
 const jpg = { 'content-type': 'image/jpeg' }
 
@@ -117,8 +130,33 @@ test('al conectarse se revisa a qué IP resuelve el nombre (un nombre público q
 })
 
 test('la descarga de afuera usa ese control en la conexión misma', async () => {
-  // localhost resuelve sin red: sin el control sería "conexión rechazada"; con él, ni se conecta
-  await expect(pedirAfuera('https://localhost:1/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('no es una dirección pública')
+  // un nombre que el DNS manda a 127.0.0.1: sin el control sería "conexión rechazada"; con él, ni se conecta
+  dnsDeMentira({ 'fotos.ejemplo.com': ['127.0.0.1'] })
+  await expect(pedirAfuera('https://fotos.ejemplo.com:1/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('no es una dirección pública')
+})
+
+test('el DNS se pregunta sin dns.lookup (que ocupa el threadpool): IPv4 primero, y con una familia alcanza', async () => {
+  const sistema = vi.spyOn(dns, 'lookup')
+  dnsDeMentira({ 'a.com': ['200.45.12.3'], 'b.com': ['8.8.8.8'] }, { 'a.com': ['2800:3f0:4002:80b::200e'], 'c.com': ['2800:3f0:4002:80b::200e'] })
+  const resolver = (host: string) => new Promise((ok) => resolverDeAfuera()(host, (err, dirs) => ok(err ? err.code : dirs)))
+  expect(await resolver('a.com')).toEqual([{ address: '200.45.12.3', family: 4 }, { address: '2800:3f0:4002:80b::200e', family: 6 }])
+  expect(await resolver('b.com')).toEqual([{ address: '8.8.8.8', family: 4 }])
+  expect(await resolver('c.com')).toEqual([{ address: '2800:3f0:4002:80b::200e', family: 6 }])
+  expect(await resolver('no-existe.com')).toBe('ENODATA')
+  expect(sistema).not.toHaveBeenCalled()
+})
+
+test('si el pedido se corta, la pregunta al DNS se cancela (no queda esperando a un DNS que no contesta)', async () => {
+  const colgadas: (() => void)[] = []
+  const colgada = () => new Promise<string[]>((_, mal) => colgadas.push(() => mal(Object.assign(new Error('cancelada'), { code: 'ECANCELLED' }))))
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve4').mockImplementation(colgada)
+  vi.spyOn(dns.promises.Resolver.prototype, 'resolve6').mockImplementation(colgada)
+  const cancelar = vi.spyOn(dns.promises.Resolver.prototype, 'cancel').mockImplementation(() => colgadas.splice(0).forEach((f) => f()))
+  const pedido = new AbortController()
+  const respuesta = new Promise((ok) => resolverDeAfuera(pedido.signal)('lento.com', (err) => ok(err?.code)))
+  pedido.abort()
+  expect(await respuesta).toBe('ECANCELLED')
+  expect(cancelar).toHaveBeenCalledTimes(1)
 })
 
 test('la descarga de afuera se presenta: sin User-Agent hay hosts de fotos (Wikimedia) que contestan 403', async () => {

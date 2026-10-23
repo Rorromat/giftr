@@ -26,6 +26,22 @@ export function linkHttp(valor: string): string | null {
   }
 }
 
+/**
+ * ¿Se puede ir a buscar esto desde el servidor (una foto, la página de un producto)? Solo https al puerto 443 de un host
+ * con nombre (nada de IPs, localhost ni nombres internos, tampoco con un punto al final): los links los pega cualquiera y
+ * no queremos pedidos a la red interna. Esto mira el texto; al conectarse, bajarDeAfuera revisa además a qué IP resuelve.
+ */
+export function esUrlPublica(url: string): boolean {
+  let u: URL
+  try { u = new URL(url) } catch { return false }
+  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
+  // "localhost." y "db.internal." son los mismos nombres que sin el punto
+  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
+  if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
+  if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
+  return true
+}
+
 /** Para el título de un deseo que era solo un link: el sitio, legible ("mercadolibre.com.ar"), para que el dueño lo cambie. */
 export function sitioDeLink(link: string): string {
   try {
