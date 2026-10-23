@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { UA_GIFTR } from '@/lib/giftrbot'
+import { API_ML_TIEMPO_MS } from '@/lib/mercadolibre'
+import { tiempos } from './helpers'
 
 // La API oficial de MercadoLibre (leerDeLaApi): fetch es de mentira, con las formas de las respuestas de la API. Nada sale
 // a la red. Cada test carga el módulo de nuevo: el token queda en memoria del módulo.
@@ -192,6 +194,29 @@ describe('catálogo y /up/', () => {
     }
   })
 
+  test('un catálogo con el item elegido que se cerró (o que no se lee): /products, que lo puede vender otro', async () => {
+    const elegido = `${CATALOGO}?pdp_filters=item_id%3AMLA3070371712`
+    for (const item of [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' }), () => respuesta({ message: 'not found' }, 404)]) {
+      const llamadas = conToken({ [`GET ${API}/items/MLA3070371712`]: [item], [`GET ${API}/products/MLA39939183`]: [() => respuesta(PRODUCTO)] })
+      expect(await (await api()).leerDeLaApi(elegido)).toMatchObject({ estado: 'ok', producto: { titulo: PRODUCTO.name, precio: '$189.990' } })
+      expect(llamadas.filter((l) => l.metodo === 'GET').map((l) => l.url)).toEqual([`${API}/items/MLA3070371712`, `${API}/products/MLA39939183`])
+      soloLaApi(llamadas)
+    }
+    // si el producto tampoco se lee, lo que dijo el item: cerrado, no-esta; sin nada, null (la página)
+    conToken({
+      [`GET ${API}/items/MLA3070371712`]: [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' })],
+      [`GET ${API}/products/MLA39939183`]: [() => respuesta({ message: 'not found' }, 404)],
+    })
+    expect(await (await api()).leerDeLaApi(elegido)).toEqual({ estado: 'no-esta' })
+    conToken({ [`GET ${API}/items/MLA3070371712`]: [() => respuesta('', 500)], [`GET ${API}/products/MLA39939183`]: [() => respuesta('', 500)] })
+    expect(await (await api()).leerDeLaApi(elegido)).toBeNull()
+    // un /up/ no es un catálogo: su item cerrado es no-esta, sin /products
+    const up = conToken({ [`GET ${API}/items/MLA3070371712`]: [() => respuesta({ ...ITEM, id: 'MLA3070371712', status: 'closed' })] })
+    const canasta = 'https://www.mercadolibre.com.ar/canasta-matera/up/MLAU3409701436?pdp_filters=item_id%3AMLA3070371712'
+    expect(await (await api()).leerDeLaApi(canasta)).toEqual({ estado: 'no-esta' })
+    expect(up.filter((l) => l.metodo === 'GET')).toHaveLength(1)
+  })
+
   test('sin un id para la API (un /up/ sin item, un link corto, una tienda, otro sitio): null, sin pedir nada', async () => {
     const llamadas = apiDeMentira({})
     const { leerDeLaApi } = await api()
@@ -264,10 +289,24 @@ test('cualquier falla (red, status, JSON raro, tiempo): null, para seguir por la
     conToken({ [`GET ${API}/items/MLA1418506688`]: [contesta] })
     expect(await (await api()).leerDeLaApi(ARTICULO), caso).toBeNull()
   }
-  // si el que pidió se fue (o se vence el tiempo), se corta
+  // si el que pidió se fue, se corta
   const llamadas = conToken({ [`GET ${API}/items/MLA1418506688`]: [() => new Promise<Response>(() => {})] })
   const usuario = new AbortController()
   usuario.abort()
   expect(await (await api()).leerDeLaApi(ARTICULO, usuario.signal)).toBeNull()
   expect(llamadas.filter((l) => l.metodo === 'GET')).toEqual([])
+})
+
+test(`si la API no contesta, se corta a los ${API_ML_TIEMPO_MS / 1000} s: null`, async () => {
+  // fetch que no contesta nunca pero respeta la señal, como el de verdad; los tiempos, cien veces más cortos
+  const colgado = vi.fn((_url: string | URL, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
+    init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
+  }))
+  vi.stubGlobal('fetch', colgado)
+  const ms = tiempos(100)
+  const antes = Date.now()
+  expect(await (await api()).leerDeLaApi(ARTICULO)).toBeNull()
+  expect(Date.now() - antes).toBeLessThan(API_ML_TIEMPO_MS / 100 + 500)
+  expect(ms).toEqual([API_ML_TIEMPO_MS])
+  expect(colgado).toHaveBeenCalledTimes(1)
 })

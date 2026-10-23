@@ -97,7 +97,7 @@ export async function importarFotoDeseo(db: Db, userId: string, src: string, o: 
   let error: 'no_carga' | 'no_es_imagen' = 'no_carga'
   for (const candidata of new Set([fotoGrande(src), src])) {
     const tiempoMs = fin - Date.now()
-    if (tiempoMs <= 0) return { error: 'no_carga' }
+    if (tiempoMs <= 0 || signal?.aborted) return { error: 'no_carga' }
     const r = await bajarFotoConUrl(candidata, pedir, esUrlPublica, {
       max: FOTO_DESEO_MAX_BYTES, tiempoMs, aceptar: imagenOBinario, signal,
     })

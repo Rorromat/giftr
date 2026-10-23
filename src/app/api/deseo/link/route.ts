@@ -2,9 +2,9 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { sitioDeLink, tituloDelLink } from '@/lib/links'
 import { esPublicacionDeMarketplace, hayApiDeMercadoLibre, leerDeLaApi, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
-import { expandirLinkCorto, leerPagina } from '@/lib/pagina-de-afuera'
+import { expandirLinkCorto, leerPagina, type PaginaLeida } from '@/lib/pagina-de-afuera'
 import { anotarPedidoAfuera, urlDelPedido } from '@/lib/pedidos-afuera'
-import type { Estado, Producto, RespuestaLink } from '@/lib/producto-del-link'
+import type { Estado, RespuestaLink } from '@/lib/producto-del-link'
 
 // Leer el producto del link que pegó el dueño en el formulario de un deseo (nombre, foto y precio), para completar lo que
 // esté vacío. Un route handler y no una Server Action: Next despacha las actions de a una por cliente, y "Agregar"
@@ -16,10 +16,13 @@ import type { Estado, Producto, RespuestaLink } from '@/lib/producto-del-link'
 export const runtime = 'nodejs'
 export const maxDuration = 10
 
-/** Para todo junto (la API de ML y la página con sus saltos): el cliente corta a los 9 s. */
+/**
+ * Para todo junto, desde que llega el pedido (la sesión, el tope, la API de ML y la página con sus saltos): el cliente
+ * corta a los 9 s y maxDuration es 10. Una base que tarda en despertar se descuenta de acá.
+ */
 const TIEMPO_MS = 8000
 
-type Leido = { estado: Estado; producto: Producto; urlProducto: string }
+type Leido = PaginaLeida & { api?: boolean }
 
 /** Sin leer la página (no se pide, o no se pudo): el nombre que trae el link. */
 const delLink = (estado: Estado, url: string): Leido => ({
@@ -27,15 +30,21 @@ const delLink = (estado: Estado, url: string): Leido => ({
 })
 
 /**
- * El orden de MercadoLibre: con la API configurada, un link corto se sigue hasta la publicación (sin pedirla) y se le
- * pregunta a la API; si no contesta, o si no hay API, la página como con cualquier link. Con ML_PEDIR_MARKETPLACE
- * apagado, bajarPagina no pide la publicación y queda el nombre del link. Nunca se cambia el host del link.
+ * El orden de MercadoLibre: con la API configurada, un link corto se sigue hasta su destino (sin pedirlo) y, si es una
+ * publicación, se le pregunta a la API; si no contesta, o si no hay API, la página como con cualquier link (la de un link
+ * corto, desde su destino: el link corto no se vuelve a pedir). Con ML_PEDIR_MARKETPLACE apagado, bajarPagina no pide la
+ * publicación y queda el nombre del link. Nunca se cambia el host del link.
  */
-async function leer(link: string, signal: AbortSignal): Promise<Leido & { api?: boolean }> {
+async function leer(link: string, signal: AbortSignal): Promise<Leido> {
   const ml = linkDeMercadoLibre(link)
   let url = link
   if (ml && hayApiDeMercadoLibre()) {
-    if (ml.tipo === 'corto') url = (await expandirLinkCorto(link, undefined, signal)) ?? link
+    if (ml.tipo === 'corto') {
+      const corto = await expandirLinkCorto(link, undefined, signal)
+      // no llegó a un destino (no cargó, fue a la home…): lo que dio
+      if (!('destino' in corto)) return corto
+      url = corto.destino
+    }
     const api = await leerDeLaApi(url, signal)
     if (api?.estado === 'ok') return { estado: 'ok', producto: api.producto, urlProducto: url, api: true }
     if (api) return { ...delLink(api.estado, url), api: true }
@@ -51,7 +60,7 @@ function hostDe(url: string): string {
   }
 }
 
-function responder(r: Leido & { api?: boolean }, inicio: number): Response {
+function responder(r: Leido, inicio: number): Response {
   // solo el host, el estado y lo que tardó (el link entero puede traer tokens): para ver cuánto bloquea cada sitio
   console.info(`deseo/link ${hostDe(r.urlProducto)} ${r.estado} ${Date.now() - inicio}ms${r.api ? ' api' : ''}`)
   const { titulo, precio, foto } = r.producto
@@ -76,5 +85,6 @@ export async function POST(request: Request) {
     console.error('deseo/link: no se pudo anotar el pedido', e)
     return responder(delLink('no-carga', link), inicio)
   }
-  return responder(await leer(link, AbortSignal.any([request.signal, AbortSignal.timeout(TIEMPO_MS)])), inicio)
+  const tiempo = AbortSignal.timeout(Math.max(0, TIEMPO_MS - (Date.now() - inicio)))
+  return responder(await leer(link, AbortSignal.any([request.signal, tiempo])), inicio)
 }

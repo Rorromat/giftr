@@ -285,28 +285,38 @@ describe('expandir un link corto de ML (para preguntarle a la API)', () => {
 
   test('sigue los saltos hasta la publicación, sin pedirla', async () => {
     const s = servidor({ 'https://meli.la/2abcXYZ': salto('https://mercadolibre.com/sec/1x2y3z'), 'https://mercadolibre.com/sec/1x2y3z': salto(ARTICULO) })
-    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir)).toBe(ARTICULO)
+    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir)).toEqual({ destino: ARTICULO })
     expect(s.urls()).toEqual(['https://meli.la/2abcXYZ', 'https://mercadolibre.com/sec/1x2y3z'])
     // también al muro, que dice cuál era (go=): tampoco se pide
     const muro = fixture('mercadolibre-10').cadenaDeRespuestas[0].location!
     const m = servidor({ 'https://meli.la/2abcXYZ': salto(muro) })
-    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', m.pedir)).toBe(muro)
+    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', m.pedir)).toEqual({ destino: muro })
     expect(m.urls()).toEqual(['https://meli.la/2abcXYZ'])
   })
 
-  test('si no lleva a algo con id (la home, una tienda, otro sitio, la red interna) o no redirige: null, sin pedir el destino', async () => {
-    for (const destino of [
-      'https://www.mercadolibre.com.ar/', 'https://www.mercadolibre.com.ar/tienda/laska', 'https://otro.com/MLA-1418506688-x-_JM',
-      'https://10.0.0.1/MLA-1418506688-x-_JM',
-    ]) {
+  test('a lo que no es una publicación (una tienda, otro sitio) también: el destino, sin pedirlo', async () => {
+    for (const destino of ['https://www.mercadolibre.com.ar/tienda/laska', 'https://otro.com/MLA-1418506688-x-_JM']) {
       const s = servidor({ 'https://meli.la/2abcXYZ': salto(destino) })
-      expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir), destino).toBeNull()
+      expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir), destino).toEqual({ destino })
       expect(s.urls()).toEqual(['https://meli.la/2abcXYZ'])
     }
-    // contesta una página: no se lee
-    const s = servidor({ 'https://meli.la/2abcXYZ': { headers: html, trozos: 3 } })
-    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir)).toBeNull()
-    expect(s.entregados()).toBe(0)
+  })
+
+  test('si la cadena termina antes, lo que dio, como leerPagina (y el link corto se pidió una sola vez)', async () => {
+    for (const [respuestas, leido] of [
+      // un código roto, a la home: sin-datos, sin pedirla
+      [{ 'https://meli.la/2abcXYZ': salto('https://www.mercadolibre.com.ar/') }, { estado: 'sin-datos' }],
+      // a la red interna: ni se pide
+      [{ 'https://meli.la/2abcXYZ': salto('https://10.0.0.1/MLA-1418506688-x-_JM') }, { estado: 'no-carga' }],
+      [{}, { estado: 'no-carga' }],
+      [{ 'https://meli.la/2abcXYZ': { status: 404, headers: html } }, { estado: 'no-esta' }],
+      // contesta una página en vez de redirigir: se lee ahí
+      [{ 'https://meli.la/2abcXYZ': { headers: html, cuerpo: pagina('Mate imperial') } }, { estado: 'ok', producto: { titulo: 'Mate imperial' } }],
+    ] as const) {
+      const s = servidor(respuestas)
+      expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir), JSON.stringify(respuestas)).toMatchObject(leido)
+      expect(s.urls()).toEqual(['https://meli.la/2abcXYZ'])
+    }
   })
 })
 

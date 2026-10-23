@@ -3,11 +3,11 @@ import http from 'node:http'
 import https from 'node:https'
 import { count, eq, sql } from 'drizzle-orm'
 import sharp from 'sharp'
-import { conConsultas, createTestDb, seedOwnerAndGiver, servidor } from './helpers'
+import { conConsultas, createTestDb, seedOwnerAndGiver, servidor, tiempos } from './helpers'
 import { fotosDeseo, pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
-import { FOTOS_POR_DIA, importarFotoDeseo, leerFotoDeseo } from '@/lib/fotos-deseo'
+import { FOTO_DESDE_LINK_TIEMPO_MS, FOTOS_POR_DIA, importarFotoDeseo, leerFotoDeseo } from '@/lib/fotos-deseo'
 import { esUrlFotoDeseo } from '@/lib/links'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
@@ -18,9 +18,16 @@ const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   session: null as { userId: string } | null,
   pedirFoto: undefined as unknown as Pedir,
+  /** lo que pasa mientras se busca la sesión (el reloj que avanza, por ejemplo) */
+  alAutenticar: null as (() => void) | null,
 }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
-vi.mock('@/auth', () => ({ auth: async () => h.session }))
+vi.mock('@/auth', () => ({
+  auth: async () => {
+    h.alAutenticar?.()
+    return h.session
+  },
+}))
 vi.mock('@/lib/bajar-foto', async (original) => ({
   ...await original<typeof import('@/lib/bajar-foto')>(), get pedirFoto() { return h.pedirFoto },
 }))
@@ -39,6 +46,7 @@ beforeEach(async () => {
   h.db = await createTestDb()
   ownerId = (await seedOwnerAndGiver(h.db)).owner.id
   h.session = { userId: ownerId }
+  h.alAutenticar = null
   h.pedirFoto = servidor({}).pedir
   vi.spyOn(https, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
   vi.spyOn(http, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
@@ -159,6 +167,18 @@ test('un solo tiempo para la grande y la del link: pasado, no_carga', async () =
   const usuario = new AbortController()
   setTimeout(() => usuario.abort(), 50)
   expect(await importarFotoDeseo(h.db, ownerId, ML, { pedir: s.pedir, signal: usuario.signal })).toEqual({ error: 'no_carga' })
+})
+
+test('los 6 s cuentan desde que llega el pedido: si la sesión tardó 4 s (una base que despierta), quedan 2 para las dos', async () => {
+  let ahora = Date.now()
+  vi.spyOn(Date, 'now').mockImplementation(() => ahora)
+  h.alAutenticar = () => { ahora += 4000 }
+  // los tiempos, cien veces más cortos: la grande no contesta nunca, y al cortarse ya no se pide la del link
+  const ms = tiempos(100)
+  const s = afuera({ [ML_GRANDE]: { status: 404, demora: 60_000 }, [ML]: { headers: { 'content-type': 'image/webp' }, cuerpo: png } })
+  expect((await traer(ML)).status).toBe(422)
+  expect(ms[0]).toBe(FOTO_DESDE_LINK_TIEMPO_MS - 4000)
+  expect(s.urls()).toEqual([ML_GRANDE])
 })
 
 test('toca solo users (el lock), pedidos_afuera y fotos_deseo: nada de deseos, reservas ni regalos', async () => {

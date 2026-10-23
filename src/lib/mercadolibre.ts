@@ -178,9 +178,10 @@ function deProducto(j: unknown, host: string): Lectura | null {
 
 /**
  * La publicación de un link de ML según la API oficial: el producto, o no-esta si se cerró. Una publicación (y un /up/ o
- * un catálogo con el item elegido) por /items; un catálogo sin item, por /products; un /up/ sin item no tiene API. Null si
- * la API no está configurada, si el link no tiene un id para ella o si algo falla (red, tiempo, status, JSON raro):
- * entonces sigue el camino de la página. Nunca tira.
+ * un catálogo con el item elegido) por /items; un catálogo sin item, por /products; un /up/ sin item no tiene API. Un
+ * catálogo con el item elegido sigue por /products si ese item se cerró o no se pudo leer: el producto lo puede vender
+ * otro. Null si la API no está configurada, si el link no tiene un id para ella o si algo falla (red, tiempo, status,
+ * JSON raro): entonces sigue el camino de la página. Nunca tira.
  */
 export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Lectura | null> {
   const ml = linkDeMercadoLibre(url)
@@ -188,13 +189,16 @@ export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Le
   const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, '')
   const tiempo = AbortSignal.timeout(API_ML_TIEMPO_MS)
   const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
-  try {
-    if (ml.itemId && ID.test(ml.itemId)) return deItem(await deLaApi(`/items/${ml.itemId}`, s), host)
-    if (ml.tipo === 'catalogo' && ml.productId && ID.test(ml.productId)) {
-      return deProducto(await deLaApi(`/products/${ml.productId}`, s), host)
+  const leer = async (ruta: string, de: (j: unknown, host: string) => Lectura | null) => {
+    try {
+      return de(await deLaApi(ruta, s), host)
+    } catch {
+      // red, tiempo o un JSON roto
+      return null
     }
-  } catch {
-    // red, tiempo o un JSON roto: la página
   }
-  return null
+  const item = ml.itemId && ID.test(ml.itemId) ? await leer(`/items/${ml.itemId}`, deItem) : null
+  if (item?.estado === 'ok' || ml.tipo !== 'catalogo' || !ml.productId || !ID.test(ml.productId)) return item
+  // un catálogo, sin item o con uno que se cerró: el producto (y si tampoco, lo que dijo el item)
+  return (await leer(`/products/${ml.productId}`, deProducto)) ?? item
 }

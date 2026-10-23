@@ -61,52 +61,56 @@ function noPedir(url: string, desde: string | null, pegado: string): Corte | nul
   return null
 }
 
+type Bajada = { html: string; urlFinal: string; cortado: boolean } | Corte
+
 /**
  * Baja la página de un link: hasta 5 redirecciones, 6 s y 4 MB en total (más que eso se corta y se lee lo que llegó). Un
  * http:// pegado se pide por https. Si no se pudo, la falla y la URL de la que sale el nombre del producto (urlProducto).
+ * antes: otros destinos que no se piden, antes que los de siempre (ver expandirLinkCorto).
  */
-export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal):
-  Promise<{ html: string; urlFinal: string; cortado: boolean } | Corte> {
+export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal,
+  antes?: (url: string, desde: string | null) => Corte | null): Promise<Bajada> {
   const r = await bajarDeAfuera(aHttps(link), pedir, esUrlPublica, {
     max: PAGINA_MAX_BYTES, tiempoMs: PAGINA_TIEMPO_MS, saltos: PAGINA_SALTOS, aceptar: esHtml, siSePasa: 'cortar', signal,
-    noPedir: (url, desde) => noPedir(url, desde, link),
+    noPedir: (url, desde) => antes?.(url, desde) ?? noPedir(url, desde, link),
   })
   if ('falla' in r) return r
   return { html: aTexto(r.datos, r.tipo), urlFinal: r.urlFinal, cortado: r.cortado }
 }
 
+/** Lo que se contesta de un link: el estado, el producto y la URL de la que sale el sitio para los avisos. */
+export type PaginaLeida = { estado: Estado; producto: Producto; urlProducto: string }
+
+/** El producto de lo que se bajó, con el título del link si la página no dio uno (o no se pudo leer). */
+function leida(p: Bajada, link: string): PaginaLeida {
+  const lectura = 'falla' in p ? { estado: estadoDeFalla(p.falla) } : leerProducto(p.html, p.urlFinal)
+  const urlProducto = ('falla' in p ? p.urlProducto : p.urlFinal) ?? link
+  const producto = lectura.estado === 'ok' ? lectura.producto : { titulo: null, precio: null, foto: null }
+  return { estado: lectura.estado, producto: { ...producto, titulo: producto.titulo ?? tituloDelLink(urlProducto) }, urlProducto }
+}
+
 /**
- * La publicación a la que lleva un link corto de ML (meli.la, mercadolibre.com/sec/), para preguntarle a la API: sigue
- * sus redirecciones como bajarPagina (cada una revisada), pero el primer destino que no es otro link corto no se pide,
- * solo se anota. Null si no lleva a algo con un id para la API (la home, otro sitio), si no redirige o si no carga: entonces
- * el link sigue el camino de siempre.
+ * Hasta dónde lleva un link corto de ML (meli.la, mercadolibre.com/sec/), para preguntarle a la API: sigue la cadena como
+ * bajarPagina (cada salto revisado, el muro, la home de un código roto), pero el primer destino público que no es otro
+ * link corto no se pide: se devuelve, y la página, si hace falta, se lee desde ahí (sin volver a pedir el link corto). Si
+ * la cadena termina antes (no carga, contesta una página en vez de redirigir, va a la home), lo que dio, como leerPagina.
  */
-export async function expandirLinkCorto(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal): Promise<string | null> {
+export async function expandirLinkCorto(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal):
+  Promise<{ destino: string } | PaginaLeida> {
   let destino = null as string | null
-  await bajarDeAfuera(aHttps(link), pedir, esUrlPublica, {
-    max: PAGINA_MAX_BYTES, tiempoMs: PAGINA_TIEMPO_MS, saltos: PAGINA_SALTOS, siSePasa: 'nada', signal,
-    // si contesta una página en vez de redirigir, no se lee
-    aceptar: () => false,
-    noPedir: (url, desde) => {
-      if (!desde || linkDeMercadoLibre(url)?.tipo === 'corto') return null
-      destino = url
-      // se corta ahí, sin pedirlo (la falla no se usa)
-      return { falla: 'sin-datos', urlProducto: url }
-    },
+  const p = await bajarPagina(link, pedir, signal, (url, desde) => {
+    if (!desde || linkDeMercadoLibre(url)?.tipo === 'corto' || esHome(url) || !esUrlPublica(url)) return null
+    destino = url
+    // se corta ahí, sin pedirlo (la falla no se usa)
+    return { falla: 'sin-datos', urlProducto: url }
   })
-  const ml = destino ? linkDeMercadoLibre(destino) : null
-  return ml?.itemId || ml?.productId ? destino : null
+  return destino ? { destino } : leida(p, link)
 }
 
 /**
  * Baja y lee el producto de un link (los pasos 6 y 7 del route): el estado, y el producto con el título del link si la
  * página no dio uno (o no se pudo leer). urlProducto es de la que sale el sitio para los avisos.
  */
-export async function leerPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal):
-  Promise<{ estado: Estado; producto: Producto; urlProducto: string }> {
-  const p = await bajarPagina(link, pedir, signal)
-  const lectura = 'falla' in p ? { estado: estadoDeFalla(p.falla) } : leerProducto(p.html, p.urlFinal)
-  const urlProducto = ('falla' in p ? p.urlProducto : p.urlFinal) ?? link
-  const producto = lectura.estado === 'ok' ? lectura.producto : { titulo: null, precio: null, foto: null }
-  return { estado: lectura.estado, producto: { ...producto, titulo: producto.titulo ?? tituloDelLink(urlProducto) }, urlProducto }
+export async function leerPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal): Promise<PaginaLeida> {
+  return leida(await bajarPagina(link, pedir, signal), link)
 }

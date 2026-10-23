@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { drizzle } from 'drizzle-orm/pglite'
 import { eq } from 'drizzle-orm'
@@ -39,6 +40,20 @@ export async function seguir(db: Db, userId: string, listId: string) {
 }
 
 export const MB = 1024 * 1024
+
+/**
+ * Espía AbortSignal.timeout: anota los ms que pide cada uno y lo hace durar eso dividido por escala, así un test ve cortar
+ * los 8 s de un route en 80 ms. Se deshace con vi.restoreAllMocks.
+ */
+export function tiempos(escala = 1): number[] {
+  const ms: number[] = []
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((t) => {
+    ms.push(t)
+    return timeout(Math.round(t / escala))
+  })
+  return ms
+}
 
 type RespuestaDeMentira = {
   status?: number

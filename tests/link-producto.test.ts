@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import http from 'node:http'
 import https from 'node:https'
 import { count, eq, sql } from 'drizzle-orm'
-import { conConsultas, createTestDb, seedOwnerAndGiver, servidor } from './helpers'
+import { conConsultas, createTestDb, seedOwnerAndGiver, servidor, tiempos } from './helpers'
 import { cuerpo, fixture } from './fixtures/links/leer'
 import { pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Pedir } from '@/lib/bajar-foto'
+import { API_ML_TIEMPO_MS } from '@/lib/mercadolibre'
+import { PAGINA_TIEMPO_MS } from '@/lib/pagina-de-afuera'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
 // POST /api/deseo/link: lee el producto del link que pegó el dueño. La base es PGlite, la sesión es de mentira y la
@@ -17,9 +19,16 @@ const h = vi.hoisted(() => ({
   session: null as { userId: string } | null,
   pedirPagina: undefined as unknown as Pedir,
   pedirMarketplace: true,
+  /** lo que pasa mientras se busca la sesión (el reloj que avanza, por ejemplo) */
+  alAutenticar: null as (() => void) | null,
 }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
-vi.mock('@/auth', () => ({ auth: async () => h.session }))
+vi.mock('@/auth', () => ({
+  auth: async () => {
+    h.alAutenticar?.()
+    return h.session
+  },
+}))
 vi.mock('@/lib/bajar-foto', async (original) => ({
   ...await original<typeof import('@/lib/bajar-foto')>(), get pedirPagina() { return h.pedirPagina },
 }))
@@ -41,6 +50,7 @@ beforeEach(async () => {
   ownerId = (await seedOwnerAndGiver(h.db)).owner.id
   h.session = { userId: ownerId }
   h.pedirMarketplace = true
+  h.alAutenticar = null
   h.pedirPagina = servidor({}).pedir
   vi.spyOn(https, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
   vi.spyOn(http, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
@@ -105,6 +115,12 @@ describe('lo que se puede pedir', () => {
   test('un cuerpo de más de 4 KB: 413, diga o no su largo', async () => {
     const grande = JSON.stringify({ url: `https://x.com/${'a'.repeat(5000)}` })
     expect((await leer(grande)).status).toBe(413)
+    // si dice que es más grande, ni se lee (aunque mienta)
+    const dice = new Request('https://giftr.app/api/deseo/link', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '5000' }, body: JSON.stringify({ url: 'https://x.com/a' }),
+    })
+    expect((await POST(dice)).status).toBe(413)
+    expect(dice.bodyUsed).toBe(false)
     // sin content-length (llega de a pedazos): se deja de leer al pasar los 4 KB
     const trozos = new ReadableStream({
       start(c) {
@@ -256,6 +272,17 @@ describe('el tope por usuario', () => {
   })
 })
 
+test('los 8 s cuentan desde que llega el pedido: si la sesión tardó 3 s (una base que despierta), quedan 5', async () => {
+  let ahora = Date.now()
+  vi.spyOn(Date, 'now').mockImplementation(() => ahora)
+  h.alAutenticar = () => { ahora += 3000 }
+  const ms = tiempos()
+  afuera({ 'https://tienda.com.ar/products/mate': { headers: html, cuerpo: pagina('Mate') } })
+  expect(await (await leer({ url: 'https://tienda.com.ar/products/mate' })).json()).toMatchObject({ estado: 'ok' })
+  // el del route y el de la página
+  expect(ms).toEqual([5000, PAGINA_TIEMPO_MS])
+})
+
 describe('con la API de MercadoLibre configurada', () => {
   const API = 'https://api.mercadolibre.com'
   const ITEM = {
@@ -264,14 +291,17 @@ describe('con la API de MercadoLibre configurada', () => {
     pictures: [{ id: '931470', secure_url: 'https://http2.mlstatic.com/D_931470-MLA89297118039_082025-O.jpg', url: 'http://x' }],
   }
 
-  /** La API de mentira: el token y lo que diga /items/MLA1418506688. Anota a qué URLs se pidió. */
+  /**
+   * La API de mentira: el token y lo que diga /items/MLA1418506688. Anota a qué URLs se pidió. El token vence enseguida
+   * (expires_in de un minuto): cada lectura pide el suyo, así ningún test usa el que quedó en memoria de otro.
+   */
   function api(item: () => Response) {
     vi.stubEnv('MELI_CLIENT_ID', '123')
     vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
     const urls: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       urls.push(url)
-      if (url === `${API}/oauth/token`) return Response.json({ access_token: 'APP_USR-1', token_type: 'Bearer', expires_in: 21600 })
+      if (url === `${API}/oauth/token`) return Response.json({ access_token: 'APP_USR-1', token_type: 'Bearer', expires_in: 60 })
       if (url === `${API}/items/MLA1418506688`) return item()
       throw new Error(`no esperaba ${url}`)
     }))
@@ -286,7 +316,7 @@ describe('con la API de MercadoLibre configurada', () => {
       foto: 'https://http2.mlstatic.com/D_931470-MLA89297118039_082025-O.jpg', sitio: 'mercadolibre.com.ar',
     })
     expect(s.urls()).toEqual([])
-    expect(urls.every((u) => u.startsWith(`${API}/`))).toBe(true)
+    expect(urls).toEqual([`${API}/oauth/token`, `${API}/items/MLA1418506688`])
     expect(await pedidos()).toBe(1)
     expect(String(info.mock.calls[0][0])).toMatch(/^deseo\/link articulo\.mercadolibre\.com\.ar ok \d+ms api$/)
   })
@@ -328,6 +358,44 @@ describe('con la API de MercadoLibre configurada', () => {
       estado: 'bloqueado', titulo: 'Mate de algarrobo premium artesanal con bombilla',
     })
     expect(otra.urls()).toEqual(['https://meli.la/2abcXYZ', ARTICULO])
+  })
+
+  test('meli.la a lo que no es una publicación: la página desde ahí, sin volver a pedir meli.la', async () => {
+    const urls = api(() => Response.json(ITEM))
+    const tienda = 'https://www.mercadolibre.com.ar/tienda/laska'
+    const s = afuera({ 'https://meli.la/2abcXYZ': { status: 301, headers: { location: tienda } }, [tienda]: { headers: html, cuerpo: '<html></html>' } })
+    expect(await (await leer({ url: 'https://meli.la/2abcXYZ' })).json()).toMatchObject({ estado: 'sin-datos', sitio: 'mercadolibre.com.ar' })
+    expect(s.urls()).toEqual(['https://meli.la/2abcXYZ', tienda])
+    // un código roto, a la home: sin-datos sin pedirla; uno que contesta una página, se lee ahí
+    const home = afuera({ 'https://meli.la/2abcXYZ': { status: 301, headers: { location: 'https://www.mercadolibre.com.ar/' } } })
+    expect(await (await leer({ url: 'https://meli.la/2abcXYZ' })).json()).toMatchObject({ estado: 'sin-datos' })
+    expect(home.urls()).toEqual(['https://meli.la/2abcXYZ'])
+    const pagina200 = afuera({ 'https://meli.la/2abcXYZ': { headers: html, cuerpo: pagina('Mate imperial') } })
+    expect(await (await leer({ url: 'https://meli.la/2abcXYZ' })).json()).toMatchObject({ estado: 'ok', titulo: 'Mate imperial' })
+    expect(pagina200.urls()).toEqual(['https://meli.la/2abcXYZ'])
+    // sin un id, a la API no se le pregunta
+    expect(urls).toEqual([])
+  })
+
+  test(`todo junto en 8 s: si la API no contesta, la página a los ${API_ML_TIEMPO_MS / 1000}; si tampoco, no-carga a los 8`, async () => {
+    vi.stubEnv('MELI_CLIENT_ID', '123')
+    vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
+    // la API y la página no contestan nunca, pero respetan la señal (como las de verdad); los tiempos, cien veces más cortos
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
+      init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
+    })))
+    const s = afuera({ [ARTICULO]: { headers: html, cuerpo: pagina('Mate'), demora: 60_000 } })
+    const ms = tiempos(100)
+    const antes = Date.now()
+    expect(await (await leer({ url: ARTICULO })).json()).toEqual({
+      estado: 'no-carga', titulo: 'Mate de algarrobo premium artesanal con bombilla', precio: null, foto: null, sitio: 'mercadolibre.com.ar',
+    })
+    expect(Date.now() - antes).toBeLessThan(80 + 500)
+    // el del route (lo que queda de los 8 s), el de la API y el de la página, que se pidió cuando la API se cortó
+    expect(ms[0]).toBeGreaterThan(7000)
+    expect(ms[0]).toBeLessThanOrEqual(8000)
+    expect(ms.slice(1)).toEqual([API_ML_TIEMPO_MS, PAGINA_TIEMPO_MS])
+    expect(s.urls()).toEqual([ARTICULO])
   })
 
   test('un link que no es de ML no le pregunta a la API', async () => {
