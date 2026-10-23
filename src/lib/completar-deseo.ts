@@ -9,8 +9,15 @@ export type { RespuestaLink }
 
 /** Lo escrito en los campos que se completan, tal cual. */
 export type Valores = { titulo: string; linkTienda: string; precio: string }
-/** Lo que escribió el autocompletado la última vez (y para qué link): eso se puede reemplazar; lo que escribió el dueño, no. */
-export type Puesto = { link: string; titulo?: string; linkTienda?: string; precio?: string }
+/** Uno de esos campos. */
+export type Campo = keyof Valores
+const CAMPOS: readonly Campo[] = ['titulo', 'linkTienda', 'precio']
+/**
+ * Lo que escribió el autocompletado la última vez (y para qué link): eso se puede reemplazar; lo que escribió el dueño, no.
+ * tituloDe: el link de otro producto que puso ese título (quedó porque el dueño estaba en el título, ver loDelAnterior);
+ * sin él, el título es de este link.
+ */
+export type Puesto = { link: string; titulo?: string; tituloDe?: string; linkTienda?: string; precio?: string }
 /** Lo que contestó la lectura: la respuesta, 'muchos' (el tope por usuario) o null (no contestó a tiempo, o sin red). */
 export type Contestado = RespuestaLink | 'muchos' | null
 /** Lo que se escribe en cada campo ('' lo vacía); lo que no viene no se toca. */
@@ -29,6 +36,8 @@ export type Completado = Campos & {
   aviso: string | null
   consejoFoto?: string
   puesto: Puesto
+  /** Lo que no se escribió porque el dueño está en ese campo: se escribe al dejarlo (ver completador). */
+  retenidos?: Campo[]
 }
 
 /** El cliente corta la lectura a los 9 s (el route tiene 10), y cuenta como que no cargó. */
@@ -113,6 +122,8 @@ export const avisoBuscando = (link: string) => `Buscando el producto en ${sitioD
  */
 export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app y tocá Pegar.'
 
+const esOk = (r: Contestado) => (r !== null && r !== 'muchos' && r.estado === 'ok' ? r : null)
+
 // Cortos, para que entren en la línea (una sola, con su lugar guardado) en un teléfono de 320 px: unas 40 letras. Lo que
 // falta completar se ve en los campos.
 function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null {
@@ -145,56 +156,55 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
  *   lo que puso el autocompletado, y si este producto no tiene, eso se vacía. Una falla (sin respuesta, el tope, no
  *   carga, no está, sin datos, bloqueado) no dice nada del producto: no vacía nada ni propone foto, solo pone el nombre
  *   del link en el título y avisa.
- * escribiendo: el dueño está en el título. El título no se toca (le cambiaría lo que está escribiendo y le movería el
- * cursor): el link pasa a la tienda y el precio se completa, y el nombre se pone al dejar el campo (ver completador).
+ * enfocado: el campo donde está el dueño. Ese no se toca (le cambiaría lo que escribe y le movería el cursor: "$88.990"
+ * y lo que tipeaba quedaba "$88.99045000"): queda en retenidos y se escribe al dejarlo (ver completador). El link que sale
+ * del título va con el título: si hay que escribirlo en la tienda y ahí está el foco, esperan los dos (si no, quedaba dos
+ * veces al pegarlo ahí, o en ningún lado); con el foco en el título pasa a la tienda igual, y el título queda con el link
+ * (el servidor lo saca, es el mismo).
  * Null si el link ya no es el que hay que completar (lo borró o pegó otro mientras se buscaba): no se aplica nada.
  */
-export function queCompletar(v: Valores, link: string, r: Contestado, puesto: Puesto | null, escribiendo = false): Completado | null {
+export function queCompletar(v: Valores, link: string, r: Contestado, puesto: Puesto | null, enfocado: Campo | null = null): Completado | null {
   const enTitulo = delTitulo(v, puesto)
   if ((enTitulo?.link ?? deLaTienda(v)) !== link) return null
-  const ok = r !== null && r !== 'muchos' && r.estado === 'ok' ? r : null
+  const ok = esOk(r)
   // sin respuesta (tiempo vencido, sin red, el tope), el nombre que trae el link
   const nombre = r && r !== 'muchos' ? r.titulo : tituloDelLink(link)
-  const c: Completado = { aviso: null, puesto: { link } }
-
-  // el título como queda; tituloPuesto: lo que puso ahí el autocompletado
-  let titulo: string | undefined
-  let tituloPuesto: string | undefined
+  // lo que va en cada campo, y lo que de eso es del autocompletado
+  const campos: Campos = {}
+  const nuevo: Puesto = { link }
   if (enTitulo) {
-    if (v.linkTienda !== link) c.linkTienda = link
-    c.puesto.linkTienda = link
+    if (v.linkTienda !== link) campos.linkTienda = link
+    nuevo.linkTienda = link
     // con texto además del link queda el texto, salvo que sea lo que puso el autocompletado (no es del dueño)
     const resto = enTitulo.resto === puesto?.titulo ? '' : enTitulo.resto
-    if (resto) titulo = resto
-    else if (nombre) titulo = tituloPuesto = nombre
+    if (resto) campos.titulo = resto
+    else if (nombre) campos.titulo = nuevo.titulo = nombre
     // sin nombre queda el link solo (el servidor pone el del link o el sitio)
-    else if (enTitulo.resto) titulo = link
+    else if (enTitulo.resto) campos.titulo = link
   } else {
     // el link de la tienda que puso el autocompletado y sigue ahí, también
-    if (puesto?.linkTienda && v.linkTienda.trim() === puesto.linkTienda) c.puesto.linkTienda = puesto.linkTienda
+    if (puesto?.linkTienda && v.linkTienda.trim() === puesto.linkTienda) nuevo.linkTienda = puesto.linkTienda
     if (!v.titulo.trim() || v.titulo === puesto?.titulo) {
       // no queda vacío si tenía algo (frenaría el envío): sin nombre, el del link o el sitio, como lo pondría el servidor
-      if (nombre || v.titulo.trim()) titulo = tituloPuesto = nombre ?? nombreDelLink(link)
+      if (nombre || v.titulo.trim()) campos.titulo = nuevo.titulo = nombre ?? nombreDelLink(link)
     }
   }
-  if (escribiendo) {
-    // queda como está, y lo que había puesto el autocompletado sigue siendo suyo
-    c.puesto.titulo = puesto?.titulo
-  } else {
-    if (titulo !== undefined) c.titulo = titulo
-    c.puesto.titulo = tituloPuesto
-  }
-  const pusoNombre = !escribiendo && !!nombre && tituloPuesto === nombre
-
-  let pusoPrecio = false
   if (ok && (!v.precio.trim() || v.precio === puesto?.precio)) {
-    if (ok.precio) {
-      c.precio = c.puesto.precio = ok.precio
-      pusoPrecio = true
-    } else if (v.precio.trim()) c.precio = ''
+    if (ok.precio) campos.precio = nuevo.precio = ok.precio
+    else if (v.precio.trim()) campos.precio = ''
   }
+
+  const retenidos: Campo[] = enfocado === 'linkTienda' && campos.linkTienda !== undefined ? ['titulo', 'linkTienda'] : enfocado ? [enfocado] : []
+  const c: Completado = { aviso: null, puesto: nuevo }
+  for (const k of CAMPOS) {
+    // queda como está, y lo que había puesto ahí el autocompletado sigue siendo suyo
+    if (retenidos.includes(k)) nuevo[k] = puesto?.[k]
+    else if (campos[k] !== undefined) c[k] = campos[k]
+  }
+  if (retenidos.includes('titulo')) nuevo.tituloDe = puesto?.tituloDe
+  if (retenidos.length) c.retenidos = retenidos
   if (ok) c.foto = ok.foto && esUrlPublica(ok.foto) ? ok.foto : null
-  c.aviso = avisoDe(r, pusoNombre, pusoPrecio)
+  c.aviso = avisoDe(r, !!nombre && c.titulo !== undefined && nuevo.titulo === nombre, !!c.precio)
   if (r && r !== 'muchos' && r.estado === 'bloqueado' && esHostDeMercadoLibre(r.sitio)) c.consejoFoto = CONSEJO_FOTO_ML
   return c
 }
@@ -217,7 +227,7 @@ function tituloSinLoPuesto(v: Valores, link: string, puesto: Puesto): string | u
  * el precio ni la foto del otro. Siempre, aunque el link nuevo empiece con el anterior. El título no queda vacío, que
  * frenaría el envío (ver tituloSinLoPuesto). Si en "Link a la tienda" quedó el anterior, se saca: así el servidor mueve
  * el nuevo, y el título no avisa que es largo. escribiendo: el dueño está en el título (o va a estar), que no se toca;
- * lo del anterior que queda ahí sigue como puesto, y se cambia al dejarlo.
+ * lo del anterior que queda ahí sigue como puesto, marcado como de su link (tituloDe), y se cambia al dejarlo.
  * Null si no hay nada que sacar; si no, lo que se escribe (y la foto propuesta se saca) y lo que queda puesto.
  */
 export function loDelAnterior(v: Valores, link: string, puesto: Puesto | null, escribiendo = false): { campos: Campos; puesto: Puesto } | null {
@@ -225,8 +235,12 @@ export function loDelAnterior(v: Valores, link: string, puesto: Puesto | null, e
   const campos: Campos = {}
   const nuevo: Puesto = { link }
   const titulo = tituloSinLoPuesto(v, link, puesto)
-  if (titulo !== undefined && escribiendo) nuevo.titulo = puesto.titulo
-  else if (titulo !== undefined) {
+  if (titulo !== undefined && escribiendo) {
+    nuevo.titulo = puesto.titulo
+    // si volvió al producto que lo puso, es de este
+    const de = puesto.tituloDe ?? puesto.link
+    if (!mismoProducto(de, link)) nuevo.tituloDe = de
+  } else if (titulo !== undefined) {
     campos.titulo = titulo
     if (titulo !== link) nuevo.titulo = titulo
   }
@@ -272,15 +286,23 @@ export function loQueEntro(e: { inputType: string; data: string | null }, pegado
   return e.inputType === 'insertText' && e.data && e.data.length > 1 ? e.data : null
 }
 
+/** Adónde pasa el foco al dejar un campo: otro de los que se completan, el botón de mandar, o ninguno de esos. */
+export type Destino = Campo | 'enviar' | null
+
 export type Completador = {
   /** Cambió el título o "Link a la tienda". pegado: lo que entró de una vez (ver loQueEntro); null si se escribió. */
   alCambiar: (pegado: string | null) => void
-  /** Dejó uno de esos dos campos (vaAlTitulo: el foco pasa al título, relatedTarget del focusout). */
-  alDejar: (campo: 'titulo' | 'linkTienda', vaAlTitulo?: boolean) => void
+  /** Dejó uno de los campos que se completan; va: adónde pasa el foco. */
+  alDejar: (campo: Campo, va: Destino) => void
   /**
-   * El formulario se manda, antes de que se arme el FormData. Lo escrito sin buscar no se busca (el servidor pone el
-   * nombre del link), pero lo que puso el link anterior sale; el título queda como al dejarlo; lo que esté en curso se
-   * corta, y lo que llegue tarde ya no se aplica.
+   * Tocó el botón de mandar (o Enter, que lo toca), antes de que el navegador revise los campos: lo escrito sin buscar no
+   * se busca (el servidor pone el nombre del link), pero lo que puso el link anterior sale; lo que no se escribió mientras
+   * el dueño estaba en un campo, se escribe; y el título no queda vacío por lo que se está leyendo (frenaba "Agregar").
+   */
+  antesDeMandar: () => void
+  /**
+   * El formulario se manda, antes de que se arme el FormData: lo mismo (si no pasó por el botón), y lo que esté en curso
+   * se corta: lo que llegue tarde ya no se aplica.
    */
   alMandar: () => void
   /** El formulario se va: se corta lo que esté en curso, y lo que llegue tarde ya no se aplica. */
@@ -293,17 +315,17 @@ export type Completador = {
  * escribir. Un link que no se busca (la home de una tienda, que no tiene un producto; uno que el servidor no toma; el que
  * ya tenía el deseo) igual saca lo que puso el anterior. Un pedido por vez: un link nuevo corta el anterior, y lo que
  * llegue de ese se descarta. Lo que ya se leyó no se vuelve a pedir (si se pega de nuevo, se vuelve a completar con
- * eso), salvo que no haya cargado; el mismo producto (ver mismoProducto), tampoco, y escrito a mano no cambia nada. Sin
- * reintentos. Nada de esto frena el envío.
- * Mientras el dueño está en el título, el título no se toca: lo que había que poner ahí se pone al dejarlo (o al mandar).
+ * eso), salvo que no haya cargado; el mismo producto (ver mismoProducto), tampoco, y escrito a mano no vuelve a poner
+ * nada. Sin reintentos. Nada de esto frena el envío.
+ * El campo donde está el dueño no se toca: lo que había que poner ahí se pone al dejarlo (o al mandar).
  */
 export function completador(o: {
   /** Al editar: el link a la tienda y el título que ya tenía el deseo (sus links no se buscan). */
   guardado: string | null
   tituloGuardado?: string | null
   leer: () => Valores
-  /** Si el dueño está en el título. */
-  escribiendo?: () => boolean
+  /** El campo donde está el dueño, si es uno de los que se completan. */
+  enfocado?: () => Campo | null
   /** Escribe los campos que vienen y, si viene foto (null incluido), se la propone a FotoField. */
   escribir: (campos: Campos, foto?: string | null) => void
   mostrar: (linea: Linea) => void
@@ -317,9 +339,9 @@ export function completador(o: {
   let enCurso: { link: string; corte: AbortController } | null = null
   /** Lo escrito a mano que se busca al dejar el campo. */
   let pendiente: string | null = null
-  /** Lo que se aplicó con el dueño en el título: lo que no se le escribió ahí se pone al dejarlo (ver soltarTitulo). */
-  let diferido: { link: string; r: Contestado } | null = null
-  const enElTitulo = () => o.escribiendo?.() ?? false
+  /** Lo que contestó un link y no se escribió porque el dueño estaba en esos campos: va al dejarlos (ver soltar). */
+  let diferido: { link: string; r: Contestado; campos: Campo[] } | null = null
+  const enfocado = () => o.enfocado?.() ?? null
 
   /** Lo pendiente y lo que se estaba buscando, cortado; si decía "Buscando…", ya no (no se busca nada). */
   function cortar() {
@@ -330,12 +352,15 @@ export function completador(o: {
     o.mostrar({ aviso: '' })
   }
 
-  function aplicar(link: string, r: Contestado, escribiendo = enElTitulo()) {
+  /** Si se busca ese link: el que hay que completar (ver linkParaCompletar), y no la home de una tienda. */
+  const seBusca = (link: string) => linkParaCompletar(o.leer(), guardados, puesto) === link && !esHome(link)
+
+  function aplicar(link: string, r: Contestado, foco = enfocado()) {
     const v = o.leer()
-    const c = linkParaCompletar(v, guardados, puesto) === link ? queCompletar(v, link, r, puesto, escribiendo) : null
+    const c = linkParaCompletar(v, guardados, puesto) === link ? queCompletar(v, link, r, puesto, foco) : null
     if (!c) return
     puesto = c.puesto
-    diferido = escribiendo ? { link, r } : null
+    diferido = c.retenidos ? { link, r, campos: c.retenidos } : null
     o.escribir(c, c.foto)
     o.mostrar({ aviso: c.aviso ?? '', consejoFoto: c.consejoFoto })
     actual = linkDelForm(o.leer(), puesto)
@@ -346,6 +371,7 @@ export function completador(o: {
     const antes = loDelAnterior(o.leer(), link, puesto, escribiendo)
     if (!antes) return
     puesto = antes.puesto
+    diferido = null
     o.escribir(antes.campos, null)
   }
 
@@ -357,51 +383,79 @@ export function completador(o: {
     const v = o.leer()
     if (v.titulo.trim() || deLaTienda(v) !== link) return
     const titulo = nombreDelLink(link)
-    puesto = { ...(puesto ?? { link }), titulo }
+    puesto = { ...(puesto ?? { link }), titulo, tituloDe: undefined }
     o.escribir({ titulo })
   }
 
-  /** Al dejar el título (o al mandar): lo que no se le escribió mientras el dueño estaba ahí. */
+  /**
+   * Al dejar un campo (o al mandar): lo que contestó el link y no se escribió porque el dueño estaba ahí, si sigue siendo
+   * el mismo producto. Se calcula de nuevo con lo que hay (lo que escribió mientras tanto queda), y solo en esos campos:
+   * lo que ya se puso y el dueño cambió o vació no vuelve. va: adónde pasa el foco, que sigue esperando.
+   */
+  function soltar(va: Campo | null) {
+    const d = diferido
+    const v = o.leer()
+    const link = linkDelForm(v, puesto)
+    if (!d || !puesto || !link || !mismoProducto(link, d.link)) return
+    const c = queCompletar(v, link, d.r, puesto, va)
+    if (!c) return
+    const sueltos = d.campos.filter((k) => !c.retenidos?.includes(k))
+    if (!sueltos.length) return
+    const quedan = d.campos.filter((k) => !sueltos.includes(k))
+    diferido = quedan.length ? { ...d, campos: quedan } : null
+    const campos: Campos = {}
+    for (const k of sueltos) if (c[k] !== undefined && c[k] !== v[k]) campos[k] = c[k]
+    const nuevo: Puesto = { ...puesto }
+    for (const k of sueltos) nuevo[k] = c.puesto[k]
+    if (sueltos.includes('titulo')) {
+      nuevo.tituloDe = undefined
+      // el link que sale del título pasa a la tienda
+      if (c.linkTienda !== undefined) campos.linkTienda = c.linkTienda
+      nuevo.linkTienda = c.puesto.linkTienda
+    }
+    puesto = nuevo
+    if (!Object.keys(campos).length) return
+    o.escribir(campos)
+    // el aviso nombra lo que puso y se ve
+    const ok = esOk(d.r)
+    if (!ok) return
+    const w = o.leer()
+    const nombre = !!ok.titulo && nuevo.titulo === ok.titulo && w.titulo === ok.titulo
+    o.mostrar({ aviso: avisoDe(ok, nombre, !!ok.precio && nuevo.precio === ok.precio && w.precio === ok.precio) ?? '' })
+  }
+
+  /**
+   * Al dejar el título (o al mandar), lo que no depende de lo que contestó el link: lo que dejó ahí el link anterior
+   * (tituloDe: el dueño estaba en el título, ver loDelAnterior), y el nombre del link si quedó vacío mientras se busca (o,
+   * al mandar, uno escrito que no se buscó).
+   */
   function soltarTitulo() {
     const v = o.leer()
     const link = linkDelForm(v, puesto)
     if (!link) return
-    const antes = diferido
-    diferido = null
-    if (puesto && antes?.link === link) {
-      // el nombre, o el texto sin el link (que ya está en la tienda)
-      const c = queCompletar(v, link, antes.r, puesto)
-      if (!c) return
-      puesto = { ...puesto, titulo: c.puesto.titulo, linkTienda: c.puesto.linkTienda ?? puesto.linkTienda }
-      const campos: Campos = {}
-      if (c.titulo !== undefined && c.titulo !== v.titulo) campos.titulo = c.titulo
-      if (c.linkTienda !== undefined) campos.linkTienda = c.linkTienda
-      return o.escribir(campos)
+    if (puesto?.tituloDe && !mismoProducto(puesto.tituloDe, link)) {
+      const titulo = tituloSinLoPuesto(v, link, puesto)
+      puesto = { ...puesto, titulo: titulo === link ? undefined : titulo, tituloDe: undefined }
+      if (titulo !== undefined && titulo !== v.titulo) o.escribir({ titulo })
     }
-    // todavía no volvió: lo del link anterior que quedó en el título, y el nombre mientras busca
-    const titulo = puesto ? tituloSinLoPuesto(v, link, puesto) : undefined
-    if (puesto && titulo !== undefined && titulo !== v.titulo) {
-      puesto = { ...puesto, titulo: titulo === link ? undefined : titulo }
-      o.escribir({ titulo })
-    }
-    if (enCurso?.link === link) nombreMientrasBusca(link)
+    if (enCurso?.link === link || (pendiente === link && seBusca(link))) nombreMientrasBusca(link)
   }
 
   /** Lo ya leído de ese link, o del mismo producto. */
   const yaLeido = (link: string) =>
     leidos.get(link) ?? (puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined)
 
-  /** escribiendo: el dueño está en el título, o va a estar (dejó la tienda para ir ahí). */
-  async function buscar(link: string, escribiendo: boolean) {
+  /** va: el campo donde está el dueño o adonde va (dejó otro para ir ahí), que no se escribe. */
+  async function buscar(link: string, va: Campo | null) {
     pendiente = null
     const leido = yaLeido(link)
-    sacarLoDelAnterior(link, escribiendo)
+    sacarLoDelAnterior(link, va === 'titulo')
     if (leido) {
       leidos.set(link, leido)
-      return aplicar(link, leido, escribiendo)
+      return aplicar(link, leido, va)
     }
-    if (linkParaCompletar(o.leer(), guardados, puesto) !== link || esHome(link)) return o.mostrar({ aviso: '' })
-    if (!escribiendo) nombreMientrasBusca(link)
+    if (!seBusca(link)) return o.mostrar({ aviso: '' })
+    if (va !== 'titulo') nombreMientrasBusca(link)
     const pedido = { link, corte: new AbortController() }
     enCurso = pedido
     o.mostrar({ aviso: avisoBuscando(link) })
@@ -422,33 +476,53 @@ export function completador(o: {
     aplicar(link, r)
   }
 
+  /**
+   * Lo escrito a mano, al dejar el campo. El mismo producto que ya se leyó (sin lo de seguimiento, recortado a mano) ya
+   * está completo: no se vuelve a poner nada (volvían el precio que había borrado y la foto que había quitado); si está en
+   * el título, solo pasa a la tienda, como lo que contesta un link (ver soltar).
+   */
+  function buscarEscrito(link: string, va: Campo | null) {
+    const leido = puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined
+    if (!puesto || !leido) return void buscar(link, va)
+    pendiente = null
+    leidos.set(link, leido)
+    const v = o.leer()
+    const enTitulo = !!delTitulo(v, puesto)
+    // el link a la tienda que puso el autocompletado, recortado, sigue siendo suyo
+    puesto = { ...puesto, link, ...(!enTitulo && puesto.linkTienda ? { linkTienda: v.linkTienda.trim() } : {}) }
+    if (enTitulo) diferido = { link, r: leido, campos: ['titulo', 'linkTienda'] }
+  }
+
+  function antesDeMandar() {
+    if (pendiente) sacarLoDelAnterior(pendiente, false)
+    soltar(null)
+    soltarTitulo()
+  }
+
   return {
     alCambiar(pegado) {
-      const v = o.leer()
-      const link = linkDelForm(v, puesto)
+      const link = linkDelForm(o.leer(), puesto)
       const trajo = !!link && pegado !== null && traeElLink(pegado, link)
       // el mismo link: nada (escribió o pegó otra cosa); pegado de nuevo, se completa otra vez si no se está buscando
       if (link === actual && !(trajo && enCurso?.link !== link)) return
       actual = link
       cortar()
       if (!link) return o.mostrar({ aviso: '' })
-      // el mismo producto con el link a la tienda recortado a mano (sin lo de seguimiento): ya está completo
-      const leido = puesto && !trajo && !delTitulo(v, puesto) && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined
-      if (puesto && leido) {
-        leidos.set(link, leido)
-        puesto = { ...puesto, link, ...(puesto.linkTienda ? { linkTienda: v.linkTienda.trim() } : {}) }
-        return
-      }
-      if (trajo) void buscar(link, enElTitulo())
+      if (trajo) void buscar(link, enfocado())
       else pendiente = link
     },
-    alDejar(campo, vaAlTitulo = false) {
-      if (pendiente) void buscar(pendiente, vaAlTitulo)
-      if (campo === 'titulo' && !vaAlTitulo) soltarTitulo()
+    alDejar(campo, va) {
+      // vuelve al mismo (tocó su etiqueta): no lo dejó
+      if (va === campo) return
+      // va a "Agregar": no se busca (se cortaría al mandar, y gastaba un pedido del tope)
+      if (va === 'enviar') return antesDeMandar()
+      if (pendiente) buscarEscrito(pendiente, va)
+      soltar(va)
+      if (campo === 'titulo') soltarTitulo()
     },
+    antesDeMandar,
     alMandar() {
-      if (pendiente) sacarLoDelAnterior(pendiente, false)
-      soltarTitulo()
+      antesDeMandar()
       cortar()
     },
     cerrar: cortar,

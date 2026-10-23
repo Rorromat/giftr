@@ -3,18 +3,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { completarCampo } from '@/components/CamposDeseo'
 import { aconsejarFoto, proponerFoto } from '@/components/FotoField'
-import { completador, loQueEntro, type Linea } from '@/lib/completar-deseo'
+import { completador, loQueEntro, type Campo, type Destino, type Linea } from '@/lib/completar-deseo'
 
-const CAMPOS = ['titulo', 'linkTienda', 'precio'] as const
+const CAMPOS = ['titulo', 'linkTienda', 'precio'] as const satisfies readonly Campo[]
 
 function valor(form: HTMLFormElement, nombre: string) {
   const campo = form.elements.namedItem(nombre)
   return campo instanceof HTMLInputElement ? campo.value : ''
 }
 
-/** Solo el título y el link a la tienda (lo que escribe completarCampo no dispara input). */
-const esCampoDelLink = (t: EventTarget | null): t is HTMLInputElement =>
-  t instanceof HTMLInputElement && (t.name === 'titulo' || t.name === 'linkTienda')
+/** Uno de los campos que se completan, de ese formulario. */
+const campoDe = (form: HTMLFormElement, t: EventTarget | null): Campo | null =>
+  t instanceof HTMLInputElement && t.form === form ? CAMPOS.find((c) => c === t.name) ?? null : null
+
+/** El botón que manda ese formulario. */
+const esEnviar = (form: HTMLFormElement, t: EventTarget | null) => t instanceof HTMLButtonElement && t.type === 'submit' && t.form === form
 
 /**
  * Completa el deseo con el link del producto, pegado en "¿Qué querés?" o en "Link a la tienda": el nombre, el precio y la
@@ -31,12 +34,11 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
   useEffect(() => {
     const form = linea.current?.closest('form')
     if (!form) return
-    const titulo = form.elements.namedItem('titulo')
     const c = completador({
       guardado,
       tituloGuardado,
       leer: () => ({ titulo: valor(form, 'titulo'), linkTienda: valor(form, 'linkTienda'), precio: valor(form, 'precio') }),
-      escribiendo: () => document.activeElement === titulo,
+      enfocado: () => campoDe(form, document.activeElement),
       escribir: (campos, foto) => {
         for (const nombre of CAMPOS) {
           const v = campos[nombre]
@@ -49,34 +51,64 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
         aconsejarFoto(form, l.consejoFoto ?? null)
       },
     })
-    // Lo que trajo un pegado: casi todos los navegadores lo dan en el input (data); si no, lo tiene el paste de antes.
+    // Lo que trajo un pegado: casi todos los navegadores lo dan en el input (data); si no, lo tiene el paste de antes. Solo
+    // en el título y el link a la tienda (lo que escribe completarCampo no dispara input).
+    const delLink = (t: EventTarget | null) => {
+      const campo = campoDe(form, t)
+      return campo === 'titulo' || campo === 'linkTienda'
+    }
     let pegado: string | null = null
     const alPegar = (e: ClipboardEvent) => {
-      pegado = esCampoDelLink(e.target) ? e.clipboardData?.getData('text/plain') ?? null : null
+      pegado = delLink(e.target) ? e.clipboardData?.getData('text/plain') ?? null : null
     }
     const alEscribir = (e: Event) => {
       const recien = pegado
       pegado = null
-      if (!esCampoDelLink(e.target)) return
+      if (!delLink(e.target)) return
       c.alCambiar(e instanceof InputEvent ? loQueEntro(e, recien) : null)
     }
-    // Lo escrito a mano se busca al dejar el campo; si el foco va al título, no se le escribe nada mientras está ahí. Irse
-    // a otra app (a copiar algo) también saca el foco, pero el campo sigue siendo el activo: eso no es dejarlo.
+    // Adónde va el foco: el relatedTarget del focusout. Tocar la etiqueta "¿Qué querés?" (no toma el foco) lo saca con
+    // relatedTarget null y lo pasa al título recién en el click, y en Safari un botón no toma el foco: ahí vale lo que se
+    // tocó. Se olvida cuando algo toma el foco.
+    let tocado: Element | null = null
+    const alTocar = (e: PointerEvent) => {
+      tocado = e.target instanceof Element ? e.target : null
+    }
+    const olvidarToque = () => {
+      tocado = null
+    }
+    const adonde = (e: FocusEvent): Destino => {
+      const a = e.relatedTarget ?? tocado?.closest('label')?.control ?? tocado?.closest('button') ?? null
+      return esEnviar(form, a) ? 'enviar' : campoDe(form, a)
+    }
+    // Lo escrito a mano se busca al dejar el campo, y lo que no se escribió mientras el dueño estaba ahí va al dejarlo.
+    // Irse a otra app (a copiar algo) también saca el foco, pero el campo sigue siendo el activo: eso no es dejarlo.
     const alDejar = (e: FocusEvent) => {
-      if (!esCampoDelLink(e.target) || document.activeElement === e.target) return
-      c.alDejar(e.target.name === 'titulo' ? 'titulo' : 'linkTienda', e.relatedTarget === titulo)
+      const campo = campoDe(form, e.target)
+      if (!campo || document.activeElement === e.target) return
+      c.alDejar(campo, adonde(e))
+    }
+    // "Agregar" (también Enter, que lo toca), antes de que el navegador revise los campos: el título no queda vacío.
+    const alTocarBoton = (e: MouseEvent) => {
+      if (e.target instanceof Element && esEnviar(form, e.target.closest('button'))) c.antesDeMandar()
     }
     // Antes de que se arme lo que se manda (este listener corre antes que el de React): lo del producto anterior afuera.
     // Lo que vuelva después ya no va (proponía una foto que se importaba para un deseo ya guardado).
     const alMandar = () => c.alMandar()
+    document.addEventListener('pointerdown', alTocar, true)
+    document.addEventListener('focusin', olvidarToque)
     form.addEventListener('paste', alPegar)
     form.addEventListener('input', alEscribir)
     form.addEventListener('focusout', alDejar)
+    form.addEventListener('click', alTocarBoton)
     form.addEventListener('submit', alMandar)
     return () => {
+      document.removeEventListener('pointerdown', alTocar, true)
+      document.removeEventListener('focusin', olvidarToque)
       form.removeEventListener('paste', alPegar)
       form.removeEventListener('input', alEscribir)
       form.removeEventListener('focusout', alDejar)
+      form.removeEventListener('click', alTocarBoton)
       form.removeEventListener('submit', alMandar)
       c.cerrar()
     }

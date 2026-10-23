@@ -235,8 +235,11 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }
 
   const alProponer = useEffectEvent((src: string | null) => {
+    // traida, y no solo trayendo: la que se empezó a traer en este mismo momento todavía no se dibujó (otro link pegado
+    // enseguida no la sacaba, y quedaba la foto de uno con el link del otro)
     const que = queHacerConPropuesta({
-      src, anterior: propuesta.current, trayendo, hayFoto: !!subida || !!url.trim(), dePropuesta, subiendo: enCurso.current,
+      src, anterior: propuesta.current, trayendo: trayendo || traida.current !== null, hayFoto: !!subida || !!url.trim(), dePropuesta,
+      subiendo: enCurso.current,
     })
     if (que === 'nada') return
     propuesta.current = src
