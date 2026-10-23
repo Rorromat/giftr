@@ -5,7 +5,8 @@
 
 :root {
   /* Color */
-  --gr-bg: #FFF6E5;
+  /* el fondo, un crema más neutro: las tarjetas blancas se despegan (con una sombra mínima) sin bordes */
+  --gr-bg: #F6F0E5;
   --gr-ink: #121212;
   --gr-surface: #FFFFFF;
   --gr-accent: #C8F31D;
@@ -13,7 +14,7 @@
   --gr-dot: #E4D9C6;
   /* La superficie suave (botones secundarios, notas, lo que antes iba punteado) y las líneas: la fina separa, la marcada
      es el borde de lo que se escribe (3:1 contra el fondo y contra el blanco, para que se vea dónde). */
-  --gr-soft: #F3EBDC;
+  --gr-soft: #ECE3D2;
   --gr-line: #E6DCCA;
   --gr-line-strong: #8C8377;
 
@@ -70,10 +71,11 @@
   }
   .gr-muted { color: var(--gr-muted); }
 
-  /* Tarjeta: blanca, sin borde ni sombra; la foto va de lado a lado */
+  /* Tarjeta: blanca y sin borde, con una sombra mínima que la despega del fondo; la foto va de lado a lado */
   .gr-sticker {
     background: var(--gr-surface);
     border-radius: var(--gr-radius-lg);
+    box-shadow: 0 1px 3px rgb(60 45 20 / 0.08);
     overflow: hidden;
   }
   .gr-sticker--dark { background: var(--gr-ink); color: var(--gr-bg); }
