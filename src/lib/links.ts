@@ -1,4 +1,4 @@
-import { LARGO } from '@/lib/limites'
+import { LARGO, recortar } from '@/lib/limites'
 
 // Links escritos o pegados a mano (el de la tienda, el de una foto, uno pegado en el título). Sin dependencias: lo usan
 // también los formularios en el navegador.
@@ -33,6 +33,76 @@ export function sitioDeLink(link: string): string {
   } catch {
     return link
   }
+}
+
+// MercadoLibre de cada país (con o sin subdominio), MercadoLivre de Brasil y los links cortos. Con $: un host parecido
+// (mercadolibre.com.ar.otro.com) no es de MercadoLibre.
+const HOST_ML = /^(?:[a-z0-9-]+\.)?mercadoli(?:bre\.(?:com\.ar|com\.mx|cl|com\.co|com\.uy|com\.pe|com\.ve|com\.ec|com)|vre\.com\.br)$|^(?:www\.)?meli\.la$/
+
+/** Si el host es de MercadoLibre (o de sus links cortos). Sin el punto final ni mayúsculas que cambien el nombre. */
+export const esHostDeMercadoLibre = (host: string) => HOST_ML.test(host.toLowerCase().replace(/\.+$/, ''))
+
+// Dónde está el nombre en el link de cada tienda. En MercadoLibre, solo sus formas: el resto de sus links (tiendas,
+// listados, clips) no traen el nombre de un producto.
+const SLUG_ML = [
+  /\/M[A-Z]{2}-?\d+-(.+?)-_JM/i, // publicación: /MLA-1418506688-mate-de-algarrobo-_JM
+  /\/([^/]+)\/p\/M[A-Z]{2}\d+/i, // catálogo
+  /\/([^/]+)\/up\/M[A-Z]{2}U\d+/i, // user product
+]
+const SLUG_TIENDA = [
+  /\/products\/([^/]+)/, // Shopify
+  /\/productos\/([^/]+)/, // Tiendanube
+  /\/producto\/([^/_]+)/, // WooCommerce y Megatone (que sigue con _MKT0278BGH)
+  /\/([^/]+)\/p\/?$/, // VTEX
+  /\/p\/([^/]+)/, // Frávega
+  /\/t\/([^/]+)/, // Nike
+  /\/listing\/\d+\/([^/]+)/, // Etsy
+  /\/([^/]+)\/dp\/[A-Z0-9]{10}/i, // Amazon
+  /\/([^/]+)-p-\d+\.html$/, // Shein
+  /\/([^/]+)-g-\d+\.html$/, // Temu
+]
+
+/** Un token que no es parte del nombre: un código o número largo (MKT0278BGH, cw2288, 2014), el JM de ML o algo enorme. */
+function esCodigo(t: string): boolean {
+  const digitos = t.replace(/\D/g, '').length
+  return digitos >= 4 || (digitos > 0 && /\p{L}/u.test(t) && t.length >= 6) || t.toLowerCase() === 'jm' || t.length > 30
+}
+
+/**
+ * El nombre del producto que trae el link, para el título mientras no haya otro ("…/MLA-123-mate-imperial-_JM" → "Mate
+ * imperial"). Es un borrador que el dueño corrige: sale sin tildes ni puntos ("12 litros"). Null si el link no lo trae
+ * (la home, un link que es solo un id, una sola palabra). Sin regex que tarden más que el largo del link.
+ */
+export function tituloDelLink(link: string): string | null {
+  let u: URL
+  try { u = new URL(link) } catch { return null }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+  const ml = esHostDeMercadoLibre(u.hostname)
+  for (const patron of ml ? SLUG_ML : SLUG_TIENDA) {
+    const slug = patron.exec(u.pathname)?.[1]
+    if (slug) return nombreDeSlug(slug)
+  }
+  if (ml) return null
+  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión; si ese es un código, el de antes
+  // ("/pantalon-nike-club-mujer/NIIM8409-010.html", "/pd/chatitas-speedcat/401287.html"). No más atrás: sería la categoría.
+  for (const pedazo of u.pathname.split('/').filter(Boolean).slice(-2).reverse()) {
+    const nombre = nombreDeSlug(pedazo.replace(/\.[a-z0-9]{1,5}$/i, ''))
+    if (nombre) return nombre
+  }
+  return null
+}
+
+/** "mate-imperial-de-calabaza-MKT0278" → "Mate imperial de calabaza"; null si no quedan al menos dos palabras. */
+function nombreDeSlug(slug: string): string | null {
+  let texto = slug
+  try { texto = decodeURIComponent(slug) } catch { /* un % suelto: queda como vino */ }
+  const tokens = texto.replace(/[-_+]/g, ' ').split(/\s+/).filter(Boolean)
+  const quedan = tokens.filter((t) => !esCodigo(t))
+  const palabras = quedan.filter((t) => (t.match(/\p{L}/gu)?.length ?? 0) >= 2).length
+  // si se descartó más de la mitad, lo que queda no es el nombre
+  if (palabras < 2 || (tokens.length - quedan.length) * 2 > tokens.length) return null
+  const nombre = quedan.join(' ')
+  return recortar(nombre.charAt(0).toUpperCase() + nombre.slice(1), LARGO.titulo) || null
 }
 
 const LINK_EN_TEXTO = /(?:https?:\/\/|www\.)\S+/i
