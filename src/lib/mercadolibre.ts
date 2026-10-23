@@ -31,8 +31,9 @@ const SUB_MARKETPLACE = new Set(['', 'www', 'articulo', 'produto'])
 const ID = /^M[A-Z]{2}\d{5,15}$/
 const ITEM = /\/(M[A-Z]{2})-?(\d{5,15})(?=[-_/]|$)/i
 const ITEM_SLUG = /\/M[A-Z]{2}-?\d+-(.+?)-_JM/i
-const CATALOGO = /\/([^/]+)\/p\/(M[A-Z]{2}\d{5,15})(?=\/|$)/i
-const UP = /\/([^/]+)\/up\/(M[A-Z]{2}U\d{5,15})(?=\/|$)/i
+// el slug antes de /p/ o /up/ puede faltar (www.mercadolibre.com.ar/p/MLA39939183): sigue siendo un catálogo
+const CATALOGO = /(?:\/([^/]+))?\/p\/(M[A-Z]{2}\d{5,15})(?=\/|$)/i
+const UP = /(?:\/([^/]+))?\/up\/(M[A-Z]{2}U\d{5,15})(?=\/|$)/i
 
 /** El item elegido de un /up/ o un /p/: pdp_filters=item_id:MLA…, o wid=MLA… (en la query o en el #fragmento). */
 function itemDeLaQuery(u: URL): string | undefined {
@@ -69,9 +70,9 @@ export function linkDeMercadoLibre(url: string, enElMuro = false): LinkML | null
   }
   const itemId = itemDeLaQuery(u)
   const up = UP.exec(u.pathname)
-  if (up) return conSitio({ tipo: 'up', upId: up[2].toUpperCase(), slug: up[1], ...(itemId && { itemId }) })
+  if (up) return conSitio({ tipo: 'up', upId: up[2].toUpperCase(), ...(up[1] && { slug: up[1] }), ...(itemId && { itemId }) })
   const cat = CATALOGO.exec(u.pathname)
-  if (cat) return conSitio({ tipo: 'catalogo', productId: cat[2].toUpperCase(), slug: cat[1], ...(itemId && { itemId }) })
+  if (cat) return conSitio({ tipo: 'catalogo', productId: cat[2].toUpperCase(), ...(cat[1] && { slug: cat[1] }), ...(itemId && { itemId }) })
   const item = ITEM.exec(u.pathname)
   if (item) {
     const slug = ITEM_SLUG.exec(u.pathname)?.[1]

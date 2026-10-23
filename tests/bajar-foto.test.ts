@@ -64,6 +64,10 @@ test('una redirección a http:// se sigue por https; solo un 200 es la foto; y s
   })
   expect(await bajarFotoConUrl('https://cdn.com/a.jpg', s.pedir, esFotoPublica)).toMatchObject({ urlFinal: 'https://fotos.cdn.com/a.jpg' })
   expect(s.pedidos.map((p) => p.url)).not.toContain('http://fotos.cdn.com/a.jpg')
+  // una foto http:// de entrada sigue como antes: no es pública, no se pide (ni por https)
+  const antes = s.pedidos.length
+  expect(await bajarFoto('http://fotos.cdn.com/a.jpg', s.pedir, esFotoPublica)).toBeNull()
+  expect(s.pedidos).toHaveLength(antes)
   expect(await bajarFoto('https://cdn.com/parcial.jpg', s.pedir, esFotoPublica)).toBeNull()
   // lo que no dice image/* no es una foto, salvo que quien llama acepte más (después lo decide sharp)
   expect(await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica)).toBeNull()

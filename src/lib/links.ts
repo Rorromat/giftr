@@ -61,6 +61,7 @@ const SLUG_TIENDA = [
   /\/([^/]+)-p-\d+\.html$/, // Shein
   /\/([^/]+)-g-\d+\.html$/, // Temu
 ]
+const EXTENSION = /\.[a-z0-9]{1,5}$/i
 
 /** Un token que no es parte del nombre: un código o número largo (MKT0278BGH, cw2288, 2014), el JM de ML o algo enorme. */
 function esCodigo(t: string): boolean {
@@ -83,13 +84,17 @@ export function tituloDelLink(link: string): string | null {
     if (slug) return nombreDeSlug(slug)
   }
   if (ml) return null
-  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión; si ese es un código, el de antes
-  // ("/pantalon-nike-club-mujer/NIIM8409-010.html", "/pd/chatitas-speedcat/401287.html"). No más atrás: sería la categoría.
-  for (const pedazo of u.pathname.split('/').filter(Boolean).slice(-2).reverse()) {
-    const nombre = nombreDeSlug(pedazo.replace(/\.[a-z0-9]{1,5}$/i, ''))
-    if (nombre) return nombre
-  }
-  return null
+  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión. Si ese es el código del producto,
+  // con extensión o con letras y números ("…/pantalon-nike-club-mujer/NIIM8409-010.html", "…/chatitas/401287.html"), el
+  // de antes. Un número suelto ("…/electrodomesticos-cocina/123456") o una palabra no: el de antes suele ser la
+  // categoría, y es mejor el nombre del sitio que el de otra cosa.
+  const pedazos = u.pathname.split('/').filter(Boolean)
+  const ultimo = pedazos[pedazos.length - 1] ?? ''
+  const sinExtension = ultimo.replace(EXTENSION, '')
+  const nombre = nombreDeSlug(sinExtension)
+  const esCodigoDelProducto = sinExtension !== ultimo || (/\p{L}/u.test(sinExtension) && /\d/.test(sinExtension))
+  if (nombre || pedazos.length < 2 || !esCodigoDelProducto) return nombre
+  return nombreDeSlug(pedazos[pedazos.length - 2].replace(EXTENSION, ''))
 }
 
 /** "mate-imperial-de-calabaza-MKT0278" → "Mate imperial de calabaza"; null si no quedan al menos dos palabras. */

@@ -211,6 +211,10 @@ describe('limpiarTitulo', () => {
     expect(limpiarTitulo('Caf&eacute; &#233; &#xe9; <b>molido</b>', null, 'x.com')).toBe('Café é é molido')
     expect(limpiarTitulo('BIOPAUSIA', null, 'www.yenny-elateneo.com')).toBe('BIOPAUSIA')
     expect(limpiarTitulo('   ', null, 'x.com')).toBeNull()
+    // lo que Object.prototype tiene no es una entidad: quedan como están
+    for (const e of ['constructor', 'toString', 'valueOf', 'hasOwnProperty', 'isPrototypeOf']) {
+      expect(limpiarTitulo(`Mate &${e}; imperial`, null, 'x.com'), e).toBe(`Mate &${e}; imperial`)
+    }
   })
 
   test('de hasta 120 caracteres, cortado en una palabra', () => {
@@ -279,6 +283,21 @@ describe('leerProducto con HTML armado', () => {
     expect(leerProducto(ld({ '@type': 'VideoObject', name: 'Un video' }) + ld({ '@type': 'Organization', name: 'X' }), 'https://x.com/v').estado).toBe('sin-datos')
   })
 
+  test('una "cosa" con offers trae su precio (la entrada de un recital); sin offers, no', () => {
+    const recital = { '@type': 'Event', name: 'Recital de Fito', image: 'https://x.com/f.jpg' }
+    expect(leerProducto(ld({ ...recital, offers: { price: 25000, priceCurrency: 'ARS' } }), 'https://www.entradas.com.ar/e/1'))
+      .toEqual({ estado: 'ok', producto: { titulo: 'Recital de Fito', precio: '$25.000', foto: 'https://x.com/f.jpg' } })
+    // sin offers ni señal de producto, el precio no sale de las meta (itemprop=price no es una señal)
+    expect(leerProducto(ld(recital) + '<meta itemprop="price" content="9000">', 'https://www.entradas.com.ar/e/1'))
+      .toMatchObject({ estado: 'ok', producto: { precio: null } })
+  })
+
+  test('las entidades de la foto: &constructor; no es una', () => {
+    const og = '<meta property="og:type" content="product"><meta property="og:title" content="Mate">'
+    expect(leerProducto(`${og}<meta property="og:image" content="https://cdn.x.com/a.jpg?x=1&toString;&amp;y=2">`, 'https://x.com/p'))
+      .toMatchObject({ producto: { foto: 'https://cdn.x.com/a.jpg?x=1&toString;&y=2' } })
+  })
+
   test('la foto: //, relativa, http, null o de la red interna sigue con la siguiente', () => {
     const pagina = (image: unknown, og = '') => ld({ '@type': 'Product', name: 'Mate', image }) + og
     expect(leerProducto(pagina('//cdn.x.com/a.jpg'), 'https://x.com/p')).toMatchObject({ producto: { foto: 'https://cdn.x.com/a.jpg' } })
@@ -308,6 +327,8 @@ describe('leerProducto con HTML armado', () => {
   })
 
   test('HTML armado para que una regex tarde: ninguna recorre la página más de una vez', () => {
+    // 4 MB (lo más que se baja) de lo mismo: con una regex que vuelve atrás, cada repetición recorría el resto
+    const cuatroMB = (s: string) => s.repeat(Math.ceil(4_000_000 / s.length))
     for (const [que, hostil] of [
       ['un meta enorme y un <title> sin cerrar', `<meta ${'a='.repeat(200_000)}><title>${'<'.repeat(100_000)}`],
       ['miles de JSON-LD sin </script>', '<script type="application/ld+json">'.repeat(100_000)],
@@ -315,6 +336,15 @@ describe('leerProducto con HTML armado', () => {
       ['un name que es todo "<"', `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: '<'.repeat(1_000_000) })}</script>`],
       ['atributos sin cerrar', `<meta property="og:title" content="${'x '.repeat(500_000)}`],
       ['muchos data-large_image', `<meta property="og:type" content="product">${'<img data-large_image="x'.repeat(100_000)}`],
+      // tags que nunca cierran con ">"
+      ['<meta sin ">"', cuatroMB('<meta ')],
+      ['<title sin ">"', cuatroMB('<title ')],
+      ['<link rel=canonical sin ">"', cuatroMB('<link rel=canonical ')],
+      ['<script ld+json sin ">"', cuatroMB('<script type=application/ld+json ')],
+      ['<template __STATE__ sin ">"', cuatroMB('<template data-varname=__STATE__ ')],
+      ['<template __STATE__ y un <script sin ">"', cuatroMB('<template data-varname=__STATE__><script ')],
+      ['<template __STATE__ sin <script', cuatroMB('<template data-varname=__STATE__>x')],
+      ['<title> sin </title>', cuatroMB('<title>x')],
     ] as const) {
       const antes = Date.now()
       leerProducto(hostil, 'https://x.com/p')

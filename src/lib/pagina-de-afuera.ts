@@ -1,4 +1,4 @@
-import { bajarDeAfuera, pedirPagina, UA_GIFTR, type Corte, type Falla, type Pedir } from '@/lib/bajar-foto'
+import { aHttps, bajarDeAfuera, pedirPagina, UA_GIFTR, type Corte, type Falla, type Pedir } from '@/lib/bajar-foto'
 import { esUrlPublica } from '@/lib/compartir'
 import { tituloDelLink } from '@/lib/links'
 import { esPublicacionDeMarketplace, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
@@ -30,15 +30,17 @@ function decodificador(label: string | undefined): TextDecoder | null {
 }
 
 /**
- * El HTML como texto, en el charset que corresponda: el del header, el BOM, el <meta charset> (o http-equiv) de los
- * primeros 4 KB, y si no, utf-8. Un label que no existe se lee como utf-8.
+ * El HTML como texto, en el charset que corresponda: el del BOM, el del header, el <meta charset> (o http-equiv) de los
+ * primeros 4 KB, y si no, utf-8. El BOM primero, como los navegadores: un archivo utf-8 con BOM servido con un header
+ * latin1 mal puesto se ve bien en el navegador, y acá también (TextDecoder saca el BOM). Un label que no existe se lee
+ * como utf-8.
  */
 export function aTexto(datos: Buffer, contentType: string | null): string {
   const bom = datos[0] === 0xef && datos[1] === 0xbb && datos[2] === 0xbf ? 'utf-8'
     : datos[0] === 0xff && datos[1] === 0xfe ? 'utf-16le'
       : datos[0] === 0xfe && datos[1] === 0xff ? 'utf-16be' : undefined
   const meta = /<meta[^>]+charset\s*=\s*["']?\s*([\w.:-]+)/i.exec(datos.subarray(0, 4096).toString('latin1'))?.[1]
-  const d = decodificador(/charset\s*=\s*["']?([\w.:-]+)/i.exec(contentType ?? '')?.[1]) ?? decodificador(bom) ??
+  const d = decodificador(bom) ?? decodificador(/charset\s*=\s*["']?([\w.:-]+)/i.exec(contentType ?? '')?.[1]) ??
     decodificador(meta) ?? new TextDecoder('utf-8')
   return d.decode(datos)
 }
@@ -61,12 +63,12 @@ function noPedir(url: string, desde: string | null, pegado: string): Corte | nul
 }
 
 /**
- * Baja la página de un link: hasta 5 redirecciones, 6 s y 4 MB en total (más que eso se corta y se lee lo que llegó). Si
- * no se pudo, la falla y la URL de la que sale el nombre del producto (urlProducto).
+ * Baja la página de un link: hasta 5 redirecciones, 6 s y 4 MB en total (más que eso se corta y se lee lo que llegó). Un
+ * http:// pegado se pide por https. Si no se pudo, la falla y la URL de la que sale el nombre del producto (urlProducto).
  */
 export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal):
   Promise<{ html: string; urlFinal: string; cortado: boolean } | Corte> {
-  const r = await bajarDeAfuera(link, pedir, esUrlPublica, {
+  const r = await bajarDeAfuera(aHttps(link), pedir, esUrlPublica, {
     max: PAGINA_MAX_BYTES, tiempoMs: PAGINA_TIEMPO_MS, saltos: PAGINA_SALTOS, aceptar: esHtml, siSePasa: 'cortar', signal,
     noPedir: (url, desde) => noPedir(url, desde, link),
   })

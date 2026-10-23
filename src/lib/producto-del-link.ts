@@ -2,9 +2,10 @@ import { esUrlPublica } from '@/lib/compartir'
 import { LARGO, largo, recortar, sinControl } from '@/lib/limites'
 import { pesos } from '@/lib/pesos'
 
-// Qué producto hay en una página de afuera: nombre, foto y precio. Puro (sin red) y sin dependencias: regex lineales solo
-// sobre <title>, <meta>, <link rel=canonical>, los JSON-LD, el __STATE__ de VTEX, itemprop y data-large_image. El HTML
-// lo escribe cualquiera: todo con topes, y lo peor que puede pasar es que no se lea nada.
+// Qué producto hay en una página de afuera: nombre, foto y precio. Puro (sin red) y sin dependencias: solo <title>,
+// <meta>, <link rel=canonical>, los JSON-LD, el __STATE__ de VTEX, itemprop y data-large_image. El HTML lo escribe
+// cualquiera: todo con topes, cada tag se corta con indexOf (ver tagDesde) y ninguna regex vuelve atrás sobre la página,
+// así que el tiempo crece con el largo y no con su cuadrado. Lo peor que puede pasar es que no se lea nada.
 
 export type Producto = { titulo: string | null; precio: string | null; foto: string | null }
 export type Estado = 'ok' | 'bloqueado' | 'sin-datos' | 'no-esta' | 'no-carga'
@@ -86,8 +87,9 @@ function decodificar(t: string): string {
   return t.replace(/&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|([a-z][a-z0-9]{1,15}));?/gi, (todo, dec, hex, nombre) => {
     if (dec) return caracter(Number(dec))
     if (hex) return caracter(parseInt(hex, 16))
-    // con nombre, solo con el punto y coma: "?a=1&copy=2" en una URL no es un ©
-    return todo.endsWith(';') && nombre in ENTIDADES ? ENTIDADES[nombre] : todo
+    // con nombre, solo con el punto y coma: "?a=1&copy=2" en una URL no es un ©. hasOwn: con "in", &constructor; daba
+    // la función de Object.prototype
+    return todo.endsWith(';') && Object.hasOwn(ENTIDADES, nombre) ? ENTIDADES[nombre] : todo
   })
 }
 
@@ -114,10 +116,33 @@ function atributo(tag: string, nombre: string): string | null {
   return m ? decodificar(m[1] ?? m[2] ?? m[3]) : null
 }
 
+type Tag = { tag: string; inicio: number; fin: number }
+const APERTURAS = new Map<string, RegExp>()
+
+/**
+ * El primer <nombre …> desde esa posición, de "<" a ">", y dónde termina. El comienzo se busca con una regex y el ">"
+ * con indexOf: con "<meta\b[^>]*>" en la regex, cada apertura sin ">" recorría el resto de la página y volvía de a un
+ * carácter (el cuadrado del largo: minutos con 4 MB de "<meta "). Null si no hay más o si ese no cierra: entonces
+ * ninguno de los que siguen cierra.
+ */
+function tagDesde(html: string, nombre: string, desde: number): Tag | null {
+  let rx = APERTURAS.get(nombre)
+  if (!rx) APERTURAS.set(nombre, (rx = new RegExp(`<${nombre}\\b`, 'gi')))
+  rx.lastIndex = desde
+  const m = rx.exec(html)
+  const fin = m ? html.indexOf('>', m.index) : -1
+  return m && fin >= 0 ? { tag: html.slice(m.index, fin + 1), inicio: m.index, fin: fin + 1 } : null
+}
+
+/** Los <nombre …> de la página, en orden. Como no se pisan, recorrerlos todos es lineal. */
+function* tags(html: string, nombre: string): Generator<Tag> {
+  for (let t = tagDesde(html, nombre, 0); t; t = tagDesde(html, nombre, t.fin)) yield t
+}
+
 /** Los <meta> por property, name o itemprop (en minúsculas): el primero de cada uno. */
 function metas(html: string): Map<string, string> {
   const r = new Map<string, string>()
-  for (const [tag] of html.matchAll(/<meta\b[^>]*>/gi)) {
+  for (const { tag } of tags(html, 'meta')) {
     const clave = atributo(tag, 'property') ?? atributo(tag, 'name') ?? atributo(tag, 'itemprop')
     const valor = atributo(tag, 'content')
     if (clave && valor !== null && !r.has(clave.toLowerCase())) r.set(clave.toLowerCase(), valor)
@@ -140,8 +165,10 @@ function absoluta(v: unknown, base: string): string | null {
 }
 
 function canonical(html: string, urlFinal: string): string | null {
-  const tag = /<link\b[^>]*\brel\s*=\s*["']?canonical["']?[^>]*>/i.exec(html)?.[0]
-  return tag ? absoluta(atributo(tag, 'href'), urlFinal) : null
+  for (const { tag } of tags(html, 'link')) {
+    if (/\brel\s*=\s*["']?canonical/i.test(tag)) return absoluta(atributo(tag, 'href'), urlFinal)
+  }
+  return null
 }
 
 // ---------------------------------------------------------------- JSON-LD
@@ -153,7 +180,7 @@ const BLOQUES_MAX = 50
 const BLOQUE_MAX_CHARS = 1_000_000
 const PROFUNDIDAD_MAX = 6
 const ARRAY_MAX = 100
-const APERTURA_LD = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>/gi
+const ES_LD = /\btype\s*=\s*["']?application\/ld\+json/i
 
 /**
  * Lo que hay desde donde termina un tag que abre hasta el primer </script>, y dónde termina ese cierre. Sin cierre, null:
@@ -168,18 +195,22 @@ function hastaElCierre(html: string, desde: number): { texto: string; fin: numbe
 
 function jsonLd(html: string): Bloque[] {
   const finHead = html.search(/<\/head\s*>/i)
-  const apertura = new RegExp(APERTURA_LD)
   const r: Bloque[] = []
-  for (let n = 0, m = apertura.exec(html); m && n < BLOQUES_MAX; n++, m = apertura.exec(html)) {
-    const bloque = hastaElCierre(html, m.index + m[0].length)
+  for (let n = 0, desde = 0; n < BLOQUES_MAX;) {
+    const t = tagDesde(html, 'script', desde)
+    if (!t) break
+    desde = t.fin
+    if (!ES_LD.test(t.tag)) continue
+    n++
+    const bloque = hastaElCierre(html, t.fin)
     if (!bloque) break
-    apertura.lastIndex = bloque.fin
+    desde = bloque.fin
     const crudo = bloque.texto.trim()
     if (crudo.length > BLOQUE_MAX_CHARS) continue
     // Samsung tiene JSON-LD inválidos: con un salto de línea crudo adentro de un string, por ejemplo
     for (const intento of [crudo, crudo.replace(/[\u0000-\u001f]/g, ' ')]) {
       try {
-        r.push({ enHead: finHead < 0 || m.index < finHead, json: JSON.parse(intento) })
+        r.push({ enHead: finHead < 0 || t.inicio < finHead, json: JSON.parse(intento) })
         break
       } catch { /* el siguiente intento, o nada */ }
     }
@@ -283,13 +314,25 @@ function precioDelNodo(n: Nodo): { monto: number; moneda: string | null } | null
 
 type Vtex = { titulo: string | null; foto: unknown; monto: number | null }
 
+const ES_STATE = /\bdata-varname\s*=\s*["']?__STATE__/i
+const SCRIPT_PEGADO = /\s*<script\b/iy
+
 /**
  * El caché de Apollo de VTEX IO (<template data-varname="__STATE__">): Carrefour no trae nada más en el HTML. Null si no
  * hay o no tiene un Product.
  */
 function estadoVtex(html: string): Vtex | null {
-  const m = /<template\b[^>]*data-varname\s*=\s*["']?__STATE__["']?[^>]*>\s*<script[^>]*>/i.exec(html)
-  const bloque = m && hastaElCierre(html, m.index + m[0].length)
+  let bloque: { texto: string } | null = null
+  for (const { tag, fin } of tags(html, 'template')) {
+    if (!ES_STATE.test(tag)) continue
+    // el <script> tiene que ir justo después: buscarlo más adelante haría que cada <template> recorra el resto
+    SCRIPT_PEGADO.lastIndex = fin
+    const s = SCRIPT_PEGADO.exec(html)
+    if (!s) continue
+    const cierra = html.indexOf('>', fin + s[0].length)
+    bloque = cierra < 0 ? null : hastaElCierre(html, cierra + 1)
+    break
+  }
   if (!bloque) return null
   let st: unknown
   try { st = JSON.parse(bloque.texto) } catch { return null }
@@ -449,6 +492,18 @@ function primeraFoto(candidatas: unknown[], base: string): string | null {
 const NO_ESTA = /discontinued|is unavailable|descatalogado|ya no est[aá] disponible|publicaci[oó]n finalizada/i
 const OG_COSA = /^(article|video|music|book|place)/
 const ITEMTYPE_PRODUCTO = /itemtype\s*=\s*["']?https?:\/\/schema\.org\/Product/i
+const CIERRE_TITLE = /<\/title\s*>/iy
+
+/** El texto del primer <title> que no tiene tags adentro (lo de "<title…>([^<]*)</title>", sin regex que vuelvan atrás). */
+function textoDelTitle(html: string): string | null {
+  for (const { fin } of tags(html, 'title')) {
+    const i = html.indexOf('<', fin)
+    if (i < 0) return null
+    CIERRE_TITLE.lastIndex = i
+    if (CIERRE_TITLE.test(html)) return html.slice(fin, i)
+  }
+  return null
+}
 
 /**
  * Lee el producto de una página ya bajada. Primero si es un muro; después el nodo del producto (JSON-LD), el __STATE__ de
@@ -470,7 +525,7 @@ export function leerProducto(html: string, urlFinal: string): Lectura {
     !!me.get('og:price:amount') || ITEMTYPE_PRODUCTO.test(html) || !!deVtex()?.titulo
   const cosa = !!nodo || OG_COSA.test(ogType)
 
-  const titleTag = limpio(/<title\b[^>]*>([^<]*)<\/title\s*>/i.exec(html)?.[1])
+  const titleTag = limpio(textoDelTitle(html))
   const titulo = (nodo && limpio(nodo.name)) || (!esProducto && deVtex()?.titulo) || limpio(me.get('og:title')) ||
     limpio(me.get('twitter:title')) || (senal ? titleTag : null)
   // Temu y Etsy: la página sigue, pero dice que el producto ya no está (Temu solo en el <title>)
@@ -487,7 +542,8 @@ export function leerProducto(html: string, urlFinal: string): Lectura {
     /data-large_image\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/.exec(html)?.slice(1).find((x) => x !== undefined),
   ], base)
 
-  let precio = esProducto && nodo ? precioDelNodo(nodo) : null
+  // el de las offers del nodo, sea un producto o una "cosa" (la entrada de un Event trae su precio)
+  let precio = nodo ? precioDelNodo(nodo) : null
   if (!precio && senal) {
     const vtexMonto = deVtex()?.monto
     if (vtexMonto) precio = { monto: vtexMonto, moneda: null }

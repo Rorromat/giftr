@@ -22,11 +22,12 @@ test('las formas de cada tienda', () => {
     ['https://www.amazon.com/Echo-Dot-5th-Gen-2022/dp/B09B8V1LZ3', 'Echo Dot 5th Gen'],
     ['https://us.shein.com/DAZY-Women-s-White-Long-Sleeve-Square-Neck-Blouse-p-77671994.html', 'DAZY Women s White Long Sleeve Square Neck Blouse'],
     ['https://www.temu.com/1pc-yerba-mate-gourd-with-bombilla-g-601099538564934.html', '1pc yerba mate gourd with bombilla'],
-    // si no coincide ninguna: el último pedazo del path sin la extensión, o el de antes si ese es un código
+    // si no coincide ninguna: el último pedazo del path sin la extensión, o el de antes si ese es el código del producto
     ['https://www.ikea.com/us/en/p/billy-bookcase-white-00263850/', 'Billy bookcase white'],
     ['https://www.booking.com/hotel/ar/alvear-palace.html', 'Alvear palace'],
     ['https://www.dexter.com.ar/pantalon-nike-sportswear-club-mujer/NIIM8409-010.html', 'Pantalon nike sportswear club mujer'],
     ['https://ar.puma.com/pd/chatitas-speedcat-gamuza-para-mujer/401287.html?color=02', 'Chatitas speedcat gamuza para mujer'],
+    ['https://www.tienda.com.ar/mate-imperial-de-calabaza/SKU12345', 'Mate imperial de calabaza'],
     ['https://www.cotodigital.com.ar/sitios/cdigi/productos/bourbon-finish-7-a%C3%B1os-ballantines-bot-700-ml/_/R-00528755-00528755-200', 'Bourbon finish 7 años ballantines bot 700 ml'],
     ['http://tienda.com.ar/productos/mate-de-calabaza', 'Mate de calabaza'],
   ] as const) expect(tituloDelLink(link), link).toBe(titulo)
@@ -66,6 +67,8 @@ test('sin nombre: null', () => {
     'javascript:alert(1)', 'no es un link', '',
     // más de la mitad descartada: no es el nombre
     'https://x.com/productos/ab12cd34-ef56gh78-mate',
+    // el de antes de un número suelto o de una palabra es la categoría, no el producto
+    'https://www.tienda.com.ar/electrodomesticos-cocina/123456', 'https://www.tienda.com/zapatillas-running/ofertas',
   ]) expect(tituloDelLink(link), link).toBeNull()
 })
 

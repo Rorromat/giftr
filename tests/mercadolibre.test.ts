@@ -46,6 +46,14 @@ test('el item de un /up/ también puede venir en wid= del fragmento', () => {
     .not.toHaveProperty('itemId')
 })
 
+test('un catálogo o un /up/ sin el nombre antes sigue siendo eso (no un item: la API sería otra)', () => {
+  expect(linkDeMercadoLibre('https://www.mercadolibre.com.ar/p/MLA39939183'))
+    .toStrictEqual({ sitio: 'MLA', tipo: 'catalogo', marketplace: true, productId: 'MLA39939183' })
+  expect(linkDeMercadoLibre('https://www.mercadolibre.com.ar/up/MLAU3409701436?pdp_filters=item_id%3AMLA2324526514'))
+    .toStrictEqual({ sitio: 'MLA', tipo: 'up', marketplace: true, upId: 'MLAU3409701436', itemId: 'MLA2324526514' })
+  expect(esPublicacionDeMarketplace(linkDeMercadoLibre('https://www.mercadolibre.com.ar/up/MLAU3409701436'))).toBe(true)
+})
+
 test('lo que no es de MercadoLibre da null, aunque se parezca', () => {
   for (const url of [
     'https://mercadolibre.com.ar.evil.com/MLA-1418506688-mate-_JM', 'https://evilmercadolibre.com.ar/MLA-1418506688-mate-_JM',

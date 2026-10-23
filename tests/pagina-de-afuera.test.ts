@@ -317,7 +317,7 @@ describe('redirecciones de los fixtures', () => {
 describe('charset', () => {
   const cafe = (enc: BufferEncoding | 'latin1') => Buffer.from('<title>Café</title>', enc)
 
-  test('por header, por <meta>, por BOM, y si no utf-8', () => {
+  test('por BOM, por header, por <meta>, y si no utf-8', () => {
     expect(aTexto(cafe('latin1'), 'text/html; charset=ISO-8859-1')).toContain('Café')
     expect(aTexto(cafe('latin1'), 'text/html; charset="windows-1252"')).toContain('Café')
     expect(aTexto(Buffer.concat([Buffer.from('<meta charset="windows-1252">'), cafe('latin1')]), 'text/html')).toContain('Café')
@@ -325,6 +325,13 @@ describe('charset', () => {
     expect(aTexto(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), cafe('utf8')]), 'text/html')).toBe('<title>Café</title>')
     expect(aTexto(Buffer.concat([Buffer.from([0xff, 0xfe]), cafe('utf16le')]), 'text/html')).toBe('<title>Café</title>')
     expect(aTexto(cafe('utf8'), 'text/html')).toBe('<title>Café</title>')
+  })
+
+  test('el BOM gana al header, como en los navegadores (y no queda en el texto)', () => {
+    const bomUtf8 = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), cafe('utf8')])
+    expect(aTexto(bomUtf8, 'text/html; charset=iso-8859-1')).toBe('<title>Café</title>')
+    expect(aTexto(Buffer.concat([Buffer.from([0xff, 0xfe]), cafe('utf16le')]), 'text/html; charset=utf-8')).toBe('<title>Café</title>')
+    expect(aTexto(Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(cafe('utf16le')).swap16()]), 'text/html; charset=utf-8')).toBe('<title>Café</title>')
   })
 
   test('el del header gana al del <meta>, y un label que no existe se lee como utf-8', () => {

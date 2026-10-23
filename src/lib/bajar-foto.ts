@@ -150,15 +150,16 @@ export type OpcionesBajar = {
 }
 
 /**
- * Baja algo de afuera: sigue a mano las redirecciones (cada destino tiene que estar permitido), con un tiempo total, y
- * corta apenas pasa el máximo de bytes: si dice que es más grande, sin bajar nada; si no lo dice o miente, a medida que
- * llega. Un error de red, de TLS o de tiempo es 'no-carga'.
+ * Baja algo de afuera: sigue a mano las redirecciones (cada destino tiene que estar permitido; uno a http:// se pide por
+ * https), con un tiempo total, y corta apenas pasa el máximo de bytes: si dice que es más grande, sin bajar nada; si no
+ * lo dice o miente, a medida que llega. Un error de red, de TLS o de tiempo es 'no-carga'. src va tal cual (la foto
+ * http:// de la vista previa sigue sin pedirse, como antes): bajarPagina lo pasa antes por aHttps.
  */
 export async function bajarDeAfuera(src: string, pedir: Pedir, permitida: (url: string) => boolean, o: OpcionesBajar):
   Promise<Bajado | Corte> {
   const tiempo = AbortSignal.timeout(o.tiempoMs)
   const total = o.signal ? AbortSignal.any([tiempo, o.signal]) : tiempo
-  let url = aHttps(src)
+  let url = src
   const corte = o.noPedir?.(url, null)
   if (corte) return corte
   if (!permitida(url)) return { falla: 'no-permitida', urlProducto: null }
