@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
+import { RegistrarSW } from '@/components/RegistrarSW'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
@@ -34,6 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans">
         <div className="mx-auto max-w-md px-[18px]">{children}</div>
         <Arranque />
+        {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}
+        <RegistrarSW />
       </body>
     </html>
   )

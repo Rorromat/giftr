@@ -3,6 +3,7 @@ import { CampoLink } from '@/components/CamposDeseo'
 import { CompletarDesdeLink } from '@/components/CompletarDesdeLink'
 import { FotoField } from '@/components/FotoField'
 import { QueQueres } from '@/components/QueQueres'
+import { RecibirCompartido, type CompartidoAlForm } from '@/components/RecibirCompartido'
 import { Hearts, Icon, PRIORIDADES } from '@/components/ui'
 import { CANTIDAD_MAXIMA, LARGO } from '@/lib/limites'
 import type { OwnerItemView } from '@/lib/serialize'
@@ -13,13 +14,15 @@ const CATEGORIAS = ['Tecnología', 'Casa', 'Ropa', 'Libros', 'Experiencias', 'Ho
  * El formulario de un deseo: vacío para agregar, o con lo cargado para editar (`deseo`). Arriba lo que más ayuda a
  * acertar (qué es, la foto, el precio); lo demás, en "Más detalles" (abierto al editar).
  */
-export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
+export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, compartido }: {
   action: (formData: FormData) => Promise<void>
   deseo?: OwnerItemView
   /** Solo al agregar, si tiene grupos: en qué lista va. */
   grupos?: { id: string; nombre: string }[]
   grupoElegido?: string
   boton: string
+  /** Solo al agregar: lo compartido a GiftR desde otra app (ver RecibirCompartido). */
+  compartido?: CompartidoAlForm
 }) {
   return (
     <form action={action} className="group/deseo mt-3.5 flex flex-col gap-4">
@@ -39,10 +42,11 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
           </div>
         </div>
       )}
-      <QueQueres defaultValue={deseo?.titulo} agregando={!deseo} />
+      <QueQueres defaultValue={deseo?.titulo ?? compartido?.link ?? compartido?.titulo} agregando={!deseo} />
       {/* con el link del producto (en "¿Qué querés?" o en "Link a la tienda") completa el nombre, el precio y la foto que estén vacíos */}
       <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} tituloGuardado={deseo?.titulo ?? null} />
       <FotoField inicial={deseo?.fotoUrl} />
+      {compartido && !deseo && <RecibirCompartido {...compartido} />}
 
       <div role="radiogroup" aria-label="Tipo de deseo" className="gr-segmented">
         <label><input type="radio" name="tipo" value="exacto" defaultChecked={deseo?.tipo !== 'idea'} className="sr-only" />Quiero ESTO</label>
@@ -100,7 +104,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
             </div>
           </div>
 
-          <textarea name="notas" maxLength={LARGO.notas} placeholder="Notas (talle, color…)" defaultValue={deseo?.notas ?? ''} className="gr-input min-h-24" />
+          <textarea name="notas" maxLength={LARGO.notas} placeholder="Notas (talle, color…)" defaultValue={deseo?.notas ?? compartido?.notas ?? ''} className="gr-input min-h-24" />
           {/* solo para "Algo así": un "Quiero ESTO" no se repite (el servidor lo guarda sin la marca aunque venga tildado) */}
           <label className="hidden min-h-11 items-center gap-3 text-sm font-semibold group-has-[input[name=tipo][value=idea]:checked]/deseo:flex">
             <input type="checkbox" name="repetible" defaultChecked={deseo?.repetible} className="size-[22px] accent-gr-ink" />

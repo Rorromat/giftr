@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { confirmarAvisosAction, desuscribirAvisosAction, probarAvisoAction, suscribirAvisosAction } from '@/app/actions'
+import { registrarSW } from '@/lib/app-instalable'
 import { estadoAlAbrir, trasPedirPermiso, type EstadoAvisos } from '@/lib/avisos-del-navegador'
 
 /** La clave pública VAPID viene en base64url; el navegador la quiere en bytes. */
@@ -24,7 +25,7 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
       soporta,
       pedirInstalar: esIOS() && !instalada(),
       permiso: soporta ? Notification.permission : 'default',
-      suscripcion: async () => (await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })).pushManager.getSubscription(),
+      suscripcion: async () => (await registrarSW()).pushManager.getSubscription(),
     }, confirmarAvisosAction).then(setEstado, () => setEstado('no-soportado'))
   }, [])
 
