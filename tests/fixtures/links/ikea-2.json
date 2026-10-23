@@ -1,0 +1,35 @@
+{
+ "tienda": "ikea",
+ "caso": "ikea.com producto viejo (id cambiado): 301 a la CATEGORIA (og:type=product.group)",
+ "urlPegadaPorElUsuario": "https://www.ikea.com/us/en/p/billy-bookcase-white-00263850/",
+ "urlFinal": "https://www.ikea.com/us/en/cat/billy-bookcases-58288/",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://www.ikea.com/us/en/cat/billy-bookcases-58288/",
+   "contentType": "text/plain; charset=utf-8",
+   "server": "cloudflare"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-producto",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "BILLY Bookcases & Bookshelves",
+   "image": "https://www.ikea.com/global/assets/range-categorisation/images/billy-bookcases-58288.jpeg",
+   "price": null
+  }
+ }
+}

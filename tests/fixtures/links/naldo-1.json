@@ -1,0 +1,28 @@
+{
+ "tienda": "naldo",
+ "caso": "VTEX IO completo; og:title con sufijo largo",
+ "urlPegadaPorElUsuario": "https://www.naldo.com.ar/55-pud7309-77-smart-4k-uhd-titan-tv-505782-1/p",
+ "urlFinal": "https://www.naldo.com.ar/55-pud7309-77-smart-4k-uhd-titan-tv-505782-1/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Smart Tv Philips 55 Pud7309/77 4k Uhd Titan Tv",
+  "image": "https://naldoar.vtexassets.com/arquivos/ids/230720/1.png?v=639215448530500000",
+  "imageHiRes": "https://naldoar.vtexassets.com/arquivos/ids/230720/1.png?v=639215448530500000",
+  "price": 699999,
+  "currency": "ARS",
+  "originalPrice": 999999,
+  "availability": "InStock",
+  "brand": "PHILIPS A.V."
+ }
+}

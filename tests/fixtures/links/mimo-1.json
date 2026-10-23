@@ -1,0 +1,27 @@
+{
+ "tienda": "mimo",
+ "caso": "sin og:*; entidades HTML dentro de strings del JSON-LD",
+ "urlPegadaPorElUsuario": "https://www.mimo.com.ar/v27j03011w-remera-jr-style/p",
+ "urlFinal": "https://www.mimo.com.ar/v27j03011w-remera-jr-style/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "REMERA JR STYLE",
+  "image": "https://mimoar.vtexassets.com/arquivos/ids/17766737/REMERA-JR-STYLE.jpg?v=639233512528230000",
+  "imageHiRes": "https://mimoar.vtexassets.com/arquivos/ids/17766737/REMERA-JR-STYLE.jpg?v=639233512528230000",
+  "price": 20720,
+  "currency": "ARS",
+  "originalPrice": 25900,
+  "availability": "InStock"
+ }
+}

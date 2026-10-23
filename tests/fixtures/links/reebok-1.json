@@ -1,0 +1,39 @@
+{
+ "tienda": "reebok",
+ "caso": "og:price:amount \"234.999\"; ProductGroup sin offers a nivel grupo",
+ "urlPegadaPorElUsuario": "https://www.reebok.com.ar/products/zapatillas-reebok-nano-x5-rbk1100209359",
+ "urlFinal": "https://reebok.com.ar/products/zapatillas-reebok-nano-x5-rbk1100209359",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://reebok.com.ar/products/zapatillas-reebok-nano-x5-rbk1100209359",
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  },
+  {
+   "status": 103,
+   "location": null,
+   "contentType": null,
+   "server": null
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Zapatillas Reebok Nano X5",
+  "image": "https://reebok.com.ar/cdn/shop/files/RBK1100209359-1.jpg?v=1756496959",
+  "imageHiRes": "https://reebok.com.ar/cdn/shop/files/RBK1100209359-1.jpg?v=1756496959",
+  "price": 234999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

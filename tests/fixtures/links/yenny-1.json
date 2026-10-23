@@ -1,0 +1,28 @@
+{
+ "tienda": "yenny-elateneo",
+ "caso": "producto principal en WebPage.mainEntity; 8 Product relacionados en el body",
+ "urlPegadaPorElUsuario": "https://www.yenny-elateneo.com/productos/biopausia/",
+ "urlFinal": "https://www.yenny-elateneo.com/productos/biopausia/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "BIOPAUSIA",
+  "image": "https://acdn-us.mitiendanube.com/stores/004/088/117/products/731828-ac9e01d76e2e8678b317510423500145-480-0.webp",
+  "imageHiRes": "https://acdn-us.mitiendanube.com/stores/004/088/117/products/731828-ac9e01d76e2e8678b317510423500145-1024-1024.webp",
+  "price": 30900,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "Editorial El Ateneo"
+ }
+}

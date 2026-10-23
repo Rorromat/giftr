@@ -1,0 +1,24 @@
+{
+ "tienda": "nike",
+ "caso": "nike.com: 403 Access Denied (Akamai)",
+ "urlPegadaPorElUsuario": "https://www.nike.com/t/air-force-1-07-mens-shoes-jBrhbr/CW2288-111",
+ "urlFinal": "https://www.nike.com/t/air-force-1-07-mens-shoes-jBrhbr/CW2288-111",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

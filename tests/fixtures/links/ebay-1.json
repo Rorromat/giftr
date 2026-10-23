@@ -1,0 +1,24 @@
+{
+ "tienda": "ebay",
+ "caso": "ebay.com/itm/<id>: 403 Akamai 'Error Page | eBay'",
+ "urlPegadaPorElUsuario": "https://www.ebay.com/itm/365586425719",
+ "urlFinal": "https://www.ebay.com/itm/365586425719",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 403,
+   "location": null,
+   "contentType": "text/html",
+   "server": "AkamaiGHost"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

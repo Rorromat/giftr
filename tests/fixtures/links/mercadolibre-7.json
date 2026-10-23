@@ -1,0 +1,27 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "publicación PAUSADA",
+ "urlPegadaPorElUsuario": "https://articulo.mercadolibre.com.ar/MLA-1418506681-dije-charm-pando-globo-terraqueo-plata-925-22gr-plateado-_JM",
+ "urlFinal": "https://articulo.mercadolibre.com.ar/MLA-1418506681-dije-charm-pando-globo-terraqueo-plata-925-22gr-plateado-_JM",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Dije Charm Pando Globo Terráqueo Plata 925 2,2gr Plateado",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_651258-MLA75340231004_032024-O.webp",
+  "price": 48000,
+  "currency": "ARS",
+  "originalPrice": null,
+  "status": "paused",
+  "statusMessage": "Publicación pausada",
+  "itemId": "MLA1418506681"
+ }
+}

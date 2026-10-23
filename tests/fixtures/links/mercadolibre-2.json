@@ -1,0 +1,32 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "publicacion con descuento (link /up/ de \"user product\")",
+ "urlPegadaPorElUsuario": "https://www.mercadolibre.com.ar/canasta-matera-eco-cuero-portatermo-practica-y-resistente/up/MLAU3409701436?pdp_filters=item_id%3AMLA2324526514#polycard_client=mshops-appearance-api&component=tabbed_carousel&wid=MLA2324526514",
+ "urlFinal": "https://www.mercadolibre.com.ar/canasta-matera-eco-cuero-portatermo-practica-y-resistente/up/MLAU3409701436?pdp_filters=item_id%3AMLA2324526514",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Canasta Matera Eco Cuero Portatermo Practica Y Resistente Negro",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_624791-MLA110418098269_042026-O.webp",
+  "imageHiRes": "https://http2.mlstatic.com/D_NQ_NP_624791-MLA110418098269_042026-F.webp",
+  "price": 14920,
+  "currency": "ARS",
+  "originalPrice": 23000,
+  "discountPercent": 35,
+  "installments": null,
+  "status": "active",
+  "itemId": "MLA2324526514",
+  "catalogProductId": "MLA55580378",
+  "userProductId": "MLAU3409701436",
+  "canonicalUrl": "https://www.mercadolibre.com.ar/canasta-matera-eco-cuero-portatermo-practica-y-resistente-negro/p/MLA55580378"
+ }
+}

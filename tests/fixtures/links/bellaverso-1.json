@@ -1,0 +1,32 @@
+{
+ "tienda": "bellaverso",
+ "caso": "tienda chica con precio 0,00 (precio oculto)",
+ "urlPegadaPorElUsuario": "https://bellaverso.shop/products/pisos-bandeja-8d-ford-ranger-2012-2023",
+ "urlFinal": "https://bellaverso.shop/products/pisos-bandeja-8d-ford-ranger-2012-2023",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 103,
+   "location": null,
+   "contentType": null,
+   "server": null
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Pisos Bandeja 8D Ford Ranger 2024-2026",
+  "image": "https://bellaverso.shop/cdn/shop/files/23_c23bcd13-dd8b-4d07-8770-9358b0fba2dd.jpg?v=1782846929&width=1920",
+  "imageHiRes": "https://bellaverso.shop/cdn/shop/files/23_c23bcd13-dd8b-4d07-8770-9358b0fba2dd.jpg?v=1782846929&width=1920",
+  "price": null,
+  "currency": "ARS",
+  "originalPrice": null
+ }
+}

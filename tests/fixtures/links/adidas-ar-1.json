@@ -1,0 +1,24 @@
+{
+ "tienda": "adidas",
+ "caso": "adidas.com.ar: 403 pagina WAF de Akamai",
+ "urlPegadaPorElUsuario": "https://www.adidas.com.ar/zapatillas-samba-og/B75806.html",
+ "urlFinal": "https://www.adidas.com.ar/zapatillas-samba-og/B75806.html",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 403,
+   "location": null,
+   "contentType": "text/html",
+   "server": "AkamaiNetStorage"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-waf-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "tienda": "booking",
+ "caso": "booking.com: 301 a .es-ar.html y luego 202 con challenge AWS WAF (JS)",
+ "urlPegadaPorElUsuario": "https://www.booking.com/hotel/ar/alvear-palace.html",
+ "urlFinal": "https://www.booking.com/hotel/ar/alvear-palace.es-ar.html?label=gen173nr-10CAsoDEINYWx2ZWFyLXBhbGFjZUgzWARolQKIAQGYATO4ARfIAQzYAQPoAQH4AQGIAgGoAgG4Aviq6NYGwAIB0gIkMmViYmViYjItOGI0MC00MDMyLWJhYjgtNGMzNzM5NjczZWM42AIB4AIB&sid=x&dist=0&keep_landing=1&sb_price_type=total&type=total&",
+ "status": 202,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "aws-waf-challenge",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

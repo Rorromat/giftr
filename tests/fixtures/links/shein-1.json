@@ -1,0 +1,30 @@
+{
+ "tienda": "shein",
+ "caso": "us.shein.com producto: 302 a /risk/challenge (captcha 909), 200 con la home generica",
+ "urlPegadaPorElUsuario": "https://us.shein.com/DAZY-Women-s-White-Long-Sleeve-Square-Neck-Blouse-p-77671994.html",
+ "urlFinal": "https://us.shein.com/risk/challenge?captcha_type=909&redirection=https%3A%2F%2Fus.shein.com%2FDAZY-Women-s-White-Long-Sleeve-Square-Neck-Blouse-p-77671994.html&risk-id=E4936325400956637441",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 302,
+   "location": "/risk/challenge?captcha_type=909&redirection=https%3A%2F%2Fus.shein.com%2FDAZY-Women-s-White-Long-Sleeve-Square-Neck-Blouse-p-77671994.html&risk-id=E4936325400956637441",
+   "contentType": null,
+   "server": "cloudflare"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "shein-risk-challenge",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

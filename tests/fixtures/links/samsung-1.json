@@ -1,0 +1,26 @@
+{
+ "tienda": "samsung",
+ "caso": "og:image = logo; foto buena en JSON-LD",
+ "urlPegadaPorElUsuario": "https://www.samsung.com/ar/smartphones/galaxy-a/galaxy-a37-5g-awesome-charcoal-256gb-sm-a376bzafaro/",
+ "urlFinal": "https://www.samsung.com/ar/smartphones/galaxy-a/galaxy-a37-5g-awesome-charcoal-256gb-sm-a376bzafaro/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Galaxy A37 5G",
+  "image": "https://images.samsung.com/is/image/samsung/p6pim/ar/sm-a376bzafaro/gallery/ar-galaxy-a37-5g-sm-a376-sm-a376bzafaro-thumb-552871769",
+  "imageHiRes": "https://images.samsung.com/is/image/samsung/p6pim/ar/sm-a376bzafaro/gallery/ar-galaxy-a37-5g-sm-a376-sm-a376bzafaro-thumb-552871769?$1300_1038_PNG$",
+  "price": 999999,
+  "currency": "ARS",
+  "originalPrice": null
+ }
+}

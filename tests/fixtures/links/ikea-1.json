@@ -1,0 +1,31 @@
+{
+ "tienda": "ikea",
+ "caso": "ikea.com/us/en/p/<slug>-<id>/ producto: JSON-LD Product con precio, og completos",
+ "urlPegadaPorElUsuario": "https://www.ikea.com/us/en/p/billy-bookcase-black-oak-effect-00477337/",
+ "urlFinal": "https://www.ikea.com/us/en/p/billy-bookcase-black-oak-effect-00477337/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "BILLY Bookcase - black oak effect 31 1/2x11x41 3/4 \"",
+  "image": "https://www.ikea.com/us/en/images/products/billy-bookcase-black-oak-effect__1097107_pe864733_s5.jpg",
+  "price": 59,
+  "currency": "USD",
+  "canonicalUrl": "https://www.ikea.com/us/en/p/billy-bookcase-black-oak-effect-00477337/",
+  "generico": {
+   "title": "BILLY Bookcase - black oak effect 31 1/2x11x41 3/4 \"",
+   "image": "https://www.ikea.com/us/en/images/products/billy-bookcase-black-oak-effect__1097107_pe864733_s5.jpg",
+   "price": "59",
+   "currency": "USD"
+  }
+ }
+}

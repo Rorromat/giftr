@@ -1,0 +1,28 @@
+{
+ "tienda": "grimoldi",
+ "caso": "og + JSON-LD; espacio inicial y entidades",
+ "urlPegadaPorElUsuario": "https://www.grimoldi.com/Product/Detail/HBM_370122",
+ "urlFinal": "https://www.grimoldi.com/Product/Detail/HBM_370122",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Billetera Hush Puppies Marrón Billetera Elva",
+  "image": "https://mmgrim2.azureedge.net/MediaFiles/Grimoldi/2026/9/11/12044047_800.jpg",
+  "imageHiRes": "https://mmgrim2.azureedge.net/MediaFiles/Grimoldi/2026/9/11/12044047_1000.jpg",
+  "price": 39500,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "Hush Puppies"
+ }
+}

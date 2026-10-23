@@ -1,0 +1,35 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "MURO DE LOGIN en Brasil (portugues)",
+ "urlPegadaPorElUsuario": "https://www.mercadolivre.com.br/garrafa-termica-stanley-aerolight-transit-354ml-8605-dried-pine-lisa/p/MLB79300621",
+ "urlFinal": "https://www.mercadolivre.com.br/gz/account-verification?go=https%3A%2F%2Fwww.mercadolivre.com.br%2Fgarrafa-termica-stanley-aerolight-transit-354ml-8605-dried-pine-lisa%2Fp%2FMLB79300621&tid=9ef65923-24a9-4509-97e0-618052ff4d13",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 302,
+   "location": "https://www.mercadolivre.com.br/gz/account-verification?go=https%3A%2F%2Fwww.mercadolivre.com.br%2Fgarrafa-termica-stanley-aerolight-transit-354ml-8605-dried-pine-lisa%2Fp%2FMLB79300621&tid=9ef65923-24a9-4509-97e0-618052ff4d13",
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  },
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "account-verification",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "fallbackFromUrl": {
+   "site": "MLB",
+   "catalogProductId": "MLB79300621",
+   "slugTitle": "garrafa termica stanley aerolight transit 354ml 8605 dried pine lisa"
+  }
+ }
+}

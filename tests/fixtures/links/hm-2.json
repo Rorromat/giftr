@@ -1,0 +1,24 @@
+{
+ "tienda": "hm",
+ "caso": "www2.hm.com: 200 con captcha conductual de Akamai (sec-if-cpt)",
+ "urlPegadaPorElUsuario": "https://www2.hm.com/en_us/productpage.0970819001.html",
+ "urlFinal": "https://www2.hm.com/en_us/productpage.0970819001.html",
+ "status": 200,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-sec-cpt",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "tienda": "zara",
+ "caso": "zara.com/us/en/<slug>-p<ref>.html: JSON-LD ProductGroup con precio y og completos",
+ "urlPegadaPorElUsuario": "https://www.zara.com/us/en/basic-heavyweight-t-shirt--03-p01887410.html",
+ "urlFinal": "https://www.zara.com/us/en/basic-heavyweight-t-shirt--03-p01887410.html",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "BASIC HEAVYWEIGHT T-SHIRT /03",
+  "image": "https://static.zara.net/assets/public/0a76/6175/572e4c5f8a5b/a2966ea40eea/04087840500-p/04087840500-p.jpg?ts=1790150077079&w=560&f=auto",
+  "price": 29.9,
+  "currency": "USD",
+  "canonicalUrl": "https://www.zara.com/us/en/basic-heavyweight-t-shirt--03-p01887410.html",
+  "generico": {
+   "title": "BASIC HEAVYWEIGHT T-SHIRT /03",
+   "price": "29.9",
+   "currency": "USD"
+  }
+ }
+}

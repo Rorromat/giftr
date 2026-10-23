@@ -1,0 +1,25 @@
+{
+ "tienda": "acortador",
+ "caso": "a.co/d/<code> (boton Compartir de la app de Amazon): 301 con Location",
+ "urlPegadaPorElUsuario": "https://a.co/d/06FPbzeA",
+ "urlFinal": "https://a.co/d/06FPbzeA",
+ "status": 301,
+ "contentType": "application/json",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://www.amazon.com/shop/influencer-c3d3fe7d?ref=cm_sw_r_apin_aipsfshop_C3CS384288XDD16CCH45_2&ref_=cm_sw_r_apin_aipsfshop_C3CS384288XDD16CCH45_2&social_share=cm_sw_r_apin_aipsfshop_C3CS384288XDD16CCH45_2&language=en-US",
+   "contentType": "application/json",
+   "server": "Server"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://www.amazon.com/shop/influencer-c3d3fe7d?ref=cm_sw_r_apin_aipsfshop_C3CS384288XDD16CCH45_2&..."
+ }
+}

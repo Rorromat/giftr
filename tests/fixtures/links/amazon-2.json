@@ -1,0 +1,32 @@
+{
+ "tienda": "amazon",
+ "caso": "amazon.com, mismo producto: og:title + og:image, sin precio",
+ "urlPegadaPorElUsuario": "https://www.amazon.com/dp/B09B8V1LZ3",
+ "urlFinal": "https://www.amazon.com/dp/B09B8V1LZ3",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "Amazon Echo Dot (newest model) - Vibrant sounding speaker, Designed for Alexa+, Great for bedrooms, dining rooms and offices, Charcoal",
+  "image": "https://m.media-amazon.com/images/I/71hNp8d9WvL.jpg_BO30,255,255,255_UF750,750_SR1910,1000,0,C_QL100_.jpg",
+  "imageLimpia": "https://m.media-amazon.com/images/I/71hNp8d9WvL.jpg",
+  "price": null,
+  "currency": null,
+  "asin": "B09B8V1LZ3",
+  "canonicalUrl": "https://www.amazon.com/Amazon-vibrant-helpful-routines-Charcoal/dp/B09B8V1LZ3",
+  "generico": {
+   "title": "Amazon Echo Dot (newest model) - Vibrant sounding speaker, Designed for Alexa+, Great for bedrooms, dining rooms and offices, Charcoal",
+   "image": "https://m.media-amazon.com/images/I/71hNp8d9WvL.jpg_BO30,255,255,255_UF750,750_SR1910,1000,0,C_QL100_.jpg",
+   "price": null
+  }
+ }
+}

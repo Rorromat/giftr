@@ -1,0 +1,25 @@
+{
+ "tienda": "acortador",
+ "caso": "spotify.link/<code> invalido: 307 a la home de open.spotify.com",
+ "urlPegadaPorElUsuario": "https://spotify.link/abc123",
+ "urlFinal": "https://spotify.link/abc123",
+ "status": 307,
+ "contentType": null,
+ "cadenaDeRespuestas": [
+  {
+   "status": 307,
+   "location": "https://open.spotify.com/",
+   "contentType": null,
+   "server": "openresty"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://open.spotify.com/"
+ }
+}

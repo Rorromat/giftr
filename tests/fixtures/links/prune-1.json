@@ -1,0 +1,26 @@
+{
+ "tienda": "prune",
+ "caso": "og + product:price:amount + itemprop; og:image miniatura",
+ "urlPegadaPorElUsuario": "https://www.prune.com.ar/p101061laaa1.html",
+ "urlFinal": "https://www.prune.com.ar/p101061laaa1.html",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Billetera de hombre Bernard en cuero grabado lagarto",
+  "image": "https://www.prune.com.ar/media/catalog/product/P/S/PS262305020027P101061LAAA1000_1.jpg?optimize=low&bg-color=255,255,255&fit=bounds&height=248&width=198&canvas=198:248",
+  "imageHiRes": "https://www.prune.com.ar/media/catalog/product/P/S/PS262305020027P101061LAAA1000_1.jpg",
+  "price": 54900,
+  "currency": "ARS",
+  "originalPrice": null
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "tienda": "sporting",
+ "caso": "sin og:*; solo JSON-LD Product (talles casi todos sin stock)",
+ "urlPegadaPorElUsuario": "https://www.sporting.com.ar/zapatillas-adidas-dropset-de-mujer-6la3870-000/p",
+ "urlFinal": "https://www.sporting.com.ar/zapatillas-adidas-dropset-de-mujer-6la3870-000/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Zapatillas Training adidas Dropset de Mujer",
+  "image": "https://sporting.vtexassets.com/arquivos/ids/3262036/6LA3870-000-1.jpg?v=639250053216670000",
+  "imageHiRes": "https://sporting.vtexassets.com/arquivos/ids/3262036/6LA3870-000-1.jpg?v=639250053216670000",
+  "price": 124999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "ADIDAS"
+ }
+}

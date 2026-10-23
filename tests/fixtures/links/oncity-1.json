@@ -1,0 +1,28 @@
+{
+ "tienda": "oncity",
+ "caso": "VTEX IO completo (og + product:price + JSON-LD + __STATE__)",
+ "urlPegadaPorElUsuario": "https://www.oncity.com/celular-motorola-moto-g06-4g-4-gb-64-gb-nfc-tapestry-158039/p",
+ "urlFinal": "https://www.oncity.com/celular-motorola-moto-g06-4g-4-gb-64-gb-nfc-tapestry-158039/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Celular Motorola Moto G06 4G 4 Gb 64 Gb Nfc Tapestry",
+  "image": "https://aremsaprod.vtexassets.com/arquivos/ids/1295066/158039_01.jpg?v=639159340704870000",
+  "imageHiRes": "https://aremsaprod.vtexassets.com/arquivos/ids/1295066-1000-1000/158039_01.jpg?v=639159340704870000",
+  "price": 229999,
+  "currency": "ARS",
+  "originalPrice": 259999,
+  "availability": "InStock",
+  "brand": "Motorola"
+ }
+}

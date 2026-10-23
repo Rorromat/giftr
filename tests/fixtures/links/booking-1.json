@@ -1,0 +1,29 @@
+{
+ "tienda": "booking",
+ "caso": "booking.com/hotel/ar/<slug>.html: og + JSON-LD Hotel (sin precio porque no hay fechas)",
+ "urlPegadaPorElUsuario": "https://www.booking.com/hotel/ar/alvear-palace.html",
+ "urlFinal": "https://www.booking.com/hotel/ar/alvear-palace.html",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "alojamiento",
+  "title": "Alvear Palace Hotel - Leading Hotels of the World",
+  "image": "https://r-xx.bstatic.com/xdata/images/hotel/1200x630/434380858.jpg?k=71b9c8cf80477a360b55c216c118a4595e8658f8dc7b0d776e2a911c76919b26&o=",
+  "price": null,
+  "currency": null,
+  "canonicalUrl": "https://www.booking.com/hotel/ar/alvear-palace.html",
+  "generico": {
+   "title": "Alvear Palace Hotel - Leading Hotels of the World, Buenos Aires (updated prices 2027)",
+   "price": null
+  }
+ }
+}

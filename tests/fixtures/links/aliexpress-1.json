@@ -1,0 +1,30 @@
+{
+ "tienda": "aliexpress",
+ "caso": "aliexpress.com/item/<id>.html: og:title + og:image, sin precio (pagina CSR)",
+ "urlPegadaPorElUsuario": "https://s.click.aliexpress.com/e/_EuGprMV",
+ "urlFinal": "https://www.aliexpress.com/item/1005007519345794.html",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=UTF-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "BLUX Gravity Minnow 50mm 4.3g Long Cast Heavy Shinking Fishing Lure Wobbler Freshwater Saltwater Bass Pike Hard Plastic Bait",
+  "image": "https://ae-pic-a1.aliexpress-media.com/kf/S3c7944fa0e3944c0bba66cf80adbceeff.jpg",
+  "price": null,
+  "currency": null,
+  "itemId": "1005007519345794",
+  "generico": {
+   "title": "BLUX Gravity Minnow 50mm 4.3g Long Cast Heavy Shinking Fishing Lure Wobbler Freshwater Saltwater Bass Pike Hard Plastic Bait - AliExpress 18",
+   "image": "https://ae-pic-a1.aliexpress-media.com/kf/S3c7944fa0e3944c0bba66cf80adbceeff.jpg",
+   "price": null
+  }
+ }
+}

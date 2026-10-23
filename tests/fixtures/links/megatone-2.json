@@ -1,0 +1,27 @@
+{
+ "tienda": "megatone",
+ "caso": "418 sin cuerpo",
+ "urlPegadaPorElUsuario": "https://www.megatone.net/producto/aire-acondicionado-split-friocalor-bgh-4644f-bs54wcdw_MKT0278BGH/",
+ "urlFinal": "https://www.megatone.net/producto/aire-acondicionado-split-friocalor-bgh-4644f-bs54wcdw_MKT0278BGH/",
+ "status": 418,
+ "contentType": null,
+ "cadenaDeRespuestas": [
+  {
+   "status": 418,
+   "location": null,
+   "contentType": null,
+   "server": "GenericServerI"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "http-418",
+  "genericPage": false,
+  "title": null,
+  "image": null,
+  "imageHiRes": null,
+  "price": null,
+  "currency": null,
+  "originalPrice": null
+ }
+}

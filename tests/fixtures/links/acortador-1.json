@@ -1,0 +1,25 @@
+{
+ "tienda": "acortador",
+ "caso": "amzn.to/<code> (Amazon Associates): 301 con Location",
+ "urlPegadaPorElUsuario": "https://amzn.to/4sbF6z8",
+ "urlFinal": "https://amzn.to/4sbF6z8",
+ "status": 301,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 301,
+   "location": "https://www.amazon.es/shop/estiloextra/list/1DNWF76A9LHB0?linkCode=spc&tag=eeys-21&domainId=influencer&asc_contentid=amzn1.ideas.1DNWF76A9LHB0",
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://www.amazon.es/shop/estiloextra/list/1DNWF76A9LHB0?linkCode=spc&tag=eeys-21&domainId=influencer&asc_contentid=amzn1.ideas.1DNWF76A9LHB0"
+ }
+}

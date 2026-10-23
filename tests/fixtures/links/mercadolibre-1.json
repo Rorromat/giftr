@@ -1,0 +1,31 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "publicacion activa, precio sin descuento",
+ "urlPegadaPorElUsuario": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM",
+ "urlFinal": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Mate De Algarrobo Premium Artesanal Con Bombilla",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_931470-MLA89297118039_082025-O.webp",
+  "imageHiRes": "https://http2.mlstatic.com/D_NQ_NP_931470-MLA89297118039_082025-F.webp",
+  "price": 88990,
+  "currency": "ARS",
+  "originalPrice": null,
+  "discountPercent": null,
+  "installments": "6 cuotas de $ 19.844,77 (con interés)",
+  "status": "active",
+  "itemId": "MLA1418506688",
+  "catalogProductId": null,
+  "canonicalUrl": "https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM"
+ }
+}

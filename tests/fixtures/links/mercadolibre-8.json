@@ -1,0 +1,26 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "vehiculo en pesos con numero grande (JSON-LD @type Vehicle)",
+ "urlPegadaPorElUsuario": "https://auto.mercadolibre.com.ar/MLA-1579719973-toyota-hilux-pick-up-24-cd-dx-150cv-4x4-at-de-_JM",
+ "urlFinal": "https://auto.mercadolibre.com.ar/MLA-1579719973-toyota-hilux-pick-up-24-cd-dx-150cv-4x4-at-de-_JM",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Toyota Hilux Pick-up 2.4 Cd Dx 150cv 4x4 At De",
+  "titleAlternativo": "Toyota Hilux Pick-Up 2.4 Cd Dx 150Cv 4X4 At",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_620649-MLA97959893689_112025-O.webp",
+  "ogImage": "https://http2.mlstatic.com/D_NQ_NP_620649-MLA97959893689_112025-O.jpg",
+  "price": 55820020,
+  "currency": "ARS",
+  "itemId": "MLA1579719973"
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "tienda": "jumbo",
+ "caso": "dos JSON-LD Product con precios distintos (regular vs promo)",
+ "urlPegadaPorElUsuario": "https://www.jumbo.com.ar/cerveza-quilmes-clasica-lata-473mlx6/p",
+ "urlFinal": "https://www.jumbo.com.ar/cerveza-quilmes-clasica-lata-473mlx6/p",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx/1.27.5"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "Cerveza Rubia 473 Ml x 6 Un Quilmes",
+  "image": "https://jumboargentina.vtexassets.com/arquivos/ids/890488/Cerveza-Quilmes-Cl-sica-Lata-473mlx6-1-2764.jpg?v=638987206008530000",
+  "imageHiRes": "https://jumboargentina.vtexassets.com/arquivos/ids/890488/Cerveza-Quilmes-Cl-sica-Lata-473mlx6-1-2764.jpg?v=638987206008530000",
+  "price": 16750,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock",
+  "brand": "QUILMES",
+  "promoPrice": 11725
+ }
+}

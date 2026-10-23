@@ -1,0 +1,30 @@
+{
+ "tienda": "airbnb",
+ "caso": "airbnb.com/rooms/<id>: og + JSON-LD VacationRental/Product (sin precio)",
+ "urlPegadaPorElUsuario": "https://www.airbnb.com/rooms/5931067",
+ "urlFinal": "https://www.airbnb.com/rooms/5931067",
+ "status": 200,
+ "contentType": "text/html;charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "alojamiento",
+  "title": "Palermo Soho",
+  "image": "https://a0.muscache.com/im/pictures/74108413/135c83d4_original.jpg",
+  "price": null,
+  "currency": null,
+  "canonicalUrl": "https://www.airbnb.com/rooms/5931067",
+  "generico": {
+   "title": "Palermo Soho",
+   "image": "https://a0.muscache.com/im/pictures/74108413/135c83d4_original.jpg",
+   "price": null
+  }
+ }
+}

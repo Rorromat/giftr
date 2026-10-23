@@ -1,0 +1,27 @@
+{
+ "tienda": "cuspide",
+ "caso": "sin og:*, JSON-LD sin image",
+ "urlPegadaPorElUsuario": "https://cuspide.com/producto/antes-de-que-se-enfrie-el-cafe/",
+ "urlFinal": "https://cuspide.com/producto/antes-de-que-se-enfrie-el-cafe/",
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=UTF-8",
+   "server": "cloudflare"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "genericPage": false,
+  "title": "ANTES DE QUE SE ENFRIE EL CAFE",
+  "image": "https://cdn.livriz.com/media/mediaspace/F9AFB48D-741D-4834-B760-F59344EEFF34/45/492b4726-f76d-4623-ac24-aa727ce2147f/mediamodifier70cbd9f8096.webp",
+  "imageHiRes": "https://cdn.livriz.com/media/mediaspace/F9AFB48D-741D-4834-B760-F59344EEFF34/45/492b4726-f76d-4623-ac24-aa727ce2147f/mediamodifier70cbd9f8096.webp",
+  "price": 44999,
+  "currency": "ARS",
+  "originalPrice": null,
+  "availability": "InStock"
+ }
+}

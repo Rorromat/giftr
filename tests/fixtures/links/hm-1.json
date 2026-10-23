@@ -1,0 +1,24 @@
+{
+ "tienda": "hm",
+ "caso": "www2.hm.com/en_us/productpage.<id>.html: 403 Access Denied (Akamai)",
+ "urlPegadaPorElUsuario": "https://www2.hm.com/en_us/productpage.0970819001.html",
+ "urlFinal": "https://www2.hm.com/en_us/productpage.0970819001.html",
+ "status": 403,
+ "contentType": "text/html",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "bloqueo": "akamai-403",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}

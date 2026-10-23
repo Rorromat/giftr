@@ -1,0 +1,26 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "la misma publicacion en dolares, render mobile CON og:image",
+ "urlPegadaPorElUsuario": "https://departamento.mercadolibre.com.ar/MLA-2042172639-departamento-en-venta-en-miami-florida-estados-unidos-_JM",
+ "urlFinal": "https://departamento.mercadolibre.com.ar/MLA-2042172639-departamento-en-venta-en-miami-florida-estados-unidos-_JM",
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html; charset=utf-8",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "title": "Departamento En Venta En Miami, Florida, Estados Unidos",
+  "image": "https://http2.mlstatic.com/D_NQ_NP_767486-MLA115406180586_082026-O.webp",
+  "ogImage": "https://http2.mlstatic.com/D_NQ_NP_767486-MLA115406180586_082026-O.jpg",
+  "price": 309000,
+  "currency": "USD",
+  "originalPrice": 329000,
+  "itemId": "MLA2042172639"
+ }
+}

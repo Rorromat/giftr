@@ -1,0 +1,25 @@
+{
+ "tienda": "aliexpress",
+ "caso": "Paso intermedio de s.click.aliexpress.com: star.aliexpress.com/share/share.htm (200, redirige por JS)",
+ "urlPegadaPorElUsuario": "https://s.click.aliexpress.com/e/_EuGprMV",
+ "urlFinal": "https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&shareId=60833475765&redirectUrl=https%3A%2F%2Fwww.aliexpress.com%2Fitem%2F1005007519345794.html%3FbusinessType%3DProductDetail%26srcSns%3Dsns_Copy%26spreadType%3DsocialShare%26bizType%3DProductDetail%26social_params%3D60833475765&aff_fsk=_EuGprMV&sk=_EuGprMV",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=UTF-8",
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "redireccion-js",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "destino": "https://www.aliexpress.com/item/1005007519345794.html"
+ }
+}

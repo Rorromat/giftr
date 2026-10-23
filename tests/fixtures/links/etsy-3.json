@@ -1,0 +1,29 @@
+{
+ "tienda": "etsy",
+ "caso": "etsy.com listing eliminado: 410 'This item is unavailable - Etsy' (con recomendaciones)",
+ "urlPegadaPorElUsuario": "https://www.etsy.com/listing/1046013437/personalized-leather-mate",
+ "urlFinal": "https://www.etsy.com/listing/1046013437/",
+ "status": 410,
+ "contentType": "text/html; charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": null,
+   "server": null
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "no-disponible",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null,
+  "generico": {
+   "title": "This item is unavailable - Etsy",
+   "image": null,
+   "price": null
+  }
+ }
+}

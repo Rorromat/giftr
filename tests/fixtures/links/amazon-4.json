@@ -1,0 +1,32 @@
+{
+ "tienda": "amazon",
+ "caso": "amazon.es: og:title + og:image, sin precio",
+ "urlPegadaPorElUsuario": "https://www.amazon.es/dp/B0FK3H2G5G",
+ "urlFinal": "https://www.amazon.es/dp/B0FK3H2G5G",
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "cadenaDeRespuestas": [
+  {
+   "status": 200,
+   "location": null,
+   "contentType": "text/html;charset=UTF-8",
+   "server": "Server"
+  }
+ ],
+ "expected": {
+  "blocked": false,
+  "tipo": "producto",
+  "title": "WUBEN X4 Linterna Led Recargable, Linterna Táctica con Iluminación RGB | 1500lúmenes, interruptor táctico, ajuste de brillo continuo, 4 modos, clip & magnética, puerto tipo C,IP65,Portátil,137 G",
+  "image": "https://m.media-amazon.com/images/I/71Sw+7SRapL.jpg_BO30,255,255,255_UF750,750_SR1910,1000,0,C_QL100_.jpg",
+  "imageLimpia": "https://m.media-amazon.com/images/I/71Sw+7SRapL.jpg",
+  "price": null,
+  "currency": null,
+  "asin": "B0FK3H2G5G",
+  "canonicalUrl": "https://www.amazon.es/WUBEN-X4-Recargable-Linternas-Emergencia/dp/B0FK3H2G5G",
+  "generico": {
+   "title": "WUBEN X4 Linterna Led Recargable, Linterna Táctica con Iluminación RGB | 1500lúmenes, interruptor táctico, ajuste de brillo continuo, 4 modos, clip & magnética, puerto tipo C,IP65,Portátil,137 G",
+   "image": "https://m.media-amazon.com/images/I/71Sw+7SRapL.jpg_BO30,255,255,255_UF750,750_SR1910,1000,0,C_QL100_.jpg",
+   "price": null
+  }
+ }
+}

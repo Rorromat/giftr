@@ -1,0 +1,24 @@
+{
+ "tienda": "mercadolibre",
+ "caso": "429 local_rate_limited (JSON)",
+ "urlPegadaPorElUsuario": "https://www.mercadolibre.com.ar/apple-iphone-15-128-gb-negro/p/MLA27172677",
+ "urlFinal": "https://www.mercadolibre.com.ar/apple-iphone-15-128-gb-negro/p/MLA27172677",
+ "status": 429,
+ "contentType": "application/json",
+ "cadenaDeRespuestas": [
+  {
+   "status": 429,
+   "location": null,
+   "contentType": "application/json",
+   "server": "nginx"
+  }
+ ],
+ "expected": {
+  "blocked": true,
+  "blockKind": "http-429",
+  "title": null,
+  "image": null,
+  "price": null,
+  "currency": null
+ }
+}
