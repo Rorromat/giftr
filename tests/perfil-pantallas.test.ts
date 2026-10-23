@@ -10,16 +10,21 @@ import { guardarGustos, misGustos } from '@/lib/bienvenida'
 import { sanitizarGustos } from '@/lib/gustos'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { CumpleCampos } from '@/components/CumpleCampos'
+import { ATAJO_IPHONE, TEXTOS_APPS } from '@/lib/agregar-desde-apps'
 
-// Perfil, la bienvenida y el perfil público tal cual, con la base en PGlite y la sesión y las redirecciones de Next
-// simuladas.
+// Perfil, la bienvenida y el perfil público tal cual, con la base en PGlite y la sesión, el user-agent y las redirecciones
+// de Next simulados.
 const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
   session: null as { userId: string; user?: { name: string } } | null,
+  ua: '',
 }))
 vi.mock('@/db', () => ({ get db() { return h.db } }))
 vi.mock('@/auth', () => ({ auth: async () => h.session, signIn: vi.fn(), signOut: vi.fn() }))
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined, set: () => {}, delete: () => {} }) }))
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined, set: () => {}, delete: () => {} }),
+  headers: async () => new Headers(h.ua ? { 'user-agent': h.ua } : {}),
+}))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
@@ -49,6 +54,7 @@ async function preparar() {
   h.db = await createTestDb()
   const seed = await seedOwnerAndGiver(h.db)
   h.session = { userId: seed.owner.id, user: { name: 'Euge' } }
+  h.ua = ''
   return seed
 }
 
@@ -188,4 +194,29 @@ test('perfil público visto por su dueño: no promete "ver mi lista como la ven"
   p = await ver(list.shareToken)
   expect(p).toContain(`href="/l/${list.shareToken}"`)
   expect(p).toContain('Ver la lista de Euge')
+})
+
+test('"Agregar desde otras apps" en Perfil: en Android y en iPhone (con la receta del atajo mientras no haya link); en la compu, no', async () => {
+  await preparar()
+  const perfil = (ua: string) => { h.ua = ua; return html(Perfil({ searchParams: Promise.resolve({}) })) }
+  const android = await perfil('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36')
+  expect(android).toContain(TEXTOS_APPS.titulo)
+  // después de Avisos
+  expect(android.indexOf(TEXTOS_APPS.titulo)).toBeGreaterThan(android.indexOf('>Avisos<'))
+  expect(android).toContain(TEXTOS_APPS['android-manual'].texto)
+  expect(android).not.toContain(TEXTOS_APPS.receta.sinAtajo)
+
+  expect(ATAJO_IPHONE).toBeNull()
+  const iphone = await perfil('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1')
+  expect(iphone).toContain(TEXTOS_APPS.titulo)
+  expect(iphone).toContain(TEXTOS_APPS.ios.texto)
+  expect(iphone).toContain(`<details open=""`)
+  expect(iphone).toContain(`>${TEXTOS_APPS.receta.sinAtajo}</summary>`)
+  expect(iphone).toContain('/compartir?url=')
+
+  for (const ua of ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', '']) {
+    const compu = await perfil(ua)
+    expect(compu).toContain('>Avisos<')
+    expect(compu).not.toContain(TEXTOS_APPS.titulo)
+  }
 })

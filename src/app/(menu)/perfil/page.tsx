@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
@@ -11,6 +12,8 @@ import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
+import { AgregarDesdeApps } from '@/components/AgregarDesdeApps'
+import { ATAJO_IPHONE, plataformaDe, TEXTOS_APPS } from '@/lib/agregar-desde-apps'
 import { clavesVapid } from '@/lib/codazos'
 import { seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
@@ -28,13 +31,14 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
   const [lista, cumple, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misGustos(db, session.userId),
   ])
-  const [foto, vapid, invitado] = await Promise.all([miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador()])
+  const [foto, vapid, invitado, pedido] = await Promise.all([miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers()])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
   const email = session.user?.email ?? ''
   const nombre = session.user?.name ?? email
+  const plataforma = plataformaDe(pedido.get('user-agent') ?? '')
 
   return (
     <Seccion className="flex flex-col gap-3.5 pb-32 pt-[52px]">
@@ -88,6 +92,14 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         </div>
         <ActivarAvisos vapidPublica={vapid.publica} />
       </section>
+
+      {/* Compartir a GiftR un link o una foto desde otra app. En la compu no va: no hay hoja de compartir con GiftR. */}
+      {plataforma && (
+        <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
+          <p className="font-display text-lg font-extrabold">{TEXTOS_APPS.titulo}</p>
+          <AgregarDesdeApps plataforma={plataforma} base={process.env.NEXT_PUBLIC_BASE_URL ?? ''} atajo={ATAJO_IPHONE} />
+        </section>
+      )}
 
 
       {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista. La key lo vuelve a armar con lo
