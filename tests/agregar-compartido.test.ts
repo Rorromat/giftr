@@ -69,6 +69,15 @@ test('?texto= llena el título con la primera línea y las notas con el texto en
   expect(notas(html)).toBe('Mate de calabaza\ncon bombilla')
 })
 
+test('?texto= con un link de más de 2000 caracteres no deja un pedazo en el título (ni en las notas)', async () => {
+  await preparar()
+  const largo = `https://www.otro-sitio.com/p/${'a'.repeat(2100)}`
+  expect(titulo(await pagina({ texto: largo }))).not.toContain('value=')
+  const html = await pagina({ texto: `Mate de calabaza ${largo}\ncon bombilla` })
+  expect(titulo(html)).toContain('value="Mate de calabaza"')
+  expect(notas(html)).toBe('Mate de calabaza\ncon bombilla')
+})
+
 test('lo que no sirve deja el formulario vacío: javascript:, un link repetido en la URL, un id del buzón que no es uno', async () => {
   await preparar()
   for (const q of [{ link: 'javascript:alert(1)' }, { link: [ML, ML] }, { compartido: '../x' }, { texto: '  ' }] as Busqueda[]) {
@@ -121,11 +130,10 @@ test('sin sesión y con buzón: la vuelta lleva auto=1 solo si se llegó desde G
     h.headers = { 'sec-fetch-site': sitio }
     expect(await redirige({ compartido: ID }), sitio).toBe(`/?volver=${encodeURIComponent(`/agregar?compartido=${ID}&auto=1`)}`)
   }
-  h.headers = {}
-  expect(await redirige({ compartido: ID })).toBe(`/?volver=${encodeURIComponent(`/agregar?compartido=${ID}&auto=1`)}`)
-  for (const sitio of ['cross-site', 'same-site']) {
-    h.headers = { 'sec-fetch-site': sitio }
-    expect(await redirige({ compartido: ID }), sitio).toBe(`/?volver=${encodeURIComponent(`/agregar?compartido=${ID}`)}`)
+  // sin Sec-Fetch-Site (un navegador viejo) no se sabe de dónde vino: como desde otro sitio
+  for (const sitio of ['cross-site', 'same-site', null]) {
+    h.headers = sitio ? { 'sec-fetch-site': sitio } : {}
+    expect(await redirige({ compartido: ID }), String(sitio)).toBe(`/?volver=${encodeURIComponent(`/agregar?compartido=${ID}`)}`)
   }
   // la vuelta de Google llega cross-site: con auto=1 y el buzón sigue valiendo (y vuelve igual)
   h.headers = { 'sec-fetch-site': 'cross-site' }

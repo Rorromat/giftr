@@ -38,5 +38,28 @@ export async function borrarCompartido(id: string, c: CacheStorage | undefined =
   try {
     const buzon = await c?.open(BUZON)
     await Promise.all([buzon?.delete(`/compartido/${id}`), buzon?.delete(`/compartido/${id}/foto`)])
-  } catch { /* queda hasta el próximo compartir, o un día (ver public/sw.js) */ }
+  } catch { /* queda hasta el próximo compartir, o un día (ver limpiarBuzon) */ }
+}
+
+/** Lo que nadie levantó (compartió y no entró) no queda más que esto. El mismo tope que en public/sw.js (lo fija un test). */
+export const BUZON_MAX_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Saca del buzón lo de más de un día (o sin fecha legible), con su foto. Lo llama RegistrarSW cada vez que se abre GiftR: el
+ * service worker limpia solo al activarse, que es una vez por versión. Una foto sin sus datos no se toca: puede ser la de un
+ * compartir que se está guardando (el SW guarda la foto primero), y la saca el SW.
+ */
+export async function limpiarBuzon(c: CacheStorage | undefined = globalThis.caches, ahora = Date.now()) {
+  try {
+    if (!c || !(await c.has(BUZON))) return
+    const buzon = await c.open(BUZON)
+    for (const pedido of await buzon.keys()) {
+      const clave = new URL(pedido.url).pathname
+      if (clave.endsWith('/foto')) continue
+      const sobre: unknown = await (await buzon.match(pedido))?.json().catch(() => null)
+      const en = sobre && typeof sobre === 'object' ? Number((sobre as { en?: unknown }).en) : NaN
+      if (Number.isFinite(en) && ahora - en <= BUZON_MAX_MS) continue
+      await Promise.all([buzon.delete(pedido), buzon.delete(`${clave}/foto`)])
+    }
+  } catch { /* sin Cache Storage: no hay nada que limpiar */ }
 }

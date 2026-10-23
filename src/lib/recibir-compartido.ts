@@ -22,12 +22,37 @@ const TEXTO_MAX = 5000
 // los saltos de línea de un formulario multipart llegan como \r\n
 const texto = (v: unknown) => (typeof v === 'string' ? sinControl(v.slice(0, TEXTO_MAX)).replace(/\r\n?/g, '\n').trim() : '')
 
+// Una sola línea que termina en la extensión de una foto; con una barra es un link de verdad (el de una foto)
+const NOMBRE_DE_FOTO = /^[^/\\\n]+\.(jpe?g|png|webp|gif|hei[cf]|avif)$/i
+// Los de la cámara y las capturas, con o sin extensión
+const DE_LA_CAMARA = /^(IMG|PXL|DSC|VID|Screenshot)[-_]\S*$/i
+
 /**
  * El nombre del archivo que algunas galerías mandan con la foto ("IMG_20261022_101010.jpg"): no es lo que quiere, y uno
- * como "mate.png" pasaría por un link (https://mate.png). Con una barra es un link de verdad (el de una foto).
+ * como "mate.png" pasaría por un link (https://mate.png). Con espacios, solo si es corto y trae números, como la fecha de
+ * "Captura de pantalla 2026-10-22 a las 10.10.10.png": "Me gusta este mate.jpg", o una nota de varias líneas que termina
+ * en ".png", es un texto.
  */
-const ES_ARCHIVO = /^[^/\\]+\.(jpe?g|png|webp|gif|hei[cf]|avif)$|^(IMG|PXL|DSC|VID|Screenshot)[-_]\S*$/i
-const sinArchivo = (t: string) => (ES_ARCHIVO.test(t) ? '' : t)
+const esArchivo = (t: string) => DE_LA_CAMARA.test(t) || (NOMBRE_DE_FOTO.test(t) && (!/\s/.test(t) || (t.length <= 80 && /\d/.test(t))))
+const sinArchivo = (t: string) => (esArchivo(t) ? '' : t)
+
+// Lo que tiene forma de link, como lo busca linkEnTexto
+const CON_FORMA_DE_LINK = /(?:https?:\/\/|www\.)\S+/gi
+
+/**
+ * Sin lo que tiene forma de link y no es uno que sirva (ver linkHttp: uno de más de 2000 caracteres no se toma, cortado no
+ * anda). Si quedara, recortado a 120 en el título (o a 500 en las notas) sería un link que sí pasa, pero roto: se buscaría
+ * como uno pegado y, al agregar, iría a "Link a la tienda". Sin los espacios que quedan de más.
+ */
+function sinLinksQueNoSirven(t: string): string {
+  let saco = false
+  const r = t.replace(CON_FORMA_DE_LINK, (m) => {
+    if (linkEnTexto(m)) return m
+    saco = true
+    return ''
+  })
+  return saco ? r.replace(/[^\S\n]+/g, ' ').replace(/ ?\n ?/g, '\n').trim() : r
+}
 
 /** El primer link, con la misma regla que un pegado: el de url; si no, el de text (ahí lo pone Android) y, si no, el de title. */
 function primerLink(...campos: string[]): string | null {
@@ -44,7 +69,8 @@ function primerLink(...campos: string[]): string | null {
  * producto.
  */
 export function loCompartido(r: Recibido): Compartido | null {
-  const [title, text, url] = [sinArchivo(texto(r.title)), sinArchivo(texto(r.text)), texto(r.url)]
+  const [title, text] = [r.title, r.text].map((v) => sinLinksQueNoSirven(sinArchivo(texto(v))))
+  const url = texto(r.url)
   const link = primerLink(url, text, title)
   if (link) return { link }
   const escrito = text || title
@@ -87,12 +113,14 @@ export const esRutaAgregar = (v: string) => /^\/agregar(\?[A-Za-z0-9%&=*._+-]*)?
 
 /**
  * Si la búsqueda del link y la subida de la foto corren solas: solo si se llegó desde GiftR o desde otra app (Sec-Fetch-Site
- * ausente, none o same-origin), no desde otro sitio, que si no podría gastarle al dueño los topes de lecturas y de fotos con
- * un link o un formulario. También con auto=1 junto con un id del buzón: lo pone /agregar en la vuelta del login (que llega
- * cross-site, desde Google) solo si la primera llegada vino de acá, y otro sitio no conoce el id.
+ * none o same-origin), no desde otro sitio, que si no podría gastarle al dueño los topes de lecturas y de fotos con un link
+ * o un formulario. Sin Sec-Fetch-Site tampoco: falta en los navegadores que no lo mandan (Safari antes de 16.4, Firefox
+ * antes de 90), y ahí cualquier sitio pasaría; el link queda en el título sin buscarse, como desde otro sitio. También con
+ * auto=1 junto con un id del buzón: lo pone /agregar en la vuelta del login (que llega cross-site, desde Google) solo si la
+ * primera llegada vino de acá, y otro sitio no conoce el id.
  */
 export function compartidoAutomatico(o: { sitio: string | null; buzon?: string; auto?: string }): boolean {
-  if (!o.sitio || o.sitio === 'none' || o.sitio === 'same-origin') return true
+  if (o.sitio === 'none' || o.sitio === 'same-origin') return true
   return esIdCompartido(o.buzon) && o.auto === '1'
 }
 
@@ -101,8 +129,8 @@ export type QueHacer = {
   /** Lo que va en "¿Qué querés?": el link o la primera línea del texto. Solo si estaba vacío. */
   titulo?: string
   /**
-   * Lo que entra en el título como un pegado (como "Pegar link copiado"): CompletarDesdeLink busca el link en el momento y
-   * "¿Qué querés?" deja de estar vacío. Un link, solo si es automático; un texto, siempre (no hay nada que buscar).
+   * El link, si es automático: entra en el título como un pegado (como "Pegar link copiado"), y CompletarDesdeLink lo busca
+   * en el momento. Lo demás (un texto, o un link que no es automático) entra como escrito (ver RecibirCompartido).
    */
   pegar?: string
   /** Solo si estaban vacías. */
@@ -119,7 +147,7 @@ export function queHacerConLoCompartido(r: DelBuzon, o: { automatico: boolean; t
   const titulo = c && !o.titulo.trim() ? c.link ?? c.titulo : undefined
   return {
     titulo,
-    pegar: titulo !== undefined && (o.automatico || !c?.link) ? titulo : undefined,
+    pegar: titulo !== undefined && o.automatico && c?.link !== undefined ? titulo : undefined,
     notas: c?.notas && !o.notas.trim() ? c.notas : undefined,
     foto: o.automatico && r.foto ? r.foto : undefined,
     fotoNoLlego: (!!r.foto && !o.automatico) || r.fotoRechazada,

@@ -11,8 +11,12 @@ const TEXTO_MAX = 5000
 // Las mismas que acepta el manifest: Chrome ya descarta las demás, esto es por las dudas (un SVG, un PDF). Sin HEIC: Chrome
 // no la puede achicar en el teléfono y el sharp del servidor no la lee (daría "No pudimos subir esa foto")
 const FOTO = /^image\/(jpe?g|png|webp|gif|avif)$/i
-// Un compartir que nadie levantó (compartió y no entró) no queda más de un día
+// Un compartir que nadie levantó (compartió y no entró) se saca pasado un día: cuando se actualiza el SW (activate) o se
+// abre GiftR (limpiarBuzon, en src/lib/buzon-compartido.ts, con el mismo tope), y si no, al próximo compartir
 const UN_DIA_MS = 24 * 60 * 60 * 1000
+// Lo que entra en la URL del respaldo, ya codificado: una más larga no llega (Vercel corta en unos 14 KB, y una letra con
+// tilde ocupa 6 caracteres; un emoji, 12). El route usa el primer link (de hasta 2000), 120 letras de título y 500 de notas
+const URL_MAX = 6000
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -58,6 +62,28 @@ self.addEventListener('fetch', (event) => {
 })
 
 const texto = (v) => (typeof v === 'string' ? v.slice(0, TEXTO_MAX) : '')
+// Lo que ocupa en la URL, como lo codifica URLSearchParams (que no tira con un emoji cortado al medio, como encodeURIComponent)
+const enUrl = (s) => new URLSearchParams({ s }).toString().length - 2
+
+/**
+ * Los textos para la URL del respaldo, en el orden en que el route busca el link (url, text, title), hasta URL_MAX entre
+ * todos. Por palabras enteras: un link cortado sería otro link, que se buscaría y se guardaría roto.
+ */
+function paraLaUrl(campos) {
+  let queda = URL_MAX
+  const r = {}
+  for (const k of ['url', 'text', 'title']) {
+    let v = ''
+    for (const pedazo of campos[k].split(/(\s+)/)) {
+      const n = enUrl(pedazo)
+      if (n > queda) break
+      v += pedazo
+      queda -= n
+    }
+    r[k] = v
+  }
+  return r
+}
 // 303: el navegador sigue con GET. Absoluta: Response.redirect no toma una ruta relativa en todos lados
 const a = (ruta) => Response.redirect(new URL(ruta, self.location.origin).href, 303)
 
@@ -89,8 +115,8 @@ async function recibir(request) {
     await buzon.put(`/compartido/${id}`, new Response(JSON.stringify(sobre), { headers: { 'content-type': 'application/json' } }))
     return a(`/agregar?compartido=${id}`)
   } catch {
-    // sin lugar (o sin Cache Storage): los textos por la URL, que arma y revisa el servidor; la foto no
-    return a(`/compartir?${new URLSearchParams({ ...campos, ...(archivos.length ? { foto: 'no' } : {}) })}`)
+    // sin lugar (o sin Cache Storage): los textos por la URL (lo que entra), que arma y revisa el servidor; la foto no
+    return a(`/compartir?${new URLSearchParams({ ...paraLaUrl(campos), ...(archivos.length ? { foto: 'no' } : {}) })}`)
   }
 }
 

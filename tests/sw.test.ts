@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
 import manifest from '@/app/manifest'
-import { BUZON, leerCompartido } from '@/lib/buzon-compartido'
-import { ID_COMPARTIDO } from '@/lib/recibir-compartido'
+import { BUZON, BUZON_MAX_MS, leerCompartido, limpiarBuzon } from '@/lib/buzon-compartido'
+import { ID_COMPARTIDO, loCompartido } from '@/lib/recibir-compartido'
 
 // public/sw.js tal cual, corrido con node:vm: un self y un Cache Storage de mentira, y Response, Request, URL y crypto de
 // Node. Lo que guarda el service worker lo lee leerCompartido (el formulario): es el contrato entre los dos.
@@ -21,6 +21,7 @@ function cachesDeMentira() {
   const cajas = new Map<string, Caja>()
   const url = (k: Clave) => new URL(typeof k === 'string' ? k : k instanceof URL ? k.href : k.url, BASE).href
   const caches = {
+    async has(nombre: string) { return cajas.has(nombre) },
     async open(nombre: string) {
       const caja = cajas.get(nombre) ?? new Map<string, Response>()
       cajas.set(nombre, caja)
@@ -172,6 +173,33 @@ describe('el POST de compartir', () => {
     expect((await pedir(cargar(), malo))!.headers.get('location')).toBe('https://giftr.test/agregar')
   })
 
+  test('sin Cache Storage, los textos largos van por la URL hasta un tope y por palabras enteras (un link no va cortado)', async () => {
+    const roto = { open: async () => { throw new Error('QuotaExceededError') } }
+    const sw = cargar({ caches: roto })
+    // 5000 letras con tilde ocupan 30.000 caracteres en la URL: Vercel contesta 414 pasados unos 14 KB
+    const conTildes = `${'ñandú '.repeat(800)}`.slice(0, 5000)
+    const r = await pedir(sw, compartir({ title: 'Mate | MercadoLibre', text: conTildes, url: ML }))!
+    const destino = new URL(r.headers.get('location')!)
+    expect(destino.search.length).toBeLessThanOrEqual(6100)
+    const q = Object.fromEntries(destino.searchParams)
+    // el link va entero, primero; el texto, hasta donde entra y sin una palabra a medias
+    expect(q.url).toBe(ML)
+    expect(q.text.length).toBeGreaterThan(500)
+    expect(conTildes.startsWith(q.text)).toBe(true)
+    expect(q.text.trimEnd().endsWith('ñandú')).toBe(true)
+    expect(loCompartido(q)).toEqual({ link: ML })
+
+    // un link que ya no entra no va (cortado sería otro link, que se buscaría roto); el título, con lo que queda
+    const largo = `${'ñandú '.repeat(370)}${ML}`
+    const cortado = new URL((await pedir(sw, compartir({ title: 'Mate', text: largo }))!).headers.get('location')!)
+    const c = Object.fromEntries(cortado.searchParams)
+    expect(cortado.search.length).toBeLessThanOrEqual(6100)
+    expect(largo.startsWith(c.text)).toBe(true)
+    expect(c.text).not.toContain('http')
+    expect(c.title).toBe('Mate')
+    expect(loCompartido(c)?.link).toBeUndefined()
+  })
+
   test('un texto de 1 MB se guarda cortado', async () => {
     const sw = cargar()
     const id = new URL((await pedir(sw, compartir({ text: 'a'.repeat(1024 * 1024) }))!).headers.get('location')!).searchParams.get('compartido')!
@@ -198,6 +226,29 @@ test('activate: borra lo de más de un día (y una foto sin sus datos) y toma la
   expect(sinCaches.self.clients.claim).toHaveBeenCalledOnce()
 })
 
+test('limpiarBuzon (al abrir GiftR): saca lo de más de un día, con su foto; lo nuevo y una foto sin sus datos quedan', async () => {
+  const { caches, cajas } = cachesDeMentira()
+  // sin buzón no lo crea
+  await limpiarBuzon(caches)
+  expect(cajas.has(BUZON)).toBe(false)
+  const ahora = Date.now()
+  const caja = await caches.open(BUZON)
+  const sobre = (en: unknown) => new Response(JSON.stringify({ title: '', text: ML, url: '', foto: true, fotoRechazada: false, en }))
+  await caja.put('/compartido/viejo', sobre(ahora - BUZON_MAX_MS - 1))
+  await caja.put('/compartido/viejo/foto', new Response(jpeg()))
+  await caja.put('/compartido/nuevo', sobre(ahora - 60 * 1000))
+  await caja.put('/compartido/nuevo/foto', new Response(jpeg()))
+  await caja.put('/compartido/guardandose/foto', new Response(jpeg()))
+  await caja.put('/compartido/sin-fecha', sobre('ayer'))
+  await caja.put('/compartido/roto', new Response('no es json'))
+  await limpiarBuzon(caches, ahora)
+  expect([...cajas.get(BUZON)!.keys()].sort())
+    .toEqual([`${BASE}compartido/guardandose/foto`, `${BASE}compartido/nuevo`, `${BASE}compartido/nuevo/foto`])
+  // sin Cache Storage, o si tira, no pasa nada
+  await limpiarBuzon(undefined)
+  await limpiarBuzon({ has: async () => { throw new Error('no') } } as unknown as CacheStorage)
+})
+
 test('install: skipWaiting y los GET directo a la red si el navegador puede; si no puede o tira, no pasa nada', async () => {
   const sw = cargar()
   const addRoutes = vi.fn(async () => {})
@@ -212,6 +263,9 @@ test('install: skipWaiting y los GET directo a la red si el navegador puede; si 
 
 test('contrato: el buzón se llama igual en sw.js y en el formulario, y el manifest manda lo que leen los dos', () => {
   expect(/const BUZON = '([^']+)'/.exec(CODIGO)?.[1]).toBe(BUZON)
+  // y lo viejo se saca con el mismo tope de los dos lados
+  const unDia = /const UN_DIA_MS = ([\d *]+)\n/.exec(CODIGO)?.[1]
+  expect(unDia?.split('*').reduce((a, n) => a * Number(n), 1)).toBe(BUZON_MAX_MS)
   const st = manifest().share_target!
   expect(st).toMatchObject({ action: '/compartir', method: 'POST', enctype: 'multipart/form-data' })
   expect(st.params).toMatchObject({ title: 'title', text: 'text', url: 'url' })

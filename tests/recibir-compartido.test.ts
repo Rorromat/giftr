@@ -1,10 +1,10 @@
-import { describe, expect, test } from 'vitest'
-import { loQueEntro } from '@/lib/completar-deseo'
+import { describe, expect, test, vi } from 'vitest'
+import { completador, loQueEntro, type Valores } from '@/lib/completar-deseo'
 import type { DelBuzon } from '@/lib/buzon-compartido'
 import {
   compartidoAutomatico, esRutaAgregar, loCompartido, queHacerConLoCompartido, rutaAgregar, VUELTA_MAX,
 } from '@/lib/recibir-compartido'
-import { comoPegado } from '@/components/RecibirCompartido'
+import { comoEscrito, comoPegado } from '@/components/RecibirCompartido'
 
 // Lo que llega al compartir a GiftR desde otra app (Android manda title y text; el atajo del iPhone, url), y adónde va.
 
@@ -55,6 +55,32 @@ describe('loCompartido', () => {
     // con una barra es un link (el de una foto), y un texto que empieza parecido no es un archivo
     expect(loCompartido({ title: 'https://http2.mlstatic.com/D_123-O.jpg' })).toEqual({ link: 'https://http2.mlstatic.com/D_123-O.jpg' })
     expect(loCompartido({ text: 'IMG de regalo para el día del padre' })?.titulo).toBe('IMG de regalo para el día del padre')
+    expect(loCompartido({ text: 'WhatsApp Image 2026-10-22 at 10.10.10.jpeg' })).toBeNull()
+  })
+
+  test('un texto que termina en ".jpg" o ".png" no es un archivo: con espacios y sin números, o de varias líneas', () => {
+    expect(loCompartido({ text: 'Me gusta este mate.jpg' })).toEqual({ titulo: 'Me gusta este mate.jpg', notas: null })
+    expect(loCompartido({ text: 'Regalos para mamá\nla taza de la foto.png' }))
+      .toEqual({ titulo: 'Regalos para mamá', notas: 'Regalos para mamá\nla taza de la foto.png' })
+    expect(loCompartido({ title: 'Captura de pantalla 2026-10-22 a las 10.10.10.png\nmate' })?.titulo).toBe('Captura de pantalla 2026-10-22 a las 10.10.10.png')
+    // uno largo con espacios y números es un texto; sin espacios, un archivo (si no, pasaría por un link)
+    const nota = `Lista de regalos 2026: ${'una taza '.repeat(10)}la de la foto.png`
+    expect(loCompartido({ text: nota })?.notas).toBe(nota)
+    expect(loCompartido({ text: `${'a'.repeat(200)}.png` })).toBeNull()
+  })
+
+  test('algo con forma de link que no sirve (de más de 2000 caracteres) no queda cortado en el título ni en las notas', () => {
+    const largo = `https://www.otro-sitio.com/p/${'a'.repeat(2100)}`
+    expect(loCompartido({ text: largo })).toBeNull()
+    expect(loCompartido({ text: `www.otro-sitio.com/p/${'a'.repeat(2100)}` })).toBeNull()
+    expect(loCompartido({ text: `Mirá esto ${largo} qué lindo` })).toEqual({ titulo: 'Mirá esto qué lindo', notas: null })
+    expect(loCompartido({ text: `Para mamá\n${largo}\nel azul` })).toEqual({ titulo: 'Para mamá', notas: 'Para mamá\n\nel azul' })
+    // Chrome con una página de link enorme: queda el <title>
+    expect(loCompartido({ title: 'Mate imperial | Otro sitio', text: largo })).toEqual({ titulo: 'Mate imperial | Otro sitio', notas: null })
+    // el que sí sirve, aunque venga después
+    expect(loCompartido({ text: `${largo} o este ${ML}` })).toEqual({ link: ML })
+    // por la URL (?texto=) tampoco vuelve como un link
+    expect(rutaAgregar({ compartido: loCompartido({ text: `Mirá ${largo}` }) })).toBe('/agregar?texto=Mir%C3%A1')
   })
 
   test('sin caracteres de control ni bidi, y javascript: no es un link', () => {
@@ -134,9 +160,11 @@ test('esRutaAgregar: solo /agregar con lo que da URLSearchParams', () => {
   }
 })
 
-test('compartidoAutomatico: desde GiftR o desde otra app sí; desde otro sitio, solo con el buzón y auto=1', () => {
-  for (const sitio of [null, '', 'none', 'same-origin']) expect(compartidoAutomatico({ sitio }), String(sitio)).toBe(true)
-  for (const sitio of ['cross-site', 'same-site']) expect(compartidoAutomatico({ sitio }), sitio).toBe(false)
+test('compartidoAutomatico: desde GiftR o desde otra app sí; desde otro sitio o sin Sec-Fetch-Site, solo con el buzón y auto=1', () => {
+  for (const sitio of ['none', 'same-origin']) expect(compartidoAutomatico({ sitio }), sitio).toBe(true)
+  // sin el encabezado (Safari antes de 16.4, Firefox antes de 90) cualquier sitio pasaría
+  for (const sitio of [null, '', 'cross-site', 'same-site']) expect(compartidoAutomatico({ sitio }), String(sitio)).toBe(false)
+  expect(compartidoAutomatico({ sitio: null, buzon: ID, auto: '1' })).toBe(true)
   expect(compartidoAutomatico({ sitio: 'cross-site', buzon: ID, auto: '1' })).toBe(true)
   expect(compartidoAutomatico({ sitio: 'cross-site', buzon: ID })).toBe(false)
   expect(compartidoAutomatico({ sitio: 'cross-site', auto: '1' })).toBe(false)
@@ -157,18 +185,24 @@ describe('queHacerConLoCompartido', () => {
   test('no pisa un título ni unas notas ya escritos (y entonces no hay nada que buscar)', () => {
     expect(queHacerConLoCompartido(del({ text: ML }), { ...vacio, titulo: 'Mi mate' })).toEqual({ fotoNoLlego: false })
     const texto = del({ text: 'Mate de calabaza\ncon bombilla' })
-    expect(queHacerConLoCompartido(texto, { ...vacio, notas: 'el negro' }))
-      .toEqual({ titulo: 'Mate de calabaza', pegar: 'Mate de calabaza', fotoNoLlego: false })
+    expect(queHacerConLoCompartido(texto, { ...vacio, notas: 'el negro' })).toEqual({ titulo: 'Mate de calabaza', fotoNoLlego: false })
     expect(queHacerConLoCompartido(texto, { ...vacio, titulo: '  ' }))
-      .toEqual({ titulo: 'Mate de calabaza', pegar: 'Mate de calabaza', notas: 'Mate de calabaza\ncon bombilla', fotoNoLlego: false })
+      .toEqual({ titulo: 'Mate de calabaza', notas: 'Mate de calabaza\ncon bombilla', fotoNoLlego: false })
   })
 
   test('si no es automático no hay foto ni búsqueda: el link queda en el título y la foto no llegó', () => {
     expect(queHacerConLoCompartido(del({ text: ML, foto }), { ...vacio, automatico: false }))
       .toEqual({ titulo: ML, fotoNoLlego: true })
-    // un texto igual entra como pegado: no tiene link que buscar
-    expect(queHacerConLoCompartido(del({ text: 'Mate' }), { ...vacio, automatico: false }))
-      .toEqual({ titulo: 'Mate', pegar: 'Mate', fotoNoLlego: false })
+    // solo un link automático entra como pegado: un texto, nunca (entra como escrito)
+    expect(queHacerConLoCompartido(del({ text: 'Mate' }), { ...vacio, automatico: false })).toEqual({ titulo: 'Mate', fotoNoLlego: false })
+    expect(queHacerConLoCompartido(del({ text: 'Mate' }), vacio)).toEqual({ titulo: 'Mate', fotoNoLlego: false })
+  })
+
+  test('un link de más de 2000 caracteres no deja un pedazo en el título, que se buscaría como uno pegado', () => {
+    const largo = `https://www.otro-sitio.com/p/${'a'.repeat(2100)}`
+    expect(queHacerConLoCompartido(del({ text: largo }), { ...vacio, automatico: false })).toEqual({ fotoNoLlego: false })
+    expect(queHacerConLoCompartido(del({ text: `Mirá ${largo}` }), { ...vacio, automatico: false }))
+      .toEqual({ titulo: 'Mirá', fotoNoLlego: false })
   })
 
   test('una foto que el service worker no tomó da fotoNoLlego; solo foto deja el título vacío', () => {
@@ -181,4 +215,24 @@ test('lo compartido entra en el título como un pegado: CompletarDesdeLink lo to
   const init = comoPegado(ML)
   expect(init).toMatchObject({ bubbles: true, inputType: 'insertFromPaste', data: ML })
   expect(loQueEntro({ inputType: init.inputType, data: init.data })).toBe(ML)
+})
+
+test('lo demás entra como escrito: un input común (no un InputEvent), y un link no se pide hasta dejar el campo', async () => {
+  const e = comoEscrito()
+  expect(e).toBeInstanceOf(Event)
+  expect(e).toMatchObject({ type: 'input', bubbles: true })
+  expect('inputType' in e).toBe(false)
+  // lo que hace CompletarDesdeLink con un input que no es un InputEvent: alCambiar(null)
+  const v: Valores = { titulo: ML, linkTienda: '', precio: '' }
+  const pedir = vi.fn(async () => undefined)
+  const c = completador({ guardado: null, leer: () => v, escribir: () => {}, mostrar: () => {}, pedir })
+  c.alCambiar(null)
+  await Promise.resolve()
+  expect(pedir).not.toHaveBeenCalled()
+  // ni al ir a "Agregar"
+  c.alDejar('titulo', 'enviar')
+  expect(pedir).not.toHaveBeenCalled()
+  c.alDejar('titulo', 'precio')
+  expect(pedir).toHaveBeenCalledOnce()
+  c.cerrar()
 })

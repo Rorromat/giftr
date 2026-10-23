@@ -23,10 +23,17 @@ export type CompartidoAlForm = {
 export const FOTO_NO_LLEGO = 'La foto no llegó: tocá Foto y elegila de nuevo.'
 
 /**
- * Cómo entra lo compartido en "¿Qué querés?": como un pegado, igual que con "Pegar link copiado" (QueQueres). Así
- * CompletarDesdeLink busca el link en el momento (ver loQueEntro) y "¿Qué querés?" deja de estar vacío.
+ * Cómo entra un link que se busca solo en "¿Qué querés?": como un pegado, igual que con "Pegar link copiado" (QueQueres).
+ * Así CompletarDesdeLink lo busca en el momento (ver loQueEntro) y "¿Qué querés?" deja de estar vacío.
  */
 export const comoPegado = (texto: string) => ({ bubbles: true, inputType: 'insertFromPaste', data: texto }) satisfies InputEventInit
+
+/**
+ * Lo demás (un texto, o un link que no se busca solo): un input común, que no es un InputEvent. QueQueres se entera de que
+ * "¿Qué querés?" ya no está vacío (y esconde las ideas, que lo pisarían), y CompletarDesdeLink lo toma como escrito (ver
+ * loQueEntro): un link se busca recién si la persona deja el campo, como uno escrito a mano.
+ */
+export const comoEscrito = () => new Event('input', { bubbles: true })
 
 /** "Más detalles" abierto, para que se vean las notas que vinieron. */
 function verNotas(notas: HTMLTextAreaElement) {
@@ -70,6 +77,7 @@ export function RecibirCompartido({ buzon, link, automatico, sinFoto }: Comparti
     }
     if (que.foto) entregarFoto(form, que.foto)
     if (que.pegar !== undefined) pegar(que.pegar)
+    else if (que.titulo !== undefined) titulo.dispatchEvent(comoEscrito())
     setFotoNoLlego(que.fotoNoLlego)
     void borrarCompartido(buzon)
   })
