@@ -8,7 +8,7 @@ import { Readable } from 'node:stream'
 import zlib from 'node:zlib'
 import { bajarDeAfuera, pedirAfuera, pedirFoto, pedirPagina } from '@/lib/bajar-foto'
 import { esUrlPublica } from '@/lib/compartir'
-import { aTexto, bajarPagina, estadoDeFalla, leerPagina, PAGINA_MAX_BYTES, UA_GIFTR } from '@/lib/pagina-de-afuera'
+import { aTexto, bajarPagina, estadoDeFalla, expandirLinkCorto, leerPagina, PAGINA_MAX_BYTES, UA_GIFTR } from '@/lib/pagina-de-afuera'
 import { leerProducto } from '@/lib/producto-del-link'
 import { cuerpo, fixture } from './fixtures/links/leer'
 import Bot from '@/app/bot/page'
@@ -276,6 +276,37 @@ describe('redirecciones', () => {
     expect(await bajarDeAfuera('https://lento.com/1', s.pedir, esUrlPublica, { ...opciones, tiempoMs: 5000, signal: usuario.signal }))
       .toMatchObject({ falla: 'no-carga' })
     expect(Date.now() - antes).toBeLessThan(400)
+  })
+})
+
+describe('expandir un link corto de ML (para preguntarle a la API)', () => {
+  const ARTICULO = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM'
+  const salto = (a: string) => ({ status: 301, headers: { location: a } })
+
+  test('sigue los saltos hasta la publicación, sin pedirla', async () => {
+    const s = servidor({ 'https://meli.la/2abcXYZ': salto('https://mercadolibre.com/sec/1x2y3z'), 'https://mercadolibre.com/sec/1x2y3z': salto(ARTICULO) })
+    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir)).toBe(ARTICULO)
+    expect(s.urls()).toEqual(['https://meli.la/2abcXYZ', 'https://mercadolibre.com/sec/1x2y3z'])
+    // también al muro, que dice cuál era (go=): tampoco se pide
+    const muro = fixture('mercadolibre-10').cadenaDeRespuestas[0].location!
+    const m = servidor({ 'https://meli.la/2abcXYZ': salto(muro) })
+    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', m.pedir)).toBe(muro)
+    expect(m.urls()).toEqual(['https://meli.la/2abcXYZ'])
+  })
+
+  test('si no lleva a algo con id (la home, una tienda, otro sitio, la red interna) o no redirige: null, sin pedir el destino', async () => {
+    for (const destino of [
+      'https://www.mercadolibre.com.ar/', 'https://www.mercadolibre.com.ar/tienda/laska', 'https://otro.com/MLA-1418506688-x-_JM',
+      'https://10.0.0.1/MLA-1418506688-x-_JM',
+    ]) {
+      const s = servidor({ 'https://meli.la/2abcXYZ': salto(destino) })
+      expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir), destino).toBeNull()
+      expect(s.urls()).toEqual(['https://meli.la/2abcXYZ'])
+    }
+    // contesta una página: no se lee
+    const s = servidor({ 'https://meli.la/2abcXYZ': { headers: html, trozos: 3 } })
+    expect(await expandirLinkCorto('https://meli.la/2abcXYZ', s.pedir)).toBeNull()
+    expect(s.entregados()).toBe(0)
   })
 })
 

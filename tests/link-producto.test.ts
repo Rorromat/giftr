@@ -10,7 +10,7 @@ import type { Pedir } from '@/lib/bajar-foto'
 import { PEDIDOS_AFUERA_POR_DIA } from '@/lib/pedidos-afuera'
 
 // POST /api/deseo/link: lee el producto del link que pegó el dueño. La base es PGlite, la sesión es de mentira y la
-// página la contesta un servidor de mentira (pedirPagina): nada sale a la red (https.get falla si se llama).
+// página la contesta un servidor de mentira (pedirPagina): nada sale a la red (https.get y fetch fallan si se llaman).
 
 const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
@@ -44,11 +44,14 @@ beforeEach(async () => {
   h.pedirPagina = servidor({}).pedir
   vi.spyOn(https, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
   vi.spyOn(http, 'get').mockImplementation(() => { throw new Error('nada sale a la red') })
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('nada sale a la red') }))
   info = vi.spyOn(console, 'info').mockImplementation(() => {})
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 function leer(body: unknown, headers: Record<string, string> = { 'content-type': 'application/json' }) {
@@ -250,5 +253,87 @@ describe('el tope por usuario', () => {
     expect(r.status).toBe(200)
     expect(await r.json()).toEqual({ estado: 'no-carga', titulo: 'Crocs classic clog', precio: null, foto: null, sitio: 'crocs.com.ar' })
     expect(s.urls()).toEqual([])
+  })
+})
+
+describe('con la API de MercadoLibre configurada', () => {
+  const API = 'https://api.mercadolibre.com'
+  const ITEM = {
+    id: 'MLA1418506688', title: 'Mate De Algarrobo Premium Artesanal Con Bombilla', price: 88990, currency_id: 'ARS', status: 'active',
+    thumbnail: 'http://http2.mlstatic.com/D_931470-MLA89297118039_082025-I.jpg',
+    pictures: [{ id: '931470', secure_url: 'https://http2.mlstatic.com/D_931470-MLA89297118039_082025-O.jpg', url: 'http://x' }],
+  }
+
+  /** La API de mentira: el token y lo que diga /items/MLA1418506688. Anota a qué URLs se pidió. */
+  function api(item: () => Response) {
+    vi.stubEnv('MELI_CLIENT_ID', '123')
+    vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
+    const urls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      urls.push(url)
+      if (url === `${API}/oauth/token`) return Response.json({ access_token: 'APP_USR-1', token_type: 'Bearer', expires_in: 21600 })
+      if (url === `${API}/items/MLA1418506688`) return item()
+      throw new Error(`no esperaba ${url}`)
+    }))
+    return urls
+  }
+
+  test('una publicación se lee de la API, sin pedir la página (y cuenta en el tope)', async () => {
+    const urls = api(() => Response.json(ITEM))
+    const s = afuera({})
+    expect(await (await leer({ url: ARTICULO })).json()).toEqual({
+      estado: 'ok', titulo: 'Mate De Algarrobo Premium Artesanal Con Bombilla', precio: '$88.990',
+      foto: 'https://http2.mlstatic.com/D_931470-MLA89297118039_082025-O.jpg', sitio: 'mercadolibre.com.ar',
+    })
+    expect(s.urls()).toEqual([])
+    expect(urls.every((u) => u.startsWith(`${API}/`))).toBe(true)
+    expect(await pedidos()).toBe(1)
+    expect(String(info.mock.calls[0][0])).toMatch(/^deseo\/link articulo\.mercadolibre\.com\.ar ok \d+ms api$/)
+  })
+
+  test('cerrada: no-esta, con el nombre del link', async () => {
+    api(() => Response.json({ ...ITEM, status: 'closed' }))
+    expect(await (await leer({ url: ARTICULO })).json()).toEqual({
+      estado: 'no-esta', titulo: 'Mate de algarrobo premium artesanal con bombilla', precio: null, foto: null, sitio: 'mercadolibre.com.ar',
+    })
+  })
+
+  test('si la API falla, sigue por la página (y si ML_PEDIR_MARKETPLACE está apagado, el nombre del link)', async () => {
+    api(() => new Response('error', { status: 500 }))
+    const f = fixture('mercadolibre-1')
+    const s = afuera({ [ARTICULO]: { headers: { 'content-type': f.contentType! }, cuerpo: cuerpo('mercadolibre-1') } })
+    expect(await (await leer({ url: ARTICULO })).json()).toMatchObject({ estado: 'ok', precio: '$88.990' })
+    expect(s.urls()).toEqual([ARTICULO])
+    h.pedirMarketplace = false
+    const apagado = afuera({})
+    expect(await (await leer({ url: ARTICULO })).json()).toMatchObject({ estado: 'bloqueado', titulo: 'Mate de algarrobo premium artesanal con bombilla' })
+    expect(apagado.urls()).toEqual([])
+    // con la API se le preguntó a ella, así que cuenta
+    expect(await pedidos()).toBe(2)
+  })
+
+  test('meli.la se sigue hasta la publicación, que no se pide: se le pregunta a la API', async () => {
+    const urls = api(() => Response.json(ITEM))
+    const s = afuera({ 'https://meli.la/2abcXYZ': { status: 301, headers: { location: ARTICULO } } })
+    expect(await (await leer({ url: 'https://meli.la/2abcXYZ' })).json()).toMatchObject({ estado: 'ok', titulo: ITEM.title, sitio: 'mercadolibre.com.ar' })
+    expect(s.urls()).toEqual(['https://meli.la/2abcXYZ'])
+    expect(urls).toContain(`${API}/items/MLA1418506688`)
+    // si la API no contesta, la página sigue desde la publicación (meli.la no se pide de nuevo)
+    api(() => new Response('error', { status: 503 }))
+    const otra = afuera({
+      'https://meli.la/2abcXYZ': { status: 301, headers: { location: ARTICULO } },
+      [ARTICULO]: { status: 302, headers: { location: fixture('mercadolibre-10').cadenaDeRespuestas[0].location! } },
+    })
+    expect(await (await leer({ url: 'https://meli.la/2abcXYZ' })).json()).toMatchObject({
+      estado: 'bloqueado', titulo: 'Mate de algarrobo premium artesanal con bombilla',
+    })
+    expect(otra.urls()).toEqual(['https://meli.la/2abcXYZ', ARTICULO])
+  })
+
+  test('un link que no es de ML no le pregunta a la API', async () => {
+    const urls = api(() => Response.json(ITEM))
+    afuera({ 'https://tienda.com.ar/products/mate': { headers: html, cuerpo: pagina('Mate') } })
+    expect(await (await leer({ url: 'https://tienda.com.ar/products/mate' })).json()).toMatchObject({ estado: 'ok', titulo: 'Mate' })
+    expect(urls).toEqual([])
   })
 })

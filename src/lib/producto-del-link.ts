@@ -560,6 +560,9 @@ function primeraFoto(candidatas: unknown[], base: string): string | null {
   return null
 }
 
+/** Una foto de afuera como la de la página (la de la API de ML, por ejemplo): https pública y que entra; si no, null. */
+export const limpiarFoto = (v: unknown, base: string) => primeraFoto([v], base)
+
 // ---------------------------------------------------------------- todo junto
 
 const NO_ESTA = /discontinued|is unavailable|descatalogado|ya no est[aá] disponible|publicaci[oó]n finalizada/i

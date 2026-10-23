@@ -76,6 +76,29 @@ export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, sign
 }
 
 /**
+ * La publicación a la que lleva un link corto de ML (meli.la, mercadolibre.com/sec/), para preguntarle a la API: sigue
+ * sus redirecciones como bajarPagina (cada una revisada), pero el primer destino que no es otro link corto no se pide,
+ * solo se anota. Null si no lleva a algo con un id para la API (la home, otro sitio), si no redirige o si no carga: entonces
+ * el link sigue el camino de siempre.
+ */
+export async function expandirLinkCorto(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal): Promise<string | null> {
+  let destino = null as string | null
+  await bajarDeAfuera(aHttps(link), pedir, esUrlPublica, {
+    max: PAGINA_MAX_BYTES, tiempoMs: PAGINA_TIEMPO_MS, saltos: PAGINA_SALTOS, siSePasa: 'nada', signal,
+    // si contesta una página en vez de redirigir, no se lee
+    aceptar: () => false,
+    noPedir: (url, desde) => {
+      if (!desde || linkDeMercadoLibre(url)?.tipo === 'corto') return null
+      destino = url
+      // se corta ahí, sin pedirlo (la falla no se usa)
+      return { falla: 'sin-datos', urlProducto: url }
+    },
+  })
+  const ml = destino ? linkDeMercadoLibre(destino) : null
+  return ml?.itemId || ml?.productId ? destino : null
+}
+
+/**
  * Baja y lee el producto de un link (los pasos 6 y 7 del route): el estado, y el producto con el título del link si la
  * página no dio uno (o no se pudo leer). urlProducto es de la que sale el sitio para los avisos.
  */

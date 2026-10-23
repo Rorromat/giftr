@@ -1,8 +1,11 @@
+import { UA_GIFTR } from '@/lib/giftrbot'
 import { esHostDeMercadoLibre } from '@/lib/links'
+import { limpiarFoto, limpiarTitulo, montoDeTexto, precioParaElForm, type Lectura } from '@/lib/producto-del-link'
 
 // Los links de MercadoLibre: qué son y qué ids traen, sin pedir nada a la red. Las publicaciones de marketplace
 // (articulo., /p/, /up/) tienen un muro de login para los pedidos que salen de un datacenter: no lo eludimos, y el link
-// se pide tal como vino. Los clasificados (auto., departamento., …) se leen como cualquier página.
+// se pide tal como vino. Los clasificados (auto., departamento., …) se leen como cualquier página. Si está configurada,
+// la API oficial lee las publicaciones antes de ir a la página (ver leerDeLaApi, al final).
 
 /**
  * Si se piden las publicaciones de marketplace. Con el muro no dan nada, pero pedirlas igual nos dice (por los logs de
@@ -84,3 +87,114 @@ export function linkDeMercadoLibre(url: string, enElMuro = false): LinkML | null
 /** Una publicación de marketplace (articulo., /p/, /up/): las que tienen el muro. Las tiendas, listados y clips no. */
 export const esPublicacionDeMarketplace = (l: LinkML | null) =>
   !!l && l.marketplace && (l.tipo === 'item' || l.tipo === 'catalogo' || l.tipo === 'up')
+
+// ---------------------------------------------------------------- API oficial
+
+// La API oficial de MercadoLibre, con un token de la aplicación (client_credentials): lee las publicaciones que el muro
+// no deja ver, con la foto y el precio. Se prende con dos variables de entorno, las credenciales de una aplicación
+// registrada en developers.mercadolibre.com.ar: MELI_CLIENT_ID (el App ID) y MELI_CLIENT_SECRET (la clave secreta). Sin
+// las dos, no se usa y los links de ML siguen el camino de la página. Siempre a este host (por eso alcanza con fetch):
+// los ids se validan antes de armar la URL.
+
+const API = 'https://api.mercadolibre.com'
+/** Para el token y la publicación juntos: si no contesta en esto, sigue el camino de la página. */
+export const API_ML_TIEMPO_MS = 4000
+
+export const hayApiDeMercadoLibre = () => !!(process.env.MELI_CLIENT_ID && process.env.MELI_CLIENT_SECRET)
+
+type Json = Record<string, unknown>
+const esJson = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/** El token de la aplicación, en memoria hasta un minuto antes de que venza. */
+let token: { valor: string; vence: number } | null = null
+
+/** Una respuesta que no se va a leer: se suelta la conexión. */
+const descartar = (r: Response) => r.body?.cancel().catch(() => {})
+
+async function tokenDeLaApp(signal: AbortSignal): Promise<string | null> {
+  if (token && Date.now() < token.vence) return token.valor
+  const r = await fetch(`${API}/oauth/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', 'user-agent': UA_GIFTR },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials', client_id: process.env.MELI_CLIENT_ID ?? '', client_secret: process.env.MELI_CLIENT_SECRET ?? '',
+    }),
+    redirect: 'error',
+    signal,
+  })
+  if (!r.ok) {
+    // solo el status: ni la respuesta ni el pedido, que lleva la clave
+    console.warn(`API de MercadoLibre: el token dio ${r.status}`)
+    await descartar(r)
+    return null
+  }
+  const j: unknown = await r.json()
+  const segundos = esJson(j) ? Number(j.expires_in) : NaN
+  if (!esJson(j) || typeof j.access_token !== 'string' || !j.access_token || !Number.isFinite(segundos)) return null
+  token = { valor: j.access_token, vence: Date.now() + Math.max(0, segundos - 60) * 1000 }
+  return token.valor
+}
+
+/** GET a la API con el token; si da 401 (vencido antes de tiempo, revocado), se pide otro una sola vez. Null si no da 200. */
+async function deLaApi(ruta: string, signal: AbortSignal): Promise<unknown> {
+  for (let intento = 0; intento < 2; intento++) {
+    const t = await tokenDeLaApp(signal)
+    if (!t) return null
+    const r = await fetch(`${API}${ruta}`, {
+      headers: { authorization: `Bearer ${t}`, accept: 'application/json', 'user-agent': UA_GIFTR }, redirect: 'error', signal,
+    })
+    if (r.ok) return r.json()
+    await descartar(r)
+    if (r.status !== 401) return null
+    if (token?.valor === t) token = null
+  }
+  return null
+}
+
+/** Lo de la API, limpio como lo de la página (ver limpiarTitulo, limpiarFoto y precioParaElForm). Null sin título. */
+function lectura(titulo: unknown, fotos: unknown[], monto: unknown, moneda: unknown, host: string): Lectura | null {
+  const t = typeof titulo === 'string' ? limpiarTitulo(titulo, null, host) : null
+  if (!t) return null
+  const foto = fotos.map((f) => limpiarFoto(f, `https://${host}/`)).find(Boolean) ?? null
+  const precio = precioParaElForm(montoDeTexto(monto), typeof moneda === 'string' ? moneda : null, host)
+  return { estado: 'ok', producto: { titulo: t, foto, precio } }
+}
+
+/** /items/{id}: una publicación cerrada ya no está; pausada o activa, se completa (como con la página). */
+function deItem(j: unknown, host: string): Lectura | null {
+  if (!esJson(j)) return null
+  if (j.status === 'closed') return { estado: 'no-esta' }
+  const foto = Array.isArray(j.pictures) && esJson(j.pictures[0]) ? j.pictures[0].secure_url ?? j.pictures[0].url : null
+  return lectura(j.title, [foto, j.thumbnail], j.price, j.currency_id, host)
+}
+
+/** /products/{id}: el producto de catálogo, con el precio de la publicación que gana (si no hay, sin precio). */
+function deProducto(j: unknown, host: string): Lectura | null {
+  if (!esJson(j)) return null
+  const foto = Array.isArray(j.pictures) && esJson(j.pictures[0]) ? j.pictures[0].url : null
+  const gana = esJson(j.buy_box_winner) ? j.buy_box_winner : null
+  return lectura(j.name, [foto], gana?.price, gana?.currency_id, host)
+}
+
+/**
+ * La publicación de un link de ML según la API oficial: el producto, o no-esta si se cerró. Una publicación (y un /up/ o
+ * un catálogo con el item elegido) por /items; un catálogo sin item, por /products; un /up/ sin item no tiene API. Null si
+ * la API no está configurada, si el link no tiene un id para ella o si algo falla (red, tiempo, status, JSON raro):
+ * entonces sigue el camino de la página. Nunca tira.
+ */
+export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Lectura | null> {
+  const ml = linkDeMercadoLibre(url)
+  if (!ml || !hayApiDeMercadoLibre()) return null
+  const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, '')
+  const tiempo = AbortSignal.timeout(API_ML_TIEMPO_MS)
+  const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
+  try {
+    if (ml.itemId && ID.test(ml.itemId)) return deItem(await deLaApi(`/items/${ml.itemId}`, s), host)
+    if (ml.tipo === 'catalogo' && ml.productId && ID.test(ml.productId)) {
+      return deProducto(await deLaApi(`/products/${ml.productId}`, s), host)
+    }
+  } catch {
+    // red, tiempo o un JSON roto: la página
+  }
+  return null
+}
