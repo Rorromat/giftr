@@ -8,6 +8,9 @@ import { linkHttp } from '@/lib/links'
 
 const ES_LINK = /^https?:\/\/\S+$/i
 
+/** El id del campo para elegir la foto: el botón "Foto" de "¿Qué querés?" es un label suyo (ver QueQueres). */
+export const ID_ELEGIR_FOTO = 'elegir-foto-deseo'
+
 const AVISOS = {
   subiendo: 'Subiendo la foto…',
   probando: 'Cargando la foto…',
@@ -55,6 +58,8 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   const espera = useRef<ReturnType<typeof setTimeout>>(undefined)
   // el link copiado que se está probando con Pegar: hasta que carga, el formulario no se manda
   const [probandoPegado, setProbandoPegado] = useState(false)
+  // si pidió escribir el link de una foto
+  const [conLink, setConLink] = useState(false)
 
   const delLink = estadoDelLink(url, guardado, probados)
   const foto = subida ?? (delLink.estado === 'ok' ? delLink.link : null)
@@ -172,43 +177,51 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
 
   const mensaje = subiendo ? 'subiendo'
     : aviso ?? (subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
-  const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] bg-gr-soft text-xs font-bold'
+  // el link de una foto se escribe solo si lo pide (o si ya hay uno); escondido sigue ahí, porque frena el envío
+  const verLink = conLink || !!url
   return (
-    <div className="flex flex-col gap-3">
-      {foto && rota !== foto && (
+    <div className="flex flex-col gap-2">
+      {foto && rota !== foto ? (
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
           <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
                // si falló antes de que cargue la página, onError no llega
                ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
-               className="h-[200px] w-full rounded-[16px] border border-gr-line object-cover" />
+               className="h-[220px] w-full rounded-[20px] object-cover" />
           <button type="button" aria-label="Quitar foto" onClick={quitar}
-                  className="absolute -right-2.5 -top-2.5 flex size-8 items-center justify-center rounded-full border border-gr-line bg-gr-surface before:absolute before:-inset-2 before:content-['']">
-            <Icon name="close" size={13} strokeWidth={3.2} />
+                  className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-full bg-white/90">
+            <Icon name="close" size={14} strokeWidth={3} />
           </button>
         </div>
-      )}
-      <div className="flex items-center gap-2.5">
+      ) : (
+        // Donde va a estar el deseo: tocándolo se elige la foto (también desde "Foto", en "¿Qué querés?")
         <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
-                aria-label={foto ? 'Cambiar la foto' : 'Subir una foto de la galería o sacar una'}
-                className={`${boton} ${subiendo ? 'animate-pulse' : ''}`}>
-          <Icon name="camera" size={20} strokeWidth={2.4} />
-          Foto
+                className={`flex flex-col items-center gap-2 rounded-[20px] bg-gr-soft px-5 py-7 text-center ${subiendo ? 'motion-safe:animate-pulse' : ''}`}>
+          <span className="flex size-12 items-center justify-center rounded-full bg-gr-surface"><Icon name="plus" size={22} strokeWidth={2.6} /></span>
+          <span className="font-display text-xl font-extrabold tracking-[-0.02em]">Acá aparece tu deseo</span>
+          <span className="text-sm leading-snug font-medium">Sumá una foto: es lo que más ayuda a que acierten.</span>
         </button>
-        <button type="button" onClick={pegar} disabled={subiendo} aria-label="Pegar una foto copiada" className={boton}>
-          <Icon name="paste" size={20} strokeWidth={2.4} />
-          Pegar
-        </button>
-        {!foto && <p className="text-[13px] leading-snug font-medium">La foto es lo que más ayuda a que acierten.</p>}
-      </div>
-      <input ref={elegir} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
+      )}
+      <input ref={elegir} id={ID_ELEGIR_FOTO} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
              onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
       {mensaje && (
         <p role={mensaje === 'subiendo' || mensaje === 'probando' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
       )}
-      <input ref={link} value={url} placeholder="O el link de una foto (opcional)" aria-label="Link de una foto"
+      <div className="flex flex-wrap gap-x-4 text-[13px] font-semibold">
+        <button type="button" onClick={pegar} disabled={subiendo} className="min-h-10 underline decoration-1 underline-offset-4">
+          Pegar una foto copiada
+        </button>
+        {!verLink && (
+          <button type="button" onClick={() => { setConLink(true); setTimeout(() => link.current?.focus(), 0) }}
+                  className="min-h-10 underline decoration-1 underline-offset-4">
+            Usar el link de una foto
+          </button>
+        )}
+      </div>
+      <input ref={link} value={url} placeholder="El link de una foto" aria-label="Link de una foto"
              inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-             className="gr-input shadow-none" onChange={(e) => escribir(e.target.value)} />
+             {...(verLink ? { className: 'gr-input' } : { className: 'sr-only', tabIndex: -1, 'aria-hidden': true })}
+             onChange={(e) => escribir(e.target.value)} />
       <input type="hidden" name="fotoUrl" value={foto ?? ''} />
     </div>
   )

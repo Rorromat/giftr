@@ -38,10 +38,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton }: {
           </div>
         </div>
       )}
-      <div className="gr-sticker flex flex-col gap-3.5 p-3.5">
-        <QueQueres defaultValue={deseo?.titulo} agregando={!deseo} />
-        <FotoField inicial={deseo?.fotoUrl} />
-      </div>
+      <QueQueres defaultValue={deseo?.titulo} agregando={!deseo} />
+      <FotoField inicial={deseo?.fotoUrl} />
 
       <div role="radiogroup" aria-label="Tipo de deseo" className="gr-segmented">
         <label><input type="radio" name="tipo" value="exacto" defaultChecked={deseo?.tipo !== 'idea'} className="sr-only" />Quiero ESTO</label>
