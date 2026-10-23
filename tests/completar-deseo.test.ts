@@ -514,7 +514,7 @@ describe('completador: cuándo se pide', () => {
     expect(g.pedidos.map((p) => p.link)).toEqual(['https://tienda.com.ar/producto/mate-imperial.'])
   })
 
-  test('el mismo link pegado de nuevo no se pide otra vez (se completa con lo leído), salvo que no haya cargado', async () => {
+  test('el mismo link pegado de nuevo no se pide otra vez (se completa con lo leído), salvo que no haya cargado o no lo dejaran ver', async () => {
     const f = armar()
     f.pegar('titulo', ML)
     f.pedidos[0].contestar(ok())
@@ -533,6 +533,11 @@ describe('completador: cuándo se pide', () => {
     expect(f.pedir).toHaveBeenCalledTimes(2)
     f.pegar('titulo', OTRO)
     expect(f.pedidos.map((p) => p.link)).toEqual([ML, OTRO, OTRO])
+    // uno que la tienda no dejó ver, también (muchas veces es un 429 pasajero)
+    f.pedidos[2].contestar({ estado: 'bloqueado', titulo: 'Termo stanley', precio: null, foto: null, sitio: 'mercadolibre.com.ar' })
+    await vi.advanceTimersByTimeAsync(0)
+    f.pegar('titulo', OTRO)
+    expect(f.pedidos.map((p) => p.link)).toEqual([ML, OTRO, OTRO, OTRO])
   })
 
   test('un link nuevo corta el pedido anterior, y lo que llega de ese se descarta', async () => {
@@ -1056,6 +1061,48 @@ describe('completador: cuándo se pide', () => {
     const g = armar({ titulo: `Para mamá ${OTRO}`, linkTienda: OTRO })
     g.dejar('titulo')
     expect(g.v.titulo).toBe(`Para mamá ${OTRO}`)
+  })
+
+  test('lo que vino pegado con el link (el texto de la app de MercadoLibre) no es del dueño: en el título va el nombre', async () => {
+    const texto = `Mirá este producto en Mercado Libre ${ML}`
+    const f = armar()
+    f.pegar('titulo', texto)
+    expect(f.pedidos.map((p) => p.link)).toEqual([ML])
+    f.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '$88.990' })
+    // con el foco en el título, al dejarlo
+    const g = armar()
+    g.foco.campo = 'titulo'
+    g.pegar('titulo', texto)
+    g.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(g.v.titulo).toBe(texto)
+    g.dejar('titulo', 'precio')
+    expect(g.v.titulo).toBe('Mate imperial de calabaza')
+    // si manda antes de que vuelva, va el link solo: el servidor pone el nombre que trae el link
+    const h = armar()
+    h.foco.campo = 'titulo'
+    h.pegar('titulo', texto)
+    expect(h.agregar(true)).toBe(true)
+    expect(deseoDesdeForm(fd({ ...h.v }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+    // lo que escribió el dueño antes de pegar el link, y lo que agrega después, quedan
+    const i = armar()
+    i.foco.campo = 'titulo'
+    i.cambiar('titulo', 'Para mamá ')
+    i.pegar('titulo', `Para mamá ${ML}`, ML)
+    i.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    i.dejar('titulo', 'precio')
+    expect(i.v.titulo).toBe('Para mamá')
+    const j = armar()
+    j.foco.campo = 'titulo'
+    j.pegar('titulo', texto)
+    j.cambiar('titulo', `${texto} para papá`)
+    j.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    j.dejar('titulo', 'precio')
+    expect(j.v.titulo).toBe('Mirá este producto en Mercado Libre para papá')
   })
 
   test('una home o un link que no se busca, pegado en el título después de completar, igual saca lo del anterior', async () => {

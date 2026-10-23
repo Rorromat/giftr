@@ -162,8 +162,12 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
  * veces al pegarlo ahí, o en ningún lado); con el foco en el título pasa a la tienda igual, y el título queda con el link
  * (el servidor lo saca, es el mismo).
  * Null si el link ya no es el que hay que completar (lo borró o pegó otro mientras se buscaba): no se aplica nada.
+ * pegadoConElLink: el texto que vino pegado junto con el link ("Mirá este producto en Mercado Libre" de la app); no lo
+ * escribió el dueño, así que en el título va el nombre.
  */
-export function queCompletar(v: Valores, link: string, r: Contestado, puesto: Puesto | null, enfocado: Campo | null = null): Completado | null {
+export function queCompletar(
+  v: Valores, link: string, r: Contestado, puesto: Puesto | null, enfocado: Campo | null = null, pegadoConElLink: string | null = null,
+): Completado | null {
   const enTitulo = delTitulo(v, puesto)
   if ((enTitulo?.link ?? deLaTienda(v)) !== link) return null
   const ok = esOk(r)
@@ -175,8 +179,9 @@ export function queCompletar(v: Valores, link: string, r: Contestado, puesto: Pu
   if (enTitulo) {
     if (v.linkTienda !== link) campos.linkTienda = link
     nuevo.linkTienda = link
-    // con texto además del link queda el texto, salvo que sea lo que puso el autocompletado (no es del dueño)
-    const resto = enTitulo.resto === puesto?.titulo ? '' : enTitulo.resto
+    // con texto además del link queda el texto, salvo que sea lo que puso el autocompletado o lo que vino pegado con el
+    // link (no es del dueño)
+    const resto = enTitulo.resto === puesto?.titulo || enTitulo.resto === pegadoConElLink ? '' : enTitulo.resto
     if (resto) campos.titulo = resto
     else if (nombre) campos.titulo = nuevo.titulo = nombre
     // sin nombre queda el link solo (el servidor pone el del link o el sitio)
@@ -343,8 +348,8 @@ export type Completador = {
  * escribir. Un link que no se busca (la home de una tienda, que no tiene un producto; uno que el servidor no toma; el que
  * ya tenía el deseo) igual saca lo que puso el anterior. Un pedido por vez: un link nuevo corta el anterior, y lo que
  * llegue de ese se descarta. Lo que ya se leyó no se vuelve a pedir (si se pega de nuevo, se vuelve a completar con
- * eso), salvo que no haya cargado; el mismo producto (ver mismoProducto), tampoco, y escrito a mano no vuelve a poner
- * nada. Sin reintentos. Nada de esto frena el envío.
+ * eso), salvo que no haya cargado o no lo hayan dejado ver; el mismo producto (ver mismoProducto), tampoco, y escrito
+ * a mano no vuelve a poner nada. Sin reintentos. Nada de esto frena el envío.
  * El campo donde está el dueño no se toca: lo que había que poner ahí se pone al dejarlo (o al mandar).
  */
 export function completador(o: {
@@ -369,6 +374,9 @@ export function completador(o: {
   let pendiente: string | null = null
   /** Lo que contestó un link y no se escribió porque el dueño estaba en esos campos: va al dejarlos (ver soltar). */
   let diferido: { link: string; r: Contestado; campos: Campo[] } | null = null
+  /** El texto que vino pegado junto con un link (ver queCompletar). */
+  let delPegado: { link: string; texto: string } | null = null
+  const pegadoCon = (link: string) => (delPegado?.link === link ? delPegado.texto : null)
   const enfocado = () => o.enfocado?.() ?? null
 
   /** Lo pendiente y lo que se estaba buscando, cortado; si decía "Buscando…", ya no (no se busca nada). */
@@ -385,7 +393,7 @@ export function completador(o: {
 
   function aplicar(link: string, r: Contestado, foco = enfocado()) {
     const v = o.leer()
-    const c = linkParaCompletar(v, guardados, puesto) === link ? queCompletar(v, link, r, puesto, foco) : null
+    const c = linkParaCompletar(v, guardados, puesto) === link ? queCompletar(v, link, r, puesto, foco, pegadoCon(link)) : null
     if (!c) return
     puesto = c.puesto
     diferido = c.retenidos ? { link, r, campos: c.retenidos } : null
@@ -427,7 +435,7 @@ export function completador(o: {
     const v = o.leer()
     const link = linkDelForm(v, puesto)
     if (!d || !puesto || !link || !mismoProducto(link, d.link)) return
-    const c = queCompletar(v, link, d.r, puesto, va)
+    const c = queCompletar(v, link, d.r, puesto, va, pegadoCon(link))
     if (!c) return
     const sueltos = d.campos.filter((k) => !c.retenidos?.includes(k))
     if (!sueltos.length) return
@@ -502,7 +510,8 @@ export function completador(o: {
     if (enCurso !== pedido) return
     enCurso = null
     if (r === undefined) return o.mostrar({ aviso: '' })
-    if (r && r !== 'muchos' && r.estado !== 'no-carga') leidos.set(link, r)
+    // lo que no cargó o no dejaron ver (muchas veces un 429 pasajero de la tienda) se vuelve a pedir si lo pega de nuevo
+    if (r && r !== 'muchos' && r.estado !== 'no-carga' && r.estado !== 'bloqueado') leidos.set(link, r)
     aplicar(link, r)
   }
 
@@ -530,6 +539,10 @@ export function completador(o: {
     else if (pendiente) sacarLoDelAnterior(pendiente, false)
     soltar(null)
     soltarTitulo()
+    // lo que vino pegado con el link sigue en el título (no volvió la lectura): va el link solo, y el servidor pone el
+    // nombre que trae el link
+    const t = delTitulo(o.leer(), puesto)
+    if (delPegado && t?.link === delPegado.link && t.resto === delPegado.texto) o.escribir({ titulo: delPegado.link })
   }
 
   return {
@@ -541,8 +554,12 @@ export function completador(o: {
       actual = link
       cortar()
       if (!link) return o.mostrar({ aviso: '' })
-      if (trajo) void buscar(link, enfocado())
-      else pendiente = link
+      if (!trajo) {
+        pendiente = link
+        return
+      }
+      delPegado = { link, texto: linkEnTexto(pegado ?? '')?.resto ?? '' }
+      void buscar(link, enfocado())
     },
     alDejar(campo, va) {
       // vuelve al mismo (tocó su etiqueta): no lo dejó

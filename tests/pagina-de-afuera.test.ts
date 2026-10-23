@@ -56,7 +56,7 @@ describe('cómo nos presentamos', () => {
       expect(Object.keys(headers).filter((k) => /^(cookie|referer|sec-|upgrade-insecure|dnt$)/.test(k))).toEqual([])
       expect(opciones).toMatchObject({ agent: false, lookup: expect.any(Function) })
     }
-    expect(UA_GIFTR).toMatch(/^Mozilla\/5\.0 \(compatible; GiftRBot\/1\.0(; \+https:\/\/[^\s)]+\/bot)?\)$/)
+    expect(UA_GIFTR).toMatch(/^Mozilla\/5\.0 \(compatible; GiftR\/1\.0(; \+https:\/\/[^\s)]+\/bot)?\)$/)
     expect(UA_GIFTR).not.toMatch(/facebookexternalhit|WhatsApp|Twitterbot|Googlebot|MercadoLibre-|curl|Chrome|Safari/i)
     const pagina = llamadas[0].opciones.headers as Record<string, string>
     expect(pagina['accept-language']).toMatch(/^es-AR/)
@@ -65,12 +65,12 @@ describe('cómo nos presentamos', () => {
     expect((llamadas[1].opciones.headers as Record<string, string>).accept).toMatch(/^image\//)
   })
 
-  test('el User-Agent lleva la página que explica qué es GiftRBot', async () => {
+  test('el User-Agent lleva la página que explica qué es el lector de links de GiftR', async () => {
     vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://giftr.example.com/')
     vi.resetModules()
     try {
       const { UA_GIFTR: ua } = await import('@/lib/pagina-de-afuera')
-      expect(ua).toBe('Mozilla/5.0 (compatible; GiftRBot/1.0; +https://giftr.example.com/bot)')
+      expect(ua).toBe('Mozilla/5.0 (compatible; GiftR/1.0; +https://giftr.example.com/bot)')
     } finally {
       vi.unstubAllEnvs()
       vi.resetModules()

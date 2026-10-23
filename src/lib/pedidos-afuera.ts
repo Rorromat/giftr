@@ -8,10 +8,13 @@ import { esUrlPublica, linkHttp } from '@/lib/links'
 // lo que llega en el pedido. Cada uno puede ser 4 MB (una página) o 6 MB (una foto, la grande y la del link juntas) y 6 s
 // de un servidor nuestro, así que hay un máximo por día y otro por rato, contando lecturas y fotos juntas.
 
-/** Una tarde de diciembre cargando 30 deseos son unos 60. */
-export const PEDIDOS_AFUERA_POR_DIA = 120
-/** En 10 minutos: pegar un link tras otro entra; un script que pide sin parar, no. */
-export const PEDIDOS_AFUERA_POR_RATO = 20
+/** Cada deseo son dos (la página y su foto): una tarde de diciembre cargando 50 deseos son unos 100. */
+export const PEDIDOS_AFUERA_POR_DIA = 200
+/**
+ * En 10 minutos: pegar un link tras otro entra (con 20 alcanzaba para 10 deseos, poco para quien arma su lista de una);
+ * un script que pide sin parar, no.
+ */
+export const PEDIDOS_AFUERA_POR_RATO = 40
 
 const haceUnDia = sql`now() - interval '24 hours'`
 const haceUnRato = sql`now() - interval '10 minutes'`
