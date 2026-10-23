@@ -36,7 +36,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
         <p className="text-base leading-snug font-medium">Tu gente coordina los regalos sin arruinarte la sorpresa.</p>
         <form action={entrarConGoogleAction} className="mt-2.5 w-full">
           <input type="hidden" name="volver" value={volver ?? '/inicio'} />
-          {volver && <p className="mb-3 text-[15px] font-bold">Entrá y lo sumamos a tu lista.</p>}
+          {volver && <p className="mb-3 text-[15px] font-bold">Entrá y seguimos con lo que compartiste.</p>}
           <button className="gr-btn-primary h-[56px] w-full gap-3">
             <span aria-hidden className="flex size-[30px] items-center justify-center rounded-full bg-gr-surface font-sans text-base font-bold">G</span>
             Entrar con Google

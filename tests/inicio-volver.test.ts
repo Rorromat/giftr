@@ -21,7 +21,7 @@ import Home from '@/app/page'
 
 const ML = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-imperial-de-calabaza-_JM'
 const VUELTA = `/agregar?link=${encodeURIComponent(ML)}&foto=no`
-const LINEA = 'Entrá y lo sumamos a tu lista.'
+const LINEA = 'Entrá y seguimos con lo que compartiste.'
 
 const portada = async (volver?: string | string[]) =>
   renderToStaticMarkup(await Home({ searchParams: Promise.resolve(volver === undefined ? {} : { volver }) }))

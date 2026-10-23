@@ -37,7 +37,7 @@ export function comoAgregar({ plataforma, instalada, puedeInstalar, recienInstal
 export const TEXTOS_APPS = {
   titulo: 'Agregar desde otras apps',
   'android-app': {
-    texto: 'Tocá Compartir en MercadoLibre, Instagram o la galería y elegí GiftR: lo sumamos a tu lista.',
+    texto: 'Tocá Compartir en MercadoLibre, Instagram o la galería y elegí GiftR: se abre el deseo listo para agregar.',
     chico: '¿No aparece? Puede tardar un día; si no, desinstalala y volvé a instalarla.',
   },
   'android-boton': {
