@@ -124,13 +124,34 @@ export function compartidoAutomatico(o: { sitio: string | null; buzon?: string; 
   return esIdCompartido(o.buzon) && o.auto === '1'
 }
 
+/**
+ * Si el link que llegó por la URL (?link=) y es automático (ver compartidoAutomatico) se busca solo: si además la llegada es
+ * nueva y de afuera de GiftR, que el servidor no puede saber. tipo: el de la navegación (PerformanceNavigationTiming);
+ * referrer: el de la página.
+ * - Una recarga, o ir atrás y adelante, no: después del replaceState que hace Next al cargar, Chrome las manda same-origin
+ *   aunque se haya llegado desde otro sitio (en Android alcanza con el pull-to-refresh).
+ * - Desde una página de GiftR, tampoco: un link de adentro con lo que escribió otro ("Ver en la tienda" de un deseo ajeno
+ *   que lleva a /agregar?link=… o a /compartir?url=…) llega same-origin.
+ * Lo que llega de otra app (el atajo del iPhone, el respaldo del share target) es una navegación nueva y sin referrer. El
+ * buzón no necesita esto: otro sitio no conoce el id, y lo de ahí se borra al levantarlo.
+ */
+export function llegadaDeAfuera(o: { tipo?: string; referrer: string; origen: string }): boolean {
+  if (o.tipo === 'reload' || o.tipo === 'back_forward') return false
+  try {
+    return !o.referrer || new URL(o.referrer).origin !== o.origen
+  } catch {
+    return true
+  }
+}
+
 /** Qué hace el formulario con lo que dejó el service worker (ver RecibirCompartido). */
 export type QueHacer = {
   /** Lo que va en "¿Qué querés?": el link o la primera línea del texto. Solo si estaba vacío. */
   titulo?: string
   /**
    * El link, si es automático: entra en el título como un pegado (como "Pegar link copiado"), y CompletarDesdeLink lo busca
-   * en el momento. Lo demás (un texto, o un link que no es automático) entra como escrito (ver RecibirCompartido).
+   * en el momento. Lo demás (un texto, o un link que no es automático) entra sin buscarse, como por la URL (ver
+   * RecibirCompartido).
    */
   pegar?: string
   /** Solo si estaban vacías. */

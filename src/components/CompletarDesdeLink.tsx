@@ -19,6 +19,14 @@ const campoDe = (form: HTMLFormElement, t: EventTarget | null): Campo | null =>
 /** El botón que manda ese formulario. */
 const esEnviar = (form: HTMLFormElement, t: EventTarget | null) => t instanceof HTMLButtonElement && t.type === 'submit' && t.form === form
 
+const SIN_BUSCAR = 'deseo:sin-buscar'
+/**
+ * Un input para lo que el código puso en el título y no se busca, como lo que llega de defaultValue (lo compartido que no
+ * corre solo, ver RecibirCompartido): lo ven los demás (QueQueres deja de estar vacío), el autocompletado no.
+ */
+export const inputSinBuscar = () => new CustomEvent('input', { bubbles: true, detail: SIN_BUSCAR })
+export const esSinBuscar = (e: Event) => e instanceof CustomEvent && e.detail === SIN_BUSCAR
+
 /**
  * Completa el deseo con el link del producto, pegado en "¿Qué querés?" o en "Link a la tienda": el nombre, el precio y la
  * foto (la trae FotoField), sin pisar lo que escribió el dueño (ver queCompletar). Se ve como una sola línea de estado, que
@@ -64,7 +72,7 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
     const alEscribir = (e: Event) => {
       const recien = pegado
       pegado = null
-      if (!delLink(e.target)) return
+      if (!delLink(e.target) || esSinBuscar(e)) return
       c.alCambiar(e instanceof InputEvent ? loQueEntro(e, recien) : null)
     }
     // Adónde va el foco: el relatedTarget del focusout. Tocar la etiqueta "¿Qué querés?" (no toma el foco) lo saca con

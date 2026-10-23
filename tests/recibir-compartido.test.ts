@@ -2,9 +2,10 @@ import { describe, expect, test, vi } from 'vitest'
 import { completador, loQueEntro, type Valores } from '@/lib/completar-deseo'
 import type { DelBuzon } from '@/lib/buzon-compartido'
 import {
-  compartidoAutomatico, esRutaAgregar, loCompartido, queHacerConLoCompartido, rutaAgregar, VUELTA_MAX,
+  compartidoAutomatico, esRutaAgregar, llegadaDeAfuera, loCompartido, queHacerConLoCompartido, rutaAgregar, VUELTA_MAX,
 } from '@/lib/recibir-compartido'
-import { comoEscrito, comoPegado } from '@/components/RecibirCompartido'
+import { comoPegado } from '@/components/RecibirCompartido'
+import { esSinBuscar, inputSinBuscar } from '@/components/CompletarDesdeLink'
 
 // Lo que llega al compartir a GiftR desde otra app (Android manda title y text; el atajo del iPhone, url), y adónde va.
 
@@ -217,22 +218,52 @@ test('lo compartido entra en el título como un pegado: CompletarDesdeLink lo to
   expect(loQueEntro({ inputType: init.inputType, data: init.data })).toBe(ML)
 })
 
-test('lo demás entra como escrito: un input común (no un InputEvent), y un link no se pide hasta dejar el campo', async () => {
-  const e = comoEscrito()
-  expect(e).toBeInstanceOf(Event)
+test('lo demás entra sin buscarse: un input que ve QueQueres y CompletarDesdeLink ignora, como el link que llega por la URL', async () => {
+  const e = inputSinBuscar()
+  // React lo toma por el tipo: el onInput de QueQueres corre (y esconde las ideas)
   expect(e).toMatchObject({ type: 'input', bubbles: true })
-  expect('inputType' in e).toBe(false)
-  // lo que hace CompletarDesdeLink con un input que no es un InputEvent: alCambiar(null)
+  expect(esSinBuscar(e)).toBe(true)
+  // un input común, o el de un pegado, sí lo mira
+  expect(esSinBuscar(new Event('input', { bubbles: true }))).toBe(false)
+  expect(esSinBuscar(new Event('input', comoPegado(ML)))).toBe(false)
+  expect(esSinBuscar(new CustomEvent('input', { bubbles: true, detail: 'otra cosa' }))).toBe(false)
+  // El completador, sin alCambiar (lo que hace CompletarDesdeLink con este input): dejar el precio, el título o el link a la
+  // tienda no pide nada (antes un link que no corría solo quedaba pendiente, y se buscaba al dejar cualquiera de los tres)
   const v: Valores = { titulo: ML, linkTienda: '', precio: '' }
   const pedir = vi.fn(async () => undefined)
   const c = completador({ guardado: null, leer: () => v, escribir: () => {}, mostrar: () => {}, pedir })
-  c.alCambiar(null)
+  for (const campo of ['precio', 'titulo', 'linkTienda'] as const) c.alDejar(campo, null)
   await Promise.resolve()
   expect(pedir).not.toHaveBeenCalled()
-  // ni al ir a "Agregar"
-  c.alDejar('titulo', 'enviar')
-  expect(pedir).not.toHaveBeenCalled()
+  // si la persona lo cambia, es uno escrito: se busca al dejar el campo
+  v.titulo = `${ML} `
+  c.alCambiar(null)
   c.alDejar('titulo', 'precio')
   expect(pedir).toHaveBeenCalledOnce()
   c.cerrar()
+})
+
+describe('llegadaDeAfuera', () => {
+  const origen = 'https://giftr.app'
+
+  test('una navegación nueva, sin referrer o desde otro sitio, sí (el atajo del iPhone, el respaldo del share target)', () => {
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: '', origen })).toBe(true)
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: 'https://otro.com/', origen })).toBe(true)
+    // un subdominio es otro origen
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: 'https://www.giftr.app/', origen })).toBe(true)
+    // sin Navigation Timing, o con un referrer que no se entiende, cuenta como nueva
+    expect(llegadaDeAfuera({ referrer: '', origen })).toBe(true)
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: 'no es una url', origen })).toBe(true)
+  })
+
+  test('una recarga o ir atrás y adelante, no (Chrome las manda same-origin después del replaceState de Next)', () => {
+    expect(llegadaDeAfuera({ tipo: 'reload', referrer: '', origen })).toBe(false)
+    expect(llegadaDeAfuera({ tipo: 'reload', referrer: 'https://otro.com/', origen })).toBe(false)
+    expect(llegadaDeAfuera({ tipo: 'back_forward', referrer: '', origen })).toBe(false)
+  })
+
+  test('desde una página de GiftR, no: "Ver en la tienda" de un deseo ajeno puede llevar a /agregar?link=…', () => {
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: `${origen}/l/tok/item/1`, origen })).toBe(false)
+    expect(llegadaDeAfuera({ tipo: 'navigate', referrer: `${origen}/`, origen })).toBe(false)
+  })
 })

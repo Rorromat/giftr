@@ -2,9 +2,10 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { completarCampo } from '@/components/CamposDeseo'
+import { inputSinBuscar } from '@/components/CompletarDesdeLink'
 import { entregarFoto } from '@/components/FotoField'
 import { borrarCompartido, leerCompartido } from '@/lib/buzon-compartido'
-import { queHacerConLoCompartido } from '@/lib/recibir-compartido'
+import { llegadaDeAfuera, queHacerConLoCompartido } from '@/lib/recibir-compartido'
 
 /** Lo compartido a GiftR desde otra app, para el formulario de agregar (lo arma /agregar). */
 export type CompartidoAlForm = {
@@ -28,32 +29,38 @@ export const FOTO_NO_LLEGO = 'La foto no llegó: tocá Foto y elegila de nuevo.'
  */
 export const comoPegado = (texto: string) => ({ bubbles: true, inputType: 'insertFromPaste', data: texto }) satisfies InputEventInit
 
-/**
- * Lo demás (un texto, o un link que no se busca solo): un input común, que no es un InputEvent. QueQueres se entera de que
- * "¿Qué querés?" ya no está vacío (y esconde las ideas, que lo pisarían), y CompletarDesdeLink lo toma como escrito (ver
- * loQueEntro): un link se busca recién si la persona deja el campo, como uno escrito a mano.
- */
-export const comoEscrito = () => new Event('input', { bubbles: true })
-
 /** "Más detalles" abierto, para que se vean las notas que vinieron. */
 function verNotas(notas: HTMLTextAreaElement) {
   const detalles = notas.closest('details')
   if (detalles) detalles.open = true
 }
 
+/** Lo que el servidor no sabe de cómo se llegó (ver llegadaDeAfuera). */
+function deAfuera() {
+  let tipo: string | undefined
+  try {
+    tipo = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type
+  } catch { /* sin Navigation Timing: cuenta como nueva */ }
+  return llegadaDeAfuera({ tipo, referrer: document.referrer, origen: location.origin })
+}
+
 /**
  * Lo compartido a GiftR desde otra app, en el formulario de agregar (editar nunca lo usa). Corre una vez, al abrir.
  * - Sin buzon (/agregar?link=… o ?texto=…, desde el route o el atajo del iPhone): el servidor ya lo puso en los campos, y si
- *   es automático el link se busca.
+ *   es automático y la llegada es nueva y de afuera (ver llegadaDeAfuera), el link se busca.
  * - Con buzon (lo dejó el service worker): el título, las notas, la foto y la búsqueda, en ese orden (la foto empieza a
  *   subir antes de que vuelva la lectura del link, así la que proponga el link no la reemplaza), y se borra del buzón. Lo
- *   que ya esté escrito no se pisa (ver queHacerConLoCompartido).
+ *   que ya esté escrito no se pisa (ver queHacerConLoCompartido). Lo que no se busca solo (un texto, o un link que no es
+ *   automático) queda como el que llega por la URL: CompletarDesdeLink no lo mira (ver inputSinBuscar), y un link se busca
+ *   recién si la persona lo cambia, como uno escrito.
  * Va después de CompletarDesdeLink y FotoField en el formulario: sus efectos, que escuchan, corren antes que el de acá.
- * Que la foto no llegó lo dice una línea propia: en el consejo de FotoField lo borraría CompletarDesdeLink al buscar.
+ * Que la foto no llegó lo dice una línea propia (en el consejo de FotoField lo borraría CompletarDesdeLink al buscar),
+ * mientras no haya foto: una elegida con Foto, o la que trajo el link.
  */
 export function RecibirCompartido({ buzon, link, automatico, sinFoto }: CompartidoAlForm) {
   const linea = useRef<HTMLParagraphElement>(null)
   const [fotoNoLlego, setFotoNoLlego] = useState(false)
+  const [hayFoto, setHayFoto] = useState(false)
 
   const recibir = useEffectEvent(async (form: HTMLFormElement, sigue: () => boolean) => {
     // siempre después de un await: en desarrollo el efecto corre dos veces seguidas, y lo de la primera no va (ni borra el buzón)
@@ -65,7 +72,7 @@ export function RecibirCompartido({ buzon, link, automatico, sinFoto }: Comparti
     const pegar = (texto: string) => titulo.dispatchEvent(new InputEvent('input', comoPegado(texto)))
     if (!buzon) {
       if (notas.value.trim()) verNotas(notas)
-      if (link && automatico) pegar(link)
+      if (link && automatico && deAfuera()) pegar(link)
       return
     }
     if (!r) return
@@ -77,7 +84,7 @@ export function RecibirCompartido({ buzon, link, automatico, sinFoto }: Comparti
     }
     if (que.foto) entregarFoto(form, que.foto)
     if (que.pegar !== undefined) pegar(que.pegar)
-    else if (que.titulo !== undefined) titulo.dispatchEvent(comoEscrito())
+    else if (que.titulo !== undefined) titulo.dispatchEvent(inputSinBuscar())
     setFotoNoLlego(que.fotoNoLlego)
     void borrarCompartido(buzon)
   })
@@ -92,11 +99,23 @@ export function RecibirCompartido({ buzon, link, automatico, sinFoto }: Comparti
     }
   }, [])
 
+  // Si hay foto, la del campo oculto fotoUrl de FotoField: React le cambia el value, que en un input hidden es el atributo
+  // (no hay evento que escuchar).
+  useEffect(() => {
+    const foto = linea.current?.closest('form')?.elements.namedItem('fotoUrl')
+    if (!(foto instanceof HTMLInputElement)) return
+    const mirar = () => setHayFoto(!!foto.value)
+    mirar()
+    const cambios = new MutationObserver(mirar)
+    cambios.observe(foto, { attributes: true, attributeFilter: ['value'] })
+    return () => cambios.disconnect()
+  }, [])
+
   // Está siempre (un role="status" que aparece con el texto no siempre se lee), y vacía no ocupa lugar: el margen se come
   // el espacio entre los campos.
   return (
     <p ref={linea} role="status" className="-mt-2 text-xs font-semibold empty:-mt-4">
-      {sinFoto || fotoNoLlego ? FOTO_NO_LLEGO : null}
+      {(sinFoto || fotoNoLlego) && !hayFoto ? FOTO_NO_LLEGO : null}
     </p>
   )
 }
