@@ -27,6 +27,22 @@ export function linkHttp(valor: string): string | null {
 }
 
 /**
+ * Sin las c del final ("/p//" → "/p"). Letra por letra desde el final: con /\/+$/, una racha larga que no está al final
+ * ("a////b") hacía que la regex, desde cada una, recorriera todas las que siguen (el cuadrado del largo).
+ */
+export function sinAlFinal(s: string, c: string): string {
+  let fin = s.length
+  while (fin > 0 && s[fin - 1] === c) fin--
+  return s.slice(0, fin)
+}
+
+/** El host en minúsculas y sin los puntos del final: "localhost." y "db.internal." son los mismos nombres que sin el punto. */
+export const hostSinPunto = (host: string) => sinAlFinal(host.toLowerCase(), '.')
+
+// Lo más largo que puede ser un nombre en el DNS
+const HOST_MAX_CHARS = 253
+
+/**
  * ¿Se puede ir a buscar esto desde el servidor (una foto, la página de un producto)? Solo https al puerto 443 de un host
  * con nombre (nada de IPs, localhost ni nombres internos, tampoco con un punto al final): los links los pega cualquiera y
  * no queremos pedidos a la red interna. Esto mira el texto; al conectarse, bajarDeAfuera revisa además a qué IP resuelve.
@@ -35,8 +51,9 @@ export function esUrlPublica(url: string): boolean {
   let u: URL
   try { u = new URL(url) } catch { return false }
   if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false
-  // "localhost." y "db.internal." son los mismos nombres que sin el punto
-  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
+  const h = hostSinPunto(u.hostname)
+  // URL acepta "a....b" y un host de cualquier largo: ninguno se resuelve, y así nada de lo que sigue los recorre
+  if (h.length > HOST_MAX_CHARS || h.includes('..')) return false
   if (h === 'localhost' || !h.includes('.') || /\.(local|internal|localhost|lan|home|corp)$/.test(h)) return false
   if (/^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')) return false // IP v4 o v6 literal
   return true
@@ -66,7 +83,7 @@ export function sitioDeLink(link: string): string {
 const HOST_ML = /^(?:[a-z0-9-]+\.)?mercadoli(?:bre\.(?:com\.ar|com\.mx|cl|com\.co|com\.uy|com\.pe|com\.ve|com\.ec|com)|vre\.com\.br)$|^(?:www\.)?meli\.la$/
 
 /** Si el host es de MercadoLibre (o de sus links cortos). Sin el punto final ni mayúsculas que cambien el nombre. */
-export const esHostDeMercadoLibre = (host: string) => HOST_ML.test(host.toLowerCase().replace(/\.+$/, ''))
+export const esHostDeMercadoLibre = (host: string) => HOST_ML.test(hostSinPunto(host))
 
 // Dónde está el nombre en el link de cada tienda. En MercadoLibre, solo sus formas: el resto de sus links (tiendas,
 // listados, clips) no traen el nombre de un producto.

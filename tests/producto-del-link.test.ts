@@ -280,10 +280,11 @@ describe('muros', () => {
       'https://www.mercadolibre.com.ar/gz/account-verification?go=https%3A%2F%2Farticulo.mercadolibre.com.ar%2FMLA-1-_JM',
       'https://us.shein.com/risk/challenge?captcha_type=909', 'https://us.shein.com/risk/action/limit?risk-id=1',
       'https://www.google.com/sorry/index?continue=https://www.youtube.com/watch', 'https://www.aliexpress.com/_____tmd_____/punish?x=1',
+      'https://www.google.com.ar./sorry/index', 'https://www.google.co.uk/sorry/index',
     ]) expect(esUrlDeMuro(si), si).toBe(true)
     for (const no of [
       'https://articulo.mercadolibre.com.ar/MLA-1-mate-_JM', 'https://www.tienda.com/p?volver=google.com/sorry',
-      'https://www.google.com.ar/search?q=sorry', 'no es una url',
+      'https://www.google.com.ar/search?q=sorry', 'https://www.google.com.ar.otro.com/sorry', 'no es una url',
     ]) expect(esUrlDeMuro(no), no).toBe(false)
   })
 
@@ -403,10 +404,14 @@ describe('leerProducto con HTML armado', () => {
     const cuatroMB = (s: string) => s.repeat(Math.ceil(4_000_000 / s.length))
     // 40 bloques de 70 productos con 100 offers.url relativas que no son esta página: 280 mil URLs para comparar
     const ofertas = ld(Array(70).fill({ '@type': 'Product', name: 'a', offers: Array(100).fill({ url: 'y' }) })).repeat(40)
-    // las 106 candidatas a foto, todas "?": cada una resuelta contra la base da una URL de su largo
-    const fotos = ld({ '@type': 'Product', name: 'Mate', image: Array(100).fill('?') }) +
-      ['og:image:secure_url', 'og:image', 'twitter:image', 'twitter:image:src'].map((p) => `<meta property="${p}" content="?">`).join('') +
-      '<meta itemprop="image" content="?"><img data-large_image="?">'
+    // 475 offers.url de casi 2000 (las que entran en el 1 MB de JSON.parse) con barras y una letra al final: sacar las
+    // barras del final con una regex recorría, desde cada barra, todas las que siguen
+    const barras = ld(Array(5).fill({ '@type': 'Product', name: 'a', offers: Array(95).fill({ url: `https://x.com/${'/'.repeat(1970)}a` }) }))
+    // las 106 candidatas a foto, todas iguales: "?" resuelta contra la base da una URL de su largo
+    const fotosCon = (c: string) => ld({ '@type': 'Product', name: 'Mate', image: Array(100).fill(c) }) +
+      ['og:image:secure_url', 'og:image', 'twitter:image', 'twitter:image:src'].map((p) => `<meta property="${p}" content="${c}">`).join('') +
+      `<meta itemprop="image" content="${c}"><img data-large_image="${c}">`
+    const fotos = fotosCon('?')
     // un Location con 15 mil espacios, que pasan a %20: la urlFinal queda de 45 KB
     const urlFinalLarga = `https://evil.com/${'%20'.repeat(15_000)}/x`
     // casi 1 MB (el tope de un bloque) de objetos con claves distintas, con un salto de línea e inválido al final: JSON.parse
@@ -442,6 +447,10 @@ describe('leerProducto con HTML armado', () => {
       ['una urlFinal de 45 KB y las fotos "?"', fotos, urlFinalLarga],
       ['un canonical de 4 MB y las fotos "?"', `<link rel="canonical" href="https://x.com/a${' '.repeat(3_990_000)}b">${fotos}`],
       ['un canonical de 1,9 MB de "é" y las fotos "?"', `<link rel="canonical" href="https://x.com/a${'é'.repeat(1_900_000)}b">${fotos}`],
+      ['475 offers.url de casi 2000 con barras y una letra al final', barras],
+      // un host con 1950 puntos en el medio (URL lo acepta) que no es público: se siguen mirando las demás
+      ['las fotos con un host de puntos en el medio', fotosCon(`https://a${'.'.repeat(1950)}b.local/x.jpg`)],
+      ['una urlFinal con 6 mil "google." en el host', '<meta property="og:type" content="product">', `https://${'google.'.repeat(6000)}x-1/sorry`],
       // entidades sin ";": cada una es una vuelta del replace que deja todo igual
       ['og:image con "&amp" sin ";"', `<meta property="og:type" content="product"><meta property="og:image" content="${cuatroMB('&amp')}">`],
       ['un canonical con "&amp" sin ";"', `<link rel="canonical" href="${cuatroMB('&amp')}">`],
@@ -485,6 +494,15 @@ describe('leerProducto con HTML armado', () => {
     } finally {
       parse.mockRestore()
     }
+    // un bloque con controles que ya no entra ni se copia sin ellos: el reintento no entraría
+    const conSalto = `<script type="application/ld+json">{"name": "${'x'.repeat(300_000)}\n"}</script>`
+    const replace = vi.spyOn(String.prototype, 'replace')
+    try {
+      expect(leerProducto(enorme + conSalto.repeat(3), 'https://x.com/p')).toEqual({ estado: 'sin-datos' })
+      expect(replace.mock.contexts.filter((t) => String(t).length > 100_000)).toHaveLength(0)
+    } finally {
+      replace.mockRestore()
+    }
   })
 
   test('las <meta>: solo las que se leen, por property, name o itemprop, y la primera de cada una', () => {
@@ -511,5 +529,7 @@ describe('leerProducto con HTML armado', () => {
     // el producto de esta página sigue saliendo por su url aunque antes haya otros
     const ld2 = ld([{ '@type': 'Product', name: 'Otro', url: 'https://www.tienda.com/otro' }, { '@type': 'Product', name: 'Este', url: '/este' }])
     expect(leerProducto(ld2, 'https://www.tienda.com/este')).toMatchObject({ producto: { titulo: 'Este' } })
+    // con las barras del final, o sin el www., es la misma página
+    expect(leerProducto(ld2, 'https://tienda.com/este///')).toMatchObject({ producto: { titulo: 'Este' } })
   })
 })

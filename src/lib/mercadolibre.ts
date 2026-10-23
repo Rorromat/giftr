@@ -1,5 +1,5 @@
 import { UA_GIFTR } from '@/lib/giftrbot'
-import { esHostDeMercadoLibre } from '@/lib/links'
+import { esHostDeMercadoLibre, hostSinPunto } from '@/lib/links'
 import { limpiarFoto, limpiarTitulo, montoDeTexto, precioParaElForm, type Lectura } from '@/lib/producto-del-link'
 
 // Los links de MercadoLibre: qué son y qué ids traen, sin pedir nada a la red. Las publicaciones de marketplace
@@ -55,7 +55,7 @@ function itemDeLaQuery(u: URL): string | undefined {
 export function linkDeMercadoLibre(url: string, enElMuro = false): LinkML | null {
   let u: URL
   try { u = new URL(url) } catch { return null }
-  const host = u.hostname.toLowerCase().replace(/\.+$/, '')
+  const host = hostSinPunto(u.hostname)
   if ((u.protocol !== 'https:' && u.protocol !== 'http:') || !esHostDeMercadoLibre(host)) return null
   if (/^(?:www\.)?meli\.la$/.test(host) || (/^(?:www\.)?mercadolibre\.com$/.test(host) && u.pathname.startsWith('/sec/'))) {
     return { sitio: '', tipo: 'corto', marketplace: false }
@@ -218,7 +218,7 @@ function deProducto(j: unknown, host: string): Lectura | null {
 export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Lectura | null> {
   const ml = linkDeMercadoLibre(url)
   if (!ml || !hayApiDeMercadoLibre()) return null
-  const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, '')
+  const host = hostSinPunto(new URL(url).hostname)
   const tiempo = AbortSignal.timeout(API_ML_TIEMPO_MS)
   const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
   const leer = async (ruta: string, de: (j: unknown, host: string) => Lectura | null) => {

@@ -1,5 +1,5 @@
 import { LARGO, largo, recortar, sinControl } from '@/lib/limites'
-import { esHome, esUrlPublica } from '@/lib/links'
+import { esHome, esUrlPublica, hostSinPunto, sinAlFinal } from '@/lib/links'
 import { pesos } from '@/lib/pesos'
 
 // Qué producto hay en una página de afuera: nombre, foto y precio. Puro (sin red) y sin dependencias: solo <title>,
@@ -40,9 +40,10 @@ const MURO_HTML_BYTES = 300_000
 export function esUrlDeMuro(url: string): boolean {
   let u: URL
   try { u = new URL(url) } catch { return false }
-  // sin la query: un link que trae "google.com/sorry" en un parámetro no es un muro
-  const h = u.hostname.toLowerCase().replace(/\.+$/, '')
-  return MURO_EN_URL.some((m) => u.pathname.includes(m)) || (/(^|\.)google\.[a-z.]+$/.test(h) && u.pathname.startsWith('/sorry'))
+  // sin la query: un link que trae "google.com/sorry" en un parámetro no es un muro. google.com, .com.ar, .co.uk: con
+  // "google\.[a-z.]+$", cada "google." de un host armado con cientos recorría el resto
+  const h = hostSinPunto(u.hostname)
+  return MURO_EN_URL.some((m) => u.pathname.includes(m)) || (/(^|\.)google\.[a-z]+(\.[a-z]+)?$/.test(h) && u.pathname.startsWith('/sorry'))
 }
 
 /** La página que se quería ver, según el muro (go= en ML, redirection= en Shein, continue= en Google); null si no dice. */
@@ -271,9 +272,10 @@ function jsonLd(html: string, p: Presupuesto): Bloque[] {
     const crudo = bloque.texto.trim()
     if (crudo.length > BLOQUE_MAX_CHARS) continue
     // Samsung tiene JSON-LD inválidos: con un salto de línea crudo adentro de un string, por ejemplo. Sin los controles,
-    // se reintenta solo si los tiene (y si entra en el presupuesto, que cuenta los dos intentos)
+    // se reintenta solo si los tiene y si entra en el presupuesto, que cuenta los dos intentos: si no entra, ni se buscan
+    // (el replace copiaba el bloque entero para que parsear lo descartara)
     let json = parsear(crudo, p)
-    if (json === undefined && CONTROL.test(crudo)) json = parsear(crudo.replace(CONTROLES, ' '), p)
+    if (json === undefined && crudo.length <= p.quedan && CONTROL.test(crudo)) json = parsear(crudo.replace(CONTROLES, ' '), p)
     if (json !== undefined) r.push({ enHead: finHead < 0 || t.inicio < finHead, json })
   }
   return r
@@ -333,7 +335,8 @@ function comparable(v: unknown, base: string): string | null {
   if (typeof v !== 'string' || v.length > LARGO.link) return null
   try {
     const u = new URL(v, base)
-    return `${u.hostname.replace(/^www\./i, '')}${u.pathname.replace(/\/+$/, '')}`.toLowerCase()
+    // sin regex para las barras del final: con /\/+$/, un path de barras y una letra al final costaba el cuadrado
+    return `${u.hostname.replace(/^www\./i, '')}${sinAlFinal(u.pathname, '/')}`.toLowerCase()
   } catch {
     return null
   }
@@ -484,7 +487,7 @@ const miles = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
  */
 export function precioParaElForm(monto: number | null, moneda: string | null, host: string): string | null {
   if (!monto) return null
-  const m = moneda?.trim().toUpperCase() || (host.toLowerCase().replace(/\.+$/, '').endsWith('.ar') ? 'ARS' : null)
+  const m = moneda?.trim().toUpperCase() || (hostSinPunto(host).endsWith('.ar') ? 'ARS' : null)
   let r: string | null = null
   if (m === 'ARS' && Math.round(monto) > 0) r = pesos(Math.round(monto))
   else if (m === 'USD' && Math.round(monto * 100) > 0) {
@@ -504,7 +507,7 @@ const TITULO_MAX_CHARS = 2000
 
 /** El nombre de la tienda en su host: la etiqueta antes del dominio (www.crocs.com.ar → crocs, store.steampowered.com → steampowered). */
 function nombreDelHost(host: string): string {
-  const partes = host.toLowerCase().replace(/\.+$/, '').split('.')
+  const partes = hostSinPunto(host).split('.')
   partes.pop()
   if (partes.length > 1 && /^(com|net|org|gob|gov|edu|co)$/.test(partes[partes.length - 1])) partes.pop()
   return partes.pop() ?? ''
