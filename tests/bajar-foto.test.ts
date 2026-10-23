@@ -1,41 +1,13 @@
 import { expect, test, vi } from 'vitest'
 import type { LookupAddress } from 'node:dns'
 import https from 'node:https'
-import { bajarFoto, esIpPublica, lookupPublico, pedirAfuera, type Pedir, type Resolver, type Respuesta } from '@/lib/bajar-foto'
+import { bajarFoto, bajarFotoConUrl, esIpPublica, lookupPublico, pedirAfuera, UA_GIFTR, type Resolver } from '@/lib/bajar-foto'
 import { esFotoPublica } from '@/lib/compartir'
+import { MB, servidor } from './helpers'
 
 // La foto de la vista previa la baja el servidor desde un link que carga cualquiera.
 
-const MB = 1024 * 1024
 const permitida = () => true
-
-/** Un servidor de mentira: contesta lo que le digan y cuenta los bytes que entregó. Respeta la señal, como el de verdad. */
-function servidor(respuestas: Record<string, { status?: number; headers?: Record<string, string>; trozos?: number; demora?: number }>) {
-  const pedidos: { url: string; signal: AbortSignal }[] = []
-  let entregados = 0
-  const pedir: Pedir = async (url, signal) => {
-    pedidos.push({ url, signal })
-    const r = respuestas[url]
-    if (!r) throw new Error(`no esperaba ${url}`)
-    if (r.demora) {
-      await new Promise<void>((ok, mal) => {
-        const t = setTimeout(ok, r.demora)
-        signal.addEventListener('abort', () => { clearTimeout(t); mal(signal.reason) })
-      })
-    }
-    async function* cuerpo() {
-      for (let n = 0; n < (r!.trozos ?? Infinity); n++) {
-        if (signal.aborted) throw signal.reason
-        await new Promise((ok) => setTimeout(ok, 0))
-        entregados += MB
-        yield new Uint8Array(MB)
-      }
-    }
-    const headers = Object.fromEntries(Object.entries(r.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]))
-    return { status: r.status ?? 200, header: (k) => headers[k.toLowerCase()] ?? null, cuerpo: cuerpo() } satisfies Respuesta
-  }
-  return { pedir, pedidos, entregados: () => entregados }
-}
 
 const jpg = { 'content-type': 'image/jpeg' }
 
@@ -81,6 +53,22 @@ test('las redirecciones: cada destino se revisa, como mucho 3, y el tiempo es un
   const antes = Date.now()
   expect(await bajarFoto('https://lento.com/1', s.pedir, esFotoPublica, 8 * MB, 200)).toBeNull()
   expect(Date.now() - antes).toBeLessThan(450)
+})
+
+test('una redirección a http:// se sigue por https; solo un 200 es la foto; y se sabe de dónde vino', async () => {
+  const s = servidor({
+    'https://cdn.com/a.jpg': { status: 302, headers: { location: 'http://fotos.cdn.com/a.jpg' } },
+    'https://fotos.cdn.com/a.jpg': { headers: jpg, trozos: 1 },
+    'https://cdn.com/parcial.jpg': { status: 206, headers: jpg, trozos: 1 },
+    'https://cdn.com/binario': { headers: { 'content-type': 'application/octet-stream' }, trozos: 1 },
+  })
+  expect(await bajarFotoConUrl('https://cdn.com/a.jpg', s.pedir, esFotoPublica)).toMatchObject({ urlFinal: 'https://fotos.cdn.com/a.jpg' })
+  expect(s.pedidos.map((p) => p.url)).not.toContain('http://fotos.cdn.com/a.jpg')
+  expect(await bajarFoto('https://cdn.com/parcial.jpg', s.pedir, esFotoPublica)).toBeNull()
+  // lo que no dice image/* no es una foto, salvo que quien llama acepte más (después lo decide sharp)
+  expect(await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica)).toBeNull()
+  const binario = (t: string) => t.startsWith('image/') || t === 'application/octet-stream'
+  expect((await bajarFoto('https://cdn.com/binario', s.pedir, esFotoPublica, 8 * MB, 5000, binario))?.length).toBe(MB)
 })
 
 test('fotos de afuera: el host con un punto al final es el mismo nombre', () => {
@@ -137,7 +125,8 @@ test('la descarga de afuera se presenta: sin User-Agent hay hosts de fotos (Wiki
   })
   try {
     await expect(pedirAfuera('https://upload.wikimedia.org/x.jpg', AbortSignal.timeout(2000))).rejects.toThrow('sin red')
-    expect(opciones?.headers).toMatchObject({ 'user-agent': expect.stringMatching(/\S/), accept: 'image/*' })
+    // el mismo bot que lee las páginas de producto (ver pagina-de-afuera.test.ts)
+    expect(opciones?.headers).toMatchObject({ 'user-agent': UA_GIFTR, accept: 'image/*' })
   } finally {
     espia.mockRestore()
   }
