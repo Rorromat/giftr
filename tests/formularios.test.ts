@@ -141,14 +141,15 @@ test('un link con un carácter de control no rompe al guardar: ni en la tienda, 
 })
 
 test('el formulario de un deseo: el link pegado en el título pasa a "Link a la tienda" y el título queda legible', () => {
-  expect(deseoDesdeForm(form({ titulo: ML }))).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: ML })
+  // solo el link: el nombre que trae ("…-mate-imperial-_JM"), o el sitio si no trae uno (una sola palabra, como el de Zara)
+  expect(deseoDesdeForm(form({ titulo: ML }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
   expect(deseoDesdeForm(form({ titulo: `Mate imperial ${ML}` }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
   expect(deseoDesdeForm(form({ titulo: 'www.zara.com/ar/campera' }))).toMatchObject({ titulo: 'zara.com', linkTienda: 'https://www.zara.com/ar/campera' })
   // si ya puso otro link a la tienda, no se pisa ni se pierde el del título: queda en el título
   expect(deseoDesdeForm(form({ titulo: ML, linkTienda: 'https://otra.com/x' }))).toMatchObject({ titulo: ML, linkTienda: 'https://otra.com/x' })
   expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: 'otra.com/x' }))).toMatchObject({ titulo: `Mate ${ML}`, linkTienda: 'https://otra.com/x' })
   // el mismo link pegado en los dos lados (con o sin https://) no deja la URL de título
-  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: ML }))).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: ML })
+  expect(deseoDesdeForm(form({ titulo: ML, linkTienda: ML }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
   expect(deseoDesdeForm(form({ titulo: `Mate ${ML}`, linkTienda: ML.replace('https://', '') }))).toMatchObject({ titulo: 'Mate', linkTienda: ML })
   // un título sin link queda como está
   expect(deseoDesdeForm(form({ titulo: 'Zara.com gift card' }))).toMatchObject({ titulo: 'Zara.com gift card', linkTienda: null })
@@ -171,7 +172,7 @@ test('el link pegado en el título no se lleva la puntuación de la oración (la
     ['Ver [https://x.com/a]', { titulo: 'Ver [', linkTienda: 'https://x.com/a' }],
     ['Mate <https://x.com/a>', { titulo: 'Mate <', linkTienda: 'https://x.com/a' }],
     ['Ver https://x.com/a?f[0]=1', { titulo: 'Ver', linkTienda: 'https://x.com/a?f[0]=1' }],
-    [ML, { titulo: 'mercadolibre.com.ar', linkTienda: ML }],
+    [ML, { titulo: 'Mate imperial', linkTienda: ML }],
   ]
   for (const [titulo, esperado] of casos) expect(deseoDesdeForm(form({ titulo })), titulo).toMatchObject(esperado)
   expect(deseoDesdeForm(form({ titulo: 'www.' }))).toMatchObject({ titulo: 'www.', linkTienda: null })
@@ -259,7 +260,7 @@ test('agregar sin JS un link en el título y algo que no es link a la tienda: el
   // más largo que el título: quedarse ahí lo cortaba a 120 y se perdían los dos links
   const largo = `${ML}-${'x'.repeat(80)}`
   expect(await redirigeA(addItemAction(form({ titulo: largo, linkTienda: '@lacasadelmate' })))).toBe('/mi-lista')
-  expect((await h.db.select().from(items).where(eq(items.listId, list.id)))[0]).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: largo })
+  expect((await h.db.select().from(items).where(eq(items.listId, list.id)))[0]).toMatchObject({ titulo: 'Mate imperial', linkTienda: largo })
   // al editar sigue quedando en el título: el undefined conserva el link guardado (test de arriba)
   expect(deseoDesdeForm(form({ titulo: largo, linkTienda: '@lacasadelmate' }))).toMatchObject({ titulo: largo, linkTienda: undefined })
 })
@@ -270,7 +271,7 @@ test('dos productos de la misma tienda pegados seguidos en el título son dos de
   const termo = 'https://articulo.mercadolibre.com.ar/MLA-222-termo-stanley-_JM'
   for (const titulo of [mate, termo]) expect(await redirigeA(addItemAction(form({ titulo })))).toBe('/mi-lista')
   const filas = await h.db.select().from(items).where(eq(items.listId, list.id))
-  expect(filas.map((f) => [f.titulo, f.linkTienda]).sort()).toEqual([['mercadolibre.com.ar', mate], ['mercadolibre.com.ar', termo]])
+  expect(filas.map((f) => [f.titulo, f.linkTienda]).sort()).toEqual([['Mate imperial', mate], ['Termo stanley', termo]])
   // el mismo dos veces (un doble toque) sigue siendo uno, y lo mismo con otra foto u otras notas son dos
   expect(await redirigeA(addItemAction(form({ titulo: termo })))).toBe('/mi-lista')
   expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la roja' })))).toBe('/mi-lista')
@@ -283,7 +284,7 @@ test('agregar pegando el link en el título guarda el link a la tienda; una cant
   const { list } = await preparar()
   expect(await redirigeA(addItemAction(form({ titulo: ML, cantidad: '99999999999' })))).toBe('/mi-lista')
   const [fila] = await h.db.select().from(items).where(eq(items.listId, list.id))
-  expect(fila).toMatchObject({ titulo: 'mercadolibre.com.ar', linkTienda: ML, cantidad: 99 })
+  expect(fila).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML, cantidad: 99 })
 })
 
 test('editar: un link sin https:// se guarda con https://; uno que no es link deja el que había; vacío lo borra', async () => {

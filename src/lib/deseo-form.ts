@@ -1,6 +1,6 @@
 import type { CambiosDeseo, NewItemData } from '@/lib/items'
 import { largo, LARGO } from '@/lib/limites'
-import { esUrlFotoDeseo, linkEnTexto, linkHttp, sitioDeLink } from '@/lib/links'
+import { esUrlFotoDeseo, linkEnTexto, linkHttp, sitioDeLink, tituloDelLink } from '@/lib/links'
 
 // Sin dependencias del servidor: los avisos de abajo los usan los campos del formulario en el navegador.
 
@@ -42,9 +42,11 @@ function linkQuePasa(titulo: string, linkTienda: string | null | undefined) {
  * lo que había). Los largos y el tope de la cantidad los ponen createItem/updateItem.
  * - Un link sin https:// ("mercadolibre.com.ar/…") va con https://.
  * - Un link pegado en "¿Qué querés?" (lo que pide el formulario) pasa a "Link a la tienda" si ese campo vino vacío o con
- *   el mismo link, y el título queda con el resto del texto o, si era solo el link, con el sitio, para que el dueño lo
- *   cambie. Si vino otro, el título queda como vino: sacárselo perdía ese link, y al editar un deseo de antes (con el link
- *   en el título y otro a la tienda) cualquier cambio le cambiaba el título y les avisaba a los que lo reservaron.
+ *   el mismo link, y el título queda con el resto del texto o, si era solo el link, con el nombre que trae el link ("Mate
+ *   imperial", ver tituloDelLink) o el sitio, para que el dueño lo cambie (llega así sin JS, o si manda antes de que
+ *   vuelva la lectura del producto). Si vino otro, el título queda como vino: sacárselo perdía ese link, y al editar un
+ *   deseo de antes (con el link en el título y otro a la tienda) cualquier cambio le cambiaba el título y les avisaba a
+ *   los que lo reservaron.
  * - alAgregar: no hay link guardado que conservar, así que algo que no es link en "Link a la tienda" cuenta como vacío y
  *   el del título pasa igual (llega sin JS o antes de que hidrate: si no, se quedaba en el título y createItem lo cortaba).
  */
@@ -54,7 +56,7 @@ export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | 
   let linkTienda = link(fd, 'linkTienda')
   const enTitulo = linkQuePasa(titulo, alAgregar ? linkTienda ?? null : linkTienda)
   if (enTitulo) {
-    titulo = enTitulo.resto || sitioDeLink(enTitulo.link)
+    titulo = enTitulo.resto || tituloDelLink(enTitulo.link) || sitioDeLink(enTitulo.link)
     linkTienda = enTitulo.link
   }
   const p = campo(fd, 'prioridad')
