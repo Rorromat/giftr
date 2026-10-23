@@ -1,29 +1,32 @@
-/* GiftR — sistema visual "Sticker" (ver HANDOFF del rediseño).
+/* GiftR — sistema visual. Minimalista: las fotos y la lista primero. Sin bordes negros gruesos, sin sombras duras ni
+   cosas giradas; el verde, para lo que se toca (la acción principal, lo elegido en la barra).
    Las fuentes las carga next/font en layout.tsx y exponen --font-bricolage / --font-instrument.
    Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
 
 :root {
   /* Color */
-  --gr-bg: #FFF6E5;
+  /* el fondo, un crema más neutro: las tarjetas blancas se despegan (con una sombra mínima) sin bordes */
+  --gr-bg: #F6F0E5;
   --gr-ink: #121212;
   --gr-surface: #FFFFFF;
   --gr-accent: #C8F31D;
   --gr-muted: #5C574F;
   --gr-dot: #E4D9C6;
+  /* La superficie suave (botones secundarios, notas, lo que antes iba punteado) y las líneas: la fina separa, la marcada
+     es el borde de lo que se escribe (3:1 contra el fondo y contra el blanco, para que se vea dónde). */
+  --gr-soft: #ECE3D2;
+  --gr-line: #E6DCCA;
+  --gr-line-strong: #8C8377;
 
   /* Tipografía */
   --gr-font-display: var(--font-bricolage), sans-serif;
   --gr-font-body: var(--font-instrument), sans-serif;
 
   /* Forma */
-  --gr-border: 3px solid var(--gr-ink);
-  --gr-border-sm: 2.5px solid var(--gr-ink);
-  --gr-radius-lg: 22px;
-  --gr-radius-md: 16px;
+  --gr-border: 1px solid var(--gr-line-strong);
+  --gr-radius-lg: 20px;
+  --gr-radius-md: 14px;
   --gr-radius-pill: 999px;
-  --gr-shadow: 5px 5px 0 var(--gr-ink);
-  --gr-shadow-sm: 3px 3px 0 var(--gr-ink);
-  --gr-shadow-accent: 5px 5px 0 var(--gr-accent);
 
   /* Espaciado */
   --gr-gutter: 18px;
@@ -45,9 +48,9 @@
   .gr-title {
     font-family: var(--gr-font-display);
     font-weight: 800;
-    font-size: 52px;
-    line-height: 0.92;
-    letter-spacing: -0.05em;
+    font-size: 40px;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
     font-variation-settings: 'opsz' 96;
     margin: 0;
   }
@@ -60,19 +63,19 @@
   }
   .gr-label {
     font-family: var(--gr-font-body);
-    font-weight: 700;
+    font-weight: 600;
     font-size: 12px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
+    color: var(--gr-muted);
   }
   .gr-muted { color: var(--gr-muted); }
 
-  /* Sticker card */
+  /* Tarjeta: blanca y sin borde, con una sombra mínima que la despega del fondo; la foto va de lado a lado */
   .gr-sticker {
     background: var(--gr-surface);
-    border: var(--gr-border);
     border-radius: var(--gr-radius-lg);
-    box-shadow: var(--gr-shadow);
+    box-shadow: 0 1px 3px rgb(60 45 20 / 0.08);
     overflow: hidden;
   }
   .gr-sticker--dark { background: var(--gr-ink); color: var(--gr-bg); }
@@ -80,44 +83,30 @@
     display: block;
     width: 100%;
     object-fit: cover;
-    border-bottom: var(--gr-border);
   }
 
-  /* Foto troquelada (collages) */
+  /* Fotos sueltas (el collage de la portada) */
   .gr-diecut {
     display: block;
     object-fit: cover;
-    border: 6px solid var(--gr-surface);
-    outline: 2.5px solid var(--gr-ink);
     border-radius: 18px;
-    box-shadow: 6px 6px 0 var(--gr-ink);
     box-sizing: border-box;
   }
 
-  /* Etiquetas sobre fotos */
+  /* Etiquetas sobre fotos: chicas y sin borde, para que mande la foto */
   .gr-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: var(--gr-border-sm);
     border-radius: var(--gr-radius-pill);
-    background: var(--gr-surface);
+    background: rgb(255 255 255 / 0.92);
     padding: 4px 10px;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 12px;
   }
-  .gr-tag--dark { background: var(--gr-ink); color: var(--gr-accent); }
-  .gr-price {
-    border: var(--gr-border-sm);
-    border-radius: 10px;
-    background: var(--gr-surface);
-    padding: 3px 8px;
-    font-family: var(--gr-font-display);
-    font-weight: 800;
-    font-size: 15px;
-  }
+  .gr-tag--dark { background: var(--gr-ink); color: var(--gr-bg); }
 
-  /* Botones */
+  /* Botones: sin borde ni sombra. El verde, para la acción principal; los demás, en la superficie suave. */
   .gr-btn,
   .gr-btn-primary {
     display: inline-flex;
@@ -126,37 +115,32 @@
     gap: 8px;
     min-height: 48px;
     padding: 0 18px;
-    border: var(--gr-border-sm);
+    border: 0;
     border-radius: var(--gr-radius-md);
-    background: var(--gr-surface);
+    background: var(--gr-soft);
     color: var(--gr-ink);
-    font-family: var(--gr-font-display);
-    font-weight: 800;
-    font-size: 17px;
+    font-family: var(--gr-font-body);
+    font-weight: 700;
+    font-size: 16px;
     text-decoration: none;
     cursor: pointer;
-    transition: transform 80ms ease, box-shadow 80ms ease;
+    transition: transform 80ms ease;
   }
+  .gr-btn:active, .gr-btn-primary:active { transform: scale(0.98); }
   .gr-btn-primary {
     background: var(--gr-accent);
-    box-shadow: var(--gr-shadow);
-    min-height: 56px;
-    font-size: 19px;
+    min-height: 54px;
+    font-size: 17px;
   }
-  .gr-btn-primary:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--gr-ink); }
-  .gr-btn--sm { min-height: 50px; font-size: 17px; }
-  .gr-btn-primary.gr-btn--sm { box-shadow: var(--gr-shadow-sm); }
-  .gr-btn-primary.gr-btn--sm:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--gr-ink); }
-  .gr-btn--dark { background: var(--gr-ink); color: var(--gr-accent); box-shadow: var(--gr-shadow-accent); }
-  .gr-btn--dark:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--gr-accent); }
+  .gr-btn--sm { min-height: 44px; font-size: 15px; }
+  .gr-btn--dark { background: var(--gr-ink); color: var(--gr-accent); }
   .gr-icon-btn {
     width: 44px;
     height: 44px;
-    border: var(--gr-border-sm);
-    border-radius: 14px;
-    background: var(--gr-surface);
+    border: 0;
+    border-radius: 12px;
+    background: var(--gr-soft);
     color: var(--gr-ink);
-    box-shadow: var(--gr-shadow-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -169,12 +153,12 @@
     align-items: center;
     height: 38px;
     padding: 0 14px;
-    border: var(--gr-border-sm);
+    border: 1px solid var(--gr-line);
     border-radius: var(--gr-radius-pill);
     background: var(--gr-surface);
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
-    font-weight: 700;
+    font-weight: 600;
     font-size: 14px;
     white-space: nowrap;
     text-decoration: none;
@@ -182,16 +166,16 @@
   }
   .gr-chip[aria-pressed="true"],
   .gr-chip[aria-current="page"],
-  .gr-chip:has(:checked) { background: var(--gr-ink); color: var(--gr-bg); }
+  .gr-chip:has(:checked) { background: var(--gr-ink); border-color: var(--gr-ink); color: var(--gr-bg); }
 
-  /* Segmentado */
+  /* Segmentado: lo elegido, en blanco sobre la superficie suave */
   .gr-segmented {
     display: flex;
-    height: 48px;
-    border: var(--gr-border-sm);
+    height: 46px;
+    padding: 3px;
+    gap: 3px;
     border-radius: var(--gr-radius-md);
-    overflow: hidden;
-    background: var(--gr-surface);
+    background: var(--gr-soft);
   }
   .gr-segmented > * {
     flex: 1;
@@ -199,30 +183,30 @@
     align-items: center;
     justify-content: center;
     border: none;
-    background: var(--gr-surface);
+    border-radius: 11px;
+    background: transparent;
     color: var(--gr-ink);
-    font-family: var(--gr-font-display);
-    font-weight: 800;
-    font-size: 17px;
+    font-family: var(--gr-font-body);
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
     cursor: pointer;
   }
-  .gr-segmented > * + * { border-left: var(--gr-border-sm); }
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-current="page"],
-  .gr-segmented > :has(:checked) { background: var(--gr-ink); color: var(--gr-accent); }
+  .gr-segmented > :has(:checked) { background: var(--gr-surface); box-shadow: 0 1px 2px rgb(18 18 18 / 0.14); }
 
   /* Foco visible en chips y segmentos hechos con radios ocultos */
-  .gr-chip:has(:focus-visible) { outline: 2.5px solid var(--gr-ink); outline-offset: 2px; }
-  .gr-segmented > :has(:focus-visible) { outline: 2.5px dashed currentColor; outline-offset: -7px; }
+  .gr-chip:has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: 2px; }
+  .gr-segmented > :has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: -2px; }
 
   /* Input */
   .gr-input {
     width: 100%;
     min-height: 50px;
-    border: var(--gr-border-sm);
+    border: var(--gr-border);
     border-radius: var(--gr-radius-md);
     background: var(--gr-surface);
-    box-shadow: var(--gr-shadow-sm);
     padding: 0 14px;
     font-family: var(--gr-font-body);
     font-size: 15px;
@@ -230,15 +214,15 @@
   }
   textarea.gr-input { padding: 12px 14px; }
   .gr-input::placeholder { color: var(--gr-muted); }
-  .gr-input:focus { outline: 2.5px solid var(--gr-ink); outline-offset: 2px; }
+  .gr-input:focus { outline: 2px solid var(--gr-ink); outline-offset: 1px; }
 
-  /* Avatares */
+  /* Avatares: con un aro blanco, para que se separen al superponerse */
   .gr-avatar {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    border: var(--gr-border-sm);
-    background: var(--gr-surface);
+    border: 2px solid var(--gr-surface);
+    background: var(--gr-soft);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -296,9 +280,6 @@
   .gr-nav a:active > .gr-nav__add { transform: rotate(-6deg) scale(0.88); } /* se hunde al apretarlo */
   .gr-nav[data-oculta] a > .gr-nav__add { transform: rotate(39deg) scale(0.92); }
 
-  /* Rotaciones decorativas */
-  .gr-tilt-l { transform: rotate(-1.2deg); }
-  .gr-tilt-r { transform: rotate(1deg); }
 }
 
 /* Al llegar a una sección del menú (<Seccion> en ui.tsx) el contenido aparece con un fundido corto. Solo
@@ -309,7 +290,69 @@
 .gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
 
+/* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
+   un <main aria-busy>), la estrella del ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de
+   30° la deja igual, así que aguanta lo que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de
+   deseos (data-arranque-destino) mientras se ve la lista; en las demás se achica. Todo con CSS, así anda antes que el JS:
+   las transiciones de la salida no corren si la pantalla ya llegó sin la de carga (ahí no se ve nada). */
+.gr-arranque {
+  position: fixed; inset: 0; z-index: 50;
+  visibility: hidden; pointer-events: none;
+  transition: visibility 0s linear 560ms;
+}
+.gr-arranque__fondo {
+  position: absolute; inset: 0; background: var(--gr-bg);
+  opacity: 0; transition: opacity 320ms ease-out 120ms;
+}
+/* El mismo marco que el de las páginas (layout.tsx): 50cqw es la mitad de su ancho útil y 50cqh, la de la pantalla. */
+.gr-arranque__marco {
+  position: absolute; inset: 0; margin-inline: auto; max-width: 28rem;
+  padding-inline: var(--gr-gutter); container-type: size;
+}
+/* Parado donde va el contador de Mi lista: 52px de arriba + 44 de la fila del logo + 14 de separación - 4, a 30px del
+   borde derecho (la estrella mide 62 y esta 150: el centro cae 79px adentro del marco). Mientras carga, en el medio. */
+.gr-arranque__vuelo {
+  position: absolute; top: 62px; right: 4px; width: 150px; height: 150px;
+  transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(0);
+  /* al llegar se desvanece y deja ver el contador de abajo, con su número */
+  opacity: 0;
+  transition: transform 300ms cubic-bezier(0.5, -0.6, 0.7, 0.5), opacity 120ms linear 400ms;
+}
+body:has([data-arranque-destino]) .gr-arranque__vuelo {
+  transform: translate(0px, 0px) rotate(0deg) scale(0.413);
+  transition: transform 480ms cubic-bezier(0.5, -0.35, 0.3, 1), opacity 120ms linear 400ms;
+}
+.gr-arranque__pegado, .gr-arranque__sombra { position: absolute; inset: 0; }
+.gr-arranque__vuelo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* la sombra va solo mientras está pegada: al despegarse se va de una */
+.gr-arranque__sombra polygon { fill: var(--gr-ink); }
+.gr-arranque__letra { opacity: 0; transition: opacity 150ms ease-out; }
+
+/* Mientras carga. data-listo: ya llegó la primera pantalla (lo pone Arranque, así no vuelve en las de carga de después). */
+body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
+  visibility: visible; pointer-events: auto; transition: none;
+  .gr-arranque__fondo { opacity: 1; transition: none; }
+  .gr-arranque__vuelo { opacity: 1; transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(1); transition: none; }
+  .gr-arranque__pegado { animation: gr-se-pega 420ms cubic-bezier(0.3, 0, 0.2, 1) both; }
+  .gr-arranque__sombra { transform: translate(7px, 7px); animation: gr-sombra 420ms ease-out both; }
+  .gr-arranque__giro { animation: gr-golpecito 600ms cubic-bezier(0.3, 0, 0.2, 1) 450ms infinite; }
+  .gr-arranque__letra { opacity: 1; transition: none; }
+}
+@keyframes gr-se-pega {
+  from { opacity: 0; transform: scale(1.8) rotate(-25deg); }
+  55% { opacity: 1; transform: scale(0.9) rotate(0deg); }
+  78% { transform: scale(1.05) rotate(0deg); }
+}
+/* la sombra aparece cuando la estrella toca la pantalla */
+@keyframes gr-sombra { from, 40% { transform: translate(0px, 0px); } }
+@keyframes gr-golpecito {
+  30% { transform: rotate(36deg); }
+  45%, to { transform: rotate(30deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav__marca, .gr-nav a > .gr-nav__add { transition: none; }
   .gr-seccion, .gr-hoja { animation: none; }
+  /* la estrella quieta mientras carga, y se va de una */
+  .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }

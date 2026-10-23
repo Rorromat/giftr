@@ -64,7 +64,7 @@ export function Hearts({ n, className = '' }: { n: number; className?: string })
   )
 }
 
-/** Etiqueta de prioridad sobre la foto: negra con corazones ácidos si es "mucho", blanca si no. */
+/** Etiqueta de prioridad: negra con corazones ácidos si es "mucho", blanca si no. */
 export function PriorityTag({ prioridad, children, className = '' }: {
   prioridad: Prioridad
   children?: React.ReactNode
@@ -75,8 +75,8 @@ export function PriorityTag({ prioridad, children, className = '' }: {
   return (
     <span
       role="img" aria-label={label}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-full border-[2.5px] border-gr-ink px-2.5 text-xs font-bold ${
-        dark ? 'bg-gr-ink text-gr-accent' : 'bg-gr-surface text-gr-ink'} ${className}`}
+      className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold ${
+        dark ? 'bg-gr-ink text-gr-accent' : 'bg-white/90 text-gr-ink'} ${className}`}
     >
       <Hearts n={corazones} />
       {children && <span className={dark ? 'text-gr-bg' : ''}>{children}</span>}
@@ -84,21 +84,7 @@ export function PriorityTag({ prioridad, children, className = '' }: {
   )
 }
 
-/** Precio montado sobre el borde inferior de la foto (el padre tiene que ser `relative`). */
-export function PriceSticker({ children, rotate = -5, className = '' }: {
-  children: React.ReactNode
-  rotate?: number
-  className?: string
-}) {
-  return (
-    <span className={`gr-price absolute bottom-1 right-2 max-w-[calc(100%-16px)] [overflow-wrap:anywhere] ${className}`}
-          style={{ transform: `rotate(${rotate}deg)` }}>
-      {children}
-    </span>
-  )
-}
-
-/** Foto del deseo a sangre; sin foto (o si no carga), placeholder crema con la estrella y la inicial. */
+/** Foto del deseo a sangre; sin foto (o si no carga), la inicial sobre la superficie suave. */
 export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' }: {
   src: string | null
   titulo: string
@@ -108,9 +94,10 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
 }) {
   const inicial = titulo.trim().charAt(0).toUpperCase()
   const placeholder = (
-    <div className={`flex items-center justify-center border-b-[3px] border-gr-ink bg-gr-bg ${dimmed ? 'opacity-45' : ''} ${className}`}
-         style={{ height }}>
-      <Starburst size={Math.min(96, Math.round(height * 0.55))} fontSize={46} className="rotate-12">{inicial}</Starburst>
+    <div className={`flex items-center justify-center bg-gr-soft ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }}>
+      <span aria-hidden className="font-display font-extrabold text-gr-line-strong" style={{ fontSize: Math.min(64, Math.round(height * 0.3)) }}>
+        {inicial}
+      </span>
     </div>
   )
   if (!src) return placeholder
@@ -120,13 +107,13 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
 }
 
-/** Avatar sticker cuadrado: la foto si hay, si no las iniciales (Lista compartida, Perfil). */
+/** Avatar cuadrado: la foto si hay, si no las iniciales (Lista compartida, Perfil). */
 export function AvatarSticker({ nombre, foto, size = 56, className = '' }: { nombre: string; foto?: string | null; size?: number; className?: string }) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
     <div aria-hidden
-         className={`flex flex-none items-center justify-center overflow-hidden border-[3px] border-gr-ink bg-gr-accent font-display font-extrabold tracking-[-0.04em] shadow-sticker-sm ${className}`}
-         style={{ width: size, height: size, borderRadius: size * 0.31, fontSize: size * 0.42, transform: 'rotate(-5deg)' }}>
+         className={`flex flex-none items-center justify-center overflow-hidden bg-gr-accent font-display font-extrabold tracking-[-0.04em] ${className}`}
+         style={{ width: size, height: size, borderRadius: size * 0.31, fontSize: size * 0.42 }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
       {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
@@ -139,7 +126,7 @@ export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: 
     <div aria-hidden className={`flex flex-none ${className}`}>
       {nombres.map((n, i) => (
         <span key={i}
-              className={`flex items-center justify-center overflow-hidden rounded-full border-[2.5px] border-gr-ink font-display font-extrabold ${i ? 'bg-gr-surface' : 'bg-gr-accent'}`}
+              className={`flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-display font-extrabold ${i ? 'bg-gr-soft' : 'bg-gr-accent'}`}
               style={{ width: size, height: size, fontSize: size * 0.42, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
           {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
@@ -162,11 +149,10 @@ export function BackLink({ href, label }: { href: string; label: string }) {
   )
 }
 
-/** Logo "GiftR" en sticker blanco. */
+/** El logo: la palabra "GiftR". */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-block rounded-2xl border-[3px] border-gr-ink bg-gr-surface px-3 pb-1 pt-0.5 font-display text-[28px] leading-none font-extrabold tracking-[-0.05em] shadow-sticker-sm ${className}`}
-          style={{ transform: 'rotate(-3deg)' }}>
+    <span className={`inline-block font-display text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
       GiftR
     </span>
   )
@@ -179,6 +165,8 @@ const ICONS = {
   close: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   home: <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
+  calendar: <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+  wallet: <><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M16 12.5h2.5" /><path d="M6 6l9-3 1.5 3" /></>,
   gift: <><rect x="3" y="8" width="18" height="13" rx="2" /><path d="M12 8v13" /><path d="M3 12h18" /><path d="M12 8c-2-4-6-4-6-1.5S9 8 12 8c3 0 6-.5 6-1.5S14 4 12 8z" /></>,
   users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5c2.4 0 4 1.6 4.5 4.5" /></>,
   lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,

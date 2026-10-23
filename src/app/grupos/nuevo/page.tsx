@@ -39,10 +39,10 @@ export default async function NuevoGrupo() {
             <input type="checkbox" name="anual" defaultChecked className="size-[22px] accent-gr-ink" /> Se repite todos los años (un cumple)
           </label>
         </div>
-        <p className="rounded-sticker border-[2.5px] border-dashed border-gr-ink px-4 py-3 text-sm font-medium leading-snug">
+        <p className="rounded-sticker bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
           Después invitás a quien la arma con vos. Los que regalan la ven como una sola lista, y ninguno de ustedes ve quién reserva qué.
         </p>
-        <BotonEnviar pendiente="Creando…" className="gr-btn-primary mt-2 h-[60px] w-full rounded-[20px] border-[3px] text-[21px]">Crear grupo</BotonEnviar>
+        <BotonEnviar pendiente="Creando…" className="gr-btn-primary mt-2 h-[60px] w-full rounded-[20px] text-[21px]">Crear grupo</BotonEnviar>
       </form>
     </main>
   )

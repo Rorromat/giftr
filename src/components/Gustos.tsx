@@ -5,7 +5,7 @@ import { AvatarSticker, Icon } from '@/components/ui'
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
 export function IconoSeccion({ s, size = 36 }: { s: Pick<SeccionGustos, 'icono'>; size?: number }) {
   return (
-    <span aria-hidden className="flex flex-none -rotate-6 items-center justify-center rounded-xl border-[2.5px] border-gr-ink bg-gr-accent"
+    <span aria-hidden className="flex flex-none items-center justify-center rounded-xl bg-gr-accent"
           style={{ width: size, height: size }}>
       <Icon name={s.icono} size={size * 0.55} strokeWidth={2.4} />
     </span>
@@ -23,7 +23,7 @@ export function SeccionesGustos({ secciones }: { secciones: SeccionGustos[] }) {
             <dt className="text-xs font-bold uppercase tracking-wide text-gr-muted">{s.titulo}</dt>
             <dd className="flex flex-wrap gap-1.5">
               {s.items.map((i) => (
-                <span key={i} className="rounded-full border-2 border-gr-ink bg-gr-surface px-2.5 py-0.5 text-[13px] font-semibold [overflow-wrap:anywhere]">{i}</span>
+                <span key={i} className="rounded-full border border-gr-line bg-gr-surface px-2.5 py-0.5 text-[13px] font-semibold [overflow-wrap:anywhere]">{i}</span>
               ))}
             </dd>
           </div>
@@ -45,9 +45,8 @@ export const adelantoGustos = (secciones: SeccionGustos[]) =>
 export function ResumenGustos({ secciones }: { secciones: SeccionGustos[] }) {
   return (
     <ul className="grid grid-cols-2 gap-2.5">
-      {paraResumen(secciones).slice(0, 6).map((s, i) => (
-        <li key={s.clave} className="flex flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3 shadow-sticker-sm"
-            style={{ transform: `rotate(${i % 2 ? 0.8 : -0.8}deg)` }}>
+      {paraResumen(secciones).slice(0, 6).map((s) => (
+        <li key={s.clave} className="flex flex-col gap-2 rounded-2xl bg-gr-surface p-3">
           <div className="flex items-center gap-2">
             <IconoSeccion s={s} size={30} />
             <span className="text-[11px] font-bold uppercase leading-tight tracking-wide text-gr-muted">{s.titulo}</span>

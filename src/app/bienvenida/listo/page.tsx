@@ -43,7 +43,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
   return (
     <main className="flex flex-col gap-5 pb-12 pt-[52px]">
       <div className="relative flex flex-col items-center gap-3 pt-4 text-center">
-        <Starburst size={136} fontSize={30} label="Listo" className="rotate-12">¡Listo!</Starburst>
+        <Starburst size={136} fontSize={30} label="Listo">¡Listo!</Starburst>
         <h1 className="gr-title">¡Todo listo{nombre ? `, ${nombre.split(' ')[0]}` : ''}!</h1>
         <p className="text-[15px] font-medium leading-snug">
           {completas === filas.length ? 'Cargaste todo. ' : `Cargaste ${completas} de ${filas.length}. `}
@@ -60,10 +60,10 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
         {!foto && <Link href={`/bienvenida?${editar}paso=0`} className="text-sm font-bold underline underline-offset-4">Subir foto</Link>}
       </div>
 
-      <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot rounded-sticker border-[3px] border-gr-ink bg-gr-surface px-3.5">
+      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-sticker border border-gr-line bg-gr-surface px-3.5">
         {filas.map((f) => (
           <li key={f.paso} className="flex items-center gap-3 py-2.5">
-            <span aria-hidden className={`flex size-9 flex-none -rotate-6 items-center justify-center rounded-xl border-[2.5px] border-gr-ink ${f.valor ? 'bg-gr-accent' : 'bg-gr-surface'}`}>
+            <span aria-hidden className={`flex size-9 flex-none items-center justify-center rounded-xl border border-gr-line ${f.valor ? 'bg-gr-accent' : 'bg-gr-surface'}`}>
               <Icon name={f.icono} size={19} strokeWidth={2.4} />
             </span>
             <div className="min-w-0 flex-1">

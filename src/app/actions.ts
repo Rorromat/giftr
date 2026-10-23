@@ -95,7 +95,6 @@ export async function updateItemAction(formData: FormData) {
   const itemId = str(formData, 'itemId') ?? ''
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
-  const volver = editable.grupo ? `/grupos/${editable.grupo.id}` : '/mi-lista'
   const data = deseoDesdeForm(formData)
   if (!data) redirect(`/editar/${itemId}`)
   // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
@@ -103,7 +102,8 @@ export async function updateItemAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
-  redirect(volver)
+  // vuelve a verlo, con los cambios
+  redirect(`/deseo/${itemId}`)
 }
 
 export async function archiveItemAction(formData: FormData) {
@@ -114,6 +114,9 @@ export async function archiveItemAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
+  // desde la pantalla del deseo, que archivado ya no se abre, vuelve a su lista
+  const volver = str(formData, 'volver')
+  if (volver) redirect(rutaPropia(volver))
 }
 
 /** "Volver a mi lista" desde Archivados. */

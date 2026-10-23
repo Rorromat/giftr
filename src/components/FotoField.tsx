@@ -9,6 +9,9 @@ import { esUrlFotoDeseo, linkHttp } from '@/lib/links'
 
 const ES_LINK = /^https?:\/\/\S+$/i
 
+/** El id del campo para elegir la foto: el botón "Foto" de "¿Qué querés?" es un label suyo (ver QueQueres). */
+export const ID_ELEGIR_FOTO = 'elegir-foto-deseo'
+
 const AVISOS = {
   subiendo: 'Subiendo la foto…',
   probando: 'Cargando la foto…',
@@ -18,7 +21,7 @@ const AVISOS = {
   'sin-foto': 'No hay una foto copiada. Mantené apretada una foto, tocá Copiar y volvé a tocar Pegar.',
   'no-es-foto': 'Ese link no es una foto (si es de una tienda, pegalo en Link a la tienda).',
   'no-carga': 'Esa foto ya no carga. Cambiala, o borrá el link.',
-  'muy-largo': 'Ese link es muy largo. Copiá la foto y tocá Pegar.',
+  'muy-largo': 'Ese link es muy largo. Copiá la foto y tocá Pegar una foto copiada.',
 } as const
 
 /** Si el link carga como imagen en este navegador (la página de un producto, no). Con tope, lo que tarda más no cargó. */
@@ -34,7 +37,7 @@ function cargaComoFoto(src: string, tope?: number): Promise<boolean> {
 
 const PROPUESTA = 'deseo:foto-propuesta'
 const CONSEJO = 'deseo:foto-consejo'
-const SIN_FOTO = 'La foto es lo que más ayuda a que acierten.'
+const SIN_FOTO = 'Sumá una foto: es lo que más ayuda a que acierten.'
 
 /**
  * La foto del producto que encontró la lectura del link (ver CompletarDesdeLink), para el campo de foto de ese formulario;
@@ -46,7 +49,7 @@ export function proponerFoto(form: HTMLFormElement, src: string | null) {
 
 /**
  * Cómo poner la foto que la lectura del link no pudo traer (una publicación de MercadoLibre que no se deja ver), o null.
- * Va al lado de Pegar, en el lugar del texto de siempre, y solo si no hay foto: no corre nada de lugar.
+ * Va en el lugar de la foto, en vez del texto de siempre, y solo si no hay foto: no corre nada de lugar.
  */
 export function aconsejarFoto(form: HTMLFormElement, texto: string | null) {
   form.dispatchEvent(new CustomEvent<string | null>(CONSEJO, { detail: texto }))
@@ -90,6 +93,8 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   // el pedido de la que se está trayendo: si queda atrás, se corta (no gasta el cupo de fotos en una que no va)
   const traida = useRef<AbortController | null>(null)
   const [consejo, setConsejo] = useState<string | null>(null)
+  // si pidió escribir el link de una foto
+  const [conLink, setConLink] = useState(false)
 
   const delLink = estadoDelLink(url, guardado, probados)
   const foto = subida ?? (delLink.estado === 'ok' ? delLink.link : null)
@@ -297,53 +302,57 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   }, [bloqueo])
 
   // Abajo, solo lo que hizo el dueño (subir, probar un Pegar, los errores). Lo que llega solo, la foto del link mientras
-  // se trae, va al lado de Pegar en el lugar del texto de siempre: una línea nueva acá corría todo lo de abajo dos veces
-  // (al empezar y al llegar), sin que el dueño hiciera nada.
+  // se trae, va en el lugar de la foto: una línea nueva acá corría todo lo de abajo dos veces (al empezar y al llegar),
+  // sin que el dueño hiciera nada.
   const mensaje = subiendo ? 'subiendo'
     : aviso ?? (subida ? null : delLink.estado === 'ok' ? (rota === foto ? 'no-carga' : null) : delLink.estado)
-  const boton = 'flex size-[72px] flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] border-[2.5px] border-dashed border-gr-ink text-xs font-bold'
-  const vista = !!foto && rota !== foto
+  // el link de una foto se escribe solo si lo pide (o si ya hay uno); escondido sigue ahí, porque frena el envío
+  const verLink = conLink || !!url
   return (
-    <div ref={raiz} className="flex flex-col gap-3">
-      {/* Foto y Pegar siempre en el mismo lugar; a la derecha, la foto o el texto. Con la foto a la izquierda, al llegar la
-          del link (sola, quizás mientras el dueño iba a tocar Foto o Pegar) los corría. */}
-      <div className="flex items-center gap-2.5">
+    <div ref={raiz} className="flex flex-col gap-2">
+      {foto && rota !== foto ? (
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
+          <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
+               // si falló antes de que cargue la página, onError no llega
+               ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
+               // la que vino de otro link, mientras se trae la de este
+               className={`h-[220px] w-full rounded-[20px] object-cover${trayendo ? ' motion-safe:animate-pulse' : ''}`} />
+          <button type="button" aria-label="Quitar foto" onClick={quitar}
+                  className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-full bg-white/90">
+            <Icon name="close" size={14} strokeWidth={3} />
+          </button>
+        </div>
+      ) : (
+        // Donde va a estar el deseo: tocándolo se elige la foto (también desde "Foto", en "¿Qué querés?"). Mientras se trae
+        // la del link lo dice acá, y al llegar la foto queda en este lugar: no se corre nada.
         <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
-                aria-label={foto ? 'Cambiar la foto' : 'Subir una foto de la galería o sacar una'}
-                className={`${boton} ${subiendo ? 'animate-pulse' : ''}`}>
-          <Icon name="camera" size={20} strokeWidth={2.4} />
-          Foto
+                className={`flex flex-col items-center gap-2 rounded-[20px] bg-gr-soft px-5 py-7 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
+          <span className="flex size-12 items-center justify-center rounded-full bg-gr-surface"><Icon name="plus" size={22} strokeWidth={2.6} /></span>
+          <span className="font-display text-xl font-extrabold tracking-[-0.02em]">Acá aparece tu deseo</span>
+          <span role="status" className="text-sm leading-snug font-medium">{trayendo ? AVISOS.trayendo : consejo ?? SIN_FOTO}</span>
         </button>
-        <button type="button" onClick={pegar} disabled={subiendo} aria-label="Pegar una foto copiada" className={boton}>
-          <Icon name="paste" size={20} strokeWidth={2.4} />
-          Pegar
-        </button>
-        {vista ? (
-          <div className="relative flex-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
-            <img src={foto} alt="Vista previa de la foto" onError={() => setRota(foto)}
-                 // si falló antes de que cargue la página, onError no llega
-                 ref={(img) => { if (img?.complete && !img.naturalWidth) setRota(foto) }}
-                 // la que vino de otro link, mientras se trae la de este
-                 className={`size-[72px] -rotate-4 rounded-[14px] border-[2.5px] border-gr-ink object-cover${trayendo ? ' animate-pulse' : ''}`} />
-            <button type="button" aria-label="Quitar foto" onClick={quitar}
-                    className="absolute -right-2.5 -top-2.5 flex size-7 items-center justify-center rounded-full border-[2.5px] border-gr-ink bg-gr-surface before:absolute before:-inset-2 before:content-['']">
-              <Icon name="close" size={12} strokeWidth={3.2} />
-            </button>
-          </div>
-        ) : !foto && (
-          // mientras se trae la del link lo dice acá, y al llegar la foto queda en este lugar: no se mueve nada
-          <p role="status" className="text-[13px] leading-snug font-medium">{trayendo ? AVISOS.trayendo : consejo ?? SIN_FOTO}</p>
-        )}
-      </div>
-      <input ref={elegir} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
+      )}
+      <input ref={elegir} id={ID_ELEGIR_FOTO} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
              onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.target.value = '' }} />
       {mensaje && (
         <p role={mensaje === 'subiendo' || mensaje === 'probando' ? 'status' : 'alert'} className="text-xs font-semibold">{AVISOS[mensaje]}</p>
       )}
-      <input ref={link} value={url} placeholder="O el link de una foto (opcional)" aria-label="Link de una foto"
+      <div className="flex flex-wrap gap-x-4 text-[13px] font-semibold">
+        <button type="button" onClick={pegar} disabled={subiendo} className="min-h-10 underline decoration-1 underline-offset-4">
+          Pegar una foto copiada
+        </button>
+        {!verLink && (
+          <button type="button" onClick={() => { setConLink(true); setTimeout(() => link.current?.focus(), 0) }}
+                  className="min-h-10 underline decoration-1 underline-offset-4">
+            Usar el link de una foto
+          </button>
+        )}
+      </div>
+      <input ref={link} value={url} placeholder="El link de una foto" aria-label="Link de una foto"
              inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-             className="gr-input shadow-none" onChange={(e) => escribir(e.target.value)} />
+             {...(verLink ? { className: 'gr-input' } : { className: 'sr-only', tabIndex: -1, 'aria-hidden': true })}
+             onChange={(e) => escribir(e.target.value)} />
       <input type="hidden" name="fotoUrl" value={foto ?? ''} />
     </div>
   )

@@ -6,16 +6,16 @@ import { useState } from 'react'
 import { Icon, type IconName } from '@/components/ui'
 
 const DESTINOS: { href: string; label: string; icon: IconName; columna: number }[] = [
-  { href: '/mi-lista', label: 'Mi lista', icon: 'home', columna: 0 },
-  { href: '/eventos', label: 'Eventos', icon: 'gift', columna: 1 },
-  { href: '/gente', label: 'Tu gente', icon: 'users', columna: 3 },
-  { href: '/perfil', label: 'Perfil', icon: 'user', columna: 4 },
+  { href: '/inicio', label: 'Inicio', icon: 'home', columna: 0 },
+  { href: '/gente', label: 'Tu gente', icon: 'users', columna: 1 },
+  { href: '/cuentas', label: 'Cuentas', icon: 'wallet', columna: 3 },
+  { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', icon: 'user', columna: 4 },
 ]
 
-/** La sección del menú a la que pertenece una pantalla (un grupo es parte de Mi lista; Cuentas, de Perfil). */
+/** La sección del menú a la que pertenece una pantalla (todo el año es de Inicio; un grupo, un deseo y el perfil, de Vos). */
 function seccionDe(path: string) {
-  if (path.startsWith('/grupos/')) return '/mi-lista'
-  if (path === '/cuentas') return '/perfil'
+  if (path === '/eventos') return '/inicio'
+  if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil') return '/mi-lista'
   return path
 }
 

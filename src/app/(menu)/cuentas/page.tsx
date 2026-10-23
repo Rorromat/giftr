@@ -8,7 +8,7 @@ import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAc
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { AvatarSticker, BackLink, Icon, QuizasLink, Seccion, Starburst } from '@/components/ui'
+import { AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
   return (
@@ -42,7 +42,7 @@ function Persona({ p }: { p: CuentaPersona }) {
         </p>
       </div>
       {ambas && <p className="text-xs font-semibold text-gr-muted">Ya está descontado lo que se deben entre los dos.</p>}
-      <ul className="flex flex-col divide-y-2 divide-dashed divide-gr-dot">
+      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot">
         {p.lineas.map((l) => <Linea key={`${l.giftId}-${l.deudorId}`} l={l} />)}
       </ul>
       {p.lineas.length > 1 && (
@@ -125,7 +125,7 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
 function Corregir({ c }: { c: CompraParaCorregir }) {
   const alguienDebe = c.miembros.some((m) => !m.esYo && m.monto > 0)
   return (
-    <li className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+    <li className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
       <p className="text-sm leading-snug">
         <span className="font-bold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
         <span className="block text-xs font-medium text-gr-muted">
@@ -154,16 +154,13 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
 
   return (
     <Seccion className="flex flex-col gap-4 pb-32 pt-[52px]">
-      <div className="flex items-center gap-3.5">
-        <BackLink href="/perfil" label="Volver a Perfil" />
-        <div className="flex flex-col gap-0.5">
-          <h1 className="gr-title">Cuentas</h1>
-          <p className="text-[15px] font-medium">Los regalos grupales: quién le debe a quién.</p>
-        </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="gr-title">Cuentas</h1>
+        <p className="text-[15px] font-medium">Los regalos grupales: quién le debe a quién.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1 rounded-sticker border-[3px] border-gr-ink bg-gr-ink px-3.5 py-3 text-gr-bg">
+        <div className="flex flex-col gap-1 rounded-sticker border border-gr-line bg-gr-ink px-3.5 py-3 text-gr-bg">
           <span className="text-xs font-bold uppercase tracking-wide text-gr-accent">Debés</span>
           <span className="font-display text-[28px] leading-none font-extrabold tabular-nums">{pesos(c.debes)}</span>
         </div>
@@ -176,8 +173,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
       <CartelCorreccion motivo={correccion} cerrar="/cuentas" />
 
       {vacio && (
-        <div className="relative mt-2 flex flex-col gap-2 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-7 text-center text-[15px] font-medium leading-snug">
-          <Starburst size={52} fontSize={46} className="absolute -right-2 -top-6 rotate-12">$</Starburst>
+        <div className="relative mt-2 flex flex-col gap-2 rounded-sticker bg-gr-soft px-5 py-7 text-center text-[15px] font-medium leading-snug">
           <p>Cuando arman un regalo entre varios, acá ves cuánto puso cada uno y a quién le falta pagar.</p>
           <p>Abrí un deseo de la lista de alguien y tocá “Armar regalo grupal”.</p>
         </div>
@@ -197,7 +193,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           <ul className="flex flex-col gap-2.5">
             {c.enCurso.map((r) => (
               <li key={r.giftId}>
-                <QuizasLink href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface px-3 py-2.5">
+                <QuizasLink href={r.href} className="flex min-h-14 items-center gap-3 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
                   <span className="min-w-0 flex-1 text-sm leading-snug">
                     <span className="font-bold [overflow-wrap:anywhere]">{r.itemTitulo}</span> para {r.para}
                     <span className="block text-xs font-medium text-gr-muted">

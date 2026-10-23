@@ -1376,12 +1376,10 @@ test('el formulario lleva la línea de estado entre el título y la foto, vacía
   expect(html).not.toContain('role="alert"')
 })
 
-test('la foto va a la derecha de Foto y Pegar, en el lugar del texto: al llegar sola no corre los botones', () => {
-  const pegar = 'aria-label="Pegar una foto copiada"'
+test('lo que llega solo (la foto del link mientras se trae, el consejo) va en el lugar de la foto: al llegar no corre nada', () => {
   const sinFoto = renderToStaticMarkup(createElement(FotoField, {}))
-  expect(sinFoto.indexOf(pegar)).toBeGreaterThan(sinFoto.indexOf('aria-label="Subir una foto'))
-  expect(sinFoto).toMatch(new RegExp(`${pegar}[^]*</button><p role="status"[^>]*>La foto es lo que más ayuda a que acierten.</p>`))
+  expect(sinFoto).toMatch(/Acá aparece tu deseo<\/span><span role="status"[^>]*>Sumá una foto: es lo que más ayuda a que acierten.<\/span><\/button>/)
   const conFoto = renderToStaticMarkup(createElement(FotoField, { inicial: '/foto/deseo/00000000-0000-4000-8000-000000000001' }))
-  expect(conFoto.indexOf('alt="Vista previa de la foto"')).toBeGreaterThan(conFoto.indexOf(pegar))
-  expect(conFoto).not.toContain('La foto es lo que más ayuda')
+  expect(conFoto).toContain('alt="Vista previa de la foto"')
+  expect(conFoto).not.toContain('Acá aparece tu deseo')
 })

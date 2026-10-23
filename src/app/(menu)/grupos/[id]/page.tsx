@@ -43,7 +43,7 @@ export default async function Grupo({ params, searchParams }: {
     <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
       <div className="flex items-center justify-between">
         <BackLink href="/mi-lista" label="Volver a Mi lista" />
-        <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm min-h-11 rotate-2 rounded-[14px]">+ Agregar</Link>
+        <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm min-h-11 rounded-[14px]">+ Agregar</Link>
       </div>
 
       <div className="relative flex flex-col gap-1 pr-20">
@@ -55,7 +55,7 @@ export default async function Grupo({ params, searchParams }: {
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())}
           </summary>
-          <form action={setGroupDateAction} className="mt-1 flex flex-col gap-2 rounded-2xl border-[2.5px] border-gr-ink bg-gr-surface p-3">
+          <form action={setGroupDateAction} className="mt-1 flex flex-col gap-2 rounded-2xl border border-gr-line bg-gr-surface p-3">
             <input type="hidden" name="grupoId" value={grupo.id} />
             {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
             <input name="fecha" type="date" required min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`}
@@ -73,7 +73,7 @@ export default async function Grupo({ params, searchParams }: {
         </details>
         {activos.length > 0 && (
           <Starburst label={`${activos.length} ${activos.length === 1 ? 'deseo' : 'deseos'}`}
-                     fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[10px] rotate-12">
+                     fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[10px]">
             {activos.length}
           </Starburst>
         )}
@@ -82,7 +82,7 @@ export default async function Grupo({ params, searchParams }: {
       <Banners />
 
       {aviso && (
-        <p role="status" className="rounded-2xl border-[2.5px] border-gr-ink bg-gr-accent px-3.5 py-3 text-sm font-semibold shadow-sticker-sm">{aviso}</p>
+        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-semibold">{aviso}</p>
       )}
 
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
@@ -131,8 +131,7 @@ export default async function Grupo({ params, searchParams }: {
       </section>
 
       {activos.length === 0 && (
-        <div className="relative mt-4 rounded-sticker border-[2.5px] border-dashed border-gr-ink px-5 py-8 text-center text-[15px] font-medium">
-          <Starburst size={52} fontSize={50} className="absolute -right-2 -top-6 rotate-12">+</Starburst>
+        <div className="relative mt-4 rounded-sticker bg-gr-soft px-5 py-8 text-center text-[15px] font-medium">
           Todavía no hay nada en “{grupo.nombre}”.<br />Agreguen lo primero que necesiten.
         </div>
       )}
@@ -156,7 +155,7 @@ export default async function Grupo({ params, searchParams }: {
       </div>
 
       <a href={`https://wa.me/?text=${waRegalar}`} target="_blank"
-         className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 -rotate-2 whitespace-nowrap rounded-[18px] border-[3px] px-[22px]">
+         className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
         <Icon name="chat" size={20} strokeWidth={2.4} />
         Mandala por WhatsApp
       </a>

@@ -119,7 +119,7 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
     }
   }, [guardado, tituloGuardado])
 
-  // Una línea siempre, también vacía: lo que aparece no corre Foto ni Pegar. Los avisos son cortos para entrar en un
+  // Una línea siempre, también vacía: lo que aparece no corre la foto ni lo de abajo. Los avisos son cortos para entrar en un
   // teléfono; "Buscando…" con un sitio largo (o con la letra agrandada) entra cortado, y el lector de pantalla lo lee entero.
   return (
     <p ref={linea} role="status" className="-mt-1 min-h-4 truncate text-xs font-semibold">

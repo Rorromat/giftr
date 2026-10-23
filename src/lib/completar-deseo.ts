@@ -117,10 +117,9 @@ const AVISO_NO_CARGA = 'No pudimos abrir esa página.'
 export const avisoBuscando = (link: string) => `Buscando el producto en ${sitioDeLink(link)}…`
 
 /**
- * Para una publicación de MercadoLibre que no se deja ver: lo dice FotoField al lado de Pegar, si no hay foto (ahí entra
- * en el alto de los botones; que es de MercadoLibre lo dice la línea).
+ * Para una publicación de MercadoLibre que no se deja ver: lo dice FotoField en el lugar de la foto, si no hay una.
  */
-export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app y tocá Pegar.'
+export const CONSEJO_FOTO_ML = 'Copiá la foto desde la app de MercadoLibre y tocá Pegar una foto copiada.'
 
 const esOk = (r: Contestado) => (r !== null && r !== 'muchos' && r.estado === 'ok' ? r : null)
 
@@ -137,7 +136,7 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
       return nombre || precio ? `Completamos el ${nombre ? 'nombre' : 'precio'}: revisalo.` : null
     }
     case 'bloqueado':
-      // el nombre del link ya se ve en el campo, y cómo poner la foto va al lado de Pegar (CONSEJO_FOTO_ML)
+      // el nombre del link ya se ve en el campo, y cómo poner la foto va en el lugar de la foto (CONSEJO_FOTO_ML)
       return ml ? 'MercadoLibre no deja ver la publicación.' : 'La tienda no deja ver la página.'
     case 'no-esta':
       return `Esa ${ml ? 'publicación' : 'página'} ya no existe: revisá el link.`
