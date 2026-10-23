@@ -401,7 +401,15 @@ describe('leerProducto con HTML armado', () => {
   test('HTML armado para que una regex tarde: ninguna recorre la página más de una vez', () => {
     // 4 MB (lo más que se baja) de lo mismo: con una regex que vuelve atrás, cada repetición recorría el resto
     const cuatroMB = (s: string) => s.repeat(Math.ceil(4_000_000 / s.length))
-    for (const [que, hostil] of [
+    // 40 bloques de 70 productos con 100 offers.url relativas que no son esta página: 280 mil URLs para comparar
+    const ofertas = ld(Array(70).fill({ '@type': 'Product', name: 'a', offers: Array(100).fill({ url: 'y' }) })).repeat(40)
+    // las 106 candidatas a foto, todas "?": cada una resuelta contra la base da una URL de su largo
+    const fotos = ld({ '@type': 'Product', name: 'Mate', image: Array(100).fill('?') }) +
+      ['og:image:secure_url', 'og:image', 'twitter:image', 'twitter:image:src'].map((p) => `<meta property="${p}" content="?">`).join('') +
+      '<meta itemprop="image" content="?"><img data-large_image="?">'
+    // un Location con 15 mil espacios, que pasan a %20: la urlFinal queda de 45 KB
+    const urlFinalLarga = `https://evil.com/${'%20'.repeat(15_000)}/x`
+    for (const [que, hostil, urlFinal = 'https://x.com/p'] of [
       ['un meta enorme y un <title> sin cerrar', `<meta ${'a='.repeat(200_000)}><title>${'<'.repeat(100_000)}`],
       ['miles de JSON-LD sin </script>', '<script type="application/ld+json">'.repeat(100_000)],
       ['miles de __STATE__ sin </script>', '<template data-varname="__STATE__"><script>'.repeat(80_000)],
@@ -417,10 +425,39 @@ describe('leerProducto con HTML armado', () => {
       ['<template __STATE__ y un <script sin ">"', cuatroMB('<template data-varname=__STATE__><script ')],
       ['<template __STATE__ sin <script', cuatroMB('<template data-varname=__STATE__>x')],
       ['<title> sin </title>', cuatroMB('<title>x')],
+      // URLs enormes: ninguna se resuelve entera, y se comparan las primeras mil
+      ['una urlFinal de 45 KB y 280 mil offers.url', ofertas, urlFinalLarga],
+      ['un link de 2000 y 280 mil offers.url', ofertas, `https://tienda.com/${'%C3%A9'.repeat(330)}`],
+      ['una urlFinal de 45 KB y las fotos "?"', fotos, urlFinalLarga],
+      ['un canonical de 4 MB y las fotos "?"', `<link rel="canonical" href="https://x.com/a${' '.repeat(3_990_000)}b">${fotos}`],
+      ['un canonical de 1,9 MB de "é" y las fotos "?"', `<link rel="canonical" href="https://x.com/a${'é'.repeat(1_900_000)}b">${fotos}`],
+      // entidades sin ";": cada una es una vuelta del replace que deja todo igual
+      ['og:image con "&amp" sin ";"', `<meta property="og:type" content="product"><meta property="og:image" content="${cuatroMB('&amp')}">`],
+      ['un canonical con "&amp" sin ";"', `<link rel="canonical" href="${cuatroMB('&amp')}">`],
+      ['og:image con "&#1"', `<meta property="og:type" content="product"><meta property="og:image" content="${cuatroMB('&#1')}">`],
     ] as const) {
       const antes = Date.now()
-      leerProducto(hostil, 'https://x.com/p')
+      leerProducto(hostil, urlFinal)
       expect(Date.now() - antes, que).toBeLessThan(1000)
     }
+  })
+
+  test('una URL de más de 2000 no es la de esta página ni una foto: no se resuelve, y lo demás se lee igual', () => {
+    const og = '<meta property="og:type" content="product"><meta property="og:title" content="Mate">'
+    // contra una urlFinal enorme, solo su origen: lo que empieza con / da la misma URL que en el navegador
+    const larga = `https://www.tienda.com/${'%20'.repeat(15_000)}/x`
+    expect(leerProducto(`${og}<meta property="og:image" content="/img/mate.jpg">`, larga))
+      .toMatchObject({ estado: 'ok', producto: { titulo: 'Mate', foto: 'https://www.tienda.com/img/mate.jpg' } })
+    // un canonical de más de 2000 no cuenta: la foto relativa se resuelve contra la urlFinal
+    const canonicalLargo = `<link rel="canonical" href="https://otra.com/${'a'.repeat(2000)}">`
+    expect(leerProducto(`${canonicalLargo}${og}<meta property="og:image" content="mate.jpg">`, 'https://www.tienda.com/p/1'))
+      .toMatchObject({ producto: { foto: 'https://www.tienda.com/p/mate.jpg' } })
+    // un og:image de más de 8 KB se descarta entero (no se corta: daría otra URL), y sigue la siguiente
+    const enorme = `https://cdn.tienda.com/a.jpg${' '.repeat(9000)}x`
+    expect(leerProducto(`${og}<meta property="og:image" content="${enorme}"><meta name="twitter:image" content="https://cdn.tienda.com/b.jpg">`, 'https://www.tienda.com/p'))
+      .toMatchObject({ producto: { foto: 'https://cdn.tienda.com/b.jpg' } })
+    // el producto de esta página sigue saliendo por su url aunque antes haya otros
+    const ld2 = ld([{ '@type': 'Product', name: 'Otro', url: 'https://www.tienda.com/otro' }, { '@type': 'Product', name: 'Este', url: '/este' }])
+    expect(leerProducto(ld2, 'https://www.tienda.com/este')).toMatchObject({ producto: { titulo: 'Este' } })
   })
 })

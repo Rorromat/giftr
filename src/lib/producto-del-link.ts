@@ -110,13 +110,19 @@ function limpio(v: unknown): string | null {
 // ---------------------------------------------------------------- HTML
 
 const ATRIBUTOS = new Map<string, RegExp>()
+// Un atributo o una URL de la página de más de esto no es una URL (se guardan de hasta 2000) ni un título (se corta a
+// 5000): se descarta antes de decodificar, que con un "&amp" sin ";" repetido por 4 MB pasaba del segundo
+const VALOR_MAX_CHARS = 8192
 
-/** Un atributo de un tag, con comillas dobles, simples o sin comillas (Megatone), con las entidades decodificadas. */
+/**
+ * Un atributo de un tag, con comillas dobles, simples o sin comillas (Megatone), con las entidades decodificadas. Null
+ * si no está o si pasa de VALOR_MAX_CHARS (cortado, un href sería otra URL).
+ */
 function atributo(tag: string, nombre: string): string | null {
   let rx = ATRIBUTOS.get(nombre)
   if (!rx) ATRIBUTOS.set(nombre, (rx = new RegExp(`[\\s<]${nombre}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, 'i')))
-  const m = rx.exec(tag)
-  return m ? decodificar(m[1] ?? m[2] ?? m[3]) : null
+  const v = rx.exec(tag)?.slice(1).find((x) => x !== undefined)
+  return v === undefined || v.length > VALOR_MAX_CHARS ? null : decodificar(v)
 }
 
 type Tag = { tag: string; inicio: number; fin: number }
@@ -153,23 +159,42 @@ function metas(html: string): Map<string, string> {
   return r
 }
 
-/** Una URL de la página, absoluta y por https (contra el canonical o la URL final: Dexter tiene el canonical relativo). */
+/**
+ * Contra qué se resuelven las URLs relativas de la página: la URL final, o solo su origen si pasa de LARGO.link (una
+ * redirección estirada a 45 KB con espacios no es la de un producto, y cada relativa resuelta contra ella arrastraba todo
+ * ese largo). Así "?x" o "a.jpg" dan otra URL, pero del mismo sitio, que es el que escribió la página.
+ */
+function baseDe(urlFinal: string): string {
+  if (urlFinal.length <= LARGO.link) return urlFinal
+  try {
+    return new URL(urlFinal).origin
+  } catch {
+    // no es una URL (lo que falla está en el esquema o el host, al principio): nada se resuelve contra ella, como antes
+    return urlFinal.slice(0, LARGO.link)
+  }
+}
+
+/**
+ * Una URL de la página, absoluta, por https y de hasta LARGO.link (contra el canonical o la URL final: Dexter tiene el
+ * canonical relativo). Una más larga se descarta antes de resolverla, sin recorrerla entera.
+ */
 function absoluta(v: unknown, base: string): string | null {
-  if (typeof v !== 'string' || !v.trim()) return null
+  if (typeof v !== 'string' || v.length > VALOR_MAX_CHARS || !v.trim()) return null
   let u = decodificar(v.trim())
   if (u.startsWith('//')) u = `https:${u}`
+  if (u.length > LARGO.link) return null
   try {
     u = new URL(u, base).toString()
   } catch {
     return null
   }
   u = u.replace(/^http:/i, 'https:')
-  return u.startsWith('https://') ? u : null
+  return u.startsWith('https://') && u.length <= LARGO.link ? u : null
 }
 
-function canonical(html: string, urlFinal: string): string | null {
+function canonical(html: string, base: string): string | null {
   for (const { tag } of tags(html, 'link')) {
-    if (/\brel\s*=\s*["']?canonical/i.test(tag)) return absoluta(atributo(tag, 'href'), urlFinal)
+    if (/\brel\s*=\s*["']?canonical/i.test(tag)) return absoluta(atributo(tag, 'href'), base)
   }
   return null
 }
@@ -265,9 +290,16 @@ function esDe(n: Nodo, lista: string[]): boolean {
   return lista.some((x) => t.has(x))
 }
 
-/** host sin www. y path sin / final, en minúsculas: para ver si un nodo es el de esta página. */
+// Una página de verdad compara unas decenas de URLs (Jumbo: dos productos con sus offers). Cada comparación arma una URL:
+// sin tope, 280 mil offers.url relativas eran segundos con el event loop trabado
+const COMPARACIONES_MAX = 1000
+
+/**
+ * host sin www. y path sin / final, en minúsculas: para ver si un nodo es el de esta página. Una de más de LARGO.link no
+ * es la de esta página (ni se resuelve: el resultado arrastraría todo su largo).
+ */
 function comparable(v: unknown, base: string): string | null {
-  if (typeof v !== 'string') return null
+  if (typeof v !== 'string' || v.length > LARGO.link) return null
   try {
     const u = new URL(v, base)
     return `${u.hostname.replace(/^www\./i, '')}${u.pathname.replace(/\/+$/, '')}`.toLowerCase()
@@ -280,9 +312,9 @@ function comparable(v: unknown, base: string): string | null {
  * El nodo del producto de la página (el primero que aparezca gana): el mainEntity de un WebPage (Tiendanube: los Product
  * sueltos del body son recomendados); un producto cuya url, @id u offers.url es esta página (Jumbo trae el regular y el
  * promocional); el primero del <head>; el primero; si no hay producto, la primera "cosa" con nombre. Nunca og:url: VTEX
- * pone ahí una ruta interna.
+ * pone ahí una ruta interna. Se comparan las primeras COMPARACIONES_MAX URLs.
  */
-function elegir(bloques: Bloque[], canon: string | null, urlFinal: string): Nodo | null {
+function elegir(bloques: Bloque[], canon: string | null, urlFinal: string, base: string): Nodo | null {
   const todos = bloques.map((b) => ({ b, ns: nodos(b.json) }))
   for (const { ns } of todos) {
     for (const n of ns) {
@@ -290,10 +322,12 @@ function elegir(bloques: Bloque[], canon: string | null, urlFinal: string): Nodo
     }
   }
   const productos = todos.flatMap(({ b, ns }) => ns.filter((n) => esDe(n, PRODUCTO) && n.name).map((n) => ({ n, b })))
-  const esta = new Set([comparable(canon, urlFinal), comparable(urlFinal, urlFinal)].filter(Boolean))
+  const esta = new Set([comparable(canon, base), comparable(urlFinal, base)].filter(Boolean))
+  let quedan = esta.size ? COMPARACIONES_MAX : 0
   const deEsta = productos.find(({ n }) => {
+    if (quedan <= 0) return false
     const ofertas = (Array.isArray(n.offers) ? n.offers.slice(0, ARRAY_MAX) : [n.offers]).filter(esNodo).map((o) => o.url)
-    return [n.url, n['@id'], ...ofertas].some((v) => esta.has(comparable(v, urlFinal)))
+    return [n.url, n['@id'], ...ofertas].some((v) => quedan-- > 0 && esta.has(comparable(v, base)))
   })
   const elegido = deEsta ?? productos.find(({ b }) => b.enHead) ?? productos[0]
   if (elegido) return elegido.n
@@ -541,11 +575,11 @@ export function fotoGrande(url: string): string {
   return u.toString()
 }
 
-/** La primera que sirve: https pública (ver esUrlPublica) y de un largo que se pueda guardar. */
+/** La primera que sirve: https pública (ver esUrlPublica) y de un largo que se pueda guardar (ver absoluta). */
 function primeraFoto(candidatas: unknown[], base: string): string | null {
   for (const c of candidatas) {
     const u = absoluta(c, base)
-    if (u && u.length <= LARGO.link && esUrlPublica(u)) return u
+    if (u && esUrlPublica(u)) return u
   }
   return null
 }
@@ -588,8 +622,9 @@ export function leerProducto(html: string, urlFinal: string): Lectura {
 function leer(html: string, urlFinal: string): Lectura {
   if (esPaginaBloqueada(html, urlFinal)) return { estado: 'bloqueado' }
   const me = metas(html)
-  const canon = canonical(html, urlFinal)
-  const nodo = elegir(jsonLd(html), canon, urlFinal)
+  const base = baseDe(urlFinal)
+  const canon = canonical(html, base)
+  const nodo = elegir(jsonLd(html), canon, urlFinal, base)
   const esProducto = !!nodo && esDe(nodo, PRODUCTO)
   let vtex: Vtex | null | undefined
   const deVtex = () => (vtex === undefined ? (vtex = estadoVtex(html)) : vtex)
@@ -608,13 +643,12 @@ function leer(html: string, urlFinal: string): Lectura {
 
   let host = ''
   try { host = new URL(urlFinal).hostname } catch { /* sin host: sin "pesos por ser .ar" */ }
-  const base = canon ?? urlFinal
   const foto = primeraFoto([
     ...(nodo ? imagenDe(nodo.image) : []), deVtex()?.foto, me.get('og:image:secure_url'), me.get('og:image'),
     me.get('twitter:image'), me.get('twitter:image:src'), me.get('image'),
     // WooCommerce (Cúspide): la foto grande de la galería
     /data-large_image\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/.exec(html)?.slice(1).find((x) => x !== undefined),
-  ], base)
+  ], canon ?? base)
 
   // el de las offers del nodo, sea un producto o una "cosa" (la entrada de un Event trae su precio)
   let precio = nodo ? precioDelNodo(nodo) : null

@@ -87,7 +87,10 @@ const SLUG_TIENDA = [
   /\/([^/]+)-p-\d+\.html$/, // Shein
   /\/([^/]+)-g-\d+\.html$/, // Temu
 ]
-const EXTENSION = /\.[a-z0-9]{1,5}$/i
+// La extensión, con el idioma que algunas le ponen antes (Booking: "alvear-palace.es-ar.html")
+const EXTENSION = /(?:\.[a-z]{2}(?:[-_][a-z]{2})?)?\.[a-z0-9]{1,5}$/i
+// El idioma o el país de la tienda ("en_us" en H&M, "es-ar", "ar"): no es el nombre de nada
+const IDIOMA_O_PAIS = /^[a-z]{2}(?:[-_][a-z]{2,3})?$/i
 
 /** Un token que no es parte del nombre: un código o número largo (MKT0278BGH, cw2288, 2014), el JM de ML o algo enorme. */
 function esCodigo(t: string): boolean {
@@ -110,15 +113,16 @@ export function tituloDelLink(link: string): string | null {
     if (slug) return nombreDeSlug(slug)
   }
   if (ml) return null
-  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión. Si ese es el código del producto,
-  // con extensión o con letras y números ("…/pantalon-nike-club-mujer/NIIM8409-010.html", "…/chatitas/401287.html"), el
-  // de antes. Un número suelto ("…/electrodomesticos-cocina/123456") o una palabra no: el de antes suele ser la
-  // categoría, y es mejor el nombre del sitio que el de otra cosa.
-  const pedazos = u.pathname.split('/').filter(Boolean)
+  // Si no coincide ninguna forma conocida, el último pedazo del path sin la extensión (sin contar los del idioma o el
+  // país). Si ese es el código del producto, con letras y números o un número con extensión ("…/pantalon-nike-club-mujer/
+  // NIIM8409-010.html", "…/chatitas/401287.html"), el de antes. Un número suelto ("…/electrodomesticos-cocina/123456") o
+  // una palabra ("…/heladeras-y-freezers/whirlpool.html") no: el de antes suele ser la categoría, y es mejor el nombre del
+  // sitio que el de otra cosa.
+  const pedazos = u.pathname.split('/').filter((p) => p && !IDIOMA_O_PAIS.test(p.replace(EXTENSION, '')))
   const ultimo = pedazos[pedazos.length - 1] ?? ''
   const sinExtension = ultimo.replace(EXTENSION, '')
   const nombre = nombreDeSlug(sinExtension)
-  const esCodigoDelProducto = sinExtension !== ultimo || (/\p{L}/u.test(sinExtension) && /\d/.test(sinExtension))
+  const esCodigoDelProducto = /\d/.test(sinExtension) && (/\p{L}/u.test(sinExtension) || sinExtension !== ultimo)
   if (nombre || pedazos.length < 2 || !esCodigoDelProducto) return nombre
   return nombreDeSlug(pedazos[pedazos.length - 2].replace(EXTENSION, ''))
 }

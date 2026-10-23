@@ -235,6 +235,35 @@ describe('redirecciones', () => {
     expect(s.urls()).toHaveLength(2)
   })
 
+  test('una redirección a una URL de más de 2000 no se sigue: no-carga, con el nombre del link pegado', async () => {
+    // un Location con 15 mil espacios: cada uno pasa a %20, y la URL queda de 45 KB
+    const mate = 'https://tienda.com.ar/products/mate-imperial-de-calabaza'
+    const s = servidor({ [mate]: salto(`/${' '.repeat(15_000)}/x`) })
+    expect(await bajarPagina(mate, s.pedir)).toEqual({ falla: 'no-permitida', urlProducto: mate })
+    expect(s.urls()).toEqual([mate])
+    expect(await leerPagina(mate, s.pedir)).toMatchObject({ estado: 'no-carga', producto: { titulo: 'Mate imperial de calabaza' }, urlProducto: mate })
+  })
+
+  test('si la última URL no trae el nombre: el de la publicación que dice el muro, o el del link pegado', async () => {
+    // una tienda Shopify con contraseña: /password no trae el nombre, el link pegado sí
+    const mate = 'https://tienda.com.ar/products/mate-imperial-de-calabaza'
+    const tienda = servidor({
+      [mate]: { status: 302, headers: { location: '/password' } },
+      'https://tienda.com.ar/password': { headers: html, cuerpo: '<html><head><title>Entrar</title></head></html>' },
+    })
+    expect(await leerPagina(mate, tienda.pedir)).toMatchObject({
+      estado: 'sin-datos', producto: { titulo: 'Mate imperial de calabaza' }, urlProducto: 'https://tienda.com.ar/password',
+    })
+    // un muro con una URL que no conocemos, que se reconoce por lo que dice: el nombre sale de go=
+    const articulo = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-_JM'
+    const muro = `https://www.mercadolibre.com.ar/gz/otro-muro?go=${encodeURIComponent(articulo)}`
+    const ml = servidor({
+      'https://www.mercadolibre.com.ar/x': salto(muro),
+      [muro]: { headers: html, cuerpo: '<html><body><div id="suspicious-traffic-frontend"></div></body></html>' },
+    })
+    expect(await leerPagina('https://www.mercadolibre.com.ar/x', ml.pedir)).toMatchObject({ estado: 'bloqueado', producto: { titulo: 'Mate de algarrobo' } })
+  })
+
   test('con ML_PEDIR_MARKETPLACE apagado, meli.la → articulo no pide articulo (el nombre sale de ahí)', async () => {
     const articulo = 'https://articulo.mercadolibre.com.ar/MLA-1418506688-mate-de-algarrobo-premium-artesanal-con-bombilla-_JM'
     const respuestas = { 'https://meli.la/2abcXYZ': { status: 301, headers: { location: articulo } }, [articulo]: { status: 403, headers: html } }

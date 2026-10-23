@@ -30,6 +30,10 @@ test('las formas de cada tienda', () => {
     ['https://www.tienda.com.ar/mate-imperial-de-calabaza/SKU12345', 'Mate imperial de calabaza'],
     ['https://www.cotodigital.com.ar/sitios/cdigi/productos/bourbon-finish-7-a%C3%B1os-ballantines-bot-700-ml/_/R-00528755-00528755-200', 'Bourbon finish 7 años ballantines bot 700 ml'],
     ['http://tienda.com.ar/productos/mate-de-calabaza', 'Mate de calabaza'],
+    // el idioma antes de la extensión (Booking en castellano) no es parte del nombre
+    ['https://www.booking.com/hotel/ar/alvear-palace.es-ar.html?label=gen173nr&sid=x', 'Alvear palace'],
+    // los pedazos del idioma o el país no cuentan: se sube del código al nombre igual
+    ['https://www.tienda.com/es-ar/mate-imperial-de-calabaza/AB12345.html', 'Mate imperial de calabaza'],
   ] as const) expect(tituloDelLink(link), link).toBe(titulo)
 })
 
@@ -67,8 +71,12 @@ test('sin nombre: null', () => {
     'javascript:alert(1)', 'no es un link', '',
     // más de la mitad descartada: no es el nombre
     'https://x.com/productos/ab12cd34-ef56gh78-mate',
-    // el de antes de un número suelto o de una palabra es la categoría, no el producto
+    // el de antes de un número suelto o de una palabra es la categoría, no el producto (con extensión, también)
     'https://www.tienda.com.ar/electrodomesticos-cocina/123456', 'https://www.tienda.com/zapatillas-running/ofertas',
+    'https://www.tienda.com/heladeras-y-freezers/whirlpool.html',
+    // el de antes del código es el idioma o el país (H&M, que bloquea: este sería el título del deseo)
+    'https://www2.hm.com/en_us/productpage.0970819001.html', 'https://www2.hm.com/es_es/productpage.0970819001.html',
+    'https://www.tienda.com/es-ar/AB12345.html', 'https://www.tienda.com/es-ar/', 'https://www.tienda.com/ar/es-ar.html',
   ]) expect(tituloDelLink(link), link).toBeNull()
 })
 

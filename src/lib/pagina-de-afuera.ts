@@ -1,5 +1,6 @@
 import { aHttps, bajarDeAfuera, pedirPagina, UA_GIFTR, type Corte, type Falla, type Pedir } from '@/lib/bajar-foto'
 import { esHome, esUrlPublica, tituloDelLink } from '@/lib/links'
+import { LARGO } from '@/lib/limites'
 import { esPublicacionDeMarketplace, linkDeMercadoLibre, ML_PEDIR_MARKETPLACE } from '@/lib/mercadolibre'
 import { esUrlDeMuro, leerProducto, urlTrasElMuro, type Estado, type Producto } from '@/lib/producto-del-link'
 
@@ -66,13 +67,16 @@ type Bajada = { html: string; urlFinal: string; cortado: boolean } | Corte
 /**
  * Baja la página de un link: hasta 5 redirecciones, 6 s y 4 MB en total (más que eso se corta y se lee lo que llegó). Un
  * http:// pegado se pide por https. Si no se pudo, la falla y la URL de la que sale el nombre del producto (urlProducto).
- * antes: otros destinos que no se piden, antes que los de siempre (ver expandirLinkCorto).
+ * antes: otros destinos que no se piden, antes que los de siempre (ver expandirLinkCorto). Una redirección a una URL de
+ * más de LARGO.link no se sigue (no-permitida): no es la de un producto (un Location con 15 mil espacios, que pasan a
+ * %20, daba una urlFinal de 45 KB), y así nada de lo que sigue recorre una URL de ese largo.
  */
 export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, signal?: AbortSignal,
   antes?: (url: string, desde: string | null) => Corte | null): Promise<Bajada> {
   const r = await bajarDeAfuera(aHttps(link), pedir, esUrlPublica, {
     max: PAGINA_MAX_BYTES, tiempoMs: PAGINA_TIEMPO_MS, saltos: PAGINA_SALTOS, aceptar: esHtml, siSePasa: 'cortar', signal,
-    noPedir: (url, desde) => antes?.(url, desde) ?? noPedir(url, desde, link),
+    noPedir: (url, desde) => (url.length > LARGO.link ? { falla: 'no-permitida', urlProducto: desde }
+      : antes?.(url, desde) ?? noPedir(url, desde, link)),
   })
   if ('falla' in r) return r
   return { html: aTexto(r.datos, r.tipo), urlFinal: r.urlFinal, cortado: r.cortado }
@@ -81,12 +85,21 @@ export async function bajarPagina(link: string, pedir: Pedir = pedirPagina, sign
 /** Lo que se contesta de un link: el estado, el producto y la URL de la que sale el sitio para los avisos. */
 export type PaginaLeida = { estado: Estado; producto: Producto; urlProducto: string }
 
-/** El producto de lo que se bajó, con el título del link si la página no dio uno (o no se pudo leer). */
+/**
+ * El nombre que traen los links: el de urlProducto; si no, el de la publicación que dice el muro (un muro que se reconoció
+ * por lo que dice, y no por su URL); si no, el del link pegado (una tienda con contraseña manda a /password, que no lo trae).
+ */
+function tituloDeLosLinks(urlProducto: string, link: string): string | null {
+  const trasElMuro = urlTrasElMuro(urlProducto)
+  return tituloDelLink(urlProducto) ?? (trasElMuro && tituloDelLink(trasElMuro)) ?? tituloDelLink(link)
+}
+
+/** El producto de lo que se bajó, con el título de los links si la página no dio uno (o no se pudo leer). */
 function leida(p: Bajada, link: string): PaginaLeida {
   const lectura = 'falla' in p ? { estado: estadoDeFalla(p.falla) } : leerProducto(p.html, p.urlFinal)
   const urlProducto = ('falla' in p ? p.urlProducto : p.urlFinal) ?? link
   const producto = lectura.estado === 'ok' ? lectura.producto : { titulo: null, precio: null, foto: null }
-  return { estado: lectura.estado, producto: { ...producto, titulo: producto.titulo ?? tituloDelLink(urlProducto) }, urlProducto }
+  return { estado: lectura.estado, producto: { ...producto, titulo: producto.titulo ?? tituloDeLosLinks(urlProducto, link) }, urlProducto }
 }
 
 /**
