@@ -40,11 +40,30 @@ const PRODUCTO = {
 const respuesta = (body: unknown, status = 200) =>
   new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const despues = (r: () => Response, ms: number) => () => new Promise<Response>((ok) => setTimeout(() => ok(r()), ms))
+/** Contesta a los ms, salvo que antes se corte su señal (como el fetch de verdad). */
+const lento = (r: () => Response, ms: number) => (init: RequestInit) => new Promise<Response>((ok, mal) => {
+  const t = setTimeout(() => ok(r()), ms)
+  init.signal?.addEventListener('abort', () => { clearTimeout(t); mal(init.signal?.reason) })
+})
+/**
+ * La respuesta (200) llega a los ms y su cuerpo, cuerpoMs después (sin cuerpoMs, nunca). Cortar la señal corta el cuerpo,
+ * como el fetch de verdad.
+ */
+const cuerpoLento = (body: unknown, ms: number, cuerpoMs?: number) => (init: RequestInit) => new Promise<Response>((ok) => setTimeout(() => {
+  ok(new Response(new ReadableStream<Uint8Array>({
+    start(c) {
+      const t = cuerpoMs === undefined ? undefined : setTimeout(() => { c.enqueue(new TextEncoder().encode(JSON.stringify(body))); c.close() }, cuerpoMs)
+      init.signal?.addEventListener('abort', () => { clearTimeout(t); c.error(init.signal?.reason) })
+    },
+  }), { headers: { 'content-type': 'application/json' } }))
+}, ms))
 
 type Llamada = { metodo: string; url: string; headers: Record<string, string>; cuerpo: Record<string, string>; redirect?: string; signal?: AbortSignal }
 
+type Contesta = (init: RequestInit) => Response | Promise<Response>
+
 /** fetch de mentira: por "MÉTODO url", lo que contesta cada vez (la última se repite). Lo que no conoce es un error. */
-function ml(rutas: Record<string, (() => Response | Promise<Response>)[]> = {}) {
+function ml(rutas: Record<string, Contesta[]> = {}) {
   const llamadas: Llamada[] = []
   const veces: Record<string, number> = {}
   vi.stubGlobal('fetch', vi.fn(async (url: string | URL, init: RequestInit = {}) => {
@@ -57,7 +76,7 @@ function ml(rutas: Record<string, (() => Response | Promise<Response>)[]> = {}) 
     const lista = rutas[clave]
     if (!lista) throw new Error(`no esperaba ${clave}`)
     const n = veces[clave] = (veces[clave] ?? 0) + 1
-    return lista[Math.min(n, lista.length) - 1]()
+    return lista[Math.min(n, lista.length) - 1](init)
   }))
   return llamadas
 }
@@ -94,6 +113,8 @@ beforeEach(async () => {
   vi.stubEnv('MELI_ADMIN_EMAILS', ' otra@giftr.app , EUGE@Test.com')
   vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://giftr.app/')
   vi.stubEnv('AUTH_SECRET', 'secreto-de-la-app-para-los-tests')
+  // solo producción renueva el acceso (ver 'solo producción renueva')
+  vi.stubEnv('VERCEL_ENV', 'production')
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('nada sale a la red') }))
 })
 
@@ -104,6 +125,8 @@ afterEach(() => {
 })
 
 const fila = async () => (await h.db.select().from(mercadolibreConexion))[0]
+const USO_ACCESS = 'mercadolibre_conexion.access_token'
+const USO_REFRESH = 'mercadolibre_conexion.refresh_token'
 
 /** Lo que se dijo en el log no tiene ningún token, la clave de la aplicación ni lo que contestó ML. */
 function sinSecretos(...espias: { mock: { calls: unknown[][] } }[]) {
@@ -360,6 +383,8 @@ async function conectada(m: Modulos, n: number, venceEn: number) {
   await m.guardarConexion(h.db, { access: t.access_token, refresh: t.refresh_token, expiraAt: new Date(Date.now() + venceEn), mlUserId: '987654321' }, ownerId)
 }
 const HORA = 3600_000
+/** El 401 de la API con un token que no acepta. */
+const no = () => respuesta({ message: 'invalid access token', error: 'not_found', status: 401, cause: [] }, 401)
 
 describe('leerDeLaApi con la cuenta conectada', () => {
   test('una publicación, con el token de la conexión (sin el de la aplicación); mientras no vence, no se vuelve a leer la base', async () => {
@@ -410,10 +435,10 @@ describe('leerDeLaApi con la cuenta conectada', () => {
       })
       expect(llamadas[0].redirect).toBe('error')
       expect(llamadas[1].headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
-      // con un tope corto, aparte del de la lectura
-      expect(ms).toEqual([m.API_ML_TIEMPO_MS, m.RENOVAR_ML_TIEMPO_MS])
-      // con la fila bloqueada, y el par nuevo guardado adentro
-      const lock = consultas.findIndex((q) => /select .* from "mercadolibre_conexion" .*for update/i.test(q))
+      // con su propio tope, aparte del de la lectura: hasta que contesta, y otro para el cuerpo
+      expect(ms).toEqual([m.API_ML_TIEMPO_MS, m.RENOVAR_ML_TIEMPO_MS, m.RENOVAR_ML_CUERPO_MS])
+      // con la fila bloqueada (si está tomada, no se espera), y el par nuevo guardado adentro
+      const lock = consultas.findIndex((q) => /select .* from "mercadolibre_conexion" .*for update skip locked$/i.test(q))
       const guarda = consultas.findIndex((q) => /^update "mercadolibre_conexion"/i.test(q))
       expect(lock).toBeGreaterThan(0)
       expect(guarda).toBeGreaterThan(lock)
@@ -471,8 +496,7 @@ describe('leerDeLaApi con la cuenta conectada', () => {
     expect(m.apiDeMercadoLibreLista()).toBe(false)
   })
 
-  test('un 401 con un token que creíamos vigente: se renueva y se reintenta una sola vez', async () => {
-    const no = () => respuesta({ message: 'invalid access token', error: 'not_found', status: 401, cause: [] }, 401)
+  test('un 401 con un token que creíamos vigente: se renueva y se reintenta una sola vez; después, otro 401 no renueva por un minuto', async () => {
     const m = await cargar()
     await conectada(m, 1, HORA)
     const llamadas = ml({ [`POST ${API}/oauth/token`]: [() => respuesta(tokens(2))], [`GET ${API}/items/MLA1418506688`]: [no, () => respuesta(ITEM)] })
@@ -481,10 +505,36 @@ describe('leerDeLaApi con la cuenta conectada', () => {
       `GET Bearer ${tokens(1).access_token}`, 'POST refresh_token', `GET Bearer ${tokens(2).access_token}`,
     ])
     expect(descifrar((await fila()).accessToken, 'mercadolibre_conexion.access_token')).toBe(tokens(2).access_token)
-    // si el nuevo también da 401, no se sigue renovando: null (la página)
+    // pasado el minuto, un 401 vuelve a renovar; si el nuevo también da 401, no se sigue renovando: null (la página)
+    const ahora = Date.now()
+    const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora + 61_000)
     const siempre = ml({ [`POST ${API}/oauth/token`]: [() => respuesta(tokens(3))], [`GET ${API}/items/MLA1418506688`]: [no] })
     expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
-    expect(siempre.map((l) => l.metodo)).toEqual(['GET', 'POST', 'GET'])
+    expect(siempre.map((l) => `${l.metodo} ${l.headers.authorization ?? l.cuerpo.grant_type}`)).toEqual([
+      `GET Bearer ${tokens(2).access_token}`, 'POST refresh_token', `GET Bearer ${tokens(3).access_token}`,
+    ])
+    // en el minuto, los 401 que siguen ni renuevan ni prueban el token de la aplicación
+    const despuesDe = ml({ [`POST ${API}/oauth/token`]: [() => respuesta(tokens(4))], [`GET ${API}/items/MLA1418506688`]: [no] })
+    reloj.mockReturnValue(ahora + 61_000 + 59_000)
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
+    expect(despuesDe.map((l) => `${l.metodo} ${l.headers.authorization ?? l.cuerpo.grant_type}`)).toEqual([`GET Bearer ${tokens(3).access_token}`])
+    reloj.mockRestore()
+  })
+
+  test('un 401 que sigue con el token nuevo: dos links de catálogo (cada uno pide /items y /products) renuevan una sola vez', async () => {
+    const m = await cargar()
+    await conectada(m, 1, HORA)
+    const llamadas = ml({
+      [`POST ${API}/oauth/token`]: [() => respuesta(tokens(2)), () => respuesta(tokens(3))],
+      [`GET ${API}/items/MLA3034341816`]: [no], [`GET ${API}/products/MLA37631077`]: [no],
+    })
+    expect(await m.leerDeLaApi(h.db, CATALOGO_APP)).toBeNull()
+    expect(await m.leerDeLaApi(h.db, CATALOGO_APP)).toBeNull()
+    expect(llamadas.map((l) => `${l.metodo} ${l.url.slice(API.length)} ${l.headers.authorization?.includes('acceso2') ? 2 : l.headers.authorization?.includes('acceso1') ? 1 : ''}`)).toEqual([
+      'GET /items/MLA3034341816 1', 'POST /oauth/token ', 'GET /items/MLA3034341816 2', 'GET /products/MLA37631077 2',
+      'GET /items/MLA3034341816 2', 'GET /products/MLA37631077 2',
+    ])
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
   })
 
   test('si renovar falla (ML caído, sin red, colgado): la conexión no se pierde, sigue por la página y no se reintenta por un minuto', async () => {
@@ -513,31 +563,214 @@ describe('leerDeLaApi con la cuenta conectada', () => {
       reloj.mockRestore()
     }
     sinSecretos(warn)
-    // colgado: se corta a los RENOVAR_ML_TIEMPO_MS (cien veces más cortos acá), sin esperar a lo que queda de la lectura
+    // colgado: se corta a su propio tope (RENOVAR_ML_TIEMPO_MS, cien veces más corto acá), no al de la lectura, que vence
+    // antes: cortarlo a la mitad podría perder el par nuevo
     await h.db.delete(mercadolibreConexion)
     const m = await cargar()
     await conectada(m, 1, -HORA)
+    let antes = 0
+    let cortada = 0
     vi.stubGlobal('fetch', vi.fn((_url: string | URL, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
-      init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
+      // como el de verdad: con la señal ya cortada, ni sale
+      if (init.signal?.aborted) return mal(init.signal.reason)
+      init.signal?.addEventListener('abort', () => {
+        cortada ||= Date.now() - antes
+        mal(init.signal?.reason)
+      })
     })))
     tiempos(100)
-    const antes = Date.now()
+    antes = Date.now()
     expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
-    expect(Date.now() - antes).toBeLessThan(m.API_ML_TIEMPO_MS / 100 + 500)
-    expect(await fila()).toMatchObject({ mlUserId: '987654321' })
-    expect((await fila()).refreshToken).not.toBeNull()
+    expect(m.API_ML_TIEMPO_MS).toBeLessThan(m.RENOVAR_ML_TIEMPO_MS)
+    expect(cortada).toBeGreaterThanOrEqual(m.RENOVAR_ML_TIEMPO_MS / 100 - 2)
+    expect(Date.now() - antes).toBeLessThan(m.RENOVAR_ML_TIEMPO_MS / 100 + 200)
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(1).refresh_token)
   })
 
-  test('el refresh cifrado con otro secreto (cambió AUTH_SECRET): la conexión se cae con el mismo aviso', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  test('si renovar falla y al acceso le quedan minutos: se sigue usando hasta un minuto, y después se vuelve a renovar', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = await cargar()
+    await conectada(m, 1, 4 * 60_000)
+    const llamadas = ml({
+      [`POST ${API}/oauth/token`]: [() => respuesta('Internal Server Error', 500), () => respuesta(tokens(2))],
+      [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+    })
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual(['refresh_token', `Bearer ${tokens(1).access_token}`])
+    // en el minuto, el mismo: ni la base ni renovar
+    const ahora = Date.now()
+    const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora + 59_000)
+    const { db, consultas } = conConsultas(h.db)
+    expect(await m.leerDeLaApi(db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(consultas).toEqual([])
+    expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual([
+      'refresh_token', `Bearer ${tokens(1).access_token}`, `Bearer ${tokens(1).access_token}`,
+    ])
+    // pasado el minuto, se renueva
+    reloj.mockReturnValue(ahora + 61_000)
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.slice(3).map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual(['refresh_token', `Bearer ${tokens(2).access_token}`])
+    reloj.mockRestore()
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
+  })
+
+  test('si se va quien preguntó mientras se renueva, la renovación sigue y el par nuevo queda guardado', async () => {
     const m = await cargar()
     await conectada(m, 1, -HORA)
-    vi.stubEnv('AUTH_SECRET', 'otro-secreto')
-    const llamadas = ml({ [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client' }, 400)] })
+    const quien = new AbortController()
+    const llamadas = ml({ [`POST ${API}/oauth/token`]: [lento(() => respuesta(tokens(2)), 30)], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+    setTimeout(() => quien.abort(), 5)
+    expect(await m.leerDeLaApi(h.db, ARTICULO, quien.signal)).toBeNull()
+    expect(quien.signal.aborted).toBe(true)
+    expect(posts(llamadas)).toHaveLength(1)
+    expect(posts(llamadas)[0].signal?.aborted).toBe(false)
+    const f = await fila()
+    expect(descifrar(f.accessToken, USO_ACCESS)).toBe(tokens(2).access_token)
+    expect(descifrar(f.refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
+    // el link que sigue lo usa, sin renovar
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(posts(llamadas)).toHaveLength(1)
+    expect(gets(llamadas).at(-1)!.headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
+  })
+
+  test('ML contesta antes del tope y el cuerpo llega después: el par nuevo se guarda igual (ML ya gastó el refresh token)', async () => {
+    // cincuenta veces más cortos: la lectura, 80 ms; hasta que contesta, 100 ms; el cuerpo, 40 ms más
+    const m = await cargar()
+    await conectada(m, 1, -HORA)
+    const llamadas = ml({ [`POST ${API}/oauth/token`]: [cuerpoLento(tokens(2), 70, 35)], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+    tiempos(50)
+    const antes = Date.now()
+    // la lectura ya venció: esta vez, la página
     expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
-    expect(llamadas.map((l) => l.cuerpo.grant_type)).toEqual(['client_credentials'])
-    expect(await fila()).toMatchObject({ accessToken: null, refreshToken: null })
-    expect(warn.mock.calls.map((c) => c[0])).toContain('MercadoLibre se desconectó: hay que volver a conectarlo en /api/mercadolibre/conectar')
+    expect(Date.now() - antes).toBeGreaterThanOrEqual(m.RENOVAR_ML_TIEMPO_MS / 50)
+    expect(posts(llamadas)).toHaveLength(1)
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(posts(llamadas)).toHaveLength(1)
+  })
+
+  test('un cuerpo que no termina de llegar se corta a su tope, sin colgar la fila; la conexión no se pierde', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = await cargar()
+    await conectada(m, 1, -HORA)
+    ml({ [`POST ${API}/oauth/token`]: [cuerpoLento(tokens(2), 70), () => respuesta({ error: 'invalid_client' }, 400)] })
+    tiempos(50)
+    const antes = Date.now()
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
+    expect(Date.now() - antes).toBeLessThan(70 + m.RENOVAR_ML_CUERPO_MS / 50 + 200)
+    expect(descifrar((await fila()).refreshToken, USO_REFRESH)).toBe(tokens(1).refresh_token)
+  })
+
+  test('un 200 con el refresh token nuevo pero sin un acceso que sirva: el refresh se guarda (es el único que vale) y la próxima renovación lo usa', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = await cargar()
+    await conectada(m, 1, -HORA)
+    const llamadas = ml({
+      [`POST ${API}/oauth/token`]: [() => respuesta({ ...tokens(2), expires_in: undefined }), () => respuesta({ error: 'invalid_client' }, 400), () => respuesta(tokens(3))],
+      [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)],
+    })
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toBeNull()
+    const f = await fila()
+    expect(descifrar(f.refreshToken, USO_REFRESH)).toBe(tokens(2).refresh_token)
+    // el acceso, el de antes (vencido)
+    expect(descifrar(f.accessToken, USO_ACCESS)).toBe(tokens(1).access_token)
+    const ahora = Date.now()
+    const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora + 61_000)
+    expect(await m.leerDeLaApi(h.db, ARTICULO)).toMatchObject({ estado: 'ok' })
+    reloj.mockRestore()
+    expect(posts(llamadas).map((l) => l.cuerpo.refresh_token ?? l.cuerpo.grant_type)).toEqual([
+      tokens(1).refresh_token, 'client_credentials', tokens(2).refresh_token,
+    ])
+  })
+
+  test('la fila tomada por otra renovación (en otra instancia): no se la espera; el acceso de antes si todavía vale, si no la página', async () => {
+    const m = await cargar()
+    // el select … for update skip locked no la devuelve; lo demás, la base de verdad
+    const tomada = {
+      select: h.db.select.bind(h.db),
+      transaction: (fn: (tx: unknown) => Promise<unknown>) => h.db.transaction(() => fn({
+        select: () => ({ from: () => ({ where: () => ({ for: (_: string, o?: { skipLocked?: boolean }) => Promise.resolve(o?.skipLocked ? [] : null) }) }) }),
+      })),
+    } as unknown as Db
+    await conectada(m, 1, 4 * 60_000)
+    const llamadas = ml({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)], [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client' }, 400)] })
+    expect(await m.leerDeLaApi(tomada, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type)).toEqual([`Bearer ${tokens(1).access_token}`])
+    // vencido: este link sigue sin la conexión (sin renovar: el token de la aplicación, y la página), y el que sigue vuelve
+    // a mirar enseguida
+    await h.db.delete(mercadolibreConexion)
+    await conectada(m, 1, -HORA)
+    const vencido = ml({ [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client' }, 400)] })
+    expect(await m.leerDeLaApi(tomada, ARTICULO)).toBeNull()
+    expect(vencido.map((l) => l.cuerpo.grant_type)).toEqual(['client_credentials'])
+    expect(m.conexionPosible()).toBe(true)
+    // ya renovada por la otra: se usa
+    await conectada(m, 2, HORA)
+    const despuesDe = ml({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+    expect(await m.leerDeLaApi(tomada, ARTICULO)).toMatchObject({ estado: 'ok' })
+    expect(despuesDe.map((l) => l.headers.authorization)).toEqual([`Bearer ${tokens(2).access_token}`])
+  })
+
+  test('solo producción renueva: un preview (quizás con su propia rama de Neon) o un npm run dev usan el acceso mientras vale, sin gastar el refresh token', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const entorno of ['preview', 'development', undefined]) {
+      vi.stubEnv('VERCEL_ENV', entorno)
+      await h.db.delete(mercadolibreConexion)
+      const m = await cargar()
+      // le quedan 4 minutos: producción ya lo renovaría, acá se usa
+      await conectada(m, 1, 4 * 60_000)
+      const llamadas = ml({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)], [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client' }, 400)] })
+      expect(await m.leerDeLaApi(h.db, ARTICULO), String(entorno)).toMatchObject({ estado: 'ok' })
+      expect(llamadas.map((l) => l.headers.authorization ?? l.cuerpo.grant_type), String(entorno)).toEqual([`Bearer ${tokens(1).access_token}`])
+      // vencido: sin renovar y sin la conexión (el token de la aplicación, y la página)
+      const ahora = Date.now()
+      const reloj = vi.spyOn(Date, 'now').mockReturnValue(ahora + 5 * 60_000)
+      expect(await m.leerDeLaApi(h.db, ARTICULO), String(entorno)).toBeNull()
+      expect(llamadas.slice(1).map((l) => l.cuerpo.grant_type), String(entorno)).toEqual(['client_credentials'])
+      const f = await fila()
+      expect(descifrar(f.accessToken, USO_ACCESS)).toBe(tokens(1).access_token)
+      expect(descifrar(f.refreshToken, USO_REFRESH)).toBe(tokens(1).refresh_token)
+      // producción la renueva en la misma base: al minuto, se usa la nueva
+      await h.db.update(mercadolibreConexion).set({
+        accessToken: cifrar(tokens(2).access_token, USO_ACCESS), refreshToken: cifrar(tokens(2).refresh_token, USO_REFRESH), expiraAt: new Date(ahora + 6 * HORA),
+      })
+      reloj.mockReturnValue(ahora + 6 * 60_000 + 1000)
+      expect(await m.leerDeLaApi(h.db, ARTICULO), String(entorno)).toMatchObject({ estado: 'ok' })
+      expect(gets(llamadas).at(-1)!.headers.authorization).toBe(`Bearer ${tokens(2).access_token}`)
+      expect(posts(llamadas).map((l) => l.cuerpo.grant_type)).toEqual(['client_credentials'])
+      reloj.mockRestore()
+    }
+    expect(warn.mock.calls.map((c) => c[0])).toContain('MercadoLibre: el acceso de la conexión venció y solo lo renueva producción')
+    sinSecretos(warn)
+  })
+
+  test('una instancia con otro AUTH_SECRET (un npm run dev o un preview con la base de producción): no puede usar la conexión, pero no la toca', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const venceEn of [HORA, -HORA]) {
+      await h.db.delete(mercadolibreConexion)
+      const prod = await cargar()
+      await conectada(prod, 1, venceEn)
+      const antes = await fila()
+      // la otra instancia, con su propio secreto
+      vi.stubEnv('AUTH_SECRET', 'secreto-del-preview')
+      warn.mockClear()
+      const otra = await cargar()
+      const llamadas = ml({ [`POST ${API}/oauth/token`]: [() => respuesta({ error: 'invalid_client' }, 400)] })
+      expect(await otra.leerDeLaApi(h.db, ARTICULO), String(venceEn)).toBeNull()
+      // sin renovar: solo el token de la aplicación
+      expect(llamadas.map((l) => l.cuerpo.grant_type), String(venceEn)).toEqual(['client_credentials'])
+      expect(await fila(), String(venceEn)).toEqual(antes)
+      expect(warn.mock.calls.map((c) => c[0])).toContain(
+        'MercadoLibre: no se pudo descifrar la conexión (¿otro AUTH_SECRET?). Si cambió el secreto, volvé a conectarla en /api/mercadolibre/conectar',
+      )
+      expect(warn.mock.calls.map((c) => c[0])).not.toContain('MercadoLibre se desconectó: hay que volver a conectarlo en /api/mercadolibre/conectar')
+      sinSecretos(warn)
+      // producción la sigue usando (o renovando)
+      vi.stubEnv('AUTH_SECRET', 'secreto-de-la-app-para-los-tests')
+      const deProd = ml({ [`POST ${API}/oauth/token`]: [() => respuesta(tokens(2))], [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+      expect(await prod.leerDeLaApi(h.db, ARTICULO), String(venceEn)).toMatchObject({ estado: 'ok' })
+      expect(gets(deProd)[0].headers.authorization).toBe(`Bearer ${tokens(venceEn > 0 ? 1 : 2).access_token}`)
+    }
   })
 
   test('sin la tabla (un preview con la base sin migrar) o con la base caída: sigue sin conexión, nunca tira, y el log no lleva lo de la base', async () => {

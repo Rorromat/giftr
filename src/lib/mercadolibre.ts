@@ -169,12 +169,14 @@ async function pedirToken(signal: AbortSignal): Promise<Token | null> {
 
 /**
  * GET a la API con el token de la conexión o, sin ella, el de la aplicación. Si da 401 (vencido antes de tiempo,
- * revocado), una sola vez otro: el de la conexión se renueva, y el de la aplicación se pide de nuevo. Null si no da 200.
+ * revocado), una sola vez otro: el de la conexión se renueva (si no da otro, la página), y el de la aplicación se pide de
+ * nuevo. Null si no da 200.
  */
 async function deLaApi(db: Db, ruta: string, signal: AbortSignal, deQuienPide?: AbortSignal): Promise<unknown> {
   let rechazado: string | undefined
   for (let intento = 0; intento < 2; intento++) {
     const deLaConexion = await tokenDeLaConexion(db, rechazado)
+    if (!deLaConexion && rechazado) return null
     const t = deLaConexion ?? await tokenDeLaApp(signal, deQuienPide)
     if (!t) return null
     const r = await fetch(`${API}${ruta}`, {

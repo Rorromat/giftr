@@ -73,10 +73,19 @@ su API pide el token de una cuenta. Se conecta la tuya una sola vez (no la de ca
    conectado*. Los tokens quedan cifrados en la base (tabla `mercadolibre_conexion`) y se renuevan
    solos.
 
+Solo el deploy de producción renueva el acceso (con `VERCEL_ENV=production`, que pone Vercel): el
+refresh token de MercadoLibre es de un solo uso, y un preview con su propia rama de Neon tiene una
+copia de la fila; si renovara, el de producción dejaría de valer. Los previews y `npm run dev` usan
+el acceso mientras vale (el que renovó producción, si comparten la base) y, si no, siguen sin la
+API.
+
 Si MercadoLibre deja de aceptar la renovación (le sacaste el permiso a GiftR desde tu cuenta de
-MercadoLibre) o cambió `AUTH_SECRET`, los logs dicen *MercadoLibre se desconectó: hay que volver a
-conectarlo en /api/mercadolibre/conectar*, y los links de MercadoLibre vuelven a completarse con lo
-que trae el link hasta que repitas el paso 3.
+MercadoLibre), los logs dicen *MercadoLibre se desconectó: hay que volver a conectarlo en
+/api/mercadolibre/conectar*, y los links de MercadoLibre vuelven a completarse con lo que trae el
+link hasta que repitas el paso 3. Si cambió `AUTH_SECRET`, la conexión guardada ya no se puede
+descifrar: los logs dicen *MercadoLibre: no se pudo descifrar la conexión (¿otro AUTH_SECRET?)* y
+también hay que repetir el paso 3. Lo mismo dicen los logs de un entorno con otro `AUTH_SECRET` (un
+`npm run dev` con la base de producción y su propio secreto), pero ese entorno no toca la conexión.
 
 **Previews y migraciones.** `DATABASE_URL` es la misma en todos los entornos, así que los previews
 (cada push a una rama que no es `main`) **no** migran: si lo hicieran, cambiarían la base de
