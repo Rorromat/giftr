@@ -4,8 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { deseoDesdeForm } from '@/lib/deseo-form'
 import {
   AVISO_MUCHOS, avisoBuscando, completador, CONSEJO_FOTO_ML, LEER_LINK_MS, linkParaCompletar, linksGuardados, loDelAnterior,
-  loQueEntro, mismoProducto, queCompletar, respuestaLink, traeElLink, type Campo, type Contestado, type Destino, type Puesto,
-  type RespuestaLink, type Valores,
+  loQueEntro, mismoProducto, queCompletar, respuestaLink, traeElLink, ultimoToque, type Campo, type Contestado, type Destino,
+  type Puesto, type RespuestaLink, type Valores,
 } from '@/lib/completar-deseo'
 import { queHacerConPropuesta } from '@/lib/foto-del-form'
 import { DeseoForm } from '@/components/DeseoForm'
@@ -161,11 +161,16 @@ describe('queCompletar', () => {
     expect(queCompletar(valores({ titulo: ML }), ML, ok(), null)!.retenidos).toBeUndefined()
   })
 
-  test('sin nombre, si era solo el link, queda el link (el servidor pone el del link o el sitio)', () => {
+  test('sin nombre, si era solo el link, queda el link (el servidor pone el del link o el sitio); si estaba vacío, el sitio', () => {
     const c = queCompletar(valores({ titulo: 'https://tienda.com.ar/x' }), 'https://tienda.com.ar/x', ok({ titulo: null, precio: null }), null)!
     expect(c.titulo).toBeUndefined()
     expect(c.linkTienda).toBe('https://tienda.com.ar/x')
     expect(c.aviso).toBeNull()
+    // vacío frenaba "Agregar" ("Completá este campo")
+    const zara = 'https://www.zara.com/ar/campera'
+    for (const r of [ok({ titulo: null, precio: null, sitio: 'zara.com' }), null]) {
+      expect(queCompletar(valores({ linkTienda: zara }), zara, r, null)!.titulo, String(r && r.estado)).toBe('zara.com')
+    }
   })
 
   test('lo que puso el primer link se reemplaza con el segundo; lo que corrigió el dueño, no', () => {
@@ -648,8 +653,7 @@ describe('completador: cuándo se pide', () => {
     f.pedidos[0].contestar(ok())
     await vi.advanceTimersByTimeAsync(0)
     expect(f.fotos).toEqual([])
-    // queda el nombre del link que se puso mientras buscaba
-    expect(f.v).toEqual(valores({ titulo: 'Termo stanley', linkTienda: OTRO }))
+    expect(f.v).toEqual(valores({ linkTienda: OTRO }))
   })
 
   test('al mandar se corta lo que esté en curso: mientras dice "Guardando…" ya no dice que busca, y lo que llega no va', async () => {
@@ -853,22 +857,50 @@ describe('completador: cuándo se pide', () => {
     }
   })
 
-  test('pegado en la tienda con el título vacío, el nombre del link va enseguida (se puede mandar) y la respuesta lo cambia', async () => {
+  test('pegado en la tienda con el título vacío, el título no se toca mientras busca; la respuesta lo llena y "Agregar" no queda frenado', async () => {
     const f = armar()
+    f.foco.campo = 'linkTienda'
     f.pegar('linkTienda', ML)
-    expect(f.v).toEqual(valores({ titulo: 'Mate imperial', linkTienda: ML }))
-    expect(deseoDesdeForm(fd({ ...f.v }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+    // el nombre del link enseguida quedaba pegado a lo que escribía si tocaba el título ("Mate imperialTermo")
+    expect(f.v).toEqual(valores({ linkTienda: ML }))
+    f.dejar('linkTienda', 'precio')
+    expect(f.v.titulo).toBe('')
     f.pedidos[0].contestar(ok())
     await vi.advanceTimersByTimeAsync(0)
-    expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '$88.990' })
+    expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '' })
+    // si toca "Agregar" (o Enter) antes de que vuelva, el nombre del link: vacío, el navegador frenaba con "Completá este campo"
+    for (const conEnter of [false, true]) {
+      const g = armar()
+      g.foco.campo = 'linkTienda'
+      g.pegar('linkTienda', ML)
+      expect(g.agregar(conEnter)).toBe(true)
+      expect(deseoDesdeForm(fd({ ...g.v }))).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML })
+    }
+    // si no contesta, el nombre del link; sin nombre en el link, el sitio (vacío, "Agregar" quedaba frenado)
+    for (const [link, nombre] of [[ML, 'Mate imperial'], ['https://www.zara.com/ar/campera', 'zara.com']]) {
+      const g = armar()
+      g.pegar('linkTienda', link)
+      g.pedidos[0].contestar(null)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(g.v.titulo, link).toBe(nombre)
+    }
     // lo que escribe en el título mientras busca queda
     const g = armar()
     g.pegar('linkTienda', 'https://www.zara.com/ar/campera')
-    expect(g.v.titulo).toBe('zara.com')
     g.v.titulo = 'Campera negra'
     g.pedidos[0].contestar(ok({ titulo: 'Campera de cuero', sitio: 'zara.com' }))
     await vi.advanceTimersByTimeAsync(0)
     expect(g.v.titulo).toBe('Campera negra')
+    // pegado (o insertado desde la tira de Gboard) en la tienda, y enseguida toca "¿Qué querés?" y escribe: queda lo suyo
+    const h = armar()
+    h.foco.campo = 'linkTienda'
+    h.pegar('linkTienda', ML)
+    h.dejar('linkTienda', 'titulo')
+    h.cambiar('titulo', `${h.v.titulo}Termo`)
+    h.pedidos[0].contestar(ok())
+    await vi.advanceTimersByTimeAsync(0)
+    h.dejar('titulo')
+    expect(h.v).toEqual({ titulo: 'Termo', linkTienda: ML, precio: '$88.990' })
   })
 
   test('el nombre provisorio no va en un título que tiene el foco o que lo va a tener; se pone al dejarlo', async () => {
@@ -1177,6 +1209,63 @@ describe('completador: cuándo se pide', () => {
     expect(f.fotos).toEqual([FOTO])
     // el link pasa a la tienda, como el de la respuesta
     expect(f.v).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '' })
+  })
+
+  test('al mandar sin dejar el título, el mismo producto escrito ahí a mano queda como al dejarlo: el nombre y el link a la tienda', async () => {
+    const conSeguimiento = `${ML}?tracking_id=abc`
+    for (const titulo of [ML, `Mate imperial de calabaza ${ML}`]) {
+      for (const conEnter of [true, false]) {
+        const cual = `${titulo} ${conEnter ? 'Enter' : 'Agregar'}`
+        const f = armar()
+        f.pegar('titulo', conSeguimiento)
+        f.pedidos[0].contestar(ok())
+        await vi.advanceTimersByTimeAsync(0)
+        expect(f.v, cual).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: conSeguimiento, precio: '$88.990' })
+        f.foco.campo = 'titulo'
+        f.cambiar('titulo', titulo)
+        expect(f.agregar(conEnter), cual).toBe(true)
+        expect(f.pedir, cual).toHaveBeenCalledTimes(1)
+        // la tienda seguía con el link con seguimiento: el servidor veía dos links y guardaba el del título como nombre
+        expect(f.v, cual).toEqual({ titulo: 'Mate imperial de calabaza', linkTienda: ML, precio: '$88.990' })
+        expect(deseoDesdeForm(fd({ ...f.v })), cual).toMatchObject({ titulo: 'Mate imperial de calabaza', linkTienda: ML })
+      }
+    }
+  })
+
+  test('lo tocado dice adónde va el foco solo durante ese toque, y tocar el campo que ya tiene el foco no es ir a él', async () => {
+    const toque = ultimoToque<string>()
+    // desde la tienda toca la etiqueta "¿Qué querés?": el focusout llega sin relatedTarget, y lo tocado lleva al título
+    toque.tocar('etiqueta del título')
+    expect(toque.alDejar('tienda')).toBe('etiqueta del título')
+    toque.olvidar() // el título toma el foco
+    // con el foco en el título, lo vuelve a tocar (para "Pegar" o para mover el cursor) y cierra el teclado ("Listo")
+    toque.tocar('título')
+    expect(toque.alDejar('título')).toBeNull()
+    // un arrastre que empieza sobre "Agregar" (pointercancel, sin click ni foco): un "Listo" después no va a "Agregar"
+    toque.tocar('agregar')
+    toque.olvidar()
+    expect(toque.alDejar('tienda')).toBeNull()
+    // terminado el click, tampoco; si para entonces hubo otro toque, ese sigue
+    toque.tocar('foto')
+    const fin = toque.terminar()
+    toque.tocar('etiqueta del título')
+    fin()
+    expect(toque.alDejar('tienda')).toBe('etiqueta del título')
+    toque.terminar()()
+    expect(toque.alDejar('tienda')).toBeNull()
+    // así, el "Listo" en el título deja el campo: lo escrito a mano se busca, y lo retenido se escribe
+    const f = armar()
+    f.foco.campo = 'titulo'
+    f.cambiar('titulo', ML)
+    f.dejar('titulo', null)
+    expect(f.pedidos.map((p) => p.link)).toEqual([ML])
+    f.foco.campo = 'titulo'
+    f.pegar('titulo', OTRO)
+    f.pedidos[1].contestar(ok({ titulo: 'Termo Stanley', precio: '$120.000' }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.v.titulo).toBe(OTRO)
+    f.dejar('titulo', null)
+    expect(f.v).toEqual({ titulo: 'Termo Stanley', linkTienda: OTRO, precio: '$120.000' })
   })
 
   test('lo que se pone al dejar el título también lo dice la línea, y Enter en el título vacío no queda frenado', async () => {

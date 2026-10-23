@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { completarCampo } from '@/components/CamposDeseo'
 import { aconsejarFoto, proponerFoto } from '@/components/FotoField'
-import { completador, loQueEntro, type Campo, type Destino, type Linea } from '@/lib/completar-deseo'
+import { completador, loQueEntro, ultimoToque, type Campo, type Destino, type Linea } from '@/lib/completar-deseo'
 
 const CAMPOS = ['titulo', 'linkTienda', 'precio'] as const satisfies readonly Campo[]
 
@@ -69,15 +69,16 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
     }
     // Adónde va el foco: el relatedTarget del focusout. Tocar la etiqueta "¿Qué querés?" (no toma el foco) lo saca con
     // relatedTarget null y lo pasa al título recién en el click, y en Safari un botón no toma el foco: ahí vale lo que se
-    // tocó. Se olvida cuando algo toma el foco.
-    let tocado: Element | null = null
-    const alTocar = (e: PointerEvent) => {
-      tocado = e.target instanceof Element ? e.target : null
-    }
-    const olvidarToque = () => {
-      tocado = null
+    // tocó, solo mientras dura ese toque (ver ultimoToque). Se olvida después del click, que es cuando la etiqueta pasa el
+    // foco (el setTimeout deja que corran antes los focusout que trae).
+    const toque = ultimoToque<Element>()
+    const alTocar = (e: PointerEvent) => toque.tocar(e.target instanceof Element ? e.target : null)
+    const olvidarToque = () => toque.olvidar()
+    const alTerminarToque = () => {
+      setTimeout(toque.terminar(), 0)
     }
     const adonde = (e: FocusEvent): Destino => {
+      const tocado = e.target instanceof Element ? toque.alDejar(e.target) : null
       const a = e.relatedTarget ?? tocado?.closest('label')?.control ?? tocado?.closest('button') ?? null
       return esEnviar(form, a) ? 'enviar' : campoDe(form, a)
     }
@@ -96,6 +97,8 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
     // Lo que vuelva después ya no va (proponía una foto que se importaba para un deseo ya guardado).
     const alMandar = () => c.alMandar()
     document.addEventListener('pointerdown', alTocar, true)
+    document.addEventListener('pointercancel', olvidarToque, true)
+    document.addEventListener('click', alTerminarToque, true)
     document.addEventListener('focusin', olvidarToque)
     form.addEventListener('paste', alPegar)
     form.addEventListener('input', alEscribir)
@@ -104,6 +107,8 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
     form.addEventListener('submit', alMandar)
     return () => {
       document.removeEventListener('pointerdown', alTocar, true)
+      document.removeEventListener('pointercancel', olvidarToque, true)
+      document.removeEventListener('click', alTerminarToque, true)
       document.removeEventListener('focusin', olvidarToque)
       form.removeEventListener('paste', alPegar)
       form.removeEventListener('input', alEscribir)

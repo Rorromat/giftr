@@ -149,8 +149,8 @@ function avisoDe(r: Contestado, nombre: boolean, precio: boolean): string | null
 /**
  * Qué escribir con lo que contestó la lectura de un link. Lo que escribió el dueño no se toca; lo vacío se llena.
  * - Título: si era solo el link (con espacios o no), vacío o lo que puso el autocompletado, el nombre de la respuesta
- *   (de la página o del link); sin nombre queda el link y el servidor pone el del link o el sitio. Con texto además del
- *   link ("Para mamá https://…"), el texto, sin el nombre.
+ *   (de la página o del link); sin nombre, el link queda y el servidor pone el del link o el sitio, y uno vacío lleva
+ *   eso mismo (vacío frenaría el envío). Con texto además del link ("Para mamá https://…"), el texto, sin el nombre.
  * - El link del título pasa a "Link a la tienda" ya acá, con la regla del servidor: al mandar no hay dos movimientos.
  * - Precio y foto: solo con 'ok'. El precio (solo ARS o USD: otra moneda viene null) va si está vacío o si sigue igual a
  *   lo que puso el autocompletado, y si este producto no tiene, eso se vacía. Una falla (sin respuesta, el tope, no
@@ -184,10 +184,8 @@ export function queCompletar(v: Valores, link: string, r: Contestado, puesto: Pu
   } else {
     // el link de la tienda que puso el autocompletado y sigue ahí, también
     if (puesto?.linkTienda && v.linkTienda.trim() === puesto.linkTienda) nuevo.linkTienda = puesto.linkTienda
-    if (!v.titulo.trim() || v.titulo === puesto?.titulo) {
-      // no queda vacío si tenía algo (frenaría el envío): sin nombre, el del link o el sitio, como lo pondría el servidor
-      if (nombre || v.titulo.trim()) campos.titulo = nuevo.titulo = nombre ?? nombreDelLink(link)
-    }
+    // vacío frenaría el envío: sin nombre, el del link o el sitio, como lo pondría el servidor
+    if (!v.titulo.trim() || v.titulo === puesto?.titulo) campos.titulo = nuevo.titulo = nombre ?? nombreDelLink(link)
   }
   if (ok && (!v.precio.trim() || v.precio === puesto?.precio)) {
     if (ok.precio) campos.precio = nuevo.precio = ok.precio
@@ -289,6 +287,35 @@ export function loQueEntro(e: { inputType: string; data: string | null }, pegado
 /** Adónde pasa el foco al dejar un campo: otro de los que se completan, el botón de mandar, o ninguno de esos. */
 export type Destino = Campo | 'enviar' | null
 
+/**
+ * Lo último que se tocó, para saber adónde va el foco cuando el focusout no lo dice (sin relatedTarget): tocar la
+ * etiqueta "¿Qué querés?", que no toma el foco y lo pasa al título recién en el click, o en Safari un botón, que no lo
+ * toma. Vale solo para ese toque: se olvida cuando algo toma el foco, cuando el gesto se corta (un arrastre que empieza
+ * sobre "Agregar", fijo abajo) y cuando termina (después del click). Si no, quedaba viejo y un "Listo" del teclado más
+ * tarde contaba como ir a "Agregar" (no se buscaba lo escrito). Un toque en el mismo campo que se deja (el segundo toque
+ * en el título, para "Pegar" o para mover el cursor) no es ir a otro lado: no cuenta.
+ */
+export function ultimoToque<T>() {
+  let tocado: T | null = null
+  return {
+    tocar(t: T | null) {
+      tocado = t
+    },
+    olvidar() {
+      tocado = null
+    },
+    /** Para olvidar este toque más tarde, si para entonces no hubo otro. */
+    terminar() {
+      const t = tocado
+      return () => {
+        if (tocado === t) tocado = null
+      }
+    },
+    /** Lo tocado, al dejar ese campo (null si fue el mismo). */
+    alDejar: (campo: T) => (tocado === campo ? null : tocado),
+  }
+}
+
 export type Completador = {
   /** Cambió el título o "Link a la tienda". pegado: lo que entró de una vez (ver loQueEntro); null si se escribió. */
   alCambiar: (pegado: string | null) => void
@@ -296,8 +323,9 @@ export type Completador = {
   alDejar: (campo: Campo, va: Destino) => void
   /**
    * Tocó el botón de mandar (o Enter, que lo toca), antes de que el navegador revise los campos: lo escrito sin buscar no
-   * se busca (el servidor pone el nombre del link), pero lo que puso el link anterior sale; lo que no se escribió mientras
-   * el dueño estaba en un campo, se escribe; y el título no queda vacío por lo que se está leyendo (frenaba "Agregar").
+   * se busca (el servidor pone el nombre del link), pero lo que puso el link anterior sale (y el mismo producto ya leído
+   * queda como al dejar el campo); lo que no se escribió mientras el dueño estaba en un campo, se escribe; y el título no
+   * queda vacío por lo que se está leyendo (frenaba "Agregar").
    */
   antesDeMandar: () => void
   /**
@@ -376,8 +404,10 @@ export function completador(o: {
   }
 
   /**
-   * Con el link en "Link a la tienda" y el título vacío, mientras se lee: el nombre que trae el link (o el sitio), que la
-   * respuesta reemplaza. Vacío, "Agregar" quedaba frenado ("Completá este campo") hasta que volviera, 9 s como mucho.
+   * Con el link en "Link a la tienda" y el título vacío, mientras se lee (o sin leer, al mandar): el nombre que trae el
+   * link (o el sitio), que la respuesta reemplaza. Vacío, "Agregar" quedaba frenado ("Completá este campo") hasta que
+   * volviera, 9 s como mucho. Va solo al dejar el título o al mandar (ver soltarTitulo), no al empezar a buscar: si el
+   * dueño tocaba el título para escribir, quedaba pegado a lo suyo ("Mate imperialTermo").
    */
   function nombreMientrasBusca(link: string) {
     const v = o.leer()
@@ -441,9 +471,10 @@ export function completador(o: {
     if (enCurso?.link === link || (pendiente === link && seBusca(link))) nombreMientrasBusca(link)
   }
 
+  /** Lo ya leído del producto que está puesto, si ese link es del mismo (ver mismoProducto). */
+  const leidoDelPuesto = (link: string) => (puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined)
   /** Lo ya leído de ese link, o del mismo producto. */
-  const yaLeido = (link: string) =>
-    leidos.get(link) ?? (puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined)
+  const yaLeido = (link: string) => leidos.get(link) ?? leidoDelPuesto(link)
 
   /** va: el campo donde está el dueño o adonde va (dejó otro para ir ahí), que no se escribe. */
   async function buscar(link: string, va: Campo | null) {
@@ -455,7 +486,6 @@ export function completador(o: {
       return aplicar(link, leido, va)
     }
     if (!seBusca(link)) return o.mostrar({ aviso: '' })
-    if (va !== 'titulo') nombreMientrasBusca(link)
     const pedido = { link, corte: new AbortController() }
     enCurso = pedido
     o.mostrar({ aviso: avisoBuscando(link) })
@@ -482,7 +512,7 @@ export function completador(o: {
    * el título, solo pasa a la tienda, como lo que contesta un link (ver soltar).
    */
   function buscarEscrito(link: string, va: Campo | null) {
-    const leido = puesto && mismoProducto(link, puesto.link) ? leidos.get(puesto.link) : undefined
+    const leido = leidoDelPuesto(link)
     if (!puesto || !leido) return void buscar(link, va)
     pendiente = null
     leidos.set(link, leido)
@@ -494,7 +524,10 @@ export function completador(o: {
   }
 
   function antesDeMandar() {
-    if (pendiente) sacarLoDelAnterior(pendiente, false)
+    // lo escrito del mismo producto ya leído queda como al dejar el campo (sin pedir nada: si está en el título, pasa a la
+    // tienda con el nombre); otro link no se busca, pero lo del anterior sale
+    if (pendiente && leidoDelPuesto(pendiente)) buscarEscrito(pendiente, null)
+    else if (pendiente) sacarLoDelAnterior(pendiente, false)
     soltar(null)
     soltarTitulo()
   }
