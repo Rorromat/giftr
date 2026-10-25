@@ -8,8 +8,9 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
 import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
-import { asegurarUsuario, miAmigoToken, misAmigos, solicitudesEnviadas, solicitudesRecibidas } from '@/lib/amigos'
+import { asegurarUsuario, miAmigoToken, misAmigos, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos } from '@/lib/amigos'
 import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
+import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { AvatarStack, AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
 
 /**
@@ -88,9 +89,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
   const yo = session.userId
-  const [gente, foto, amigos, recibidas, enviadas, usuario, token] = await Promise.all([
+  const [gente, foto, amigos, recibidas, enviadas, usuario, token, sugerencias] = await Promise.all([
     miGente(db, yo, hoy), miFoto(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
-    asegurarUsuario(db, yo), miAmigoToken(db, yo),
+    asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo),
   ])
   const linkAmigo = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/amigo/${token ?? ''}`
   const esAmigo = (c: Contacto) => c.tipo === 'personal' && !!c.duenos[0] && amigos.has(c.duenos[0].id)
@@ -142,6 +143,18 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
                   <BotonEnviar className="min-h-11 px-2 text-[13px] font-semibold text-gr-muted underline underline-offset-4">Cancelar</BotonEnviar>
                 </form>
               </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {sugerencias.length > 0 && (
+        <section aria-labelledby="sugerencias-titulo" className="flex flex-col gap-2.5">
+          <h2 id="sugerencias-titulo" className="gr-label">Gente que quizás conocés</h2>
+          <ul className="gr-card flex flex-col divide-y divide-gr-line px-3.5">
+            {sugerencias.map((s) => (
+              <SugerenciaAmigo key={s.p.id} p={s.p}
+                               enComun={juntarNombres(s.enComun.length > 2 ? [...s.enComun.slice(0, 2), `${s.enComun.length - 2} más`] : s.enComun)} />
             ))}
           </ul>
         </section>

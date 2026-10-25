@@ -12,7 +12,7 @@ import { cambiarLinkParaRegalar } from '@/lib/lists'
 import {
   aceptarLinkDeAmigo, asegurarUsuario, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, cuantasRecibidas, dejarDeSerAmigos,
   miAmigoToken, misAmigos, normalizarUsuario, pedirAmistad, pedirAmistadPorMail, reclamarSolicitudesPorMail, relacionCon,
-  responderSolicitud, SOLICITUDES_POR_DIA, solicitudesEnviadas, solicitudesRecibidas, USUARIO, usuarioDelNombre,
+  responderSolicitud, SOLICITUDES_POR_DIA, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos, USUARIO, usuarioDelNombre,
 } from '@/lib/amigos'
 
 async function usuario(db: Db, nombre: string, email = `${nombre.toLowerCase().replace(/ /g, '.')}@test.com`) {
@@ -280,5 +280,51 @@ describe('link de amigo', () => {
     await aceptarLinkDeAmigo(db, sofi.id, (await miAmigoToken(db, euge.id))!)
     expect(await relacionCon(db, euge.id, sofi.id)).toBe('amigos')
     expect(await db.select().from(amistades)).toHaveLength(1)
+  })
+})
+
+describe('gente que quizás conocés', () => {
+  /** Amigos sin pasar por la solicitud (los dos la mandan). */
+  const amigos = async (db: Db, a: string, b: string) => { await pedirAmistad(db, a, b); await pedirAmistad(db, b, a) }
+
+  test('los amigos de tus amigos, primero los que tienen más en común, con quiénes', async () => {
+    const db = await createTestDb()
+    const [yo, sofi, juan, ana, beto, caro, dani] = await Promise.all(['Yo', 'Sofi Paz', 'Juan', 'Ana', 'Beto', 'Caro', 'Dani'].map((n) => usuario(db, n)))
+    await amigos(db, yo.id, sofi.id)
+    await amigos(db, yo.id, juan.id)
+    // Ana: amiga de Sofi y de Juan; Beto: solo de Juan; Caro: de Sofi, pero la solicitud está pendiente (no cuenta)
+    await amigos(db, sofi.id, ana.id)
+    await amigos(db, juan.id, ana.id)
+    await amigos(db, juan.id, beto.id)
+    await pedirAmistad(db, sofi.id, caro.id)
+    // Dani: amigo de amigos de amigos, no
+    await amigos(db, ana.id, dani.id)
+    expect(await sugerenciasDeAmigos(db, yo.id)).toEqual([
+      { p: expect.objectContaining({ id: ana.id, nombre: 'Ana' }), enComun: ['Juan', 'Sofi'] },
+      { p: expect.objectContaining({ id: beto.id, nombre: 'Beto' }), enComun: ['Juan'] },
+    ])
+    // con límite
+    expect((await sugerenciasDeAmigos(db, yo.id, 1)).map((s) => s.p.id)).toEqual([ana.id])
+    // a Ana le sugiere a mí (dos en común) y a Beto (Juan); a quien no tiene amigos, nadie
+    expect((await sugerenciasDeAmigos(db, ana.id)).map((s) => s.p.nombre)).toEqual(['Yo', 'Beto'])
+    expect(await sugerenciasDeAmigos(db, caro.id)).toEqual([])
+  })
+
+  test('no sugiere a quien ya tiene una solicitud con vos, la mandara quien la mandara, ni a quien la rechazó', async () => {
+    const db = await createTestDb()
+    const [yo, sofi, ana, beto, caro, dani] = await Promise.all(['Yo', 'Sofi', 'Ana', 'Beto', 'Caro', 'Dani'].map((n) => usuario(db, n)))
+    await amigos(db, yo.id, sofi.id)
+    for (const o of [ana, beto, caro, dani]) await amigos(db, sofi.id, o.id)
+    expect((await sugerenciasDeAmigos(db, yo.id)).map((s) => s.p.nombre)).toEqual(['Ana', 'Beto', 'Caro', 'Dani'])
+    // a Ana se la mandé; Beto me la mandó; Caro rechazó la mía
+    await pedirAmistad(db, yo.id, ana.id)
+    await pedirAmistad(db, beto.id, yo.id)
+    await pedirAmistad(db, yo.id, caro.id)
+    const [deCaro] = await db.select().from(amistades).where(sql`${amistades.deUserId} = ${yo.id} and ${amistades.paraUserId} = ${caro.id}`)
+    await responderSolicitud(db, caro.id, deCaro.id, false)
+    expect((await sugerenciasDeAmigos(db, yo.id)).map((s) => s.p.nombre)).toEqual(['Dani'])
+    // y con Dani amigos: ya no es sugerencia
+    await amigos(db, yo.id, dani.id)
+    expect(await sugerenciasDeAmigos(db, yo.id)).toEqual([])
   })
 })

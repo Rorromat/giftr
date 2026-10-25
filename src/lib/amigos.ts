@@ -340,6 +340,47 @@ export async function volverASeguirAmigos(db: Db, ownerId: string, listId: strin
   if (amigos.length) await db.insert(listFollows).values(amigos.map((userId) => ({ userId, listId }))).onConflictDoNothing()
 }
 
+// ---------------------------------------------------------------- sugerencias
+
+/** Alguien que quizás conocés, y los amigos tuyos que son amigos suyos (para "Amigos en común: Sofi y Juan"). */
+export type Sugerencia = { p: Persona; enComun: string[] }
+
+/**
+ * Gente que quizás conocés: amigos de tus amigos que no son tus amigos ni tienen una solicitud con vos, de quien sea y como
+ * esté (las pendientes ya tienen su lugar; una rechazada no se vuelve a sugerir). Primero los que tienen más amigos en
+ * común con vos.
+ */
+export async function sugerenciasDeAmigos(db: Db, userId: string, limite = 6): Promise<Sugerencia[]> {
+  const amigos = await misAmigos(db, userId)
+  if (!amigos.size) return []
+  const filas = await db.select({ de: amistades.deUserId, para: amistades.paraUserId }).from(amistades)
+    .where(and(eq(amistades.estado, 'aceptada'), or(inArray(amistades.deUserId, [...amigos]), inArray(amistades.paraUserId, [...amigos]))))
+  // cada candidato, con los amigos míos que lo tienen de amigo
+  const via = new Map<string, Set<string>>()
+  for (const { de, para } of filas) {
+    for (const [amigo, otro] of [[de, para!], [para!, de]]) {
+      if (amigos.has(amigo) && otro !== userId && !amigos.has(otro)) via.set(otro, (via.get(otro) ?? new Set()).add(amigo))
+    }
+  }
+  if (!via.size) return []
+  const candidatos = [...via.keys()]
+  const conAlgo = await db.select({ de: amistades.deUserId, para: amistades.paraUserId }).from(amistades).where(or(
+    and(eq(amistades.deUserId, userId), inArray(amistades.paraUserId, candidatos)),
+    and(eq(amistades.paraUserId, userId), inArray(amistades.deUserId, candidatos)),
+  ))
+  for (const f of conAlgo) via.delete(f.de === userId ? f.para! : f.de)
+  if (!via.size) return []
+
+  const ids = new Set([...via.keys(), ...[...via.values()].flatMap((s) => [...s])])
+  const gente = new Map((await db.select(camposPersona).from(users).where(inArray(users.id, [...ids]))).map((u) => [u.id, persona(u)]))
+  const porNombre = (a: string, b: string) => (gente.get(a)?.nombre ?? '').localeCompare(gente.get(b)?.nombre ?? '', 'es')
+  return [...via]
+    .filter(([id]) => gente.has(id))
+    .sort(([a, x], [b, y]) => y.size - x.size || porNombre(a, b))
+    .slice(0, limite)
+    .map(([id, comun]) => ({ p: gente.get(id)!, enComun: [...comun].sort(porNombre).map((a) => primerNombre(gente.get(a)?.nombre ?? '')) }))
+}
+
 // ---------------------------------------------------------------- link de amigo
 
 /** El token del link de amigo; si no tiene, se le crea. */

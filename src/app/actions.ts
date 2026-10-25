@@ -683,6 +683,19 @@ export async function pedirAmistadAction(formData: FormData) {
   redirect(conParametro(volver, 'amigo', r.ok ? r.estado : r.reason))
 }
 
+export type EstadoSugerencia = { ok: true; amigos: boolean } | { ok: false; texto: string } | null
+
+/** Sumar a alguien de "Gente que quizás conocés": contesta en su fila, sin irse ni volver arriba de todo. */
+export async function sumarSugerenciaAction(_: EstadoSugerencia, formData: FormData): Promise<EstadoSugerencia> {
+  const session = await auth()
+  if (!session?.userId) return { ok: false, texto: 'Entrá con tu cuenta.' }
+  const r = await pedirAmistad(db, session.userId, str(formData, 'para') ?? '')
+  if (!r.ok) return { ok: false, texto: r.reason === 'muchas' ? 'Mandaste muchas solicitudes hoy. Probá mañana.' : 'No se pudo mandar.' }
+  // ya me la había mandado: somos amigos, y aparece en Tu gente
+  if (r.estado === 'amigos') revalidatePath('/', 'layout')
+  return { ok: true, amigos: r.estado === 'amigos' }
+}
+
 export async function responderSolicitudAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
