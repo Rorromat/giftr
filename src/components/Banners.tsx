@@ -6,6 +6,7 @@ import { regalosParaCerrar } from '@/lib/regalos'
 import { boughtAction, markNotifsReadAction, postponeGroupGiftReminderAction, releaseAction, vistoCodazosAction } from '@/app/actions'
 import { codazosSinVer, tieneAvisos } from '@/lib/codazos'
 import { juntarNombres } from '@/lib/groups'
+import { cuantasRecibidas } from '@/lib/amigos'
 import Link from 'next/link'
 import { Icon, QuizasLink } from '@/components/ui'
 import { PreguntaInvitado } from '@/components/Identidad'
@@ -17,19 +18,20 @@ import { BotonEnviar } from '@/components/BotonEnviar'
  */
 export async function Banners() {
   const viewer = await getViewer()
-  const [todas, warnings, sinCerrar, codazos, avisos, invitado] = await Promise.all([
+  const [todas, warnings, sinCerrar, codazos, avisos, invitado, solicitudes] = await Promise.all([
     getUnreadNotifications(db, viewer),
     getMyClaimWarnings(db, viewer),
     viewer.userId ? regalosParaCerrar(db, viewer.userId) : [],
     viewer.userId ? codazosSinVer(db, viewer.userId) : [],
     viewer.userId ? tieneAvisos(db, viewer.userId) : false,
     viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
+    viewer.userId ? cuantasRecibidas(db, viewer.userId) : { n: 0, primero: null },
   ])
   const notifs = todas.flatMap((n) => {
     const texto = textoDeAviso(n.tipo, n.itemTitulo)
     return texto ? [{ id: n.id, texto, href: n.href }] : []
   })
-  if (!notifs.length && !warnings.length && !sinCerrar.length && !codazos.length && !invitado) return null
+  if (!notifs.length && !warnings.length && !sinCerrar.length && !codazos.length && !invitado && !solicitudes.n) return null
   // Codazos: quiénes (sin repetir) y, si todos son para el mismo grupo, agregar directo ahí.
   const quienes = [...new Set(codazos.map((c) => c.deNombre.split(' ')[0]))]
   const grupos = [...new Set(codazos.map((c) => (c.tipo === 'grupo' ? c.listId : null)))]
@@ -38,6 +40,18 @@ export async function Banners() {
   return (
     <div className="flex flex-col gap-2.5">
       {invitado && <PreguntaInvitado nombre={invitado} />}
+      {/* solicitudes de amistad: se contestan en Tu gente */}
+      {solicitudes.n > 0 && (
+        <Link href="/gente#solicitudes" className="gr-card flex items-center gap-3 px-4 py-3.5 text-sm font-medium">
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-accent text-xl">🤝</span>
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+            {solicitudes.n === 1
+              ? <><span className="font-semibold">{solicitudes.primero}</span> te mandó una solicitud de amistad</>
+              : <>Tenés <span className="font-semibold">{solicitudes.n} solicitudes</span> de amistad</>}
+          </span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
+      )}
       {codazos.length > 0 && (
         <div className="flex flex-col gap-3 rounded-[22px] bg-gr-blue p-4 text-gr-on-blue shadow-card">
           <div className="flex items-start gap-3">

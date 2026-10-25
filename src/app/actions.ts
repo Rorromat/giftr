@@ -27,6 +27,10 @@ import { guardarGustos } from '@/lib/bienvenida'
 import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import {
+  aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
+  pedirAmistadPorMail, responderSolicitud,
+} from '@/lib/amigos'
+import {
   cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
   salirDeRegalo, saldarCon, sumarseARegalo, type CompraResult, type DatosCompra,
 } from '@/lib/regalos'
@@ -651,4 +655,70 @@ export async function vistoCodazosAction() {
   if (!session?.userId) return
   await marcarCodazosVistos(db, session.userId)
   revalidatePath('/', 'layout')
+}
+
+// ---------------------------------------------------------------- amigos
+
+/**
+ * Mandar una solicitud de amistad: a un usuario por su id (desde su lista o Tu gente), o por lo que escribió en Agregar
+ * amigo (su @usuario o su mail). Vuelve a donde estaba con ?amigo=<cómo salió>.
+ */
+export async function pedirAmistadAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const volver = rutaPropia(str(formData, 'volver') ?? '/gente')
+  const para = str(formData, 'para')
+  const quien = str(formData, 'quien') ?? ''
+  let r
+  if (para) r = await pedirAmistad(db, session.userId, para)
+  else if (normalizarEmail(quien)) r = await pedirAmistadPorMail(db, session.userId, quien)
+  else {
+    const p = await buscarPorUsuario(db, quien)
+    r = p ? await pedirAmistad(db, session.userId, p.id) : { ok: false as const, reason: 'no_existe' as const }
+  }
+  revalidatePath('/gente')
+  redirect(conParametro(volver, 'amigo', r.ok ? r.estado : r.reason))
+}
+
+export async function responderSolicitudAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const acepta = str(formData, 'acepta') === '1'
+  const ok = await responderSolicitud(db, session.userId, str(formData, 'id') ?? '', acepta)
+  revalidatePath('/', 'layout')
+  redirect(ok && acepta ? '/gente?amigo=aceptada' : '/gente')
+}
+
+export async function cancelarSolicitudAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await cancelarSolicitud(db, session.userId, str(formData, 'id') ?? '')
+  revalidatePath('/gente')
+}
+
+export async function dejarDeSerAmigosAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await dejarDeSerAmigos(db, session.userId, str(formData, 'userId') ?? '')
+  revalidatePath('/gente')
+  revalidatePath('/eventos')
+}
+
+/** El link de amigo de alguien: quedan amigos y va a Tu gente, donde ya está. */
+export async function aceptarLinkDeAmigoAction(formData: FormData) {
+  const session = await auth()
+  const token = str(formData, 'token') ?? ''
+  if (!session?.userId || !(await existeUsuario(db, session.userId))) redirect(`/amigo/${encodeURIComponent(token)}`)
+  const r = await aceptarLinkDeAmigo(db, session.userId, token)
+  revalidatePath('/', 'layout')
+  redirect(r.ok ? '/gente?amigo=link' : `/amigo/${encodeURIComponent(token)}`)
+}
+
+/** Perfil: cambiar el @usuario. */
+export async function cambiarUsuarioAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const r = await cambiarUsuario(db, session.userId, formData.get('usuario'))
+  revalidatePath('/perfil')
+  redirect(`/perfil?usuario=${r.ok ? 'ok' : r.error}#usuario`)
 }

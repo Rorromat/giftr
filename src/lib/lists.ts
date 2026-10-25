@@ -8,6 +8,7 @@ import { cupoDe, esRepetible, pickItemFields, type ClaimView, type GiverItemView
 import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
+import { volverASeguirAmigos } from '@/lib/amigos'
 import { accesoALista, type MotivoAnonimo } from '@/lib/acceso'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
@@ -128,7 +129,7 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
 /**
  * Un link para regalar nuevo (de la lista personal o de un grupo, cualquiera de sus dueños): el anterior deja de andar.
  * También se olvida quién la seguía: Tu gente y Eventos arman el link con el token de ahora, así que si no, les pasarían
- * el nuevo a todos los que tenían el viejo. Por lo mismo se anota cuándo (share_token_at): Cuentas y la unión de un
+ * el nuevo a todos los que tenían el viejo. Los amigos del dueño no: la ven por ser amigos, no por el link. Por lo mismo se anota cuándo (share_token_at): Cuentas y la unión de un
  * invitado no le pasan el nuevo a quien solo tenía algo de antes. Lo reservado queda como está. Devuelve el token nuevo, o null.
  */
 export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: string): Promise<string | null> {
@@ -138,9 +139,11 @@ export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: str
     // la hora de la base, la misma con la que se anotan las reservas (ver unirInvitadoACuenta)
     const [list] = await t.update(lists).set({ shareToken: newShareToken(), shareTokenAt: sql`now()` })
       .where(and(eq(lists.id, listId), esDuenoSql(t, userId)))
-      .returning({ shareToken: lists.shareToken })
+      .returning({ shareToken: lists.shareToken, ownerId: lists.ownerId })
     if (!list) return null
     await t.delete(listFollows).where(eq(listFollows.listId, listId))
+    // los amigos la siguen viendo: no la tenían por el link
+    if (list.ownerId) await volverASeguirAmigos(t, list.ownerId, listId)
     return list.shareToken
   })
 }

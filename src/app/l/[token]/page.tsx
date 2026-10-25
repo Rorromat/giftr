@@ -5,6 +5,8 @@ import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
 import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
+import { relacionCon } from '@/lib/amigos'
+import { AmigoEnLista, AvisoAmigo } from '@/components/Amigos'
 import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
 import { nombreDeViewer } from '@/lib/guest'
@@ -67,10 +69,10 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string; amigo?: string }>
 }) {
   const { token } = await params
-  const { cat, disp, codazo, reserva } = await searchParams
+  const { cat, disp, codazo, reserva, amigo } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) notFound()
@@ -88,6 +90,9 @@ export default async function ListaAjena({
     identified ? nombreDeViewer(db, viewer) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
+  // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista)
+  const dueno = !vista.grupoNombre && vista.perfiles.length === 1 ? vista.perfiles[0] : null
+  const relacion = viewer.userId && dueno ? await relacionCon(db, viewer.userId, dueno.id) : null
   const cuenta = evento && evento.dias <= 60
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
     : null
@@ -155,6 +160,9 @@ export default async function ListaAjena({
           </p>
         )}
       </section>
+
+      <AvisoAmigo amigo={amigo} />
+      {dueno && relacion && <AmigoEnLista dueno={{ ...dueno, usuario: null }} relacion={relacion} volver={`/l/${token}`} />}
 
       {!veTodo && (vista.motivo === 'ex_dueno' ? <ExDueno />
         : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
