@@ -24,7 +24,7 @@ import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario } from '@/lib/users'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
-import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
+import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
 import {
@@ -212,7 +212,8 @@ export async function saveGustosAction(formData: FormData) {
   // (o "Guardar" desde Perfil) quería salir: va a Perfil, que avisa al lado de su cumple, en vez de dejarlo adentro.
   if (!cumpleOk) redirect(corte ? '/perfil?cumple=invalido#cumple' : `/bienvenida?${desdePerfil ? 'editar=1&' : ''}paso=0&cumple=invalido`)
   // La primera vez, antes de terminar, le pregunta si quiere avisos (ver /bienvenida/avisos); con "Más tarde", después
-  // sigue a su lista, como antes.
+  // sigue a su lista, como antes. Con eso ya se le preguntó: el cartel de los que ya estaban no le aparece.
+  if (!desdePerfil) await avisosPreguntados(db, session.userId)
   if (corte) redirect(desdePerfil ? '/perfil' : '/bienvenida/avisos?luego=lista')
   redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/avisos')
 }
@@ -624,6 +625,12 @@ export async function suscribirAvisosAction(suscripcion: unknown): Promise<boole
   const session = await auth()
   if (!session?.userId) return false
   return guardarSuscripcion(db, session.userId, suscripcion)
+}
+
+/** El cartel de los avisos ya se mostró (o ya los tenía activados): no se vuelve a mostrar. */
+export async function avisosPreguntadosAction() {
+  const session = await auth()
+  if (session?.userId) await avisosPreguntados(db, session.userId)
 }
 
 /** Al abrir Perfil: si los avisos de este navegador están a nombre de uno (y si faltaban, los vuelve a guardar). */

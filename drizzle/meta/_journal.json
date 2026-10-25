@@ -176,6 +176,13 @@
       "when": 1792954549282,
       "tag": "0024_regalo_en_dolares",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792967375320,
+      "tag": "0025_avisos_preguntados",
+      "breakpoints": true
     }
   ]
 }

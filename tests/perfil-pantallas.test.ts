@@ -7,6 +7,7 @@ import type { Db } from '@/db/types'
 import { lists, users } from '@/db/schema'
 import { guardarCumple, miCumple } from '@/lib/events'
 import { guardarGustos, misGustos } from '@/lib/bienvenida'
+import { preguntarAvisos } from '@/lib/codazos'
 import { sanitizarGustos } from '@/lib/gustos'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { CumpleCampos } from '@/components/CumpleCampos'
@@ -124,7 +125,9 @@ test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gu
   expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
   // los dos vacíos es que lo sacó (los campos vienen con el guardado)
   expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/bienvenida/avisos')
-  // la primera vez, antes del final, la pregunta de los avisos; con "Más tarde", después sigue a su lista
+  // la primera vez, antes del final, la pregunta de los avisos (y con eso el cartel de los que ya estaban no le aparece);
+  // con "Más tarde", después sigue a su lista
+  expect(await preguntarAvisos(h.db, owner.id)).toBe(false)
   expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', corte: '1' })))).toBe('/bienvenida/avisos?luego=lista')
   expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil', corte: '1' })))).toBe('/perfil')
   expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/bienvenida/listo?desde=perfil')

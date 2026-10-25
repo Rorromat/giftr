@@ -4,7 +4,7 @@ import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
 import { Refrescar } from '@/components/Refrescar'
 import { RegistrarSW } from '@/components/RegistrarSW'
-import { ATRAPAR_PEDIDO_INSTALAR } from '@/lib/app-instalable'
+import { ATRAPAR_PEDIDO_INSTALAR, SIN_ZOOM } from '@/lib/app-instalable'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
@@ -29,7 +29,9 @@ export const metadata: Metadata = {
   other: { 'apple-mobile-web-app-capable': 'yes' },
 }
 
-export const viewport: Viewport = { themeColor: '#F4F4F0' }
+// Como una app: sin zoom (ni con dos dedos, ni con doble toque, ni el que hace el iPhone al tocar un campo). Safari en
+// iPhone no respeta userScalable para el pellizco: ahí lo frenan touch-action (tokens.css) y SIN_ZOOM.
+export const viewport: Viewport = { themeColor: '#F4F4F0', width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -37,9 +39,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* el pedido de instalar de Chrome, si llega antes de que hidrate (texto fijo, no viene del pedido) */}
         <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />
+        <script dangerouslySetInnerHTML={{ __html: SIN_ZOOM }} />
       </head>
       <body className="min-h-screen font-sans">
         <div className="mx-auto max-w-md px-[18px]">{children}</div>
+        {/* GiftR va en vertical: en un teléfono de costado, que lo vuelva a poner derecho (la app instalada en Android ya
+            no gira, ver manifest; el navegador y el iPhone no dejan trabarla) */}
+        <div className="gr-girar">
+          <svg aria-hidden width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="gr-girar__tel">
+            <rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" />
+          </svg>
+          <p className="text-lg font-semibold">Girá el teléfono</p>
+          <p className="text-sm text-gr-muted">GiftR se usa en vertical.</p>
+        </div>
         <Arranque />
         <Refrescar />
         {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}

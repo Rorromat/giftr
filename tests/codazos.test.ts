@@ -10,8 +10,9 @@ import { createGuest } from '@/lib/guest'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem } from '@/lib/items'
 import {
-  avisar, borrarSuscripcion, clavesVapid, codazosSinVer, CODAZOS_DE_INVITADOS_POR_DIA, CODAZOS_POR_DIA, confirmarSuscripcion,
-  guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso, SUSCRIPCIONES_POR_USUARIO, tieneAvisos, type Aviso, type Enviar,
+  avisar, avisosPreguntados, borrarSuscripcion, clavesVapid, codazosSinVer, CODAZOS_DE_INVITADOS_POR_DIA, CODAZOS_POR_DIA, confirmarSuscripcion,
+  guardarSuscripcion, mandarCodazo, marcarCodazosVistos, preguntarAvisos, probarAviso, SUSCRIPCIONES_POR_USUARIO, tieneAvisos, type Aviso,
+  type Enviar,
 } from '@/lib/codazos'
 import { estadoAlAbrir, trasPedirPermiso, type NavegadorAvisos } from '@/lib/avisos-del-navegador'
 
@@ -325,4 +326,27 @@ test('los invitados (cada navegador sin cookie es uno nuevo) no les sacan el lug
   }
   const otra = await usuario(db, 'Una más')
   expect(await mandarCodazo(db, lista.shareToken, { userId: otra.id }, 'Una más', push.enviar)).toEqual({ ok: false, reason: 'muchos' })
+})
+
+test('el cartel de los avisos, una sola vez: a quien ya pasó la bienvenida, sin avisos activados y sin habérselo preguntado', async () => {
+  const db = await createTestDb()
+  const [nuevo, viejo, conAvisos] = [await usuario(db, 'Nuevo'), await usuario(db, 'Viejo'), await usuario(db, 'ConAvisos')]
+  await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, viejo.id))
+  await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, conAvisos.id))
+  await guardarSuscripcion(db, conAvisos.id, sub('con-avisos'))
+  // el nuevo todavía no pasó la bienvenida (ahí se le pregunta); el que ya los tiene, no hace falta
+  expect(await preguntarAvisos(db, nuevo.id)).toBe(false)
+  expect(await preguntarAvisos(db, conAvisos.id)).toBe(false)
+  expect(await preguntarAvisos(db, viejo.id)).toBe(true)
+  // una vez mostrado, no vuelve; y anotarlo de nuevo no cambia cuándo fue
+  await avisosPreguntados(db, viejo.id)
+  const [{ cuando }] = await db.select({ cuando: users.avisosPreguntadosAt }).from(users).where(eq(users.id, viejo.id))
+  expect(cuando).toBeInstanceOf(Date)
+  expect(await preguntarAvisos(db, viejo.id)).toBe(false)
+  await avisosPreguntados(db, viejo.id)
+  expect((await db.select({ cuando: users.avisosPreguntadosAt }).from(users).where(eq(users.id, viejo.id)))[0].cuando).toEqual(cuando)
+  // si desactiva los avisos después, tampoco: ya se le preguntó
+  await db.delete(pushSubs).where(eq(pushSubs.userId, conAvisos.id))
+  await avisosPreguntados(db, conAvisos.id)
+  expect(await preguntarAvisos(db, conAvisos.id)).toBe(false)
 })
