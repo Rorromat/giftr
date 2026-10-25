@@ -53,7 +53,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
 
   return (
     <form action={enviar} className="flex flex-col gap-3">
-      {estado?.error && <p role="alert" className="rounded-2xl bg-gr-ink px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
+      {estado?.error && <p role="alert" className="rounded-2xl bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
       <input type="hidden" name="giftId" value={giftId} />
       {token && itemId && (
         <>
@@ -67,10 +67,10 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">¿Cuánto salió en total?</span>
         <span className="flex items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3.5">
-          <span className="font-display text-xl font-extrabold">$</span>
+          <span className="text-xl font-semibold">$</span>
           <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
                  value={conPuntos(total)} onChange={(e) => setTotal(soloDigitos(e.target.value))}
-                 className="min-h-[50px] w-full bg-transparent font-display text-xl font-extrabold outline-none" />
+                 className="min-h-[50px] w-full bg-transparent text-xl font-semibold outline-none" />
         </span>
       </label>
 
@@ -85,13 +85,13 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
             <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.esYo ? 'Vos' : m.nombre}</span>
             {manual ? (
               <span className="flex items-center gap-1 rounded-xl border border-gr-line px-2">
-                <span className="font-bold">$</span>
+                <span className="font-semibold">$</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`} placeholder="0"
                        value={conPuntos(partes[m.userId] ?? '')} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}
-                       className="min-h-10 w-24 bg-transparent text-right font-display text-lg font-extrabold outline-none" />
+                       className="min-h-10 w-24 bg-transparent text-right text-lg font-semibold outline-none" />
               </span>
             ) : (
-              <span className="font-display text-lg font-extrabold tabular-nums">{pesos(montos[i])}</span>
+              <span className="text-lg font-semibold tabular-nums">{pesos(montos[i])}</span>
             )}
           </li>
         ))}

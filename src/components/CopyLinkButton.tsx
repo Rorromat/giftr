@@ -17,7 +17,7 @@ export function CopyLinkButton({ url }: { url: string }) {
 
   return (
     <button type="button" onClick={copiar}
-            className="h-11 flex-none rounded-[14px] border border-gr-bg bg-gr-accent px-3.5 font-display text-[15px] font-extrabold text-gr-ink">
+            className="h-11 flex-none rounded-[14px] border border-gr-bg bg-gr-accent px-3.5 text-[15px] font-semibold text-gr-ink">
       <span aria-live="polite">{copiado ? '¡Copiado!' : 'Copiar'}</span>
     </button>
   )

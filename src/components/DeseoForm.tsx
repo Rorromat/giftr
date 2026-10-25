@@ -59,10 +59,10 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       <details open={!!deseo} className="group/mas rounded-[18px] border border-gr-line bg-gr-surface">
         <summary className="flex min-h-[58px] cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2 [&::-webkit-details-marker]:hidden">
           <span className="flex flex-col">
-            <span className="font-display text-[17px] font-extrabold">Más detalles</span>
+            <span className="text-[17px] font-semibold">Más detalles</span>
             <span className="text-[13px] font-medium text-gr-muted">Cuánto lo querés, cantidad, categoría, notas, link</span>
           </span>
-          <Icon name="chevron" size={20} strokeWidth={2.6} className="flex-none transition-transform group-open/mas:rotate-90" />
+          <Icon name="chevron" size={20} strokeWidth={2.2} className="flex-none transition-transform group-open/mas:rotate-90" />
         </summary>
         <div className="flex flex-col gap-4 px-3.5 pb-4 pt-1">
           {/* sin https:// también vale (el servidor se lo agrega); lo que el servidor no tomaría como link avisa antes de mandar */}

@@ -4,7 +4,7 @@ import { db } from '@/db'
 import { updateItemAction } from '@/app/actions'
 import { deseoParaEditar } from '@/lib/items'
 import { DeseoForm } from '@/components/DeseoForm'
-import { BackLink } from '@/components/ui'
+import { PageHeader } from '@/components/ui'
 
 export default async function Editar({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,14 +15,9 @@ export default async function Editar({ params }: { params: Promise<{ id: string 
   const { deseo } = editable
 
   return (
-    <main className="gr-hoja pb-8 pt-[52px]">
-      <div className="flex items-center gap-3.5">
-        <BackLink href={`/deseo/${deseo.id}`} label="Volver al deseo" />
-        <div className="flex flex-col gap-0.5">
-          <h1 className="font-display text-[30px] leading-none font-extrabold tracking-[-0.04em]">Editar deseo</h1>
-          <p className="text-sm font-medium">Cambiá lo que necesites.</p>
-        </div>
-      </div>
+    <main className="gr-hoja flex flex-col gap-1 pb-8 pt-2">
+      <PageHeader title="Editar deseo" back={`/deseo/${deseo.id}`} backLabel="Volver al deseo" />
+      <p className="text-center text-sm text-gr-muted">Cambiá lo que necesites.</p>
 
       <DeseoForm action={updateItemAction} deseo={deseo} boton="Guardar cambios" />
     </main>

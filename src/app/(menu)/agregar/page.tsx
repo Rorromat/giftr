@@ -6,7 +6,7 @@ import { addItemAction } from '@/app/actions'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { compartidoAutomatico, ID_COMPARTIDO, loCompartido, rutaAgregar, VUELTA_MAX } from '@/lib/recibir-compartido'
 import { DeseoForm } from '@/components/DeseoForm'
-import { BackLink } from '@/components/ui'
+import { PageHeader } from '@/components/ui'
 
 type Valor = string | string[] | undefined
 /** Lo que llega repetido (?link=a&link=b) no se toma. */
@@ -36,14 +36,10 @@ export default async function Agregar({ searchParams }: {
   const desdeGrupo = grupos.find((g) => g.id === lista)
 
   return (
-    <main className="gr-hoja pb-8 pt-[52px]">
-      <div className="flex items-center gap-3.5">
-        <BackLink href={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'} label={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
-        <div className="flex flex-col gap-0.5">
-          <h1 className="font-display text-[30px] leading-none font-extrabold tracking-[-0.04em]">Agregar deseo</h1>
-          <p className="text-sm font-medium">Menos de 30 segundos, prometido.</p>
-        </div>
-      </div>
+    <main className="gr-hoja flex flex-col gap-1 pb-8 pt-2">
+      <PageHeader title="Agregar deseo" back={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'}
+                  backLabel={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
+      <p className="text-center text-sm text-gr-muted">Menos de 30 segundos, prometido.</p>
 
       <DeseoForm action={addItemAction} grupos={grupos} grupoElegido={desdeGrupo?.id} boton="Agregar a mi lista"
                  compartido={hayCompartido ? { buzon, link: enUrl?.link, titulo: enUrl?.titulo, notas: enUrl?.notas, automatico, sinFoto } : undefined} />

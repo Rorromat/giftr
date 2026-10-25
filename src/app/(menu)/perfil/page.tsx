@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
@@ -21,7 +20,7 @@ import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { UnirInvitado } from '@/components/Identidad'
 import { invitadoDeEsteNavegador } from '@/lib/viewer'
-import { BackLink, Seccion } from '@/components/ui'
+import { Icon, PageHeader, Row, Seccion } from '@/components/ui'
 
 
 export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string }> }) {
@@ -41,100 +40,111 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
   const plataforma = plataformaDe(pedido.get('user-agent') ?? '')
 
   return (
-    <Seccion className="flex flex-col gap-3.5 pb-32 pt-[52px]">
-      <BackLink href="/mi-lista" label="Volver a tu lista" />
-      <div className="flex items-center gap-4">
-        <FotoPerfil nombre={nombre} foto={foto} size={84} propia />
+    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
+      <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" />
+
+      <div className="gr-card flex items-center gap-4 p-4">
+        <FotoPerfil nombre={nombre} foto={foto} size={72} propia />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="font-display text-[32px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">{nombre}</h1>
+          <h2 className="text-xl leading-tight font-semibold [overflow-wrap:anywhere]">{nombre}</h2>
           {email && <p className="truncate text-sm text-gr-muted">{email}</p>}
         </div>
       </div>
 
-
-      <div className="flex items-center gap-3 rounded-sticker border border-gr-line bg-gr-ink py-3 pl-4 pr-3 text-gr-bg">
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-extrabold">Compartir mi lista</p>
-          <p className="truncate text-[13px] font-semibold text-gr-accent">{shareUrl.replace(/^https?:\/\//, '')}</p>
-        </div>
-        <CopyLinkButton url={shareUrl} />
+      <div className="flex flex-col gap-1.5">
+        <section className="gr-hero flex items-center gap-3 p-4 pl-5">
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-white/10 text-gr-accent"><Icon name="link" size={20} /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-semibold">Compartir mi lista</p>
+            <p className="truncate text-[13px] text-white/60">{shareUrl.replace(/^https?:\/\//, '')}</p>
+          </div>
+          <CopyLinkButton url={shareUrl} />
+        </section>
+        {nuevo === 'regalar' && (
+          <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-medium">
+            Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
+          </p>
+        )}
+        {/* por si el link llegó a quien no tenía que llegar */}
+        <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
+                   className="items-end">
+          El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
+          tu lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+        </Confirmar>
       </div>
-      {nuevo === 'regalar' && (
-        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-semibold">
-          Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
-        </p>
-      )}
-      {/* por si el link llegó a quien no tenía que llegar */}
-      <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
-                 className="-mt-1.5 items-end">
-        El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
-        tu lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
-      </Confirmar>
 
-      {/* Tus gustos: los ve tu gente arriba de tu lista */}
-      <Link href="/bienvenida?editar=1" className="gr-sticker flex items-center gap-3.5 px-3.5 py-3">
-        <span aria-hidden className="flex size-[46px] flex-none items-center justify-center rounded-xl bg-gr-accent font-display text-2xl font-extrabold">♥</span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-xl font-extrabold">Tus gustos</p>
-          <p className="truncate text-[13px] font-medium">{secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}</p>
+      <section className="flex flex-col gap-2.5">
+        <h2 className="gr-heading">Lo que ve tu gente</h2>
+        <div className="gr-card gr-rows">
+          {/* Tus gustos: los ve tu gente arriba de tu lista */}
+          <Row href="/bienvenida?editar=1" icon="heart" title="Tus gustos"
+               sub={secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}>
+            <span className="flex-none text-sm font-semibold">{secciones.length ? 'Editar' : 'Completar'}</span>
+          </Row>
+          <Row href={`/l/${lista.shareToken}/perfil`} icon="eye" title="Ver cómo me ven los demás" />
         </div>
-        <span className="text-sm font-bold underline decoration-2 underline-offset-4">{secciones.length ? 'Editar' : 'Completar'}</span>
-      </Link>
-      <Link href={`/l/${lista.shareToken}/perfil`} className="-mt-1.5 self-end text-sm font-bold underline decoration-2 underline-offset-4">
-        Ver cómo me ven los demás
-      </Link>
+      </section>
 
       {/* Avisos push: así llegan los codazos */}
-      <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
-        <div>
-          <p className="font-display text-lg font-extrabold">Avisos</p>
-          <p className="text-[13px] font-medium leading-snug">Cuando alguien te da un codazo para que cargues tu lista, te llega una notificación.</p>
+      <section className="flex flex-col gap-2.5">
+        <h2 className="gr-heading">Avisos</h2>
+        <div className="gr-card flex flex-col gap-3 p-4">
+          <p className="flex items-start gap-3 text-[13px] leading-snug text-gr-muted">
+            <span className="gr-row__icon text-gr-ink"><Icon name="bell" size={20} /></span>
+            <span className="pt-0.5">Cuando alguien te da un codazo para que cargues tu lista, te llega una notificación.</span>
+          </p>
+          <ActivarAvisos vapidPublica={vapid.publica} />
         </div>
-        <ActivarAvisos vapidPublica={vapid.publica} />
       </section>
 
       {/* Compartir a GiftR un link o una foto desde otra app. En la compu no va: no hay hoja de compartir con GiftR. */}
       {plataforma && (
-        <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
-          <p className="font-display text-lg font-extrabold">{TEXTOS_APPS.titulo}</p>
-          <AgregarDesdeApps plataforma={plataforma} base={process.env.NEXT_PUBLIC_BASE_URL ?? ''} atajo={ATAJO_IPHONE} />
+        <section className="flex flex-col gap-2.5">
+          <h2 className="gr-heading">{TEXTOS_APPS.titulo}</h2>
+          <div className="gr-card flex flex-col gap-3 p-4">
+            <AgregarDesdeApps plataforma={plataforma} base={process.env.NEXT_PUBLIC_BASE_URL ?? ''} atajo={ATAJO_IPHONE} />
+          </div>
         </section>
       )}
 
 
       {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista. La key lo vuelve a armar con lo
           guardado: React deja el formulario como estaba al montarse y un <select> volvía al valor viejo. */}
-      <form key={`${cumple?.dia ?? ''}-${cumple?.mes ?? ''}-${avisoCumple ?? ''}`} id="cumple" action={saveBirthdayAction}
-            className="gr-sticker flex scroll-mt-6 flex-col gap-3 p-3.5">
-        <div>
-          <p className="font-display text-lg font-extrabold">Tu cumple</p>
-          <p className="text-[13px] font-medium leading-snug">
-            {cumple ? `El ${cumple.dia} de ${MESES[cumple.mes - 1]}. ` : ''}Tu gente lo ve en Eventos, con tiempo para elegir.
+      <section className="flex flex-col gap-2.5">
+        <h2 className="gr-heading">Tu cumple</h2>
+        <form key={`${cumple?.dia ?? ''}-${cumple?.mes ?? ''}-${avisoCumple ?? ''}`} id="cumple" action={saveBirthdayAction}
+              className="gr-card flex scroll-mt-6 flex-col gap-3 p-4">
+          <p className="flex items-start gap-3 text-[13px] leading-snug text-gr-muted">
+            <span className="gr-row__icon text-gr-ink"><Icon name="cake" size={20} /></span>
+            <span className="pt-0.5">
+              {cumple && <span className="block text-[15px] font-semibold text-gr-ink">El {cumple.dia} de {MESES[cumple.mes - 1]}.</span>}
+              Tu gente lo ve en Eventos, con tiempo para elegir.
+            </span>
           </p>
-        </div>
-        {avisoCumple === 'invalido' && (
-          <>
-            <input type="hidden" name="conAviso" value="1" />
-            <p role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
-          </>
-        )}
-        <div className="flex gap-2">
-          <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" />
-          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Guardar</BotonEnviar>
-        </div>
-        {cumple && (
-          <BotonEnviar name="quitar" value="1" formNoValidate className="self-start min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">
-            Quitar mi cumple
-          </BotonEnviar>
-        )}
-      </form>
+          {avisoCumple === 'invalido' && (
+            <>
+              <input type="hidden" name="conAviso" value="1" />
+              <p role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
+            </>
+          )}
+          <div className="flex gap-2">
+            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" />
+            <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-[50px] flex-none">Guardar</BotonEnviar>
+          </div>
+          {cumple && (
+            <BotonEnviar name="quitar" value="1" formNoValidate className="gr-link self-start">
+              Quitar mi cumple
+            </BotonEnviar>
+          )}
+        </form>
+      </section>
 
       {invitado && <UnirInvitado nombre={invitado} />}
 
       {/* Para dejar este dispositivo (el de la familia, la tablet) o entrar con otra cuenta */}
       <form action={salirAction} className="self-center">
         <input type="hidden" name="volver" value="/" />
-        <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Cerrar sesión</button>
+        <button className="min-h-11 px-3 text-sm font-semibold text-red-700">Cerrar sesión</button>
       </form>
     </Seccion>
   )

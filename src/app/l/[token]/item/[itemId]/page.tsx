@@ -15,7 +15,7 @@ import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { BackLink, Icon, ItemPhoto, PriorityTag } from '@/components/ui'
+import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
 import { LARGO } from '@/lib/limites'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
@@ -90,39 +90,39 @@ export default async function DetalleItem({ params, searchParams }: {
   const precio = item.precio ?? item.rangoPrecio
 
   return (
-    <main className="flex flex-col gap-4 pb-12 pt-[52px]">
-      <BackLink href={`/l/${token}`} label="Volver a la lista" />
+    <main className="flex flex-col gap-4 pb-12 pt-2">
+      <PageHeader title="La lista" titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
 
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
-      <article className="gr-sticker rounded-3xl">
+      <article className="gr-card">
         <div className="relative">
           <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
         </div>
         <div className="flex flex-col gap-3 p-3.5">
           <div className="flex flex-col gap-1.5">
-            <h1 className="font-display text-[24px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">{item.titulo}</h1>
+            <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{item.titulo}</h1>
             <div className="flex items-center gap-2">
-              {precio && <p className="text-lg font-bold">{precio}</p>}
+              {precio && <p className="text-lg font-semibold">{precio}</p>}
               <PriorityTag prioridad={item.prioridad} className="h-6" />
             </div>
           </div>
           {cuantos && <p className="text-sm font-semibold">{cuantos}</p>}
           {item.notas && (
             <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
-              <span className="font-bold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
+              <span className="font-semibold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
             {item.linkTienda && (
-              <a href={item.linkTienda} target="_blank" className="gr-btn font-sans text-sm font-bold">
-                Ver en la tienda <Icon name="external" size={16} strokeWidth={2.4} />
+              <a href={item.linkTienda} target="_blank" className="gr-btn text-sm">
+                Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
               </a>
             )}
             {/* Mandárselo a alguien: WhatsApp arma la vista previa con la foto (opengraph-image) */}
-            <a target="_blank" className="gr-btn gap-2 font-sans text-sm font-bold"
+            <a target="_blank" className="gr-btn gap-2 text-sm"
                href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
-              <Icon name="chat" size={16} strokeWidth={2.4} />Mandarlo por WhatsApp
+              <Icon name="chat" size={16} strokeWidth={2} />Mandarlo por WhatsApp
             </a>
           </div>
         </div>
@@ -138,7 +138,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
-            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-ink text-gr-accent'} border border-gr-line`}>
+            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-brand text-gr-accent'} border border-gr-line`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
             </span>
             <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -157,15 +157,15 @@ export default async function DetalleItem({ params, searchParams }: {
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
             <input type="hidden" name="claimId" value={miCompra.id} />
-            <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Me equivoqué, todavía no lo compré</BotonEnviar>
+            <BotonEnviar className="min-h-11 text-sm font-semibold underline underline-offset-4">Me equivoqué, todavía no lo compré</BotonEnviar>
           </form>
         )}
 
         {/* La reserva venció sin que la marcara: si lo compró, que lo pueda decir; si no, que la renueve. */}
         {vencida && (
-          <div className="gr-sticker flex flex-col gap-3 p-3.5">
+          <div className="gr-card flex flex-col gap-3 p-3.5">
             <p className="text-sm font-medium leading-snug">
-              <span className="font-bold">Tu reserva venció el {ultimoDia(vencida.vencio)}.</span>{' '}
+              <span className="font-semibold">Tu reserva venció el {ultimoDia(vencida.vencio)}.</span>{' '}
               {disponible ? '¿Ya lo compraste? Marcalo. Si no, reservalo de nuevo.' : 'Ahora lo tiene otra persona: si lo habías comprado, contalo en el hilo de abajo.'}
             </p>
             {disponible && (
@@ -200,7 +200,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
 
         {miClaim && (
-          <div className="gr-sticker flex flex-col gap-3 p-3.5">
+          <div className="gr-card flex flex-col gap-3 p-3.5">
             <form action={boughtAction} className="flex flex-col gap-2.5">
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
@@ -212,7 +212,7 @@ export default async function DetalleItem({ params, searchParams }: {
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
               <input type="hidden" name="claimId" value={miClaim.id} />
-              <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Liberar reserva</BotonEnviar>
+              <BotonEnviar className="min-h-11 text-sm font-semibold underline underline-offset-4">Liberar reserva</BotonEnviar>
             </form>
             {logueado && <ArmarRegaloGrupal token={token} itemId={item.id} logueado convertir />}
           </div>
@@ -221,14 +221,14 @@ export default async function DetalleItem({ params, searchParams }: {
 
       {giver && (
         <section className="mt-2 flex flex-col gap-3">
-          <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-sm font-bold text-gr-bg">
-            <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
+          <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
+            <Icon name="lock" size={16} strokeWidth={2} className="text-gr-accent" />
             Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
           </h2>
           <ul className="flex flex-col gap-2">
             {comments.map((c) => (
               <li key={c.id} className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
-                <span className="font-bold">{c.autorNombre}:</span> {c.texto}
+                <span className="font-semibold">{c.autorNombre}:</span> {c.texto}
               </li>
             ))}
           </ul>
@@ -236,7 +236,7 @@ export default async function DetalleItem({ params, searchParams }: {
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
             <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
-            <BotonEnviar className="gr-btn bg-gr-ink text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
+            <BotonEnviar className="gr-btn bg-gr-brand text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
           </form>
         </section>
       )}

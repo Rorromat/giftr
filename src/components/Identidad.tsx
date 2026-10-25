@@ -14,9 +14,9 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 export function QuienSos({ token, volver }: { token: string; volver: string }) {
   const [estado, identificarse] = useActionState(identificarseAction, null)
   return (
-    <section aria-labelledby="quien-sos" className="gr-sticker flex flex-col gap-2.5 p-3.5">
+    <section aria-labelledby="quien-sos" className="gr-card flex flex-col gap-2.5 p-3.5">
       <div>
-        <h2 id="quien-sos" className="font-display text-lg leading-tight font-extrabold">¿Quién sos?</h2>
+        <h2 id="quien-sos" className="text-lg leading-tight font-semibold">¿Quién sos?</h2>
         <p className="text-[13px] font-medium leading-snug">
           Decinos tu nombre para ver qué ya reservaron los demás. ¿Es tu lista? Entrá con Google: así no te enterás de nada.
         </p>
@@ -37,8 +37,8 @@ function EntrarConGoogle({ volver }: { volver: string }) {
   return (
     <form action={entrarConGoogleAction}>
       <input type="hidden" name="volver" value={volver} />
-      <button className="gr-btn min-h-11 w-full gap-2 font-sans text-[15px] font-bold">
-        <span aria-hidden className="flex size-6 items-center justify-center rounded-full border border-gr-line bg-gr-surface text-xs font-bold">G</span>
+      <button className="gr-btn min-h-11 w-full gap-2 text-[15px]">
+        <span aria-hidden className="flex size-6 items-center justify-center rounded-full border border-gr-line bg-gr-surface text-xs font-semibold">G</span>
         Entrar con Google
       </button>
     </form>
@@ -53,9 +53,9 @@ function EntrarConGoogle({ volver }: { volver: string }) {
  */
 export function ConfirmarLista({ token, nombre, volver }: { token: string; nombre: string; volver: string }) {
   return (
-    <section aria-labelledby="confirmar-lista" className="gr-sticker flex flex-col gap-2.5 p-3.5">
+    <section aria-labelledby="confirmar-lista" className="gr-card flex flex-col gap-2.5 p-3.5">
       <div>
-        <h2 id="confirmar-lista" className="font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">
+        <h2 id="confirmar-lista" className="text-lg leading-tight font-semibold [overflow-wrap:anywhere]">
           Estás como “{nombre}”. ¿Es tu lista?
         </h2>
         <p className="text-[13px] font-medium leading-snug">
@@ -80,9 +80,9 @@ export function ConfirmarLista({ token, nombre, volver }: { token: string; nombr
  */
 export function OtraCuenta({ volver }: { volver: string }) {
   return (
-    <section aria-labelledby="otra-cuenta" className="gr-sticker flex flex-col gap-2.5 p-3.5">
+    <section aria-labelledby="otra-cuenta" className="gr-card flex flex-col gap-2.5 p-3.5">
       <div>
-        <h2 id="otra-cuenta" className="font-display text-lg leading-tight font-extrabold">Para reservar, entrá con Google</h2>
+        <h2 id="otra-cuenta" className="text-lg leading-tight font-semibold">Para reservar, entrá con Google</h2>
         <p className="text-[13px] font-medium leading-snug">
           En este dispositivo ya entró con su cuenta alguien de esta lista, así que acá no se muestra qué reservaron los demás.
           Si ya habías reservado algo acá con tu nombre, entrá con tu Google y tocá “Sí, soy yo”: pasa a tu cuenta y lo
@@ -100,8 +100,8 @@ export function OtraCuenta({ volver }: { volver: string }) {
  */
 export function ExDueno() {
   return (
-    <section aria-labelledby="ex-dueno" className="gr-sticker flex flex-col gap-1 p-3.5">
-      <h2 id="ex-dueno" className="font-display text-lg leading-tight font-extrabold">Ya no sos parte de este grupo</h2>
+    <section aria-labelledby="ex-dueno" className="gr-card flex flex-col gap-1 p-3.5">
+      <h2 id="ex-dueno" className="text-lg leading-tight font-semibold">Ya no sos parte de este grupo</h2>
       <p className="text-[13px] font-medium leading-snug">
         Como la armabas vos también, acá no se muestra qué reservaron los demás y no podés reservar. Si tenías algo
         reservado de esta lista, se liberó.
@@ -121,7 +121,7 @@ export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver:
       <form action={salirAction} className="flex flex-wrap items-center justify-center gap-x-1.5 text-[13px] font-medium">
         <input type="hidden" name="volver" value={volver} />
         <span className="[overflow-wrap:anywhere]">¿No sos {nombre}?</span>
-        <button className="min-h-11 font-bold underline decoration-2 underline-offset-4">Salir</button>
+        <button className="min-h-11 font-semibold underline underline-offset-4">Salir</button>
       </form>
     )
   }
@@ -129,9 +129,9 @@ export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver:
     <details className="group flex flex-col items-center text-center text-[13px] font-medium">
       <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-center gap-x-1.5 [&::-webkit-details-marker]:hidden">
         <span className="[overflow-wrap:anywhere]">¿No sos {nombre}?</span>
-        <span className="font-bold underline decoration-2 underline-offset-4">Salir de este dispositivo</span>
+        <span className="font-semibold underline underline-offset-4">Salir de este dispositivo</span>
       </summary>
-      <div className="gr-sticker mt-1 flex flex-col gap-2.5 p-3.5 text-left">
+      <div className="gr-card mt-1 flex flex-col gap-2.5 p-3.5 text-left">
         <p className="leading-snug [overflow-wrap:anywhere]">
           Lo que se reservó como “{nombre}” queda a ese nombre y ya no se va a poder manejar desde este dispositivo.
           Si sos {nombre}, mejor entrá con Google: lo que reservaste pasa a tu cuenta.
@@ -139,7 +139,7 @@ export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver:
         <EntrarConGoogle volver={volver} />
         <form action={salirAction}>
           <input type="hidden" name="volver" value={volver} />
-          <button className="min-h-11 w-full text-sm font-bold underline decoration-2 underline-offset-4">Salir igual</button>
+          <button className="min-h-11 w-full text-sm font-semibold underline underline-offset-4">Salir igual</button>
         </form>
       </div>
     </details>
@@ -152,9 +152,9 @@ export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver:
  */
 export function PreguntaInvitado({ nombre }: { nombre: string }) {
   return (
-    <section aria-labelledby="pregunta-invitado" className="gr-sticker flex flex-col gap-2.5 p-3.5">
+    <section aria-labelledby="pregunta-invitado" className="gr-card flex flex-col gap-2.5 p-3.5">
       <div>
-        <h2 id="pregunta-invitado" className="font-display text-lg leading-tight font-extrabold [overflow-wrap:anywhere]">
+        <h2 id="pregunta-invitado" className="text-lg leading-tight font-semibold [overflow-wrap:anywhere]">
           En este navegador se anotó “{nombre}”. ¿Sos vos?
         </h2>
         <p className="text-[13px] font-medium leading-snug">
@@ -166,7 +166,7 @@ export function PreguntaInvitado({ nombre }: { nombre: string }) {
           <BotonEnviar className="gr-btn-primary gr-btn--sm rounded-[14px] px-4">Sí, soy yo</BotonEnviar>
         </form>
         <form action={noSoyElInvitadoAction}>
-          <button className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">No soy yo</button>
+          <button className="min-h-11 text-sm font-semibold underline underline-offset-4">No soy yo</button>
         </form>
       </div>
     </section>
@@ -179,15 +179,15 @@ export function PreguntaInvitado({ nombre }: { nombre: string }) {
  */
 export function UnirInvitado({ nombre }: { nombre: string }) {
   return (
-    <section className="gr-sticker flex flex-col gap-2.5 p-3.5">
+    <section className="gr-card flex flex-col gap-2.5 p-3.5">
       <div>
-        <p className="font-display text-lg font-extrabold [overflow-wrap:anywhere]">En este navegador está anotado “{nombre}”</p>
+        <p className="text-lg font-semibold [overflow-wrap:anywhere]">En este navegador está anotado “{nombre}”</p>
         <p className="text-[13px] font-medium leading-snug">
           Si eras vos, lo que reservaste y comentaste como {nombre} puede pasar a tu cuenta. Si es de otra persona, dejalo así.
         </p>
       </div>
       <form action={unirInvitadoAction}>
-        <button className="gr-btn gr-btn--sm rounded-[14px] px-4 font-sans text-sm font-bold">Era yo: pasarlo a mi cuenta</button>
+        <button className="gr-btn gr-btn--sm rounded-[14px] px-4 text-sm">Era yo: pasarlo a mi cuenta</button>
       </form>
     </section>
   )

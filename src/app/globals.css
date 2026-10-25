@@ -11,7 +11,13 @@
   --color-gr-soft: var(--gr-soft);
   --color-gr-line: var(--gr-line);
   --color-gr-line-strong: var(--gr-line-strong);
+  --color-gr-brand: var(--gr-brand);
+  --color-gr-on-brand: var(--gr-on-brand);
+  --color-gr-blue: var(--gr-blue);
   --font-display: var(--gr-font-display);
   --font-sans: var(--gr-font-body);
+  --font-brand: var(--gr-font-display);
+  --shadow-card: var(--gr-shadow);
+  --shadow-float: var(--gr-shadow-float);
   --radius-sticker: var(--gr-radius-lg);
 }

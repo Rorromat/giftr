@@ -14,7 +14,7 @@ export function Confirmar({ resumen, boton, action, ocultos, children, className
 }) {
   return (
     <details className={`group flex flex-col ${className}`}>
-      <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold underline underline-offset-4 [&::-webkit-details-marker]:hidden">
         {resumen}
       </summary>
       <form action={action} className="mt-1 flex flex-col gap-2.5 rounded-2xl border border-gr-line bg-gr-surface p-3 text-left">

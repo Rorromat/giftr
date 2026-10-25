@@ -20,13 +20,13 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
   return (
     <section aria-labelledby="quien-se-ocupo" className="mt-6 flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
-        <h2 id="quien-se-ocupo" className="font-display text-[26px] leading-none font-extrabold tracking-[-0.03em]">Quién se ocupó</h2>
+        <h2 id="quien-se-ocupo" className="text-[26px] leading-none font-semibold">Quién se ocupó</h2>
         <p className="text-sm font-medium">Lo que ya le regalaron a {para} y quién lo compró.</p>
       </div>
 
       {ranking.length > 1 ? (
-        <figure className="gr-sticker p-3.5">
-          <figcaption className="mb-2.5 text-xs font-bold uppercase tracking-wide text-gr-muted">Regalos comprados por persona</figcaption>
+        <figure className="gr-card p-3.5">
+          <figcaption className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-gr-muted">Regalos comprados por persona</figcaption>
           <ul className="flex flex-col gap-2.5">
             {/* key por posición: el ranking no lleva ids (el de un invitado es parte de su credencial) */}
             {ranking.map((r, i) => (
@@ -37,14 +37,14 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
                   {/* una sola serie: un solo color; el valor va escrito en la punta */}
                   <span className="h-5 flex-none rounded-r-[4px] bg-gr-accent"
                         style={{ width: `calc((100% - 2rem) * ${r.cantidad / max})` }} />
-                  <span className="text-sm font-bold tabular-nums">{r.cantidad}</span>
+                  <span className="text-sm font-semibold tabular-nums">{r.cantidad}</span>
                 </span>
               </li>
             ))}
           </ul>
         </figure>
       ) : (
-        <p className="gr-sticker px-4 py-3 font-display text-lg leading-snug font-extrabold [overflow-wrap:anywhere]">
+        <p className="gr-card px-4 py-3 text-lg leading-snug font-semibold [overflow-wrap:anywhere]">
           {ranking[0].esYo ? 'Vos te ocupaste' : `${ranking[0].nombre} se ocupó`} {entradas.length === 1 ? 'del único regalo' : `de los ${entradas.length} regalos`} hasta ahora.
         </p>
       )}
@@ -52,9 +52,9 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
       <ol className="flex flex-col gap-2">
         {entradas.slice(0, 6).map((e) => (
           <li key={e.id} className="flex items-start gap-3 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
-            <span className="mt-0.5 flex-none rounded-lg bg-gr-ink px-2 py-0.5 text-xs font-bold text-gr-bg tabular-nums">{fecha(e.fecha)}</span>
+            <span className="mt-0.5 flex-none rounded-lg bg-gr-brand px-2 py-0.5 text-xs font-semibold text-gr-bg tabular-nums">{fecha(e.fecha)}</span>
             <span className="min-w-0 text-sm leading-snug [overflow-wrap:anywhere]">
-              <span className="font-bold">{e.titulo}</span>
+              <span className="font-semibold">{e.titulo}</span>
               {' · '}{e.grupal ? `regalo grupal de ${e.encargado}${e.con.length ? ` con ${juntarNombres(e.con)}` : ''}` : `lo compró ${e.encargado}`}
               {e.nota && <span className="text-gr-muted"> — {e.nota}</span>}
             </span>

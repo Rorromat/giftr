@@ -342,8 +342,8 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
         // la del link lo dice acá, y al llegar la foto queda en este lugar: no se corre nada.
         <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
                 className={`flex flex-col items-center gap-2 rounded-[20px] bg-gr-soft px-5 py-7 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
-          <span className="flex size-12 items-center justify-center rounded-full bg-gr-surface"><Icon name="plus" size={22} strokeWidth={2.6} /></span>
-          <span className="font-display text-xl font-extrabold tracking-[-0.02em]">Acá aparece tu deseo</span>
+          <span className="flex size-12 items-center justify-center rounded-full bg-gr-surface"><Icon name="plus" size={22} strokeWidth={2.2} /></span>
+          <span className="text-xl font-semibold">Acá aparece tu deseo</span>
           <span role="status" className="text-sm leading-snug font-medium">{trayendo ? AVISOS.trayendo : consejo ?? SIN_FOTO}</span>
         </button>
       )}

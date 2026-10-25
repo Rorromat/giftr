@@ -99,57 +99,57 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     .includes(busqueda.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')))
 
   return (
-    <form action={saveGustosAction} onSubmit={alMandar} onKeyDown={alApretarEnter} className="flex min-h-[calc(100dvh-52px)] flex-col gap-4 pb-36">
+    <form action={saveGustosAction} onSubmit={alMandar} onKeyDown={alApretarEnter} className="flex min-h-dvh flex-col gap-5 pb-36 pt-2">
       {editar && <input type="hidden" name="volver" value="perfil" />}
 
-      <div className="flex items-center gap-3">
+      <div className="flex min-h-14 items-center gap-3">
         <div className="flex flex-1 gap-1" aria-hidden>
           {PASOS.map((_, i) => (
-            <span key={i} className={`h-2 flex-1 rounded-full border border-gr-line ${i <= paso ? 'bg-gr-ink' : 'bg-gr-surface'}`} />
+            <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= paso ? 'bg-gr-brand' : 'bg-gr-dot'}`} />
           ))}
         </div>
-        <span className="text-sm font-bold tabular-nums">{paso + 1} de {PASOS.length}</span>
+        <span className="text-sm font-medium text-gr-muted tabular-nums">{paso + 1} de {PASOS.length}</span>
         {/* Se puede cortar en cualquier momento: se guarda lo elegido hasta ahí (y no pasa por "¡Todo listo!"). */}
-        <BotonEnviar name="corte" value="1" className="min-h-11 flex-none text-[13px] font-bold underline underline-offset-4">
+        <BotonEnviar name="corte" value="1" className="min-h-11 flex-none text-[13px] font-semibold">
           {editar ? 'Guardar' : 'Más tarde'}
         </BotonEnviar>
       </div>
 
       <div className="flex items-start gap-3">
-        <span aria-hidden className="mt-0.5 flex size-12 flex-none items-center justify-center rounded-2xl bg-gr-accent">
-          <Icon name={PASOS[paso].icono} size={26} strokeWidth={2.4} />
+        <span aria-hidden className="mt-0.5 flex size-12 flex-none items-center justify-center rounded-full bg-gr-accent">
+          <Icon name={PASOS[paso].icono} size={24} />
         </span>
         <div className="flex flex-col gap-1">
-          <h1 className="font-display text-[34px] leading-[0.95] font-extrabold tracking-[-0.04em]">
+          <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">
             {paso === 0 ? `¡Hola, ${nombre}!` : PASOS[paso].titulo}
           </h1>
-          <p className="text-[15px] font-medium leading-snug">{PASOS[paso].sub}</p>
+          <p className="text-[15px] leading-snug text-gr-muted">{PASOS[paso].sub}</p>
         </div>
       </div>
 
       {/* Todos los pasos están en el mismo formulario: los ocultos también se mandan al final. */}
       <section className={ver(0, 'flex flex-col gap-3')}>
-        <div className="gr-sticker flex items-center gap-4 p-3.5">
+        <div className="gr-card flex items-center gap-4 p-4">
           <FotoPerfil nombre={nombreCompleto} foto={foto} size={72} propia />
           <div className="flex min-w-0 flex-col gap-0.5">
-            <p className="font-display text-lg font-extrabold">Tu foto</p>
-            <p className="text-[13px] font-medium leading-snug">Tocala para subir una. Así te reconocen en sus listas y grupos.</p>
+            <p className="text-base font-semibold">Tu foto</p>
+            <p className="text-[13px] leading-snug text-gr-muted">Tocala para subir una. Así te reconocen en sus listas y grupos.</p>
           </div>
         </div>
-        <div className="gr-sticker flex flex-col gap-2.5 p-3.5">
-          <p className="font-display text-lg font-extrabold">¿Cuándo es tu cumple?</p>
+        <div className="gr-card flex flex-col gap-2.5 p-3.5">
+          <p className="text-base font-semibold">¿Cuándo es tu cumple?</p>
           <div className="flex gap-2">
             <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" />
           </div>
           {avisoCumple && (
             <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
           )}
-          <p className="text-[13px] font-medium text-gr-muted">Tu gente lo ve en Eventos, con tiempo para elegir.</p>
+          <p className="text-[13px] text-gr-muted">Tu gente lo ve en Eventos, con tiempo para elegir.</p>
         </div>
-        <ul className="flex flex-col gap-2 text-[15px] font-medium">
+        <ul className="flex flex-col gap-2 px-1 text-[15px]">
           {['Qué deportes y qué cuadro', 'Tus hobbies y tus marcas', 'Colores y talles', 'Lo que no querés ni regalado'].map((t) => (
             <li key={t} className="flex items-center gap-2.5">
-              <span className="size-2.5 flex-none bg-gr-ink" />{t}
+              <Icon name="check" size={16} className="flex-none" />{t}
             </li>
           ))}
         </ul>
@@ -235,16 +235,16 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
                   placeholder="Soy alérgica a la lana, ya tengo mil tazas…" className="gr-input py-3" />
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gr-line bg-gr-bg">
-        <div className="mx-auto flex max-w-md items-center gap-2.5 px-[18px] pb-6 pt-3">
+      <div className="fixed inset-x-0 bottom-0 z-10 bg-linear-to-t from-gr-bg from-70% to-transparent">
+        <div className="mx-auto flex max-w-md items-center gap-2.5 px-[18px] pb-6 pt-5">
           {paso > 0
-            ? <button type="button" onClick={() => ir(paso - 1)} className="gr-btn gr-btn--sm flex-none px-4 font-sans font-bold">Atrás</button>
-            : editar && <Link href="/perfil" className="gr-btn gr-btn--sm flex-none px-4 font-sans font-bold">Cancelar</Link>}
+            ? <button type="button" onClick={() => ir(paso - 1)} className="gr-btn flex-none px-5">Atrás</button>
+            : editar && <Link href="/perfil" className="gr-btn flex-none px-5">Cancelar</Link>}
           {/* keys distintas: si React reusara el mismo <button>, el click en "Siguiente" del anteúltimo paso
               lo convertiría en submit durante ese mismo click y mandaría el formulario sin mostrar el último paso */}
           {ultimo
-            ? <BotonEnviar key="listo" pendiente="Guardando…" className="gr-btn-primary gr-btn--sm flex-1">{editar ? 'Guardar' : '¡Listo!'}</BotonEnviar>
-            : <button key="siguiente" type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary gr-btn--sm flex-1">{paso === 0 && !editar ? 'Empezar' : 'Siguiente'}</button>}
+            ? <BotonEnviar key="listo" pendiente="Guardando…" className="gr-btn-primary flex-1">{editar ? 'Guardar' : '¡Listo!'}</BotonEnviar>
+            : <button key="siguiente" type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary flex-1">{paso === 0 && !editar ? 'Empezar' : 'Siguiente'}</button>}
         </div>
       </div>
     </form>

@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   other: { 'apple-mobile-web-app-capable': 'yes' },
 }
 
-export const viewport: Viewport = { themeColor: '#F6F0E5' }
+export const viewport: Viewport = { themeColor: '#F4F4F0' }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

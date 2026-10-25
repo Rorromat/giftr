@@ -64,7 +64,7 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
       {estado === 'cargando' && <p className="text-[13px] font-medium text-gr-muted">Fijándonos si este dispositivo puede recibir avisos…</p>}
       {estado === 'ios-instalar' && (
         <p className="text-[13px] font-medium leading-snug">
-          En iPhone los avisos andan con GiftR en la pantalla de inicio: tocá <span className="font-bold">Compartir → Agregar a inicio</span>, abrilo desde ahí y activalos.
+          En iPhone los avisos andan con GiftR en la pantalla de inicio: tocá <span className="font-semibold">Compartir → Agregar a inicio</span>, abrilo desde ahí y activalos.
         </p>
       )}
       {estado === 'no-soportado' && <p className="text-[13px] font-medium text-gr-muted">Este navegador no puede recibir avisos. Igual vas a ver los codazos al entrar.</p>}
@@ -76,9 +76,9 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
       )}
       {estado === 'activado' && (
         <div className="flex items-center gap-3">
-          <span className="flex-1 text-sm font-bold">Avisos activados ✓</span>
-          <button type="button" onClick={probar} className="gr-btn min-h-11 px-3 font-sans text-[13px] font-bold">Probar</button>
-          <button type="button" onClick={desactivar} className="min-h-11 text-[13px] font-bold underline underline-offset-4">Desactivar</button>
+          <span className="flex-1 text-sm font-semibold">Avisos activados ✓</span>
+          <button type="button" onClick={probar} className="gr-btn min-h-11 px-3 text-[13px]">Probar</button>
+          <button type="button" onClick={desactivar} className="min-h-11 text-[13px] font-semibold underline underline-offset-4">Desactivar</button>
         </div>
       )}
       {mensaje && <p role="status" className="text-[13px] font-semibold">{mensaje}</p>}

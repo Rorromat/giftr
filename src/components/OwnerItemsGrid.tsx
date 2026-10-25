@@ -22,7 +22,7 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
       <input type="hidden" name="estado" value={estado} />
       {volver && <input type="hidden" name="volver" value={volver} />}
       <p className="text-xs font-medium leading-snug">Sale de la lista. Si te arrepentís, lo volvés a poner desde Archivados, abajo de todo.</p>
-      <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px] text-[15px]">Sí, sacarlo</BotonEnviar>
+      <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Sí, sacarlo</BotonEnviar>
     </form>
   )
 }
@@ -31,34 +31,34 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
 export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; shareToken: string }) {
   const porCategoria = Object.groupBy(items, (i) => i.categoria ?? 'Sin categoría')
   return Object.entries(porCategoria).map(([cat, catItems]) => (
-    <section key={cat} className="mt-1.5 flex flex-col gap-3">
-      <h2 className="gr-label">{cat}</h2>
+    <section key={cat} className="flex flex-col gap-2.5">
+      <h3 className="gr-label">{cat}</h3>
       <ul className="grid grid-cols-2 items-start gap-3">
         {catItems!.map((item) => {
           const precio = item.precio ?? item.rangoPrecio
           return (
             // Toda la card abre el deseo (el ::after del título la cubre); el menú y la prioridad van por arriba.
-            <li key={item.id} className="gr-sticker relative">
+            <li key={item.id} className="gr-card relative">
               <div className="relative">
                 <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={ALTO_FOTO} />
                 <details className="group">
                   <summary aria-label={`Opciones de ${item.titulo}`}
                            className="absolute right-0.5 top-0.5 z-[2] flex size-11 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-white/90 group-open:bg-gr-ink group-open:text-gr-bg">
-                      <Icon name="more" size={18} strokeWidth={2.6} />
+                    <span className="flex size-8 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_4px_rgb(20_20_20/0.14)] group-open:bg-gr-brand group-open:text-gr-on-brand">
+                      <Icon name="more" size={18} strokeWidth={2.2} />
                     </span>
                   </summary>
-                  <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border border-gr-line bg-gr-surface shadow-[0_8px_24px_rgb(18_18_18/0.14)]">
-                    <Link href={`/editar/${item.id}`} className="flex min-h-11 items-center px-3 text-sm font-bold">Editar</Link>
+                  <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border border-gr-line bg-gr-surface shadow-float">
+                    <Link href={`/editar/${item.id}`} className="flex min-h-11 items-center px-3 text-sm font-semibold">Editar</Link>
                     {/* El link del deseo es el de quien regala: WhatsApp muestra la foto y el precio */}
-                    <a target="_blank" className="flex min-h-11 items-center border-t border-gr-line px-3 text-sm font-bold"
+                    <a target="_blank" className="flex min-h-11 items-center border-t border-gr-line px-3 text-sm font-semibold"
                        href={`https://wa.me/?text=${encodeURIComponent(textoDueno(item, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${item.id}`))}`}>
                       Mandar por WhatsApp
                     </a>
                     {/* Sacarlo pide confirmar (ver ConfirmarSacar) */}
                     {ARCHIVAR.map(([estado, texto]) => (
                       <details key={estado} className="border-t border-gr-line">
-                        <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
                           {texto}
                         </summary>
                         <ConfirmarSacar itemId={item.id} estado={estado} />
@@ -72,7 +72,7 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
                       className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere] after:absolute after:inset-0 after:z-[1]">
                   {item.titulo}
                 </Link>
-                {precio && <p className="text-[15px] font-bold">{precio}</p>}
+                {precio && <p className="text-[15px] font-semibold">{precio}</p>}
                 <div className="relative z-[2] self-start">
                   <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
                 </div>
@@ -92,23 +92,23 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
 export function Archivados({ items, grupo = false }: { items: OwnerItemView[]; grupo?: boolean }) {
   if (!items.length) return null
   return (
-    <details className="mt-4 flex flex-col">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 self-start text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+    <details className="flex flex-col">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 self-start text-sm font-semibold text-gr-muted [&::-webkit-details-marker]:hidden">
         Archivados ({items.length})
       </summary>
-      <ul className="mt-1 flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3">
+      <ul className="gr-card mt-1 flex flex-col divide-y divide-gr-line px-3.5">
         {/* los últimos primero */}
         {[...items].reverse().map((item) => (
           <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
             <span className="min-w-0 flex-1 text-sm leading-snug">
-              <span className="font-bold [overflow-wrap:anywhere]">{item.titulo}</span>
+              <span className="font-semibold [overflow-wrap:anywhere]">{item.titulo}</span>
               <span className="block text-xs font-medium text-gr-muted">
                 {item.estadoDueno === 'lo_tengo' ? (grupo ? 'Ya lo tienen' : 'Ya lo tenés') : grupo ? 'Ya no lo quieren' : 'Ya no lo querés'}
               </span>
             </span>
             <form action={restoreItemAction}>
               <input type="hidden" name="itemId" value={item.id} />
-              <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">{grupo ? 'Volver a la lista' : 'Volver a mi lista'}</BotonEnviar>
+              <BotonEnviar className="gr-btn min-h-11 px-2.5 text-[13px]">{grupo ? 'Volver a la lista' : 'Volver a mi lista'}</BotonEnviar>
             </form>
           </li>
         ))}
