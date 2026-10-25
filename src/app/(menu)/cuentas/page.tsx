@@ -163,8 +163,8 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
 
       <div className="grid grid-cols-2 gap-3">
         <div className="gr-hero flex flex-col gap-1.5 p-4">
-          <span className="text-xs font-semibold tracking-[0.08em] text-white/60 uppercase">Debés</span>
-          <span className="gr-number text-[30px] text-gr-accent tabular-nums">{pesos(c.debes)}</span>
+          <span className="text-xs font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
+          <span className="gr-number text-[30px] text-gr-hero-detail tabular-nums">{pesos(c.debes)}</span>
         </div>
         <div className="flex flex-col gap-1.5 rounded-[26px] bg-gr-accent p-4 shadow-card">
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-ink/60 uppercase">Te deben</span>

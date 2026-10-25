@@ -130,13 +130,13 @@ export default async function ListaAjena({
           <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
             {vista.grupoNombre
               ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={52} />
-              : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-white/20" />}
+              : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-gr-on-hero/20" />}
           </Link>
           <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
               {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
             </h1>
-            <p className="text-sm text-white/70">
+            <p className="text-sm text-gr-on-hero/70">
               {vista.grupoNombre && `De ${vista.ownerNombre}. `}Elegí, reservá y no te duplicás con nadie.
             </p>
           </div>
@@ -149,8 +149,8 @@ export default async function ListaAjena({
         )}
 
         {veTodo && (
-          <p className="flex items-center gap-2 border-t border-white/10 pt-3.5 text-[13px] text-white/80">
-            <Icon name="lock" size={16} className="flex-none text-gr-accent" />
+          <p className="flex items-center gap-2 border-t border-gr-on-hero/10 pt-3.5 text-[13px] text-gr-on-hero/80">
+            <Icon name="lock" size={16} className="flex-none text-gr-hero-detail" />
             {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
           </p>
         )}

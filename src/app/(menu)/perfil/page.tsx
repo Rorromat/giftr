@@ -53,10 +53,10 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
 
       <div className="flex flex-col gap-1.5">
         <section className="gr-hero flex items-center gap-3 p-4 pl-5">
-          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-white/10 text-gr-accent"><Icon name="link" size={20} /></span>
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-hero/10 text-gr-hero-detail"><Icon name="link" size={20} /></span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-semibold">Compartir mi lista</p>
-            <p className="truncate text-[13px] text-white/60">{shareUrl.replace(/^https?:\/\//, '')}</p>
+            <p className="truncate text-[13px] text-gr-on-hero/60">{shareUrl.replace(/^https?:\/\//, '')}</p>
           </div>
           <CopyLinkButton url={shareUrl} />
         </section>

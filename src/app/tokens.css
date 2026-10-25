@@ -21,6 +21,14 @@
   --gr-line: #E6E5DF;
   --gr-line-strong: #8D8C85;
   --gr-blue: #2F5BEA;       /* tarjetas de aviso y festejo (codazos) */
+  --gr-on-blue: #FFFFFF;
+  /* La tarjeta destacada (.gr-hero) tiene sus propios colores, para poder ser oscura o clara: el fondo, el texto, los
+     detalles chicos (íconos, el número de Cuentas) y su botón. */
+  --gr-hero: #141414;
+  --gr-on-hero: #FFFFFF;
+  --gr-hero-detail: #C8F31D;
+  --gr-hero-btn: #C8F31D;
+  --gr-on-hero-btn: #141414;
 
   /* Tipografía */
   --gr-font-display: var(--font-bricolage), sans-serif;
@@ -103,8 +111,8 @@
   .gr-hero {
     position: relative;
     border-radius: 26px;
-    background: var(--gr-brand);
-    color: var(--gr-on-brand);
+    background: var(--gr-hero);
+    color: var(--gr-on-hero);
     box-shadow: var(--gr-shadow);
   }
   /* Vacíos y explicaciones: relleno suave, sin borde */
@@ -172,6 +180,7 @@
   .gr-btn--sm { min-height: 44px; font-size: 14px; padding: 0 16px; }
   .gr-btn--dark { border-color: var(--gr-brand); background: var(--gr-brand); color: var(--gr-on-brand); }
   .gr-btn--accent { border-color: var(--gr-accent); background: var(--gr-accent); color: var(--gr-ink); }
+  .gr-btn--hero { border-color: var(--gr-hero-btn); background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
   .gr-icon-btn {
     width: 44px;
     height: 44px;

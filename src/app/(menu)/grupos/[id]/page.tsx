@@ -50,7 +50,7 @@ export default async function Grupo({ params, searchParams }: {
         {/* Fecha del grupo: aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
         <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full bg-white/10 py-1.5 pl-2.5 pr-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full bg-gr-on-hero/10 py-1.5 pl-2.5 pr-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
             <Icon name="calendar" size={16} className="flex-none text-gr-accent" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())}
           </summary>

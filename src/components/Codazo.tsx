@@ -30,7 +30,7 @@ export function Codazo({ token, para, plural, identified, conGoogle = false, res
   const wa = encodeURIComponent(`👉 ¡Codazo! Cargá lo que querés en GiftR así sé qué regalarte: ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/mi-lista`)
   return (
     <section id="codazo" className="flex scroll-mt-6 flex-col gap-2.5">
-      {mensaje && <p role="status" className="rounded-[18px] bg-gr-blue px-4 py-3 text-sm font-medium text-white">{mensaje}</p>}
+      {mensaje && <p role="status" className="rounded-[18px] bg-gr-blue px-4 py-3 text-sm font-medium text-gr-on-blue">{mensaje}</p>}
       {resultado === 'cartel' && (
         <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn min-h-11 gap-2 text-sm">
           <Icon name="chat" size={18} strokeWidth={2} />Mandale también un WhatsApp

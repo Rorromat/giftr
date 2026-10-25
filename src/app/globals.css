@@ -14,6 +14,10 @@
   --color-gr-brand: var(--gr-brand);
   --color-gr-on-brand: var(--gr-on-brand);
   --color-gr-blue: var(--gr-blue);
+  --color-gr-on-blue: var(--gr-on-blue);
+  --color-gr-hero: var(--gr-hero);
+  --color-gr-on-hero: var(--gr-on-hero);
+  --color-gr-hero-detail: var(--gr-hero-detail);
   --font-display: var(--gr-font-display);
   --font-sans: var(--gr-font-body);
   --font-brand: var(--gr-font-display);

@@ -160,7 +160,7 @@ export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
   if (!cuentas.personas.length) return null
   return (
     <Link href="/cuentas" className="flex min-h-14 items-center gap-3 rounded-[22px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
-      <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-white/10 text-gr-accent"><Icon name="wallet" size={18} /></span>
+      <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-gr-on-brand/10 text-gr-accent"><Icon name="wallet" size={18} /></span>
       <span className="min-w-0 flex-1">
         Cuentas pendientes:{' '}
         {cuentas.debes || cuentas.teDeben

@@ -39,9 +39,9 @@ export async function Banners() {
     <div className="flex flex-col gap-2.5">
       {invitado && <PreguntaInvitado nombre={invitado} />}
       {codazos.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-[22px] bg-gr-blue p-4 text-white shadow-card">
+        <div className="flex flex-col gap-3 rounded-[22px] bg-gr-blue p-4 text-gr-on-blue shadow-card">
           <div className="flex items-start gap-3">
-            <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-white/15 text-xl">👉</span>
+            <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-blue/15 text-xl">👉</span>
             <p className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">
               <span className="font-semibold">{juntarNombres(quienes)}</span> te {quienes.length > 1 ? 'dieron' : 'dio'} un codazo:
               {quienes.length > 1 ? ' quieren' : ' quiere'} saber qué regalarte{grupo ? ` en "${grupo.listaNombre ?? 'tu grupo'}"` : ''}.
@@ -55,7 +55,7 @@ export async function Banners() {
               <BotonEnviar className="min-h-11 px-2 text-sm font-semibold underline underline-offset-4">Listo</BotonEnviar>
             </form>
           </div>
-          {!avisos && <p className="text-xs font-medium text-white/80">Activá los avisos en Perfil para enterarte al toque.</p>}
+          {!avisos && <p className="text-xs font-medium text-gr-on-blue/80">Activá los avisos en Perfil para enterarte al toque.</p>}
         </div>
       )}
       {notifs.map((n) => (

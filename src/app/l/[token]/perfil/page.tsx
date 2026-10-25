@@ -44,7 +44,7 @@ export default async function Perfil({ params, searchParams }: Props) {
       <PageHeader title={propio ? 'Tu perfil público' : `Perfil de ${p.nombre.split(' ')[0]}`} titulo="p" back={atras.href} backLabel={atras.texto} />
 
       <section className="gr-hero flex flex-col items-center gap-3 p-6 text-center">
-        <AvatarSticker nombre={p.nombre} foto={p.foto} size={96} className="ring-4 ring-white/15" />
+        <AvatarSticker nombre={p.nombre} foto={p.foto} size={96} className="ring-4 ring-gr-on-hero/15" />
         <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{p.nombre}</h1>
         {p.cumple && (
           <p className="flex items-center gap-1.5 rounded-full bg-gr-accent py-1.5 pl-2.5 pr-3.5 text-sm font-semibold text-gr-ink">
@@ -53,8 +53,8 @@ export default async function Perfil({ params, searchParams }: Props) {
           </p>
         )}
         {propio && (
-          <div className="mt-1 flex flex-col items-center gap-2 border-t border-white/10 pt-3.5">
-            <p className="text-[13px] text-white/70">Así te ven los que abren tu lista</p>
+          <div className="mt-1 flex flex-col items-center gap-2 border-t border-gr-on-hero/10 pt-3.5">
+            <p className="text-[13px] text-gr-on-hero/70">Así te ven los que abren tu lista</p>
             <Link href="/bienvenida?editar=1" className="gr-btn gr-btn--sm">Editar mis gustos</Link>
           </div>
         )}

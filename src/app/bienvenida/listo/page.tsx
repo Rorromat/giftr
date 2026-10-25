@@ -46,7 +46,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
       <div className="gr-hero flex flex-col items-center gap-3 px-5 pb-6 pt-7 text-center">
         <Starburst size={120} fontSize={28} label="Listo">¡Listo!</Starburst>
         <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">¡Todo listo{nombre ? `, ${nombre.split(' ')[0]}` : ''}!</h1>
-        <p className="text-[15px] leading-snug text-white/75">
+        <p className="text-[15px] leading-snug text-gr-on-hero/75">
           {completas === filas.length ? 'Cargaste todo. ' : `Cargaste ${completas} de ${filas.length}. `}
           Tu gente lo ve en tu perfil, al abrir tu lista.
         </p>
