@@ -169,6 +169,13 @@
       "when": 1792952079176,
       "tag": "0023_amigos",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792954549282,
+      "tag": "0024_regalo_en_dolares",
+      "breakpoints": true
     }
   ]
 }

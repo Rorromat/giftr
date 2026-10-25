@@ -34,7 +34,7 @@ import {
   cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
   salirDeRegalo, saldarCon, sumarseARegalo, type CompraResult, type DatosCompra,
 } from '@/lib/regalos'
-import { parsePesos, partePesos, pesos } from '@/lib/pesos'
+import { esMoneda, parsePesos, partePesos, plata } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
 import { LARGO, recortar } from '@/lib/limites'
 
@@ -545,15 +545,16 @@ function compraDesdeForm(formData: FormData): DatosCompra {
       if (k.startsWith('parte:') && typeof v === 'string') partes[k.slice(6)] = partePesos(v) ?? Number.NaN
     }
   }
+  const moneda = str(formData, 'moneda')
   return {
     total: parsePesos(str(formData, 'total')) ?? 0,
     miembros: formData.getAll('miembro').filter((v): v is string => typeof v === 'string'),
-    partes, nota: str(formData, 'nota'),
+    partes, nota: str(formData, 'nota'), moneda: esMoneda(moneda) ? moneda : 'ARS',
   }
 }
 
 const ERRORES_COMPRA = {
-  monto_invalido: 'Revisá los montos: tienen que ser pesos. Si alguien no pone, dejá su parte vacía o en 0.',
+  monto_invalido: 'Revisá los montos: tienen que ser números enteros. Si alguien no pone, dejá su parte vacía o en 0.',
   cambiaron: 'Se sumó o se bajó alguien, revisá la división.',
   ya_pagaron: 'Alguien ya figura como que te pagó: para corregir, primero deshacé ese pago.',
   nada_que_corregir: 'Ya nadie te debe nada de este regalo: no hay nada que corregir.',
@@ -563,13 +564,13 @@ const ERRORES_COMPRA = {
 /** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
 function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
   if (r.reason === 'de_la_lista') {
-    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${pesos(r.monto)}.`
+    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${plata(r.monto, p.moneda)}.`
   }
   if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
   const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
   return suma < p.total
-    ? `Las partes suman ${pesos(suma)}: faltan ${pesos(p.total - suma)} para llegar a ${pesos(p.total)}.`
-    : `Las partes suman ${pesos(suma)}: te pasaste ${pesos(suma - p.total)} de ${pesos(p.total)}.`
+    ? `Las partes suman ${plata(suma, p.moneda)}: faltan ${plata(p.total - suma, p.moneda)} para llegar a ${plata(p.total, p.moneda)}.`
+    : `Las partes suman ${plata(suma, p.moneda)}: te pasaste ${plata(suma - p.total, p.moneda)} de ${plata(p.total, p.moneda)}.`
 }
 
 /**
@@ -607,9 +608,10 @@ export async function markPaidAction(formData: FormData) {
   revalidarRegalo(formData)
 }
 
-/** neto: lo que decía el botón (ver saldarCon). */
+/** neto: lo que decía el botón (ver saldarCon), en la moneda de esa tarjeta. */
 export async function settleUpAction(formData: FormData) {
-  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '', entero(formData, 'neto'))
+  const moneda = str(formData, 'moneda')
+  await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '', entero(formData, 'neto'), esMoneda(moneda) ? moneda : 'ARS')
   revalidarRegalo(formData)
 }
 

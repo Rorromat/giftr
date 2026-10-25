@@ -1,0 +1,1 @@
+ALTER TABLE "group_gifts" ADD COLUMN "moneda" text DEFAULT 'ARS' NOT NULL;

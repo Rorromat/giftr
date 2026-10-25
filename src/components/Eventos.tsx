@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { pesos, type Cuentas } from '@/lib/regalos'
+import type { Cuentas } from '@/lib/regalos'
+import { plata } from '@/lib/pesos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, MESES, type Evento } from '@/lib/events'
 import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
@@ -163,8 +164,11 @@ export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
       <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-gr-on-brand/10 text-gr-accent"><Icon name="wallet" size={18} /></span>
       <span className="min-w-0 flex-1">
         Cuentas pendientes:{' '}
-        {cuentas.debes || cuentas.teDeben
-          ? [cuentas.debes && `debés ${pesos(cuentas.debes)}`, cuentas.teDeben && `te deben ${pesos(cuentas.teDeben)}`].filter(Boolean).join(' · ')
+        {cuentas.debes || cuentas.teDeben || cuentas.dolares?.debes || cuentas.dolares?.teDeben
+          ? [
+            cuentas.debes && `debés ${plata(cuentas.debes)}`, cuentas.dolares?.debes && `debés ${plata(cuentas.dolares.debes, 'USD')}`,
+            cuentas.teDeben && `te deben ${plata(cuentas.teDeben)}`, cuentas.dolares?.teDeben && `te deben ${plata(cuentas.dolares.teDeben, 'USD')}`,
+          ].filter(Boolean).join(' · ')
           : 'están a mano, falta marcarlo'}
       </span>
       <Icon name="chevron" size={18} className="flex-none text-gr-accent" />

@@ -101,6 +101,24 @@ export function pesos(n: number): string {
   return `${n < 0 ? '-' : ''}$${String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
 }
 
+/** En qué se cuenta un regalo grupal (la compra, las partes y Cuentas): pesos o dólares, siempre enteros. */
+export type Moneda = 'ARS' | 'USD'
+export const esMoneda = (v: unknown): v is Moneda => v === 'ARS' || v === 'USD'
+
+/** Un monto en su moneda: "$45.000" o "US$ 300". */
+export function plata(n: number, moneda: Moneda = 'ARS'): string {
+  return moneda === 'USD' ? `${n < 0 ? '-' : ''}US$ ${pesos(Math.abs(n)).slice(1)}` : pesos(n)
+}
+
+/** Si el precio del deseo está en dólares ("US$ 300", "USD 50", "300 dólares"): el regalo grupal arranca en dólares. */
+export const enDolares = (texto: string | null | undefined) => !!texto && /US\$|U\$[SD]|USD|d[oó]lar/i.test(texto)
+
+/** El número de un precio en dólares ("US$ 1.200" → 1200), para arrancar la compra con él. Null si no se lee. */
+export function parseDolares(texto: string | null | undefined): number | null {
+  if (!enDolares(texto)) return null
+  return parsePesos(texto!.replace(/US\$|U\$[SD]|USD|d[oó]lar(?:es)?/gi, ' '))
+}
+
 /** Partes iguales en pesos enteros; los pesos que sobran van a los primeros (el encargado va primero). */
 export function dividir(total: number, n: number): number[] {
   const base = Math.floor(total / n)

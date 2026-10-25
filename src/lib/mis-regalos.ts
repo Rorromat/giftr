@@ -5,6 +5,7 @@ import type { Db } from '@/db/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { noEsNiFueDuenoSql } from '@/lib/groups'
+import type { Moneda } from '@/lib/pesos'
 
 // Mis regalos: todo lo que reservé (suelto) y los regalos grupales en los que estoy, de las listas de los demás, para
 // tenerlo a mano en un solo lugar. Lo de listas propias (o de un grupo del que fui dueño) no: sería contarme la sorpresa.
@@ -32,8 +33,9 @@ export type MiRegalo = {
   personas: number | null
   encargado: string | null
   soyEncargado: boolean
-  /** grupal comprado: mi parte, en pesos */
+  /** grupal comprado: mi parte, en su moneda */
   miParte: number | null
+  moneda: Moneda
   /** cuándo se compró (o se reservó, o se armó el grupal) */
   fecha: Date
   listId: string
@@ -84,7 +86,7 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
       .orderBy(desc(claims.updatedAt)).limit(COMPRADOS_MAX),
     db.select({
       id: groupGifts.id, estado: groupGifts.estado, compradoAt: groupGifts.compradoAt, creado: groupGifts.createdAt,
-      encargadoId: groupGifts.organizerUserId, encargado: encargados.nombre, miParte: groupGiftMembers.monto,
+      encargadoId: groupGifts.organizerUserId, encargado: encargados.nombre, miParte: groupGiftMembers.monto, moneda: groupGifts.moneda,
       personas: sql<number>`(select count(*)::int from ${groupGiftMembers} m where m.gift_id = ${groupGifts.id})`,
       ...columnasLista(db, userId, sql<Date>`${groupGifts.createdAt}`),
     }).from(groupGiftMembers)
@@ -106,12 +108,12 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
       id: r.id, tipo: 'suelto', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,
       para: para(r), href: href(r),
       venceEnDias: r.estado === 'reservado' && r.expiresAt ? Math.max(0, Math.ceil((r.expiresAt.getTime() - ahora.getTime()) / DIA)) : null,
-      personas: null, encargado: null, soyEncargado: false, miParte: null, fecha: r.fecha, listId: r.listId,
+      personas: null, encargado: null, soyEncargado: false, miParte: null, moneda: 'ARS', fecha: r.fecha, listId: r.listId,
     })),
     ...grupales.map((r): MiRegalo => ({
       id: r.id, tipo: 'grupal', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,
       para: para(r), href: href(r), venceEnDias: null, personas: r.personas, encargado: r.encargado,
-      soyEncargado: r.encargadoId === userId, miParte: r.estado === 'comprado' ? r.miParte : null, fecha: r.compradoAt ?? r.creado,
+      soyEncargado: r.encargadoId === userId, miParte: r.estado === 'comprado' ? r.miParte : null, moneda: r.moneda, fecha: r.compradoAt ?? r.creado,
       listId: r.listId,
     })),
   ]

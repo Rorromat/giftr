@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { misRegalos, type MiRegalo } from '@/lib/mis-regalos'
-import { pesos } from '@/lib/regalos'
+import { plata } from '@/lib/pesos'
 import { MESES } from '@/lib/events'
 import { miFoto } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
@@ -12,7 +12,7 @@ import { AppHeader, Icon, ItemPhoto, QuizasLink, Seccion } from '@/components/ui
 /** Qué pasa con este regalo, en una línea. */
 function estado(r: MiRegalo): { texto: string; urgente?: boolean } {
   if (r.tipo === 'grupal') {
-    if (r.estado === 'comprado') return { texto: r.miParte != null ? `Regalo grupal · tu parte ${pesos(r.miParte)}` : 'Regalo grupal · comprado' }
+    if (r.estado === 'comprado') return { texto: r.miParte != null ? `Regalo grupal · tu parte ${plata(r.miParte, r.moneda)}` : 'Regalo grupal · comprado' }
     const quien = r.soyEncargado ? 'lo organizás vos' : `organiza ${r.encargado?.split(' ')[0] ?? 'alguien'}`
     return { texto: `Regalo grupal · ${r.personas} ${r.personas === 1 ? 'persona' : 'personas'} · ${quien}` }
   }

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { buyGroupGiftAction, fixGroupGiftAction } from '@/app/actions'
-import { dividir, parsePesos, partePesos, pesos } from '@/lib/pesos'
+import { dividir, parsePesos, partePesos, pesos, plata, type Moneda } from '@/lib/pesos'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { LARGO } from '@/lib/limites'
 
@@ -18,17 +18,22 @@ const conPuntos = (v: string) => (v ? pesos(Number(v)).slice(1) : '')
  * Sin token ni deseo (desde Cuentas, cuando no tiene el link de la lista), solo vuelve a armar Cuentas.
  * corregir: la compra ya hecha, para cambiar el total o las partes (arranca con las de ahora). Cómo salió va en la página
  * si el formulario se va (ver fixGroupGiftAction).
+ * En pesos o en dólares (enteros): arranca en la de la compra, o en la del precio del deseo (monedaSugerida).
  */
-export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, corregir }: {
+export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, monedaSugerida = 'ARS', corregir }: {
   giftId: string
   token?: string
   itemId?: string
   miembros: { userId: string; nombre: string; esYo: boolean }[]
   sugerido: number | null
-  corregir?: { total: number; partes: Record<string, number>; nota: string | null }
+  monedaSugerida?: Moneda
+  corregir?: { total: number; moneda: Moneda; partes: Record<string, number>; nota: string | null }
 }) {
   const [estado, enviar] = useActionState(corregir ? fixGroupGiftAction : buyGroupGiftAction, null)
   const [total, setTotal] = useState(String(corregir?.total ?? sugerido ?? ''))
+  const [moneda, setMoneda] = useState<Moneda>(corregir?.moneda ?? monedaSugerida)
+  const signo = moneda === 'USD' ? 'US$' : '$'
+  const p = (n: number) => plata(n, moneda)
   // una compra repartida a mano se corrige a mano
   const [manual, setManual] = useState(() => !!corregir &&
     dividir(corregir.total, miembros.length).some((m, i) => m !== corregir.partes[miembros[i].userId]))
@@ -62,12 +67,21 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
         </>
       )}
       <input type="hidden" name="modo" value={manual ? 'manual' : 'iguales'} />
+      <input type="hidden" name="moneda" value={moneda} />
       {miembros.map((m) => <input key={m.userId} type="hidden" name="miembro" value={m.userId} />)}
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="gr-label">¿En qué moneda?</span>
+        <div className="gr-segmented min-h-10 w-44 text-sm" role="group" aria-label="Moneda">
+          <button type="button" aria-pressed={moneda === 'ARS'} onClick={() => setMoneda('ARS')} className="!text-sm">Pesos</button>
+          <button type="button" aria-pressed={moneda === 'USD'} onClick={() => setMoneda('USD')} className="!text-sm">Dólares</button>
+        </div>
+      </div>
 
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">¿Cuánto salió en total?</span>
         <span className="flex items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3.5">
-          <span className="text-xl font-semibold">$</span>
+          <span className="text-xl font-semibold">{signo}</span>
           <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
                  value={conPuntos(total)} onChange={(e) => setTotal(soloDigitos(e.target.value))}
                  className="min-h-[50px] w-full bg-transparent text-xl font-semibold outline-none" />
@@ -85,13 +99,13 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
             <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.esYo ? 'Vos' : m.nombre}</span>
             {manual ? (
               <span className="flex items-center gap-1 rounded-xl border border-gr-line px-2">
-                <span className="font-semibold">$</span>
+                <span className="font-semibold">{signo}</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`} placeholder="0"
                        value={conPuntos(partes[m.userId] ?? '')} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}
                        className="min-h-10 w-24 bg-transparent text-right text-lg font-semibold outline-none" />
               </span>
             ) : (
-              <span className="text-lg font-semibold tabular-nums">{pesos(montos[i])}</span>
+              <span className="text-lg font-semibold tabular-nums">{p(montos[i])}</span>
             )}
           </li>
         ))}
@@ -99,14 +113,14 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, co
 
       <p aria-live="polite" className={`text-sm font-semibold ${valido || !totalN ? 'text-gr-muted' : ''}`}>
         {!totalN ? 'Poné el total y se divide solo.'
-          : diferencia === 0 ? `Suma justo ${pesos(totalN)}. Tu parte ya cuenta como paga.`
-          : diferencia > 0 ? `Faltan ${pesos(diferencia)} para llegar al total.`
-          : `Te pasaste ${pesos(-diferencia)} del total.`}
+          : diferencia === 0 ? `Suma justo ${p(totalN)}. Tu parte ya cuenta como paga.`
+          : diferencia > 0 ? `Faltan ${p(diferencia)} para llegar al total.`
+          : `Te pasaste ${p(-diferencia)} del total.`}
       </p>
 
       <input name="nota" maxLength={LARGO.notaCompra} placeholder="¿Qué compraste? (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} className="gr-input shadow-none" />
       <BotonEnviar disabled={!valido} pendiente="Guardando…" className="gr-btn-primary gr-btn--sm w-full">
-        {corregir ? (valido ? `Guardar · dividir ${pesos(totalN)}` : 'Guardar') : valido ? `Lo compré · dividir ${pesos(totalN)}` : 'Lo compré'}
+        {corregir ? (valido ? `Guardar · dividir ${p(totalN)}` : 'Guardar') : valido ? `Lo compré · dividir ${p(totalN)}` : 'Lo compré'}
       </BotonEnviar>
     </form>
   )
