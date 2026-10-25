@@ -9,8 +9,8 @@ import { Icon, Starburst } from '@/components/ui'
 // día". En la app instalada no hay uno del sistema; en el navegador reemplaza al suyo (overscroll-behavior en el body),
 // que recargaba la página entera.
 
-/** Las pantallas donde lo que se ve lo pueden cambiar otros. No los formularios (Agregar, Editar, Perfil, un grupo nuevo). */
-const DONDE = /^\/(?:inicio|gente|cuentas|mi-lista|eventos|deseo\/[^/]+|grupos\/(?!nuevo$|unirme(?:\/|$))[^/]+|l\/.+)$/
+/** Las pantallas donde lo que se ve lo pueden cambiar otros (Mis regalos: un regalo grupal en el que estás). No los formularios (Agregar, Editar, Perfil, un grupo nuevo). */
+const DONDE = /^\/(?:inicio|gente|cuentas|regalos|mi-lista|eventos|deseo\/[^/]+|grupos\/(?!nuevo$|unirme(?:\/|$))[^/]+|l\/.+)$/
 export const refrescaEn = (path: string) => DONDE.test(path)
 
 /** Cuánto hay que tirar (con la resistencia, la mitad de lo que baja el dedo) para que al soltar actualice. */

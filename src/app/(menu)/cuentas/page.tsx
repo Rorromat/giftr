@@ -9,6 +9,7 @@ import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { miFoto } from '@/lib/perfil'
+import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
 
 function Linea({ l }: { l: LineaCuenta }) {
@@ -160,6 +161,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
         <h1 className="gr-title">Cuentas</h1>
         <p className="text-[15px] text-gr-muted">Los regalos grupales: quién le debe a quién.</p>
       </div>
+      <PestanasRegalos actual="cuentas" />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="gr-hero flex flex-col gap-1.5 p-4">
