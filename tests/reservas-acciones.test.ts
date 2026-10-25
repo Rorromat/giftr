@@ -48,8 +48,8 @@ async function redirigeA(p: Promise<unknown>): Promise<string> {
 test('agregar un "Quiero ESTO" con "Se puede repetir" tildado lo guarda sin la marca; una idea, con ella', async () => {
   const { owner } = await preparar()
   h.session = { userId: owner.id }
-  expect(await redirigeA(addItemAction(form({ titulo: 'Mate imperial', tipo: 'exacto', repetible: 'on' })))).toBe('/mi-lista')
-  expect(await redirigeA(addItemAction(form({ titulo: 'Medias', tipo: 'idea', repetible: 'on' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: 'Mate imperial', tipo: 'exacto', repetible: 'on' })))).toMatch(/^\/mi-lista\?agregado=/)
+  expect(await redirigeA(addItemAction(form({ titulo: 'Medias', tipo: 'idea', repetible: 'on' })))).toMatch(/^\/mi-lista\?agregado=/)
   const filas = await h.db.select({ titulo: items.titulo, repetible: items.repetible }).from(items)
   expect(Object.fromEntries(filas.map((f) => [f.titulo, f.repetible]))).toEqual({ Termo: false, 'Mate imperial': false, Medias: true })
 })

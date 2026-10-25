@@ -1,6 +1,7 @@
 import type { CambiosDeseo, NewItemData } from '@/lib/items'
 import { largo, LARGO } from '@/lib/limites'
 import { esUrlFotoDeseo, linkEnTexto, linkHttp, sitioDeLink, tituloDelLink } from '@/lib/links'
+import { pesos } from '@/lib/pesos'
 
 // Sin dependencias del servidor: los avisos de abajo los usan los campos del formulario en el navegador.
 
@@ -51,6 +52,17 @@ export function linkQuePasa(titulo: string, linkTienda: string | null | undefine
  * - alAgregar: no hay link guardado que conservar, así que algo que no es link en "Link a la tienda" cuenta como vacío y
  *   el del título pasa igual (llega sin JS o antes de que hidrate: si no, se quedaba en el título y createItem lo cortaba).
  */
+/**
+ * El precio como se muestra: lo escrito solo con números (con el teclado numérico, "45000" o "45.000", con o sin "$") queda
+ * "$45.000". Lo demás (dólares, un rango, lo que trajo la lectura del link) tal cual.
+ */
+export function normalizarPrecio(p: string | null): string | null {
+  const m = p?.match(/^\$?\s*(\d{1,3}(?:\.\d{3})+|\d+)$/)
+  if (!m) return p
+  const n = Number(m[1].replaceAll('.', ''))
+  return Number.isSafeInteger(n) && n > 0 ? pesos(n) : p
+}
+
 export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | null {
   let titulo = campo(fd, 'titulo')
   if (!titulo) return null
@@ -67,7 +79,7 @@ export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | 
     tipo,
     titulo,
     notas: campo(fd, 'notas'),
-    precio: campo(fd, 'precio'),
+    precio: normalizarPrecio(campo(fd, 'precio')),
     rangoPrecio: campo(fd, 'rangoPrecio'),
     categoria: campo(fd, 'categoria'),
     prioridad: p === 'mucho' || p === 'suelta' ? p : 'gustaria',

@@ -92,7 +92,9 @@ export async function addItemAction(formData: FormData) {
   const creado = await createItem(db, session.userId, paraAgregar(data), listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
-  redirect(listaId && creado ? `/grupos/${listaId}` : '/mi-lista')
+  // vuelve a la lista con el deseo recién agregado marcado (ver RecienAgregado)
+  const agregado = creado ? `?agregado=${creado.id}` : ''
+  redirect(listaId && creado ? `/grupos/${listaId}${agregado}` : `/mi-lista${agregado}`)
 }
 
 export async function updateItemAction(formData: FormData) {

@@ -15,9 +15,8 @@ export default async function Editar({ params }: { params: Promise<{ id: string 
   const { deseo } = editable
 
   return (
-    <main className="gr-hoja flex flex-col gap-1 pb-8 pt-2">
+    <main className="gr-hoja flex flex-col gap-1 pt-2">
       <PageHeader title="Editar deseo" back={`/deseo/${deseo.id}`} backLabel="Volver al deseo" />
-      <p className="text-center text-sm text-gr-muted">Cambiá lo que necesites.</p>
 
       <DeseoForm action={updateItemAction} deseo={deseo} boton="Guardar cambios" />
     </main>

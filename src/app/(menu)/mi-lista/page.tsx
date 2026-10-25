@@ -10,9 +10,11 @@ import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/e
 import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { ListaHero } from '@/components/ListaHero'
+import { RecienAgregado } from '@/components/RecienAgregado'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
-export default async function MiLista() {
+export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string }> }) {
+  const { agregado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, bienvenida, grupos, foto, cumple] = await Promise.all([
@@ -67,8 +69,9 @@ export default async function MiLista() {
         <SectionHeader title="Tus deseos" href="/agregar" linkLabel="+ Agregar" />
       )}
 
-      <OwnerItemsGrid items={activos} shareToken={lista.shareToken} />
+      <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
+      {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro="/agregar" />}
     </Seccion>
   )
 }

@@ -130,7 +130,7 @@ export function CompletarDesdeLink({ guardado, tituloGuardado = null }: { guarda
   // Una línea siempre, también vacía: lo que aparece no corre la foto ni lo de abajo. Los avisos son cortos para entrar en un
   // teléfono; "Buscando…" con un sitio largo (o con la letra agrandada) entra cortado, y el lector de pantalla lo lee entero.
   return (
-    <p ref={linea} role="status" className="-mt-1 min-h-4 truncate text-xs font-semibold">
+    <p ref={linea} role="status" className="min-h-4 truncate px-1.5 pt-1 text-xs font-semibold text-gr-muted">
       {estado.aviso || null}
     </p>
   )

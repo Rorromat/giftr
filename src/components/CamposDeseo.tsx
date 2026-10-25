@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComponentProps } from 'react'
-import { avisoDelLink, avisoDelTitulo } from '@/lib/deseo-form'
+import { avisoDelLink, avisoDelTitulo, normalizarPrecio } from '@/lib/deseo-form'
 import { linkHttp } from '@/lib/links'
 
 type Props = Omit<ComponentProps<'input'>, 'onChange' | 'maxLength'>
@@ -57,3 +57,11 @@ export function completarCampo(form: HTMLFormElement, nombre: 'titulo' | 'linkTi
   if (link instanceof HTMLInputElement) revisar(link, avisoDelLink)
   if (titulo instanceof HTMLInputElement) revisar(titulo, avisoTitulo)
 }
+
+/** El precio: con el teclado de números, y al dejarlo, "450000" pasa a "$450.000" (como lo guarda el servidor, ver normalizarPrecio). */
+export const CampoPrecio = (props: Omit<ComponentProps<'input'>, 'onBlur'>) => (
+  <input {...props} onBlur={(e) => {
+    const v = normalizarPrecio(e.currentTarget.value.trim() || null)
+    if (v && v !== e.currentTarget.value) e.currentTarget.value = v
+  }} />
+)
