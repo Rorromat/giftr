@@ -39,37 +39,40 @@ export async function Banners() {
     <div className="flex flex-col gap-2.5">
       {invitado && <PreguntaInvitado nombre={invitado} />}
       {codazos.length > 0 && (
-        <div className="relative flex flex-col gap-2.5 rounded-2xl bg-gr-accent py-3 pl-3.5 pr-12">
-          <p className="text-sm font-semibold leading-snug [overflow-wrap:anywhere]">
-            <span className="font-extrabold">{juntarNombres(quienes)}</span> te {quienes.length > 1 ? 'dieron' : 'dio'} un codazo:
-            {quienes.length > 1 ? ' quieren' : ' quiere'} saber qué regalarte{grupo ? ` en "${grupo.listaNombre ?? 'tu grupo'}"` : ''}.
-          </p>
+        <div className="flex flex-col gap-3 rounded-[22px] bg-gr-blue p-4 text-gr-on-blue shadow-card">
+          <div className="flex items-start gap-3">
+            <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-blue/15 text-xl">👉</span>
+            <p className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">
+              <span className="font-semibold">{juntarNombres(quienes)}</span> te {quienes.length > 1 ? 'dieron' : 'dio'} un codazo:
+              {quienes.length > 1 ? ' quieren' : ' quiere'} saber qué regalarte{grupo ? ` en "${grupo.listaNombre ?? 'tu grupo'}"` : ''}.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
-            <Link href={grupo ? `/agregar?lista=${grupo.listId}` : '/agregar'} className="gr-btn gr-btn--sm flex-none rounded-[14px] px-4 font-sans text-sm font-bold">
+            <Link href={grupo ? `/agregar?lista=${grupo.listId}` : '/agregar'} className="gr-btn gr-btn--sm flex-none border-white">
               Agregar algo
             </Link>
             <form action={vistoCodazosAction}>
-              <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Listo</BotonEnviar>
+              <BotonEnviar className="min-h-11 px-2 text-sm font-semibold underline underline-offset-4">Listo</BotonEnviar>
             </form>
           </div>
-          {!avisos && <p className="text-xs font-semibold">Activá los avisos en Perfil para enterarte al toque.</p>}
+          {!avisos && <p className="text-xs font-medium text-gr-on-blue/80">Activá los avisos en Perfil para enterarte al toque.</p>}
         </div>
       )}
       {notifs.map((n) => (
         <QuizasLink key={n.id} href={n.href}
-                    className="flex items-center gap-2 rounded-2xl border border-gr-line bg-gr-surface px-3.5 py-3 text-sm font-medium">
+                    className="gr-card flex items-center gap-3 px-4 py-3.5 text-sm font-medium">
           <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{n.texto}</span>
-          {n.href && <Icon name="chevron" size={18} strokeWidth={2.6} className="flex-none" />}
+          {n.href && <Icon name="chevron" size={18} className="flex-none text-gr-muted" />}
         </QuizasLink>
       ))}
       {warnings.map((w) => (
         <QuizasLink key={w.claimId} href={w.href}
-                    className="relative block rounded-2xl border border-gr-line bg-gr-ink py-3 pl-3.5 pr-12 text-sm font-medium text-gr-bg">
+                    className="relative block rounded-[22px] bg-gr-brand px-4 py-3.5 text-sm font-medium text-gr-on-brand">
           {`¿Conseguiste "${w.itemTitulo}"? Te quedan `}
-          <span className="font-bold text-gr-accent">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
+          <span className="font-semibold text-gr-accent">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
           {' de reserva.'}
           {/* en el deseo se marca comprado o se libera */}
-          {w.href && <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Marcalo o liberalo</span>}
+          {w.href && <span className="mt-0.5 block font-semibold underline underline-offset-4">Marcalo o liberalo</span>}
           {/* Sin el link de ahora no llega al deseo: lo marca o lo libera desde acá, como un regalo grupal en Cuentas. Si
               no, vencía y el deseo volvía a quedar libre aunque ya lo hubiera comprado. Un invitado que solo tenía esa
               lista no ve este cartel en ningún lado (no abre otras): su reserva vence sola.
@@ -81,11 +84,11 @@ export async function Banners() {
             <div className="flex gap-4">
               <form action={boughtAction}>
                 <input type="hidden" name="claimId" value={w.claimId} />
-                <BotonEnviar className="min-h-11 font-bold text-gr-accent underline decoration-2 underline-offset-4">Ya lo compré</BotonEnviar>
+                <BotonEnviar className="min-h-11 font-semibold text-gr-accent underline underline-offset-4">Ya lo compré</BotonEnviar>
               </form>
               <form action={releaseAction}>
                 <input type="hidden" name="claimId" value={w.claimId} />
-                <BotonEnviar className="min-h-11 font-bold underline decoration-2 underline-offset-4">Liberala</BotonEnviar>
+                <BotonEnviar className="min-h-11 font-semibold underline underline-offset-4">Liberala</BotonEnviar>
               </form>
             </div>
           )}
@@ -95,20 +98,20 @@ export async function Banners() {
           organiza se le recuerda que lo cierre (ver cuandoRecordar). Si todavía no es momento, "Sigue en pie" lo saca por 2
           semanas. */}
       {sinCerrar.map((r) => (
-        <div key={r.giftId} className="relative rounded-2xl border border-gr-line bg-gr-ink pb-1 pl-3.5 pr-12 pt-3 text-sm font-medium text-gr-bg">
+        <div key={r.giftId} className="relative rounded-[22px] bg-gr-brand px-4 pb-1.5 pt-3.5 text-sm font-medium text-gr-on-brand">
           <Link href={r.href} className="block">
             {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
-            <span className="mt-0.5 block font-bold underline decoration-2 underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
+            <span className="mt-0.5 block font-semibold underline underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
           </Link>
           <form action={postponeGroupGiftReminderAction}>
             <input type="hidden" name="giftId" value={r.giftId} />
-            <BotonEnviar className="min-h-11 text-xs font-bold text-gr-accent underline decoration-2 underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
+            <BotonEnviar className="min-h-11 text-xs font-semibold text-gr-accent underline underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
           </form>
         </div>
       ))}
       {notifs.length > 0 && (
         <form action={markNotifsReadAction}>
-          <BotonEnviar className="min-h-11 text-xs font-bold underline decoration-2 underline-offset-4">Marcar como leídas</BotonEnviar>
+          <BotonEnviar className="min-h-11 text-xs font-semibold underline underline-offset-4">Marcar como leídas</BotonEnviar>
         </form>
       )}
     </div>

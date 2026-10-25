@@ -30,18 +30,21 @@ export function Codazo({ token, para, plural, identified, conGoogle = false, res
   const wa = encodeURIComponent(`👉 ¡Codazo! Cargá lo que querés en GiftR así sé qué regalarte: ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/mi-lista`)
   return (
     <section id="codazo" className="flex scroll-mt-6 flex-col gap-2.5">
-      {mensaje && <p role="status" className="rounded-2xl bg-gr-ink px-3.5 py-3 text-sm font-semibold text-gr-bg">{mensaje}</p>}
+      {mensaje && <p role="status" className="rounded-[18px] bg-gr-blue px-4 py-3 text-sm font-medium text-gr-on-blue">{mensaje}</p>}
       {resultado === 'cartel' && (
-        <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn min-h-11 gap-2 font-sans text-sm font-bold">
-          <Icon name="chat" size={18} strokeWidth={2.4} />Mandale también un WhatsApp
+        <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn min-h-11 gap-2 text-sm">
+          <Icon name="chat" size={18} strokeWidth={2} />Mandale también un WhatsApp
         </a>
       )}
-      <div className="gr-sticker flex flex-col gap-2.5 p-3.5">
-        <div>
-          <p className="font-display text-lg leading-tight font-extrabold">¿{plural ? 'Les' : 'Le'} falta cargar cosas?</p>
-          <p className="text-[13px] font-medium leading-snug">
-            Mandale{plural ? 's' : ''} un codazo: {plural ? 'les' : 'le'} avisamos a {para} que querés saber qué regalar{plural ? 'les' : 'le'}.
-          </p>
+      <div className="gr-card flex flex-col gap-3 p-4">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-blue text-xl text-white">👉</span>
+          <div>
+            <p className="text-base leading-tight font-semibold">¿{plural ? 'Les' : 'Le'} falta cargar cosas?</p>
+            <p className="mt-0.5 text-[13px] leading-snug text-gr-muted">
+              Mandale{plural ? 's' : ''} un codazo: {plural ? 'les' : 'le'} avisamos a {para} que querés saber qué regalar{plural ? 'les' : 'le'}.
+            </p>
+          </div>
         </div>
         {identified ? (
           <form action={codazoAction}>
@@ -49,9 +52,9 @@ export function Codazo({ token, para, plural, identified, conGoogle = false, res
             <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">👉 Mandar un codazo</BotonEnviar>
           </form>
         ) : (
-          <p className="text-[13px] font-semibold leading-snug">
+          <p className="text-[13px] font-medium leading-snug">
             Para mandarlo, primero{' '}
-            <a href={conGoogle ? '#otra-cuenta' : '#quien-sos'} className="font-bold underline decoration-2 underline-offset-4">
+            <a href={conGoogle ? '#otra-cuenta' : '#quien-sos'} className="font-semibold underline underline-offset-4">
               {conGoogle ? 'entrá con Google' : 'decinos quién sos'}
             </a>
             : así sabe{plural ? 'n' : ''} quién se lo manda.

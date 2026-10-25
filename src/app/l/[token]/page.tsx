@@ -17,7 +17,7 @@ import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
-import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag } from '@/components/ui'
+import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag, LogoSticker } from '@/components/ui'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
@@ -47,8 +47,8 @@ function YaLoReservaste({ item }: { item: Tarjeta }) {
   const grupal = item.claims.some((c) => c.grupal?.soyParte)
   const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
   return (
-    <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-gr-ink px-3 text-[13px] font-bold text-gr-accent">
-      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.6} />
+    <span className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-gr-brand px-3.5 text-[13px] font-semibold text-gr-on-brand">
+      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.2} className="text-gr-accent" />
       {grupal ? 'En el regalo grupal' : compraste ? 'Ya lo compraste' : 'Ya lo reservaste'}
     </span>
   )
@@ -121,39 +121,45 @@ export default async function ListaAjena({
   const heroCupo = hero && cupo(hero)
 
   return (
-    <main className="flex flex-col gap-3 pb-32 pt-[52px]">
-      <div className="flex items-center gap-3">
-        {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
-        <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
-          {vista.grupoNombre
-            ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={48} />
-            : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} />}
-        </Link>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="font-display text-[34px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">
-            {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
-          </h1>
-          <p className="text-sm font-medium">
-            {vista.grupoNombre && `De ${vista.ownerNombre}. `}Elegí, reservá y no te duplicás con nadie.
-          </p>
+    <main className="flex flex-col gap-4 pb-36 pt-2">
+      <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
+
+      <section className="gr-hero flex flex-col gap-4 p-5">
+        <div className="flex items-center gap-3.5">
+          {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
+          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
+            {vista.grupoNombre
+              ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={52} />
+              : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-gr-on-hero/20" />}
+          </Link>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
+              {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
+            </h1>
+            <p className="text-sm text-gr-on-hero/70">
+              {vista.grupoNombre && `De ${vista.ownerNombre}. `}Elegí, reservá y no te duplicás con nadie.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {cuenta && (
-        <p className="self-start rounded-full bg-gr-accent px-3.5 py-1.5 font-display text-[15px] font-extrabold">
-          {cuenta}
-        </p>
-      )}
+        {cuenta && (
+          <p className="flex items-center gap-2 self-start rounded-full bg-gr-accent py-1.5 pl-2.5 pr-3.5 text-sm font-semibold text-gr-ink">
+            <Icon name="cake" size={16} className="flex-none" />{cuenta}
+          </p>
+        )}
 
-      {veTodo ? (
-        <p className="flex items-center gap-2 self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">
-          <Icon name="lock" size={16} strokeWidth={2.4} className="text-gr-accent" />
-          {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
-        </p>
-      ) : vista.motivo === 'ex_dueno' ? <ExDueno />
+        {veTodo && (
+          <p className="flex items-center gap-2 border-t border-gr-on-hero/10 pt-3.5 text-[13px] text-gr-on-hero/80">
+            <Icon name="lock" size={16} className="flex-none text-gr-hero-detail" />
+            {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
+          </p>
+        )}
+      </section>
+
+      {!veTodo && (vista.motivo === 'ex_dueno' ? <ExDueno />
         : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
           : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
-            : <QuienSos token={token} volver={aqui} />}
+            : <QuienSos token={token} volver={aqui} />)}
 
       <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 
@@ -164,7 +170,7 @@ export default async function ListaAjena({
 
       <Banners />
 
-      <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1">
+      <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
         <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
         {veTodo && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
         {categorias.map((c) => (
@@ -176,64 +182,62 @@ export default async function ListaAjena({
       </nav>
 
       {mostrados.length === 0 && (
-        <p className="mt-8 rounded-sticker bg-gr-soft px-5 py-8 text-center text-[15px] font-medium">
+        <p className="gr-empty mt-4 py-8 text-center">
           {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
         </p>
       )}
 
       {hero && (
-        <article className="gr-sticker relative mt-1 rounded-3xl">
+        <article className="gr-card relative">
           <div className="relative">
             <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
+            <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
           </div>
-          <div className="flex flex-col gap-2.5 p-3.5">
+          <div className="flex flex-col gap-3 p-4">
             <div className="flex flex-col gap-1">
-              <Link href={`/l/${token}/item/${hero.id}`} className="text-[19px] leading-snug font-semibold [overflow-wrap:anywhere]">
+              <Link href={`/l/${token}/item/${hero.id}`} className="text-xl leading-snug font-semibold [overflow-wrap:anywhere]">
                 {hero.titulo}
               </Link>
-              <div className="flex items-center gap-2">
-                {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-bold">{hero.precio ?? hero.rangoPrecio}</p>}
-                <PriorityTag prioridad={hero.prioridad} className="h-6" />
-              </div>
-              {hero.notas && <p className="text-sm leading-snug [overflow-wrap:anywhere]">{hero.notas}</p>}
+              {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-semibold">{hero.precio ?? hero.rangoPrecio}</p>}
+              {hero.notas && <p className="text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">{hero.notas}</p>}
               {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
             </div>
             <div className="flex items-center gap-2">
               {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
-              <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn min-h-[50px] flex-1 text-sm">Ver más</Link>
+              <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn gr-btn--sm flex-1">Ver más</Link>
             </div>
           </div>
         </article>
       )}
 
       {resto.length > 0 && (
-        <ul className="mt-1.5 grid grid-cols-2 items-start gap-3">
+        <ul className="grid grid-cols-2 items-stretch gap-3">
           {resto.map((item) => {
             const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
             const cuantas = cupo(item)
             return (
-              <li key={item.id} className="gr-sticker relative">
+              <li key={item.id} className="gr-card relative flex flex-col">
                 <div className="relative">
                   <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
                   {!item.disponible && (
-                    <span className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] rounded-lg bg-gr-ink px-2 py-1 text-[13px] leading-tight font-bold text-gr-bg [overflow-wrap:anywhere]">
+                    <span className="absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
                       {estadoNoDisponible(item)}
                     </span>
                   )}
                 </div>
-                <div className="flex flex-col gap-1 px-3 pb-3 pt-2.5">
-                  <Link href={`/l/${token}/item/${item.id}`} className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
+                <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
+                  <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
                     {item.titulo}
                   </Link>
                   <div className="flex items-center gap-1.5">
-                    {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-bold">{item.precio ?? item.rangoPrecio}</p>}
+                    {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-semibold">{item.precio ?? item.rangoPrecio}</p>}
                     {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
                   </div>
                   {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
-                  <div className="mt-1 flex flex-col items-start gap-0.5">
+                  <div className="mt-auto flex flex-col items-stretch gap-0.5 pt-1.5">
                     {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
                     <Link href={`/l/${token}/item/${item.id}`}
-                          className="inline-flex min-h-11 items-center text-[13px] font-bold underline decoration-2 underline-offset-4">
+                          className="inline-flex min-h-11 items-center justify-center text-[13px] font-semibold">
                       Ver más
                     </Link>
                   </div>
@@ -244,7 +248,7 @@ export default async function ListaAjena({
         </ul>
       )}
 
-      <div className="mt-4">
+      <div className="mt-2">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
                 identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
       </div>
@@ -256,13 +260,9 @@ export default async function ListaAjena({
         <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-10 bg-gr-ink text-gr-bg">
-        <div className="mx-auto flex h-[74px] max-w-md items-center justify-between px-[18px] pb-2.5">
-          <p className="text-[13px] font-medium">¿Y vos qué querés?</p>
-          <Link href="/" className="inline-flex h-11 items-center rounded-[14px] bg-gr-accent px-4 font-display text-[15px] font-extrabold text-gr-ink">
-            Armá tu lista →
-          </Link>
-        </div>
+      <div className="gr-floatbar">
+        <p className="text-sm font-medium">¿Y vos qué querés?</p>
+        <Link href="/" className="gr-btn gr-btn--accent gr-btn--sm">Armá tu lista →</Link>
       </div>
     </main>
   )

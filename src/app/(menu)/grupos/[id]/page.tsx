@@ -9,7 +9,8 @@ import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { AvatarStack, BackLink, Icon, Seccion, Starburst } from '@/components/ui'
+import { AvatarStack, Icon, PageHeader, Seccion, SectionHeader } from '@/components/ui'
+import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
 // Después de cambiar un link o sacar a alguien (?nuevo=…), arriba se confirma qué pasó.
@@ -40,69 +41,61 @@ export default async function Grupo({ params, searchParams }: {
   const waInvitar = encodeURIComponent(`Armemos juntos la lista "${grupo.nombre}" en GiftR: ${inviteUrl}`)
 
   return (
-    <Seccion className="flex flex-col gap-3.5 pb-48 pt-[52px]">
-      <div className="flex items-center justify-between">
-        <BackLink href="/mi-lista" label="Volver a Mi lista" />
-        <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm min-h-11 rounded-[14px]">+ Agregar</Link>
-      </div>
+    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
+      <PageHeader title="Lista en común" titulo="p" back="/mi-lista" backLabel="Volver a Mi lista"
+                  action={<Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn bg-gr-accent"><Icon name="plus" size={20} strokeWidth={2.4} /></Link>} />
 
-      <div className="relative flex flex-col gap-1 pr-20">
-        <h1 className="gr-title [overflow-wrap:anywhere]">{grupo.nombre}</h1>
-        {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
+      <ListaHero etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
+                 waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}>
         {/* Fecha del grupo: aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
-        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${fechaInvalida}`} open={fechaInvalida} className="group self-start">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full bg-gr-on-hero/10 py-1.5 pl-2.5 pr-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            <Icon name="calendar" size={16} className="flex-none text-gr-accent" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())}
           </summary>
-          <form action={setGroupDateAction} className="mt-1 flex flex-col gap-2 rounded-2xl border border-gr-line bg-gr-surface p-3">
+          <form action={setGroupDateAction} className="mt-2 flex flex-col gap-2 rounded-2xl bg-gr-surface p-3 text-gr-ink">
             <input type="hidden" name="grupoId" value={grupo.id} />
             {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
             <input name="fecha" type="date" required min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`}
                    defaultValue={fechaParaEditar(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())} aria-label="Fecha del grupo" className="gr-input" />
-            <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+            <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
               <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
             </label>
             <div className="flex gap-2">
-              <BotonEnviar className="gr-btn-primary gr-btn--sm flex-1 rounded-[14px]">Guardar</BotonEnviar>
+              <BotonEnviar className="gr-btn-primary gr-btn--sm flex-1">Guardar</BotonEnviar>
               {grupo.eventoFecha && (
-                <BotonEnviar name="quitar" value="1" formNoValidate className="gr-btn gr-btn--sm flex-none rounded-[14px] font-sans text-sm font-bold">Quitar</BotonEnviar>
+                <BotonEnviar name="quitar" value="1" formNoValidate className="gr-btn gr-btn--sm flex-none">Quitar</BotonEnviar>
               )}
             </div>
           </form>
         </details>
-        {activos.length > 0 && (
-          <Starburst label={`${activos.length} ${activos.length === 1 ? 'deseo' : 'deseos'}`}
-                     fontSize={activos.length > 99 ? 30 : 40} className="absolute -top-1 right-[10px]">
-            {activos.length}
-          </Starburst>
-        )}
-      </div>
+      </ListaHero>
 
       <Banners />
 
       {aviso && (
-        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-semibold">{aviso}</p>
+        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-medium">{aviso}</p>
       )}
 
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
-      <section className="gr-sticker flex flex-col gap-3 p-3.5">
+      <section className="gr-card flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
           <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} />
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg leading-tight font-extrabold">
+            <p className="text-base leading-tight font-semibold">
               {otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora'}
             </p>
-            <p className="text-[13px] font-medium leading-snug">Invitá a quien arma la lista con vos: va a poder agregar y editar.</p>
+            <p className="text-[13px] leading-snug text-gr-muted">Invitá a quien arma la lista con vos: va a poder agregar y editar.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-2xl bg-gr-ink py-2 pl-3.5 pr-2 text-gr-bg">
-          <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-gr-accent">{inviteUrl.replace(/^https?:\/\//, '')}</p>
+        <div className="flex items-center gap-2 rounded-full bg-gr-soft py-1.5 pl-4 pr-1.5">
+          <p className="min-w-0 flex-1 truncate text-[13px] font-medium">{inviteUrl.replace(/^https?:\/\//, '')}</p>
           <CopyLinkButton url={inviteUrl} />
         </div>
         <a href={`https://wa.me/?text=${waInvitar}`} target="_blank"
-           className="gr-btn min-h-11 justify-center gap-2 font-sans text-sm font-bold">
-          <Icon name="users" size={18} strokeWidth={2.4} />
+           className="gr-btn gr-btn--sm justify-center gap-2">
+          <Icon name="users" size={18} />
           Invitar por WhatsApp
         </a>
         <p className="text-xs text-gr-muted">Para los que regalan usá “Mandala por WhatsApp”: ese link no deja editar.</p>
@@ -114,10 +107,10 @@ export default async function Grupo({ params, searchParams }: {
         {/* el que entró por error deja de editar: lo saca uno que ya estaba, y sigue sin ver lo reservado (como uno que sale) */}
         {grupo.sacables.length > 0 && (
           <details className="group flex flex-col">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold [&::-webkit-details-marker]:hidden">
               ¿Alguien se sumó por error?
             </summary>
-            <p className="text-[13px] font-medium leading-snug">Podés sacar a quien se sumó después que vos.</p>
+            <p className="text-[13px] leading-snug text-gr-muted">Podés sacar a quien se sumó después que vos.</p>
             {grupo.sacables.map((m) => (
               <Confirmar key={m.id} resumen={`Sacar a ${m.nombre}`} boton={`Sí, sacar a ${m.nombre}`}
                          action={removeMemberAction} ocultos={{ grupoId: grupo.id, userId: m.id }}>
@@ -130,16 +123,20 @@ export default async function Grupo({ params, searchParams }: {
         )}
       </section>
 
-      {activos.length === 0 && (
-        <div className="relative mt-4 rounded-sticker bg-gr-soft px-5 py-8 text-center text-[15px] font-medium">
-          Todavía no hay nada en “{grupo.nombre}”.<br />Agreguen lo primero que necesiten.
+      {activos.length === 0 ? (
+        <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
+          <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
+          <p>Todavía no hay nada en “{grupo.nombre}”.<br />Agreguen lo primero que necesiten.</p>
+          <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm">Agregar un deseo</Link>
         </div>
+      ) : (
+        <SectionHeader title="Sus deseos" href={`/agregar?lista=${grupo.id}`} linkLabel="+ Agregar" />
       )}
 
       <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} />
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
 
-      <div className="mt-4 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}
                    ocultos={{ grupoId: grupo.id }} className="items-center">
           El link de ahora deja de andar: los que lo tienen no van a poder abrir la lista hasta que les mandes el nuevo, y
@@ -154,11 +151,6 @@ export default async function Grupo({ params, searchParams }: {
         )}
       </div>
 
-      <a href={`https://wa.me/?text=${waRegalar}`} target="_blank"
-         className="gr-btn gr-btn--dark fixed bottom-[104px] left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
-        <Icon name="chat" size={20} strokeWidth={2.4} />
-        Mandala por WhatsApp
-      </a>
     </Seccion>
   )
 }

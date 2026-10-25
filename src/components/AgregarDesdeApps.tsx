@@ -79,7 +79,7 @@ export function AgregarDesdeApps({ plataforma, base, atajo }: { plataforma: Plat
         <p className={chico}>{TEXTOS_APPS.ios.chico}</p>
       </div>
       <details open={!atajo} className="group flex flex-col">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold underline underline-offset-4 [&::-webkit-details-marker]:hidden">
           {atajo ? TEXTOS_APPS.receta.conAtajo : TEXTOS_APPS.receta.sinAtajo}
         </summary>
         <ol className={`${texto} flex list-decimal flex-col gap-1 pl-5`}>

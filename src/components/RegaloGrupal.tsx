@@ -33,7 +33,7 @@ function Ocultos({ token, itemId, giftId }: Partial<Ctx> & { giftId?: string }) 
 function EntrarParaSumarte({ token, itemId, texto }: Ctx & { texto: string }) {
   return (
     <form action={async () => { 'use server'; await signIn('google', { redirectTo: `/l/${token}/item/${itemId}` }) }}>
-      <button className="gr-btn w-full min-h-11 px-3.5 font-sans text-[15px] font-bold">{texto}</button>
+      <button className="gr-btn w-full min-h-11 px-3.5 text-[15px]">{texto}</button>
       <p className="mt-1.5 text-xs text-gr-muted">Las cuentas del regalo necesitan saber quién sos: entrás con Google.</p>
     </form>
   )
@@ -47,8 +47,8 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
       {logueado ? (
         <form action={startGroupGiftAction}>
           <Ocultos token={token} itemId={itemId} />
-          <BotonEnviar className="gr-btn w-full min-h-11 gap-2 px-3.5 font-sans text-[15px] font-bold">
-            <Icon name="users" size={18} strokeWidth={2.4} />{texto}
+          <BotonEnviar className="gr-btn w-full min-h-11 gap-2 px-3.5 text-[15px]">
+            <Icon name="users" size={18} strokeWidth={2} />{texto}
           </BotonEnviar>
         </form>
       ) : <EntrarParaSumarte token={token} itemId={itemId} texto={texto} />}
@@ -57,7 +57,7 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
   )
 }
 
-const linkSubrayado = 'flex min-h-11 cursor-pointer list-none items-center text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden'
+const linkSubrayado = 'flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold underline underline-offset-4 [&::-webkit-details-marker]:hidden'
 
 /**
  * Para el encargado mientras está abierto: sacar a alguien que se sumó por error (se le avisa y no se vuelve a sumar solo),
@@ -88,7 +88,7 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partia
                   <form action={removeGroupGiftMemberAction}>
                     <Ocultos token={token} itemId={itemId} giftId={giftId} />
                     <input type="hidden" name="miembroId" value={m.userId} />
-                    <BotonEnviar className="gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold">Sacar</BotonEnviar>
+                    <BotonEnviar className="gr-btn min-h-11 px-2.5 text-[13px]">Sacar</BotonEnviar>
                   </form>
                 </li>
               ))}
@@ -105,7 +105,7 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId }: Partia
                   <form action={letBackGroupGiftMemberAction}>
                     <Ocultos token={token} itemId={itemId} giftId={giftId} />
                     <input type="hidden" name="miembroId" value={m.id} />
-                    <BotonEnviar className="min-h-11 px-1 text-[13px] font-bold underline underline-offset-2">Dejar que vuelva</BotonEnviar>
+                    <BotonEnviar className="min-h-11 px-1 text-[13px] font-semibold underline underline-offset-4">Dejar que vuelva</BotonEnviar>
                   </form>
                 </li>
               ))}
@@ -172,11 +172,11 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   }
 
   return (
-    <section aria-label="Regalo grupal" className="gr-sticker flex flex-col gap-3 p-3.5">
+    <section aria-label="Regalo grupal" className="gr-card flex flex-col gap-3 p-3.5">
       <div className="flex items-center gap-3">
         <AvatarStack nombres={regalo.miembros.map((m) => m.nombre)} size={36} />
         <div className="min-w-0 flex-1">
-          <p className="font-display text-lg leading-tight font-extrabold">
+          <p className="text-lg leading-tight font-semibold">
             Regalo grupal{regalo.estado === 'comprado' && regalo.montoTotal ? ` · ${pesos(regalo.montoTotal)}` : ''}
           </p>
           <p className="text-[13px] font-medium leading-snug">
@@ -209,16 +209,16 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               </p>
               <form action={leaveGroupGiftAction}>
                 <Ocultos token={token} itemId={itemId} giftId={regalo.id} />
-                <BotonEnviar className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">Me bajo</BotonEnviar>
+                <BotonEnviar className="min-h-11 text-sm font-semibold underline underline-offset-4">Me bajo</BotonEnviar>
               </form>
             </>
           )}
 
           {regalo.soyEncargado && (
             <>
-              <a target="_blank" className="gr-btn min-h-11 gap-2 px-3.5 font-sans text-[15px] font-bold"
+              <a target="_blank" className="gr-btn min-h-11 gap-2 px-3.5 text-[15px]"
                  href={`https://wa.me/?text=${encodeURIComponent(`Armé un regalo grupal para ${ownerNombre}: "${titulo}". ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${itemId}`)}`}>
-                <Icon name="chat" size={18} strokeWidth={2.4} />Invitar por WhatsApp
+                <Icon name="chat" size={18} strokeWidth={2} />Invitar por WhatsApp
               </a>
               <details className="group flex flex-col">
                 <summary className="gr-btn-primary gr-btn--sm flex w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -243,7 +243,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
       ) : (
         <>
           {/* Comprado: quién puso cuánto y quién ya le pagó al encargado, a lo Splitwise */}
-          {nota && <p className="text-sm"><span className="font-bold">Compró:</span> {nota}</p>}
+          {nota && <p className="text-sm"><span className="font-semibold">Compró:</span> {nota}</p>}
           <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3">
             {regalo.miembros.map((m) => {
               const puedoMarcar = !m.esEncargado && (regalo.soyEncargado || m.esYo)
@@ -253,8 +253,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                     {m.esYo ? 'Vos' : m.nombre}
                     {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                   </span>
-                  <span className="font-display text-lg font-extrabold tabular-nums">{pesos(m.monto ?? 0)}</span>
-                  <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-bold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-ink text-gr-bg'}`}>
+                  <span className="text-lg font-semibold tabular-nums">{pesos(m.monto ?? 0)}</span>
+                  <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-brand text-gr-bg'}`}>
                     {m.esEncargado ? 'Puso' : m.pagado ? 'Pagó ✓' : 'Debe'}
                   </span>
                   {puedoMarcar && (
@@ -264,8 +264,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                       <input type="hidden" name="pagado" value={m.pagado ? '0' : '1'} />
                       {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
                       <input type="hidden" name="monto" value={m.monto ?? 0} />
-                      <BotonEnviar className={m.pagado ? 'min-h-11 px-1 text-xs font-bold underline underline-offset-2'
-                        : 'gr-btn min-h-11 px-2.5 font-sans text-[13px] font-bold'}>
+                      <BotonEnviar className={m.pagado ? 'min-h-11 px-1 text-xs font-semibold underline underline-offset-4'
+                        : 'gr-btn min-h-11 px-2.5 text-[13px]'}>
                         {m.pagado ? 'Deshacer' : m.esYo ? 'Ya le pagué' : 'Me pagó'}
                       </BotonEnviar>
                     </form>
@@ -289,8 +289,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               </div>
             </details>
           )}
-          <Link href="/cuentas" className="flex min-h-11 items-center gap-1 self-start text-sm font-bold underline decoration-2 underline-offset-4">
-            Ver todas mis cuentas <Icon name="chevron" size={16} strokeWidth={2.6} />
+          <Link href="/cuentas" className="flex min-h-11 items-center gap-1 self-start text-sm font-semibold underline underline-offset-4">
+            Ver todas mis cuentas <Icon name="chevron" size={16} strokeWidth={2.2} />
           </Link>
         </>
       )}

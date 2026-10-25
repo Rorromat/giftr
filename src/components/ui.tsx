@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 
-// Piezas base del sistema "Sticker". Server components puros (sin estado); la foto que no carga cae al placeholder
+// Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
 
 export const PRIORIDADES = {
@@ -31,7 +31,7 @@ export function Starburst({ children, sub, label, size = 62, fontSize = 40, clas
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       width={size} height={size} viewBox="0 0 100 100" className={className} style={style}
     >
-      <polygon points={STAR_POINTS} fill="var(--gr-accent)" stroke="var(--gr-ink)" strokeWidth="3.5" strokeLinejoin="round" />
+      <polygon points={STAR_POINTS} fill="var(--gr-accent)" />
       {children != null && (
         <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
               fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
@@ -64,7 +64,7 @@ export function Hearts({ n, className = '' }: { n: number; className?: string })
   )
 }
 
-/** Etiqueta de prioridad: negra con corazones ácidos si es "mucho", blanca si no. */
+/** Etiqueta de prioridad: negra con corazones lima si es "mucho", blanca si no (con una sombrita, sobre la foto). */
 export function PriorityTag({ prioridad, children, className = '' }: {
   prioridad: Prioridad
   children?: React.ReactNode
@@ -75,11 +75,11 @@ export function PriorityTag({ prioridad, children, className = '' }: {
   return (
     <span
       role="img" aria-label={label}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold ${
-        dark ? 'bg-gr-ink text-gr-accent' : 'bg-white/90 text-gr-ink'} ${className}`}
+      className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-[0_1px_4px_rgb(20_20_20/0.14)] ${
+        dark ? 'bg-gr-brand text-gr-accent' : 'bg-white/95 text-gr-ink'} ${className}`}
     >
       <Hearts n={corazones} />
-      {children && <span className={dark ? 'text-gr-bg' : ''}>{children}</span>}
+      {children && <span className={dark ? 'text-gr-on-brand' : ''}>{children}</span>}
     </span>
   )
 }
@@ -95,9 +95,7 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   const inicial = titulo.trim().charAt(0).toUpperCase()
   const placeholder = (
     <div className={`flex items-center justify-center bg-gr-soft ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }}>
-      <span aria-hidden className="font-display font-extrabold text-gr-line-strong" style={{ fontSize: Math.min(64, Math.round(height * 0.3)) }}>
-        {inicial}
-      </span>
+      <Starburst size={Math.min(84, Math.round(height * 0.5))} fontSize={44}>{inicial}</Starburst>
     </div>
   )
   if (!src) return placeholder
@@ -107,27 +105,27 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
 }
 
-/** Avatar cuadrado: la foto si hay, si no las iniciales (Lista compartida, Perfil). */
+/** Avatar redondo: la foto si hay, si no las iniciales sobre lima (Lista compartida, Perfil). */
 export function AvatarSticker({ nombre, foto, size = 56, className = '' }: { nombre: string; foto?: string | null; size?: number; className?: string }) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
     <div aria-hidden
-         className={`flex flex-none items-center justify-center overflow-hidden bg-gr-accent font-display font-extrabold tracking-[-0.04em] ${className}`}
-         style={{ width: size, height: size, borderRadius: size * 0.31, fontSize: size * 0.42 }}>
+         className={`flex flex-none items-center justify-center overflow-hidden rounded-full bg-gr-accent font-semibold ${className}`}
+         style={{ width: size, height: size, fontSize: size * 0.38 }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
       {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
   )
 }
 
-/** Avatares redondos superpuestos: la foto de cada dueño o su inicial (el primero en ácido). */
+/** Avatares redondos superpuestos con un aro blanco: la foto de cada dueño o su inicial (el primero en lima). */
 export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: { nombres: string[]; fotos?: (string | null)[]; size?: number; className?: string }) {
   return (
     <div aria-hidden className={`flex flex-none ${className}`}>
       {nombres.map((n, i) => (
         <span key={i}
-              className={`flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-display font-extrabold ${i ? 'bg-gr-soft' : 'bg-gr-accent'}`}
-              style={{ width: size, height: size, fontSize: size * 0.42, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
+              className={`flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-semibold ${i ? 'bg-gr-soft' : 'bg-gr-accent'}`}
+              style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
           {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
         </span>
@@ -144,18 +142,86 @@ export function QuizasLink({ href, className, children }: { href: string | null;
 export function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} aria-label={label} className="gr-icon-btn">
-      <Icon name="back" size={20} strokeWidth={2.6} />
+      <Icon name="back" size={20} strokeWidth={2.4} />
     </Link>
   )
 }
 
-/** El logo: la palabra "GiftR". */
+/** El logo: "GiftR" con la estrella lima. */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-block font-display text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
+    <span className={`inline-flex items-center gap-1 font-brand text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
       GiftR
+      <Starburst size={18} className="-mt-3" />
     </span>
   )
+}
+
+/**
+ * Barra de arriba de las secciones del menú: algo a la izquierda, el logo al medio y tu foto a la derecha (lleva a tu
+ * perfil). Mide 56 de alto.
+ */
+export function AppHeader({ left, nombre, foto }: { left?: React.ReactNode; nombre: string; foto: string | null }) {
+  return (
+    <header className="grid min-h-14 grid-cols-[1fr_auto_1fr] items-center">
+      <div className="justify-self-start">{left}</div>
+      <LogoSticker />
+      <Link href="/perfil" prefetch aria-label="Tu perfil" className="justify-self-end">
+        <AvatarSticker nombre={nombre} foto={foto} size={40} className="shadow-card" />
+      </Link>
+    </header>
+  )
+}
+
+/**
+ * Barra de las pantallas de adentro: volver, el título al medio y una acción opcional. El título es el h1 de la
+ * pantalla, salvo que la pantalla tenga el suyo más abajo (titulo="p").
+ */
+export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: Titulo = 'h1' }: {
+  title: string
+  back?: string
+  backLabel?: string
+  action?: React.ReactNode
+  titulo?: 'h1' | 'p'
+}) {
+  return (
+    <header className="grid min-h-14 grid-cols-[48px_1fr_48px] items-center gap-2">
+      <div>{back && <BackLink href={back} label={backLabel} />}</div>
+      <Titulo className="truncate text-center text-lg font-semibold tracking-[-0.01em]">{title}</Titulo>
+      <div className="justify-self-end">{action}</div>
+    </header>
+  )
+}
+
+/** Título de sección con su "Ver más" a la derecha. */
+export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { title: React.ReactNode; href?: string; linkLabel?: string; id?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <h2 id={id} className="gr-heading">{title}</h2>
+      {href && <Link href={href} className="flex-none text-sm font-semibold">{linkLabel}</Link>}
+    </div>
+  )
+}
+
+/** Fila de opciones: ícono en un círculo, título, bajada y flecha (va dentro de una tarjeta `gr-rows`). */
+export function Row({ href, icon, title, sub, children }: {
+  href?: string
+  icon: IconName
+  title: React.ReactNode
+  sub?: React.ReactNode
+  children?: React.ReactNode
+}) {
+  const adentro = (
+    <>
+      <span className="gr-row__icon"><Icon name={icon} size={20} /></span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[15px] font-semibold">{title}</span>
+        {sub && <span className="truncate text-[13px] text-gr-muted">{sub}</span>}
+      </span>
+      {children ?? (href && <Icon name="chevron" size={18} className="flex-none text-gr-muted" />)}
+    </>
+  )
+  return href ? <Link href={href} className="gr-row">{adentro}</Link> : <div className="gr-row">{adentro}</div>
 }
 
 const ICONS = {
@@ -176,6 +242,11 @@ const ICONS = {
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   more: <><circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" /></>,
   external: <><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+  bell: <><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+  heart: <path d="M12 20s-8-4.8-8-10.4A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 8 2.6C20 15.2 12 20 12 20z" />,
+  eye: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>,
   // Secciones de gustos y del perfil
   cake: <><path d="M4 21h16" /><rect x="5" y="12" width="14" height="9" rx="2" /><path d="M5 16c2 1.5 4.5 1.5 7 0s5-1.5 7 0" /><path d="M12 12V9" /><path d="M12 6.5c-1.1-1-1.1-2.6 0-3.8 1.1 1.2 1.1 2.8 0 3.8z" /></>,
   ball: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5l4 2.9-1.5 4.6h-5L8 10.4z" /><path d="M12 3v4.5M16 10.4l4.3-1.5M14.5 15l2.7 3.9M9.5 15l-2.7 3.9M8 10.4L3.7 8.9" /></>,
@@ -193,7 +264,7 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS
 
-export function Icon({ name, size = 22, strokeWidth = 2.2, className = '' }: {
+export function Icon({ name, size = 22, strokeWidth = 2, className = '' }: {
   name: IconName
   size?: number
   strokeWidth?: number

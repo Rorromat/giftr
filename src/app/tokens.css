@@ -1,22 +1,34 @@
-/* GiftR — sistema visual. Minimalista: las fotos y la lista primero. Sin bordes negros gruesos, sin sombras duras ni
-   cosas giradas; el verde, para lo que se toca (la acción principal, lo elegido en la barra).
+/* GiftR — sistema visual "Suave" (inspirado en Pasito): fondo claro, tarjetas blancas con un borde fino y una sombra leve,
+   botones píldora y una barra flotante blanca donde la sección activa se estira en negro con su nombre. La marca sigue
+   siendo tinta + lima (la estrella del logo): el negro para lo principal y la lima para los detalles sobre lo oscuro.
+   Bricolage queda para el logo y los números grandes; todo lo demás va en Instrument Sans.
    Las fuentes las carga next/font en layout.tsx y exponen --font-bricolage / --font-instrument.
    Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
 
 :root {
   /* Color */
-  /* el fondo, un crema más neutro: las tarjetas blancas se despegan (con una sombra mínima) sin bordes */
-  --gr-bg: #F6F0E5;
-  --gr-ink: #121212;
+  --gr-bg: #F4F4F0;
+  --gr-ink: #141414;
   --gr-surface: #FFFFFF;
-  --gr-accent: #C8F31D;
-  --gr-muted: #5C574F;
-  --gr-dot: #E4D9C6;
-  /* La superficie suave (botones secundarios, notas, lo que antes iba punteado) y las líneas: la fina separa, la marcada
-     es el borde de lo que se escribe (3:1 contra el fondo y contra el blanco, para que se vea dónde). */
-  --gr-soft: #ECE3D2;
-  --gr-line: #E6DCCA;
-  --gr-line-strong: #8C8377;
+  --gr-brand: #141414;      /* tarjeta destacada, pestaña activa, botón principal */
+  --gr-on-brand: #FFFFFF;
+  --gr-accent: #C8F31D;     /* lima: detalles sobre lo oscuro, insignias, el + */
+  --gr-muted: #66655F;
+  --gr-dot: #E2E1DB;
+  /* La superficie suave (botones secundarios, notas, vacíos) y las líneas: la fina separa, la marcada es el borde de lo que
+     se escribe (3:1 contra el fondo y contra el blanco, para que se vea dónde). */
+  --gr-soft: #EEEDE8;
+  --gr-line: #E6E5DF;
+  --gr-line-strong: #8D8C85;
+  --gr-blue: #2F5BEA;       /* tarjetas de aviso y festejo (codazos) */
+  --gr-on-blue: #FFFFFF;
+  /* La tarjeta destacada (.gr-hero) tiene sus propios colores, para poder ser oscura o clara: el fondo, el texto, los
+     detalles chicos (íconos, el número de Cuentas) y su botón. */
+  --gr-hero: #141414;
+  --gr-on-hero: #FFFFFF;
+  --gr-hero-detail: #C8F31D;
+  --gr-hero-btn: #C8F31D;
+  --gr-on-hero-btn: #141414;
 
   /* Tipografía */
   --gr-font-display: var(--font-bricolage), sans-serif;
@@ -24,9 +36,11 @@
 
   /* Forma */
   --gr-border: 1px solid var(--gr-line-strong);
-  --gr-radius-lg: 20px;
-  --gr-radius-md: 14px;
+  --gr-radius-lg: 22px;
+  --gr-radius-md: 16px;
   --gr-radius-pill: 999px;
+  --gr-shadow: 0 1px 2px rgb(20 20 20 / 0.04), 0 6px 20px rgb(20 20 20 / 0.06);
+  --gr-shadow-float: 0 2px 6px rgb(20 20 20 / 0.06), 0 12px 32px rgb(20 20 20 / 0.14);
 
   /* Espaciado */
   --gr-gutter: 18px;
@@ -44,21 +58,21 @@
 }
 
 @layer components {
-  /* Tipografía */
+  /* Tipografía: títulos tranquilos en Instrument; Bricolage solo para el logo y los números grandes (.gr-number) */
   .gr-title {
-    font-family: var(--gr-font-display);
-    font-weight: 800;
-    font-size: 40px;
-    line-height: 0.95;
-    letter-spacing: -0.04em;
-    font-variation-settings: 'opsz' 96;
+    font-family: var(--gr-font-body);
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
     margin: 0;
   }
   .gr-heading {
-    font-family: var(--gr-font-display);
-    font-weight: 800;
-    font-size: 22px;
-    letter-spacing: -0.03em;
+    font-family: var(--gr-font-body);
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
     margin: 0;
   }
   .gr-label {
@@ -70,43 +84,71 @@
     color: var(--gr-muted);
   }
   .gr-muted { color: var(--gr-muted); }
+  .gr-number {
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    font-variation-settings: 'opsz' 96;
+    line-height: 0.9;
+  }
 
-  /* Tarjeta: blanca y sin borde, con una sombra mínima que la despega del fondo; la foto va de lado a lado */
-  .gr-sticker {
+  /* Tarjeta: blanca, con un borde fino y una sombra leve; la foto va de lado a lado */
+  .gr-sticker,
+  .gr-card {
     background: var(--gr-surface);
+    border: 1px solid var(--gr-line);
     border-radius: var(--gr-radius-lg);
-    box-shadow: 0 1px 3px rgb(60 45 20 / 0.08);
+    box-shadow: var(--gr-shadow);
     overflow: hidden;
   }
-  .gr-sticker--dark { background: var(--gr-ink); color: var(--gr-bg); }
+  .gr-sticker--dark { background: var(--gr-brand); color: var(--gr-on-brand); border-color: var(--gr-brand); }
   .gr-sticker__img {
     display: block;
     width: 100%;
     object-fit: cover;
   }
+  /* Tarjeta destacada (la de arriba de cada pantalla): negra, con lo importante en lima */
+  .gr-hero {
+    position: relative;
+    border-radius: 26px;
+    background: var(--gr-hero);
+    color: var(--gr-on-hero);
+    box-shadow: var(--gr-shadow);
+  }
+  /* Vacíos y explicaciones: relleno suave, sin borde */
+  .gr-empty {
+    border-radius: var(--gr-radius-lg);
+    background: var(--gr-soft);
+    padding: 18px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
 
-  /* Fotos sueltas (el collage de la portada) */
+  /* Fotos sueltas (las de la portada) */
   .gr-diecut {
     display: block;
     object-fit: cover;
-    border-radius: 18px;
+    border-radius: 22px;
+    box-shadow: var(--gr-shadow);
     box-sizing: border-box;
   }
 
-  /* Etiquetas sobre fotos: chicas y sin borde, para que mande la foto */
+  /* Etiquetas sobre fotos: chicas, blancas y con una sombrita, para que mande la foto */
   .gr-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     border-radius: var(--gr-radius-pill);
-    background: rgb(255 255 255 / 0.92);
+    background: rgb(255 255 255 / 0.95);
     padding: 4px 10px;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 12px;
+    box-shadow: 0 1px 4px rgb(20 20 20 / 0.12);
   }
-  .gr-tag--dark { background: var(--gr-ink); color: var(--gr-bg); }
+  .gr-tag--dark { background: var(--gr-brand); color: var(--gr-on-brand); }
 
-  /* Botones: sin borde ni sombra. El verde, para la acción principal; los demás, en la superficie suave. */
+  /* Botones: píldoras. La principal en negro; las demás, blancas con un borde fino. */
   .gr-btn,
   .gr-btn-primary {
     display: inline-flex;
@@ -114,51 +156,68 @@
     justify-content: center;
     gap: 8px;
     min-height: 48px;
-    padding: 0 18px;
-    border: 0;
-    border-radius: var(--gr-radius-md);
-    background: var(--gr-soft);
-    color: var(--gr-ink);
-    font-family: var(--gr-font-body);
-    font-weight: 700;
-    font-size: 16px;
-    text-decoration: none;
-    cursor: pointer;
-    transition: transform 80ms ease;
-  }
-  .gr-btn:active, .gr-btn-primary:active { transform: scale(0.98); }
-  .gr-btn-primary {
-    background: var(--gr-accent);
-    min-height: 54px;
-    font-size: 17px;
-  }
-  .gr-btn--sm { min-height: 44px; font-size: 15px; }
-  .gr-btn--dark { background: var(--gr-ink); color: var(--gr-accent); }
-  .gr-icon-btn {
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--gr-soft);
-    color: var(--gr-ink);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-  }
-
-  /* Chips */
-  .gr-chip {
-    display: inline-flex;
-    align-items: center;
-    height: 38px;
-    padding: 0 14px;
+    padding: 0 20px;
     border: 1px solid var(--gr-line);
     border-radius: var(--gr-radius-pill);
     background: var(--gr-surface);
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
     font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(20 20 20 / 0.05);
+    transition: transform 80ms ease;
+  }
+  .gr-btn:active, .gr-btn-primary:active { transform: scale(0.98); }
+  .gr-btn-primary {
+    border-color: var(--gr-brand);
+    background: var(--gr-brand);
+    color: var(--gr-on-brand);
+    min-height: 54px;
+    font-size: 16px;
+  }
+  .gr-btn--sm { min-height: 44px; font-size: 14px; padding: 0 16px; }
+  .gr-btn--dark { border-color: var(--gr-brand); background: var(--gr-brand); color: var(--gr-on-brand); }
+  .gr-btn--accent { border-color: var(--gr-accent); background: var(--gr-accent); color: var(--gr-ink); }
+  .gr-btn--hero { border-color: var(--gr-hero-btn); background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
+  .gr-icon-btn {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    box-shadow: var(--gr-shadow);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .gr-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 4px;
+  }
+
+  /* Chips */
+  .gr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 15px;
+    border: 1px solid var(--gr-line);
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-surface);
+    color: var(--gr-ink);
+    font-family: var(--gr-font-body);
+    font-weight: 500;
     font-size: 14px;
     white-space: nowrap;
     text-decoration: none;
@@ -166,15 +225,15 @@
   }
   .gr-chip[aria-pressed="true"],
   .gr-chip[aria-current="page"],
-  .gr-chip:has(:checked) { background: var(--gr-ink); border-color: var(--gr-ink); color: var(--gr-bg); }
+  .gr-chip:has(:checked) { background: var(--gr-brand); border-color: var(--gr-brand); color: var(--gr-on-brand); font-weight: 600; }
 
-  /* Segmentado: lo elegido, en blanco sobre la superficie suave */
+  /* Segmentado: un riel suave con lo elegido en negro */
   .gr-segmented {
     display: flex;
-    height: 46px;
-    padding: 3px;
-    gap: 3px;
-    border-radius: var(--gr-radius-md);
+    min-height: 46px;
+    padding: 4px;
+    gap: 4px;
+    border-radius: var(--gr-radius-pill);
     background: var(--gr-soft);
   }
   .gr-segmented > * {
@@ -183,33 +242,33 @@
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 11px;
+    border-radius: var(--gr-radius-pill);
     background: transparent;
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 15px;
     text-decoration: none;
     cursor: pointer;
   }
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-current="page"],
-  .gr-segmented > :has(:checked) { background: var(--gr-surface); box-shadow: 0 1px 2px rgb(18 18 18 / 0.14); }
+  .gr-segmented > :has(:checked) { background: var(--gr-brand); color: var(--gr-on-brand); font-weight: 600; }
 
   /* Foco visible en chips y segmentos hechos con radios ocultos */
   .gr-chip:has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: 2px; }
-  .gr-segmented > :has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: -2px; }
+  .gr-segmented > :has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: 2px; }
 
   /* Input */
   .gr-input {
     width: 100%;
     min-height: 50px;
     border: var(--gr-border);
-    border-radius: var(--gr-radius-md);
+    border-radius: 14px;
     background: var(--gr-surface);
     padding: 0 14px;
     font-family: var(--gr-font-body);
-    font-size: 15px;
+    font-size: 16px;
     color: var(--gr-ink);
   }
   textarea.gr-input { padding: 12px 14px; }
@@ -226,12 +285,55 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 13px;
   }
   .gr-avatar + .gr-avatar { margin-left: -9px; }
 
-  /* Navegación inferior: píldora flotante, se adapta a la cantidad de destinos */
+  /* Filas de opciones (Perfil): ícono en un círculo, texto y flecha, separadas por una línea fina */
+  .gr-rows > * + * { border-top: 1px solid var(--gr-line); }
+  .gr-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    padding: 10px 16px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .gr-row__icon {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--gr-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Barra fija de abajo en la lista compartida ("¿Y vos qué querés?") */
+  .gr-floatbar {
+    position: fixed;
+    left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    right: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 20;
+    min-height: 64px;
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-brand);
+    color: var(--gr-on-brand);
+    box-shadow: var(--gr-shadow-float);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 8px 8px 20px;
+  }
+
+  /* Navegación inferior: píldora blanca flotante. La sección marcada se estira en negro y muestra su nombre (las columnas
+     se reparten con grid-template-columns, que se anima: la píldora negra crece en la nueva y se achica en la vieja).
+     El + del medio, en lima, no cambia de ancho. */
   .gr-nav {
     position: fixed;
     left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
@@ -240,45 +342,44 @@
     z-index: 20;
     height: 64px;
     border-radius: var(--gr-radius-pill);
-    background: var(--gr-ink);
+    background: var(--gr-surface);
+    border: 1px solid var(--gr-line);
+    box-shadow: var(--gr-shadow-float);
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
     align-items: center;
-    padding: 0 6px;
-    container-type: inline-size; /* para ubicar el círculo verde en columnas (100cqw) */
-    transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1);
+    gap: 2px;
+    padding: 0 7px;
+    transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1), grid-template-columns 320ms cubic-bezier(0.3, 0, 0.2, 1);
   }
+  .gr-nav[data-columna="0"] { grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr; }
+  .gr-nav[data-columna="1"] { grid-template-columns: 1fr 2.5fr 1fr 1fr 1fr; }
+  .gr-nav[data-columna="3"] { grid-template-columns: 1fr 1fr 1fr 2.5fr 1fr; }
+  .gr-nav[data-columna="4"] { grid-template-columns: 1fr 1fr 1fr 1fr 2.5fr; }
   /* En Agregar la barra se esconde: primero el + gira hasta ser una × y enseguida la barra baja.
      Al salir de Agregar vuelve a subir, sin esperar. */
   .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
   .gr-nav a {
-    position: relative; z-index: 1; /* arriba del círculo verde */
-    display: flex; justify-content: center; align-items: center; height: 48px;
-    color: var(--gr-bg); transition: color 80ms ease;
+    min-width: 0;
+    display: flex; justify-content: center; align-items: center; gap: 7px; height: 48px;
+    border-radius: var(--gr-radius-pill);
+    color: var(--gr-ink); font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap; overflow: hidden;
+    transition: background-color 160ms ease, color 160ms ease;
   }
-  .gr-nav a > span {
-    width: 44px; height: 44px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-  }
-  /* el ícono marcado se oscurece cuando llega el círculo, no antes (si no, queda negro sobre negro) */
-  .gr-nav a[data-marcado] { color: var(--gr-ink); transition: color 120ms ease 70ms; }
-  /* El círculo verde: una sola pieza que se desliza (con un rebote chico) hasta la columna marcada,
-     por debajo de los íconos y del +. 100cqw es el ancho útil de la barra, repartido en 5 columnas. */
-  .gr-nav__marca {
-    position: absolute; top: 10px; left: calc(6px + 100cqw / 10 - 22px);
-    width: 44px; height: 44px; border-radius: 50%; background: var(--gr-accent);
-    transform: translateX(calc(100cqw / 5 * var(--columna)));
-    transition: transform 320ms cubic-bezier(0.34, 1.4, 0.5, 1);
-  }
+  .gr-nav a svg { flex: none; }
+  .gr-nav a[data-marcado] { background: var(--gr-brand); color: var(--gr-on-brand); }
+  .gr-nav a[data-marcado] svg { color: var(--gr-accent); }
+  /* el nombre aparece cuando la píldora ya creció */
+  .gr-nav__nombre { display: none; }
+  .gr-nav a[data-marcado] .gr-nav__nombre { display: inline; animation: gr-aparece 200ms ease-out 80ms both; }
   .gr-nav a > .gr-nav__add {
-    width: 50px; height: 50px; border-radius: 16px;
-    border: 2.5px solid var(--gr-bg); background: var(--gr-accent); color: var(--gr-ink);
-    transform: rotate(-6deg);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--gr-accent); color: var(--gr-ink);
+    display: flex; align-items: center; justify-content: center;
     transition: transform 240ms cubic-bezier(0.34, 1.4, 0.5, 1);
   }
-  .gr-nav a:active > .gr-nav__add { transform: rotate(-6deg) scale(0.88); } /* se hunde al apretarlo */
-  .gr-nav[data-oculta] a > .gr-nav__add { transform: rotate(39deg) scale(0.92); }
+  .gr-nav a:active > .gr-nav__add { transform: scale(0.88); } /* se hunde al apretarlo */
+  .gr-nav[data-oculta] a > .gr-nav__add { transform: rotate(45deg) scale(0.92); }
 
 }
 
@@ -309,8 +410,9 @@
   position: absolute; inset: 0; margin-inline: auto; max-width: 28rem;
   padding-inline: var(--gr-gutter); container-type: size;
 }
-/* Parado donde va el contador de Mi lista: 52px de arriba + 44 de la fila del logo + 14 de separación - 4, a 30px del
-   borde derecho (la estrella mide 62 y esta 150: el centro cae 79px adentro del marco). Mientras carga, en el medio. */
+/* Parado donde va el contador de Mi lista (la estrella de su tarjeta destacada): 8px de arriba + 56 de la barra + 20 de
+   separación + 22 adentro de la tarjeta, a 30px del borde derecho (la estrella mide 62 y esta 150: el centro cae 79px
+   adentro del marco). Mientras carga, en el medio. */
 .gr-arranque__vuelo {
   position: absolute; top: 62px; right: 4px; width: 150px; height: 150px;
   transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(0);
@@ -351,7 +453,8 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav__marca, .gr-nav a > .gr-nav__add { transition: none; }
+  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav a > .gr-nav__add { transition: none; }
+  .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja { animation: none; }
   /* la estrella quieta mientras carga, y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }

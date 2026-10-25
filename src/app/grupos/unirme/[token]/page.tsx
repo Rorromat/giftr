@@ -22,9 +22,9 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 pb-12 text-center">
       <AvatarStack nombres={nombres} fotos={grupo.duenos.map((d) => d.foto)} size={64} />
       <p className="text-[15px] font-medium">{invitan} a armar juntos</p>
-      <h1 className="font-display text-[40px] leading-[0.95] font-extrabold tracking-[-0.05em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
+      <h1 className="text-[32px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
-      <p className="mt-1 rounded-sticker bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
+      <p className="mt-1 rounded-[22px] bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
         Vas a poder agregar y editar deseos de esta lista. Como es tuya también, no vas a ver quién regala qué, y aunque
         después salgas (o te saquen) del grupo no vas a poder reservar en ella. Si te llegó para regalar, no te sumes:
         pedí el link para regalar.
@@ -37,12 +37,12 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       {session?.userId ? (
         <form action={joinGroupAction} className="mt-2 w-full">
           <input type="hidden" name="invite" value={token} />
-          <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-[58px] w-full rounded-[18px]">Unirme al grupo</BotonEnviar>
+          <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-14 w-full">Unirme al grupo</BotonEnviar>
         </form>
       ) : (
         <form action={async () => { 'use server'; await signIn('google', { redirectTo: `/grupos/unirme/${token}` }) }} className="mt-2 w-full">
-          <button className="gr-btn-primary h-[58px] w-full gap-3 rounded-[18px]">
-            <span aria-hidden className="flex size-[30px] items-center justify-center rounded-full border border-gr-line bg-gr-surface font-sans text-base font-bold">G</span>
+          <button className="gr-btn-primary h-14 w-full gap-3">
+            <span aria-hidden className="flex size-[30px] items-center justify-center rounded-full border border-gr-line bg-gr-surface text-base">G</span>
             Entrar con Google para unirme
           </button>
         </form>

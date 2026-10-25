@@ -20,7 +20,7 @@ export default function ErrorDePantalla({ error, retry }: { error: Error & { dig
         No pudimos cargar esta pantalla. Puede ser la conexión: probá de nuevo en un ratito.
       </p>
       <button type="button" onClick={() => retry()} className="gr-btn-primary mt-2 w-full">Probar de nuevo</button>
-      <Link href="/" className="gr-btn min-h-[50px] w-full font-sans text-[15px] font-bold">Ir al inicio</Link>
+      <Link href="/" className="gr-btn min-h-[50px] w-full text-[15px]">Ir al inicio</Link>
     </main>
   )
 }

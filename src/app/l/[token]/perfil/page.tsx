@@ -7,7 +7,7 @@ import { MESES, seguirLista } from '@/lib/events'
 import { perfilPublico } from '@/lib/perfil'
 import { IconoSeccion, paraResumen, ResumenGustos, SeccionesGustos } from '@/components/Gustos'
 import { TallesIlustrados } from '@/components/TallesIlustrados'
-import { AvatarSticker, BackLink, Icon } from '@/components/ui'
+import { AvatarSticker, Icon, PageHeader } from '@/components/ui'
 
 type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ quien?: string }> }
 
@@ -40,36 +40,31 @@ export default async function Perfil({ params, searchParams }: Props) {
     : p.tipo === 'grupo' ? suLista : { href: '/perfil', texto: 'Volver a Perfil' }
 
   return (
-    <main className="flex flex-col gap-5 pb-32 pt-[52px]">
-      <div className="flex items-center justify-between">
-        <BackLink href={atras.href} label={atras.texto} />
-        {propio && (
-          <Link href="/bienvenida?editar=1" className="gr-btn gr-btn--sm rounded-[14px] px-4 font-sans text-sm font-bold">Editar mis gustos</Link>
+    <main className="flex flex-col gap-5 pb-36 pt-2">
+      <PageHeader title={propio ? 'Tu perfil público' : `Perfil de ${p.nombre.split(' ')[0]}`} titulo="p" back={atras.href} backLabel={atras.texto} />
+
+      <section className="gr-hero flex flex-col items-center gap-3 p-6 text-center">
+        <AvatarSticker nombre={p.nombre} foto={p.foto} size={96} className="ring-4 ring-gr-on-hero/15" />
+        <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{p.nombre}</h1>
+        {p.cumple && (
+          <p className="flex items-center gap-1.5 rounded-full bg-gr-accent py-1.5 pl-2.5 pr-3.5 text-sm font-semibold text-gr-ink">
+            <Icon name="cake" size={16} className="flex-none" />
+            {p.cumple.dias === 0 ? '¡Hoy es su cumple!' : `${p.cumple.dia} de ${MESES[p.cumple.mes - 1]} · en ${p.cumple.dias} ${p.cumple.dias === 1 ? 'día' : 'días'}`}
+          </p>
         )}
-      </div>
-
-      {propio && (
-        <p className="self-start rounded-full bg-gr-ink px-3.5 py-2 text-[13px] font-semibold text-gr-bg">Así te ven los que abren tu lista</p>
-      )}
-
-      <div className="relative flex items-center gap-4">
-        <AvatarSticker nombre={p.nombre} foto={p.foto} size={96} />
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <h1 className="font-display text-[34px] leading-none font-extrabold tracking-[-0.04em] [overflow-wrap:anywhere]">{p.nombre}</h1>
-          {p.cumple && (
-            <p className="flex items-center gap-1.5 self-start rounded-full bg-gr-accent px-3 py-1 text-[13px] font-bold">
-              <Icon name="cake" size={16} strokeWidth={2.4} />
-              {p.cumple.dias === 0 ? '¡Hoy es su cumple!' : `${p.cumple.dia} de ${MESES[p.cumple.mes - 1]} · en ${p.cumple.dias} ${p.cumple.dias === 1 ? 'día' : 'días'}`}
-            </p>
-          )}
-        </div>
-      </div>
+        {propio && (
+          <div className="mt-1 flex flex-col items-center gap-2 border-t border-gr-on-hero/10 pt-3.5">
+            <p className="text-[13px] text-gr-on-hero/70">Así te ven los que abren tu lista</p>
+            <Link href="/bienvenida?editar=1" className="gr-btn gr-btn--sm">Editar mis gustos</Link>
+          </div>
+        )}
+      </section>
 
       {p.otros.length > 0 && (
         <nav aria-label="Otros dueños de la lista" className="flex flex-wrap gap-2">
           {p.otros.map((o) => (
             <Link key={o.id} href={`/l/${token}/perfil?quien=${o.id}`} className="gr-chip gap-2">
-              <AvatarSticker nombre={o.nombre} foto={o.foto} size={24} className="" />Ver a {o.nombre.split(' ')[0]}
+              <AvatarSticker nombre={o.nombre} foto={o.foto} size={24} />Ver a {o.nombre.split(' ')[0]}
             </Link>
           ))}
         </nav>
@@ -77,38 +72,38 @@ export default async function Perfil({ params, searchParams }: Props) {
 
       {hayGustos ? (
         <section aria-labelledby="le-gusta" className="flex flex-col gap-3">
-          <h2 id="le-gusta" className="font-display text-[24px] leading-none font-extrabold tracking-[-0.03em]">{propio ? 'Lo que te gusta' : 'Lo que le gusta'}</h2>
+          <h2 id="le-gusta" className="gr-heading">{propio ? 'Lo que te gusta' : 'Lo que le gusta'}</h2>
           <ResumenGustos secciones={p.secciones} />
           <details className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm font-bold underline decoration-2 underline-offset-4 [&::-webkit-details-marker]:hidden">
-              Ver todo <Icon name="chevron" size={16} strokeWidth={2.6} className="transition-transform group-open:rotate-90" />
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm font-semibold underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+              Ver todo <Icon name="chevron" size={16} strokeWidth={2.2} className="transition-transform group-open:rotate-90" />
             </summary>
-            <div className="gr-sticker mt-2 p-3.5"><SeccionesGustos secciones={p.secciones} /></div>
+            <div className="gr-card mt-2 p-3.5"><SeccionesGustos secciones={p.secciones} /></div>
           </details>
         </section>
       ) : nadaCargado ? (
-        <div className="relative rounded-sticker bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
+        <div className="relative rounded-[22px] bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
           {propio ? 'Todavía no cargaste tus gustos.' : `${primer} todavía no cargó sus gustos.`}
-          {propio && <Link href="/bienvenida?editar=1" className="mt-2 block font-bold underline underline-offset-4">Cargarlos ahora</Link>}
+          {propio && <Link href="/bienvenida?editar=1" className="mt-2 block font-semibold underline underline-offset-4">Cargarlos ahora</Link>}
         </div>
       ) : propio && (
-        <Link href="/bienvenida?editar=1" className="self-start text-sm font-bold underline decoration-2 underline-offset-4">
+        <Link href="/bienvenida?editar=1" className="self-start text-sm font-semibold underline underline-offset-4">
           Sumá lo que te gusta: deportes, hobbies, marcas…
         </Link>
       )}
 
       {p.talles && (
         <section aria-labelledby="talles" className="flex flex-col gap-3">
-          <h2 id="talles" className="font-display text-[24px] leading-none font-extrabold tracking-[-0.03em]">{propio ? 'Tus talles' : 'Sus talles'}</h2>
-          <div className="gr-sticker flex justify-center p-3"><TallesIlustrados talles={p.talles} nombre={primer} /></div>
+          <h2 id="talles" className="gr-heading">{propio ? 'Tus talles' : 'Sus talles'}</h2>
+          <div className="gr-card flex justify-center p-3"><TallesIlustrados talles={p.talles} nombre={primer} /></div>
         </section>
       )}
 
       {noRegalar && (
-        <section className="flex gap-3 rounded-sticker border border-gr-line bg-gr-ink p-3.5 text-gr-bg">
+        <section className="flex gap-3 rounded-[22px] border border-gr-line bg-gr-brand p-3.5 text-gr-bg">
           <IconoSeccion s={noRegalar} size={34} />
           <div className="flex min-w-0 flex-col gap-1.5">
-            <h2 className="font-display text-lg leading-tight font-extrabold text-gr-accent">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
+            <h2 className="text-lg leading-tight font-semibold text-gr-accent">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
             <p className="text-sm font-semibold">{noRegalar.items.join(' · ')}</p>
           </div>
         </section>
@@ -116,13 +111,13 @@ export default async function Perfil({ params, searchParams }: Props) {
 
       {nota && (
         <p className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm leading-snug">
-          <span className="font-bold">{propio ? 'Tu nota' : `${primer} dice`}:</span> {nota.items[0]}
+          <span className="font-semibold">{propio ? 'Tu nota' : `${primer} dice`}:</span> {nota.items[0]}
         </p>
       )}
 
       <Link href={dueno ? suLista.href : `/l/${token}`}
             className="gr-btn gr-btn--dark fixed bottom-7 left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
-        <Icon name="gift" size={20} strokeWidth={2.4} />
+        <Icon name="gift" size={20} strokeWidth={2} />
         {dueno ? suLista.texto : `Ver la lista de ${primer}`}
       </Link>
     </main>

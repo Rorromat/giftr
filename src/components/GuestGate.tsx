@@ -6,8 +6,8 @@ import { NOMBRE_INVITADO_MAXIMO, RESERVAS_POR_LISTA } from '@/lib/types'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
 const BUTTON = {
-  primary: 'gr-btn-primary gr-btn--sm w-full',
-  secondary: 'gr-btn w-full min-h-11 px-3.5 text-[15px]',
+  primary: 'gr-btn-primary w-full min-h-12',
+  secondary: 'gr-btn gr-btn--sm w-full',
 } as const
 
 // Si la reserva no sale, la acción vuelve a la página con ?reserva=<motivo> y la página muestra esto arriba.
@@ -72,9 +72,9 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', vo
         {texto}
       </button>
       <dialog ref={dialogRef}
-              className="gr-sticker m-auto w-[min(22rem,calc(100%-36px))] p-5 text-gr-ink backdrop:bg-gr-ink/60">
+              className="gr-card m-auto w-[min(22rem,calc(100%-36px))] p-5 text-gr-ink backdrop:bg-gr-ink/50">
         <form action={reservar} className="flex flex-col gap-3">
-          <p className="font-display text-xl leading-tight font-extrabold tracking-[-0.03em]">
+          <p className="text-lg leading-snug font-semibold">
             ¿Quién sos? Así los demás saben que este regalo ya tiene dueño.
           </p>
           <input type="hidden" name="token" value={token} />
@@ -85,7 +85,7 @@ export function GuestGate({ token, itemId, identified, variant = 'secondary', vo
           {error}
           <BotonEnviar pendiente="Reservando…" className="gr-btn-primary mt-1 w-full">Reservar</BotonEnviar>
           <button type="button" onClick={() => dialogRef.current?.close()}
-                  className="min-h-11 text-sm font-bold underline decoration-2 underline-offset-4">
+                  className="min-h-11 text-sm font-semibold underline underline-offset-4">
             Cancelar
           </button>
         </form>

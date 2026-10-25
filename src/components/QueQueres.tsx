@@ -61,25 +61,25 @@ export function QueQueres({ defaultValue, agregando }: { defaultValue?: string; 
     marcar(form, 'categoria', categoria)
   }
 
-  const accion = 'flex h-[52px] cursor-pointer items-center justify-center gap-2 text-[15px] font-bold'
+  const accion = 'flex h-[52px] cursor-pointer items-center justify-center gap-2 text-[15px] font-semibold'
   return (
     <div className="flex flex-col gap-2.5">
       <label htmlFor="que-queres" className="gr-label">¿Qué querés?</label>
-      <div className="gr-sticker focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gr-ink">
+      <div className="gr-card focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gr-ink">
         {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); si el texto se pasa, avisa antes de mandar */}
         <CampoTitulo ref={campo} id="que-queres" name="titulo" required placeholder="Pegá un link o escribí una idea" defaultValue={defaultValue}
-                     className="block h-16 w-full bg-transparent px-4 font-display text-xl font-bold outline-none placeholder:text-gr-muted"
+                     className="block h-16 w-full bg-transparent px-4 text-xl font-semibold outline-none placeholder:text-gr-muted"
                      onInput={(e) => {
                        setVacio(!e.currentTarget.value.trim())
                        setSinCopiar(false)
                      }} />
         <div className="grid grid-cols-2 border-t border-gr-line">
           <button type="button" onClick={pegar} className={`${accion} bg-gr-accent`}>
-            <Icon name="paste" size={18} strokeWidth={2.4} />Pegar link copiado
+            <Icon name="paste" size={18} strokeWidth={2} />Pegar link copiado
           </button>
           {/* abre el campo de la foto (ver FotoField) */}
           <label htmlFor={ID_ELEGIR_FOTO} className={`${accion} border-l border-gr-line`}>
-            <Icon name="camera" size={18} strokeWidth={2.4} />Foto
+            <Icon name="camera" size={18} strokeWidth={2} />Foto
           </label>
         </div>
       </div>

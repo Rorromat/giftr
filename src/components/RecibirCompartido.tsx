@@ -66,14 +66,14 @@ export function primeraVezPorLaUrl() {
 /**
  * Lo compartido a GiftR desde otra app, en el formulario de agregar (editar nunca lo usa). Corre una vez, al abrir.
  * - Sin buzon (/agregar?link=… o ?texto=…, desde el route o el atajo del iPhone): el servidor ya lo puso en los campos, y si
- *   es automático, la llegada es nueva y de afuera (ver llegadaDeAfuera) y es la primera vez en el documento (ver
- *   primeraVezPorLaUrl), el link se busca.
+ * es automático, la llegada es nueva y de afuera (ver llegadaDeAfuera) y es la primera vez en el documento (ver
+ * primeraVezPorLaUrl), el link se busca.
  * - Con buzon (lo dejó el service worker): el título, las notas, la foto y la búsqueda, en ese orden (la foto empieza a
- *   subir antes de que vuelva la lectura del link, así la que proponga el link no la reemplaza), y se borra del buzón: al
- *   volver atrás ya no hay nada. Lo que ya esté escrito no se pisa, y una recarga no corre sola (ver
- *   queHacerConLoCompartido). Lo que no se busca solo (un texto, o un link que no es automático) queda como el que llega por
- *   la URL: CompletarDesdeLink no lo mira (ver inputSinBuscar), y un link se busca recién si la persona lo cambia, como uno
- *   escrito.
+ * subir antes de que vuelva la lectura del link, así la que proponga el link no la reemplaza), y se borra del buzón: al
+ * volver atrás ya no hay nada. Lo que ya esté escrito no se pisa, y una recarga no corre sola (ver
+ * queHacerConLoCompartido). Lo que no se busca solo (un texto, o un link que no es automático) queda como el que llega por
+ * la URL: CompletarDesdeLink no lo mira (ver inputSinBuscar), y un link se busca recién si la persona lo cambia, como uno
+ * escrito.
  * Va después de CompletarDesdeLink y FotoField en el formulario: sus efectos, que escuchan, corren antes que el de acá.
  * Que la foto no llegó lo dice una línea propia (en el consejo de FotoField lo borraría CompletarDesdeLink al buscar),
  * mientras no haya foto: una elegida con Foto, o la que trajo el link.

@@ -38,7 +38,7 @@ export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string
               className={`relative ${estado === 'subiendo' ? 'animate-pulse' : ''}`}>
         <AvatarSticker nombre={nombre} foto={actual} size={size} />
         <span className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border border-gr-line bg-gr-surface">
-          <Icon name="camera" size={16} strokeWidth={2.4} />
+          <Icon name="camera" size={16} strokeWidth={2} />
         </span>
       </button>
       <input ref={input} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
@@ -46,7 +46,7 @@ export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string
       {estado === 'error' && <p role="alert" className="text-xs font-semibold">No pudimos subir esa foto. Probá con otra.</p>}
       {estado === 'subiendo' && <p role="status" className="text-xs font-semibold text-gr-muted">Subiendo…</p>}
       {propia && estado !== 'subiendo' && actual?.startsWith('/foto/') && (
-        <button type="button" onClick={quitar} className="min-h-8 text-xs font-bold underline underline-offset-2">Quitar foto</button>
+        <button type="button" onClick={quitar} className="min-h-8 text-xs font-semibold underline underline-offset-4">Quitar foto</button>
       )}
     </div>
   )
