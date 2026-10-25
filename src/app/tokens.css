@@ -342,7 +342,8 @@
     position: fixed;
     left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
     right: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
-    bottom: 22px;
+    /* --anclaje: en iOS instalado, cuánto hay que correrla para que quede abajo de lo que se ve (ver BottomNav) */
+    bottom: calc(22px - var(--anclaje, 0px));
     z-index: 20;
     height: 64px;
     border-radius: var(--gr-radius-pill);
@@ -363,6 +364,8 @@
   /* En Agregar la barra se esconde: primero el + gira hasta ser una × y enseguida la barra baja.
      Al salir de Agregar vuelve a subir, sin esperar. */
   .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
+  /* con el teclado abierto (iOS instalado) no flota arriba del teclado: se va */
+  .gr-nav[data-teclado] { visibility: hidden; }
   .gr-nav a {
     min-width: 0;
     display: flex; justify-content: center; align-items: center; gap: 7px; height: 48px;
