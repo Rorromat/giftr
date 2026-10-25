@@ -123,7 +123,11 @@ test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gu
   expect((await misGustos(h.db, owner.id))?.hobbies).toEqual(['Cocinar'])
   expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
   // los dos vacíos es que lo sacó (los campos vienen con el guardado)
-  expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/bienvenida/listo')
+  expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/bienvenida/avisos')
+  // la primera vez, antes del final, la pregunta de los avisos; con "Más tarde", después sigue a su lista
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', corte: '1' })))).toBe('/bienvenida/avisos?luego=lista')
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil', corte: '1' })))).toBe('/perfil')
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/bienvenida/listo?desde=perfil')
   expect(await miCumple(h.db, owner.id)).toBeNull()
 })
 
