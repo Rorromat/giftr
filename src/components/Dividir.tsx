@@ -4,24 +4,32 @@ import { AvatarSticker, Icon, ItemPhoto } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 import type { Invitacion, Invitado } from '@/lib/invitaciones'
 import Link from 'next/link'
+import { Buscador } from '@/components/Buscador'
+import { paraBuscar } from '@/lib/buscar'
 
 // "Lo dividimos": elegir amigos para proponerles dividir un regalo, a quiénes se invitó (para el que lo organiza) y las
 // propuestas que te llegaron (Inicio). Siempre en partes iguales entre los que se sumen.
 
-/** Los amigos para tildar: cada uno con su foto. */
-function ElegirAmigos({ amigos }: { amigos: Persona[] }) {
+/** Con más amigos que esto, para elegir aparece el buscador. */
+const BUSCAR_DESDE = 7
+
+/** Los amigos para tildar: cada uno con su foto. Con muchos, un buscador arriba (lo tildado y escondido se manda igual). */
+function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: string }) {
   return (
-    <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
-      {amigos.map((a) => (
-        <li key={a.id}>
+    <>
+      {amigos.length >= BUSCAR_DESDE && <Buscador ambito={ambito} placeholder="Buscar un amigo" vacio="No tenés un amigo con «%s»." />}
+      <ul id={ambito} className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+        {amigos.map((a) => (
+          <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
           <label className="flex min-h-14 cursor-pointer items-center gap-3 py-2">
             <AvatarSticker nombre={a.nombre} foto={a.foto} size={36} />
             <span className="min-w-0 flex-1 text-[15px] leading-tight font-semibold [overflow-wrap:anywhere]">{a.nombre}</span>
             <input type="checkbox" name="amigo" value={a.id} className="size-5 flex-none accent-[var(--gr-ink)]" />
           </label>
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -37,7 +45,7 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
       {amigos.length > 0 ? (
         <>
           <p className="text-sm font-semibold">¿Con quién lo dividís?</p>
-          <ElegirAmigos amigos={amigos} />
+          <ElegirAmigos amigos={amigos} ambito="amigos-dividir" />
           <p className="text-xs leading-snug text-gr-muted">
             A cada uno le llega la propuesta y elige si se suma. Se divide en partes iguales entre los que se sumen; también se
             pueden sumar otros con el link.
@@ -88,7 +96,7 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={itemId} />
             <input type="hidden" name="giftId" value={giftId} />
-            <ElegirAmigos amigos={paraInvitar} />
+            <ElegirAmigos amigos={paraInvitar} ambito="amigos-invitar" />
             <BotonEnviar pendiente="Mandando…" className="gr-btn gr-btn--sm w-full">Mandarles la propuesta</BotonEnviar>
           </form>
         </details>
