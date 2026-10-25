@@ -8,16 +8,17 @@ import { Icon, type IconName } from '@/components/ui'
 const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; columna: number }[] = [
   { href: '/inicio', label: 'Inicio', nombre: 'Inicio', icon: 'home', columna: 0 },
   { href: '/gente', label: 'Tu gente', nombre: 'Gente', icon: 'users', columna: 1 },
-  { href: '/cuentas', label: 'Cuentas', nombre: 'Cuentas', icon: 'wallet', columna: 3 },
+  { href: '/regalos', label: 'Tus regalos y cuentas', nombre: 'Regalos', icon: 'gift', columna: 3 },
   { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user', columna: 4 },
 ]
 
 /**
  * La sección del menú a la que pertenece una pantalla: todo el año es de Inicio; un grupo, un deseo y el perfil, de Vos; la
- * lista de alguien y agregar un amigo, de Gente.
+ * lista de alguien y agregar un amigo, de Gente; Cuentas, de Regalos.
  */
 function seccionDe(path: string) {
   if (path === '/eventos') return '/inicio'
+  if (path === '/cuentas') return '/regalos'
   if (path.startsWith('/l/') || path.startsWith('/gente/')) return '/gente'
   if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil') return '/mi-lista'
   return path
