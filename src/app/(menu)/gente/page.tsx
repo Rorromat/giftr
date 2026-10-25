@@ -4,11 +4,12 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { miFoto } from '@/lib/perfil'
-import { getOwnList } from '@/lib/lists'
 import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
-import { unfollowAction } from '@/app/actions'
+import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
+import { asegurarUsuario, miAmigoToken, misAmigos, solicitudesEnviadas, solicitudesRecibidas } from '@/lib/amigos'
+import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
 import { AvatarStack, AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
 
 /**
@@ -24,7 +25,8 @@ function cuando(c: Contacto, hoy: Date) {
   return [`${c.tipo === 'personal' ? 'Cumple el' : 'El'} ${dia}`, falta].filter(Boolean).join(' · ')
 }
 
-function Persona({ c, hoy }: { c: Contacto; hoy: Date }) {
+function Persona({ c, hoy, amigo }: { c: Contacto; hoy: Date; amigo: boolean }) {
+  const dueno = c.tipo === 'personal' ? c.duenos[0] : undefined
   const detalle = [
     c.tipo === 'grupo' && `De ${juntarNombres(c.duenos.map((d) => d.nombre.split(' ')[0]))}`,
     `${c.deseos} ${c.deseos === 1 ? 'deseo' : 'deseos'}`,
@@ -37,7 +39,10 @@ function Persona({ c, hoy }: { c: Contacto; hoy: Date }) {
           ? <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={48} />
           : <AvatarStack nombres={c.duenos.map((d) => d.nombre).slice(0, 3)} fotos={c.duenos.map((d) => d.foto).slice(0, 3)} />}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">{c.nombre}</p>
+          <p className="flex flex-wrap items-center gap-x-2 text-base leading-tight font-semibold [overflow-wrap:anywhere]">
+            {c.nombre}
+            {amigo && <span className="rounded-full bg-gr-accent px-2 py-0.5 text-[11px] font-semibold">Amigos</span>}
+          </p>
           {fecha && <p className="flex items-center gap-1.5 text-[13px] font-medium leading-snug"><Icon name="cake" size={14} className="flex-none" />{fecha}</p>}
           <p className="text-[13px] font-medium leading-snug text-gr-muted [overflow-wrap:anywhere]">{detalle}</p>
         </div>
@@ -48,59 +53,101 @@ function Persona({ c, hoy }: { c: Contacto; hoy: Date }) {
                  className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
           <Icon name="more" size={22} strokeWidth={2.2} />
         </summary>
-        <form action={unfollowAction}
-              className="absolute right-0 top-full z-20 mt-1 flex w-60 flex-col gap-2 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
-          <input type="hidden" name="listId" value={c.listId} />
-          <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
-          <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Quitar de tu gente</BotonEnviar>
-        </form>
+        <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
+          {amigo && dueno ? (
+            <form action={dejarDeSerAmigosAction} className="flex flex-col gap-2">
+              <input type="hidden" name="userId" value={dueno.id} />
+              <p className="text-[13px] font-medium leading-snug">Ninguno de los dos va a ver más al otro acá ni en Eventos.</p>
+              <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Dejar de ser amigos</BotonEnviar>
+            </form>
+          ) : (
+            <>
+              {dueno && (
+                <form action={pedirAmistadAction} className="flex flex-col gap-2">
+                  <input type="hidden" name="para" value={dueno.id} />
+                  <p className="text-[13px] font-medium leading-snug">Le llega una solicitud: si acepta, también ve tu lista.</p>
+                  <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-11 text-sm">Sumar como amigo</BotonEnviar>
+                </form>
+              )}
+              <form action={unfollowAction} className="flex flex-col gap-2">
+                <input type="hidden" name="listId" value={c.listId} />
+                <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
+                <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Quitar de tu gente</BotonEnviar>
+              </form>
+            </>
+          )}
+        </div>
       </details>
     </li>
   )
 }
 
-export default async function Gente() {
+export default async function Gente({ searchParams }: { searchParams: Promise<{ amigo?: string }> }) {
+  const { amigo } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [gente, lista, foto] = await Promise.all([miGente(db, session.userId, hoy), getOwnList(db, session.userId), miFoto(db, session.userId)])
-  const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista?.shareToken ?? ''}`
-  const wa = encodeURIComponent(`Te paso mi lista de deseos en GiftR 🎁 ${shareUrl} ¿Me pasás la tuya así sé qué regalarte?`)
+  const yo = session.userId
+  const [gente, foto, amigos, recibidas, enviadas, usuario, token] = await Promise.all([
+    miGente(db, yo, hoy), miFoto(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
+    asegurarUsuario(db, yo), miAmigoToken(db, yo),
+  ])
+  const linkAmigo = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/amigo/${token ?? ''}`
+  const esAmigo = (c: Contacto) => c.tipo === 'personal' && !!c.duenos[0] && amigos.has(c.duenos[0].id)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <AppHeader nombre={session.user?.name ?? session.user?.email ?? 'Vos'} foto={foto} />
-      <div className="flex flex-col gap-1">
-        <h1 className="gr-title">Tu gente</h1>
-        <p className="text-[15px] text-gr-muted">A quienes les regalás, con sus listas a mano.</p>
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="gr-title">Tu gente</h1>
+          <p className="text-[15px] text-gr-muted">Tus amigos y las listas que abriste.</p>
+        </div>
+        <Link href="/gente/agregar" className="gr-btn gr-btn--sm flex-none gap-1.5"><Icon name="plus" size={18} strokeWidth={2.4} />Agregar</Link>
       </div>
+
+      <AvisoAmigo amigo={amigo} />
+
+      {recibidas.length > 0 && (
+        <section id="solicitudes" aria-labelledby="solicitudes-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
+          <h2 id="solicitudes-titulo" className="gr-label">Solicitudes de amistad</h2>
+          <ul className="flex flex-col gap-3">
+            {recibidas.map((r) => <SolicitudRecibida key={r.id} id={r.id} de={r.de} />)}
+          </ul>
+        </section>
+      )}
 
       {gente.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
           <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="users" size={26} /></span>
-          <p>Acá aparece la gente cuyas listas abrís con tu cuenta.</p>
-          <p className="text-gr-muted">Es solo para vos: nadie ve a quién tenés.</p>
+          <p>Acá aparecen tus amigos y las listas que abrís con tu cuenta.</p>
+          <p className="text-gr-muted">Tocá “Agregar” y buscalos por su @usuario o su mail.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
-          {gente.map((c) => <Persona key={c.listId} c={c} hoy={hoy} />)}
+          {gente.map((c) => <Persona key={c.listId} c={c} hoy={hoy} amigo={esAmigo(c)} />)}
         </ul>
       )}
 
-      <section className="gr-card flex flex-col gap-3 p-4">
-        <div className="flex items-start gap-3">
-          <span className="gr-row__icon"><Icon name="plus" size={20} /></span>
-          <div>
-            <p className="text-base leading-tight font-semibold">¿Falta alguien?</p>
-            <p className="mt-0.5 text-[13px] leading-snug text-gr-muted">Pedile el link de su lista y abrilo con tu cuenta: queda acá y su cumple aparece en Eventos.</p>
-          </div>
-        </div>
-        {lista && (
-          <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn gr-btn--sm gap-2">
-            <Icon name="chat" size={18} strokeWidth={2} />Pedile su lista por WhatsApp
-          </a>
-        )}
-      </section>
+      {enviadas.length > 0 && (
+        <section aria-labelledby="enviadas-titulo" className="flex flex-col gap-2.5">
+          <h2 id="enviadas-titulo" className="gr-label">Esperando respuesta</h2>
+          <ul className="gr-card flex flex-col divide-y divide-gr-line px-3.5">
+            {enviadas.map((e) => (
+              <li key={e.id} className="flex min-h-14 items-center gap-3 py-2">
+                <Icon name="clock" size={18} className="flex-none text-gr-muted" />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.a}</span>
+                <form action={cancelarSolicitudAction}>
+                  <input type="hidden" name="id" value={e.id} />
+                  <BotonEnviar className="min-h-11 px-2 text-[13px] font-semibold text-gr-muted underline underline-offset-4">Cancelar</BotonEnviar>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {token && <InvitarAmigos link={linkAmigo} usuario={usuario} />}
     </Seccion>
   )
 }

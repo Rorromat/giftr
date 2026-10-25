@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { db } from '@/db'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { anotarCuenta } from '@/lib/cookie-invitado'
+import { asegurarUsuario, reclamarSolicitudesPorMail } from '@/lib/amigos'
 
 declare module '@auth/core/types' {
   interface Session {
@@ -24,6 +25,19 @@ async function anotarCuentaEnEsteNavegador(userId: string) {
   }
 }
 
+/**
+ * Al entrar: su @usuario (si no tenía, uno sacado del nombre) y las solicitudes de amistad que esperaban a su mail (Google
+ * ya verificó que es suyo). Nunca impide entrar.
+ */
+async function prepararAmigos(userId: string, email: string) {
+  try {
+    await asegurarUsuario(db, userId)
+    await reclamarSolicitudesPorMail(db, userId, email)
+  } catch (e) {
+    console.error('No se pudieron preparar los amigos al entrar:', e)
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // select_account: después de "Cerrar sesión" en un dispositivo compartido, Google deja elegir otra cuenta
   // en vez de volver a entrar con la misma sin preguntar.
@@ -41,6 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
         token.userId = user.id
         await anotarCuentaEnEsteNavegador(user.id)
+        await prepararAmigos(user.id, profile.email)
         // Si en este navegador había un invitado, no se une acá: en un dispositivo compartido puede ser otra persona.
         // Se le pregunta después, ya adentro ("¿Sos vos?", en PreguntaInvitado).
       }

@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
+import { cambiarUsuarioAction, newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
+import { asegurarUsuario } from '@/lib/amigos'
 import { MESES, miCumple } from '@/lib/events'
 import { misGustos } from '@/lib/bienvenida'
 import { miFoto } from '@/lib/perfil'
@@ -23,14 +24,16 @@ import { invitadoDeEsteNavegador } from '@/lib/viewer'
 import { Icon, PageHeader, Row, Seccion } from '@/components/ui'
 
 
-export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string }> }) {
-  const { nuevo, cumple: avisoCumple } = await searchParams
+export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string }> }) {
+  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misGustos(db, session.userId),
   ])
-  const [foto, vapid, invitado, pedido] = await Promise.all([miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers()])
+  const [foto, vapid, invitado, pedido, usuario] = await Promise.all([
+    miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers(), asegurarUsuario(db, session.userId),
+  ])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
@@ -51,6 +54,23 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         </div>
       </div>
 
+      {/* el @usuario: con esto te encuentran para sumarte como amigo (ver amigos.ts) */}
+      <form id="usuario" action={cambiarUsuarioAction} className="gr-card flex scroll-mt-6 flex-col gap-2 p-4">
+        <label htmlFor="usuario-campo" className="text-base font-semibold">Tu usuario</label>
+        <div className="flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <span aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-gr-muted">@</span>
+            <input id="usuario-campo" name="usuario" defaultValue={usuario ?? ''} required minLength={3} maxLength={21}
+                   autoComplete="off" autoCapitalize="none" spellCheck={false} className="gr-input w-full pl-8" />
+          </div>
+          <BotonEnviar className="gr-btn gr-btn--sm flex-none">Guardar</BotonEnviar>
+        </div>
+        {avisoUsuario === 'ok' ? <p role="status" className="text-[13px] font-semibold">Listo, ahora sos @{usuario}.</p>
+          : avisoUsuario === 'ocupado' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Ese usuario ya lo tiene alguien. Probá con otro.</p>
+          : avisoUsuario === 'formato' ? <p role="alert" className="text-[13px] font-semibold text-red-700">De 3 a 20 letras, números, punto o guión bajo, sin espacios.</p>
+          : <p className="text-[13px] text-gr-muted">Con esto te encuentran para sumarte como amigo.</p>}
+      </form>
+
       <div className="flex flex-col gap-1.5">
         <section className="gr-hero flex items-center gap-3 p-4 pl-5">
           <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-hero/10 text-gr-hero-detail"><Icon name="link" size={20} /></span>
@@ -69,7 +89,7 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
                    className="items-end">
           El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
-          tu lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+          tu lista sale de su gente y de sus eventos (tus amigos la siguen viendo). Lo que ya reservaron no se pierde.
         </Confirmar>
       </div>
 

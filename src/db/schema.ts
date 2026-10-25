@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm'
-import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, uniqueIndex, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
 
 export const users = pgTable('users', {
@@ -22,7 +22,16 @@ export const users = pgTable('users', {
   fotoAt: timestamp('foto_at', { withTimezone: true }),
   // Cuándo tocó "Probar" en Avisos por última vez: uno por minuto (ver probarAviso).
   avisoProbadoAt: timestamp('aviso_probado_at', { withTimezone: true }),
-})
+  // El nombre de usuario ("euge.mateus", sin la @), para que lo encuentren y lo agreguen como amigo. Se le sugiere uno al
+  // entrar (ver asegurarUsuario) y lo cambia en Perfil. En minúsculas, único.
+  usuario: text('usuario').unique(),
+  // El link para sumarse como amigo (/amigo/<token>): quien lo abre y acepta queda amigo sin otra solicitud. Se crea la
+  // primera vez que se comparte.
+  amigoToken: text('amigo_token').unique(),
+}, (t) => [
+  // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
+  index('users_email_lower_idx').on(sql`lower(${t.email})`),
+])
 
 const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
   dataType: () => 'bytea',
@@ -254,6 +263,31 @@ export const pushSubs = pgTable('push_subs', {
   auth: text('auth').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('push_subs_user_id_idx').on(t.userId)])
+
+// Amigos: una solicitud de uno a otro y, si la acepta, se ven mutuamente (cada uno sigue la lista personal del otro, ver
+// amigos.ts). Una fila por par: la misma pasa de pendiente a aceptada o rechazada. Por mail, si nadie entró todavía con
+// ese mail, para_user_id queda vacío hasta que entre (ver reclamarSolicitudesPorMail).
+export const amistades = pgTable('amistades', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  deUserId: uuid('de_user_id').notNull().references(() => users.id),
+  paraUserId: uuid('para_user_id').references(() => users.id),
+  // el mail que escribió el que la mandó, en minúsculas: lo que ve en sus enviadas (no el nombre de la cuenta de ese mail)
+  paraEmail: text('para_email'),
+  estado: text('estado', { enum: ['pendiente', 'aceptada', 'rechazada'] }).notNull().default('pendiente'),
+  // el que la mandó la sacó de sus enviadas cuando ya estaba rechazada: queda, así no le vuelve a llegar al otro
+  ocultaAt: timestamp('oculta_at', { withTimezone: true }),
+  respondidaAt: timestamp('respondida_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // una por par, sin importar quién la mandó
+  uniqueIndex('amistades_par_idx').on(sql`least(${t.deUserId}, ${t.paraUserId})`, sql`greatest(${t.deUserId}, ${t.paraUserId})`)
+    .where(sql`${t.paraUserId} is not null`),
+  // y una por mail que todavía no es de nadie
+  uniqueIndex('amistades_mail_idx').on(t.deUserId, t.paraEmail).where(sql`${t.paraUserId} is null`),
+  index('amistades_para_user_id_idx').on(t.paraUserId),
+  index('amistades_de_user_id_created_at_idx').on(t.deUserId, t.createdAt),
+  index('amistades_para_email_idx').on(t.paraEmail).where(sql`${t.paraUserId} is null`),
+])
 
 // Codazos: alguien que regala le pide a un dueño que cargue su lista. Uno por persona y lista cada 24 h.
 export const codazos = pgTable('codazos', {
