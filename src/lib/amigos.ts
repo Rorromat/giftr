@@ -87,6 +87,13 @@ const camposPersona = { id: users.id, nombre: users.nombre, usuario: users.usuar
 const persona = (u: { id: string; nombre: string; usuario: string | null; fotoAt: Date | null; avatarUrl: string | null }): Persona =>
   ({ id: u.id, nombre: u.nombre, usuario: u.usuario, foto: urlFoto(u) })
 
+/** Lo que se muestra de varias personas (foto, nombre y @usuario), en el orden de los ids. */
+export async function personas(db: Db, ids: string[]): Promise<Persona[]> {
+  if (!ids.length) return []
+  const filas = new Map((await db.select(camposPersona).from(users).where(inArray(users.id, ids))).map((u) => [u.id, persona(u)]))
+  return ids.flatMap((id) => filas.get(id) ?? [])
+}
+
 /** Quién tiene ese usuario (para mostrarlo antes de mandarle la solicitud). Un usuario es público, como en otras apps. */
 export async function buscarPorUsuario(db: Db, escrito: unknown): Promise<Persona | null> {
   const usuario = normalizarUsuario(escrito)

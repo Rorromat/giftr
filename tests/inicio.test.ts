@@ -29,10 +29,10 @@ async function redirige(p: Promise<unknown>): Promise<string | null> {
 test('al entrar con sesión va a Inicio; la primera vez, a la bienvenida; sin sesión, a la portada', async () => {
   h.db = await createTestDb()
   const { owner } = await seedOwnerAndGiver(h.db)
-  expect(await redirige(Inicio())).toBe('/')
+  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBe('/')
   h.session = { userId: owner.id }
   expect(await redirige(Home({ searchParams: Promise.resolve({}) }))).toBe('/inicio')
-  expect(await redirige(Inicio())).toBe('/bienvenida')
+  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBe('/bienvenida')
   await saltearBienvenida(h.db, owner.id)
-  expect(await redirige(Inicio())).toBeNull()
+  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBeNull()
 })

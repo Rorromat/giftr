@@ -18,6 +18,9 @@ import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { ComoLoRegalas } from '@/components/ComoLoRegalas'
+import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
+import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { LARGO } from '@/lib/limites'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
@@ -50,9 +53,9 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
-  searchParams: Promise<{ reserva?: string; correccion?: string }>
+  searchParams: Promise<{ reserva?: string; correccion?: string; reservar?: string; regalo?: string }>
 }) {
-  const [{ token, itemId }, { reserva, correccion }] = await Promise.all([params, searchParams])
+  const [{ token, itemId }, { reserva, correccion, reservar, regalo: deRegalo }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) notFound()
@@ -88,6 +91,11 @@ export default async function DetalleItem({ params, searchParams }: {
     : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
     : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
   const cuantos = cantidad(item, giver?.item ?? null)
+  // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
+  const amigos = viewer.userId && giver ? await amigosParaDividir(db, viewer.userId, item.id) : []
+  const organizo = regalos.find((r) => r.soyEncargado && r.estado === 'abierto')
+  const invitados = organizo ? await invitadosDeRegalo(db, organizo.id) : []
+  const yaEstan = new Set([...(organizo?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
 
@@ -189,19 +197,36 @@ export default async function DetalleItem({ params, searchParams }: {
           </div>
         )}
 
-        {regalos.map((r) => (
-          <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
-                        precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
-                        logueado={logueado} ocupado={ocupado}
-                        nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} />
-        ))}
+        {deRegalo === 'sumado' && enUnRegalo && (
+          <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-medium">
+            <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />¡Listo, te sumaste! Se divide en partes iguales entre los que estén.
+          </p>
+        )}
 
-        {/* como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá */}
+        {regalos.length > 0 && (
+          <div id="regalo" className="flex scroll-mt-6 flex-col gap-2.5">
+            {regalos.map((r) => (
+              <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
+                            precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
+                            logueado={logueado} ocupado={ocupado}
+                            nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre}
+                            invitar={r.id === organizo?.id && (
+                              <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados}
+                                                  paraInvitar={amigos.filter((a) => !yaEstan.has(a.id))} />
+                            )} />
+            ))}
+          </div>
+        )}
+
+        {/* como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá.
+            "Reservar" abre las dos formas: lo compra él, o lo dividen (con sus amigos, ver ComoLoRegalas) */}
         {disponible && !mia && !vencida && !enUnRegalo && !(detalle.role === 'anonimo' && detalle.motivo !== 'sin_identidad') && (
-          <>
-            <GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva} />
-            {giver && <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />}
-          </>
+          <ComoLoRegalas abierto={reservar === '1'}
+                         compro={<GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva}
+                                            texto="Reservarlo para mí" />}
+                         dividimos={giver && (logueado
+                           ? <FormDividir token={token} itemId={item.id} amigos={amigos} />
+                           : <ArmarRegaloGrupal token={token} itemId={item.id} logueado={false} />)} />
         )}
 
         {miClaim && (

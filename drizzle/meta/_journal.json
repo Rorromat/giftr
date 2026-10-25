@@ -183,6 +183,13 @@
       "when": 1792967375320,
       "tag": "0025_avisos_preguntados",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792968400831,
+      "tag": "0026_invitaciones_regalo",
+      "breakpoints": true
     }
   ]
 }

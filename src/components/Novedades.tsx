@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import {
-  masNovedadesAction, reservarNovedadAction, robarDeseoAction, type EstadoReservaNovedad, type EstadoRobo, type NovedadVista,
+  masNovedadesAction, robarDeseoAction, type EstadoRobo, type NovedadVista,
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
@@ -141,26 +141,19 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
   )
 }
 
+/** Reservar desde el feed: lleva al deseo, que pregunta cómo (lo comprás vos o lo dividen con amigos, ver ComoLoRegalas). */
 function Reservar({ n }: { n: NovedadVista }) {
-  const [estado, reservar] = useActionState<EstadoReservaNovedad, FormData>(reservarNovedadAction, null)
   const mia = n.item.claims.some((c) => c.esMia || c.grupal?.soyParte)
   const href = `/l/${n.token}/item/${n.item.id}`
-  if (mia || estado?.ok) {
+  if (mia) {
     return (
       <Link href={href} className="gr-btn gr-btn--sm w-full gap-1.5 border-gr-accent bg-gr-accent">
-        <Icon name="check" size={17} strokeWidth={2.6} />{estado?.ok ? '¡Reservado!' : 'Lo reservaste'}
+        <Icon name="check" size={17} strokeWidth={2.6} />Lo reservaste
       </Link>
     )
   }
   if (!n.item.disponible) return <span className="gr-btn gr-btn--sm w-full cursor-default text-gr-muted">Ya lo reservaron</span>
-  return (
-    <form action={reservar} className="flex flex-col gap-1">
-      <input type="hidden" name="token" value={n.token} />
-      <input type="hidden" name="itemId" value={n.item.id} />
-      <BotonEnviar pendiente="Reservando…" className="gr-btn-primary gr-btn--sm w-full">Reservar</BotonEnviar>
-      {estado && !estado.ok && <p role="alert" className="text-xs font-semibold">{estado.texto}</p>}
-    </form>
-  )
+  return <Link href={`${href}?reservar=1#reservar`} className="gr-btn-primary gr-btn--sm w-full">Reservar</Link>
 }
 
 /**

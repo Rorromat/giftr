@@ -139,7 +139,7 @@ export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: 
   )
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado }: Ctx & {
+export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado, invitar }: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
@@ -151,6 +151,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   logueado: boolean
   /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
   ocupado?: string | null
+  /** Para el que lo organiza: a quiénes les propuso dividirlo y proponérselo a más (ver InvitadosDelRegalo). */
+  invitar?: React.ReactNode
 }) {
   // al que sacó el encargado no se le ofrece volver con un toque (ver sumarseARegalo)
   const noSeSuma = regalo.meSacaron
@@ -218,6 +220,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
 
           {regalo.soyEncargado && (
             <>
+              {invitar}
               <a target="_blank" className="gr-btn min-h-11 gap-2 px-3.5 text-[15px]"
                  href={`https://wa.me/?text=${encodeURIComponent(`Armé un regalo grupal para ${ownerNombre}: "${titulo}". ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${itemId}`)}`}>
                 <Icon name="chat" size={18} strokeWidth={2} />Invitar por WhatsApp
