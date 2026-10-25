@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
+import { Refrescar } from '@/components/Refrescar'
 import { RegistrarSW } from '@/components/RegistrarSW'
 import { ATRAPAR_PEDIDO_INSTALAR } from '@/lib/app-instalable'
 import './globals.css'
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans">
         <div className="mx-auto max-w-md px-[18px]">{children}</div>
         <Arranque />
+        <Refrescar />
         {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}
         <RegistrarSW />
       </body>
