@@ -229,6 +229,7 @@ const ICONS = {
   chevron: <path d="M9 6l6 6-6 6" />,
   plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
   close: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
+  expandir: <><path d="M14 4h6v6" /><path d="M10 20H4v-6" /><path d="M20 4l-6.5 6.5" /><path d="M4 20l6.5-6.5" /></>,
   home: <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
   calendar: <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,

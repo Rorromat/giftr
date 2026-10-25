@@ -6,6 +6,7 @@ import { deseoParaEditar } from '@/lib/items'
 import { textoDueno } from '@/lib/compartir'
 import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
 import { Icon, ItemPhoto, PriorityTag, Seccion, PageHeader } from '@/components/ui'
+import { FotoAmpliable } from '@/components/FotoAmpliable'
 
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
 // regalos, ni comentarios (la regla de la sorpresa). Desde acá se edita o se saca de la lista.
@@ -26,9 +27,9 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
       <PageHeader title={grupo?.nombre ?? 'Mi lista'} titulo="p" back={lista} backLabel={`Volver a ${grupo?.nombre ?? 'Mi lista'}`} />
 
       <article className="gr-card">
-        <div className="relative">
+        <FotoAmpliable src={deseo.fotoUrl} titulo={deseo.titulo}>
           <ItemPhoto src={deseo.fotoUrl} titulo={deseo.titulo} height={260} />
-        </div>
+        </FotoAmpliable>
         <div className="flex flex-col gap-3 p-4">
           {deseo.categoria && <p className="gr-label">{deseo.categoria}</p>}
           <div className="flex flex-col gap-1.5">
