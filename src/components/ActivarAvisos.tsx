@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { confirmarAvisosAction, desuscribirAvisosAction, probarAvisoAction, suscribirAvisosAction } from '@/app/actions'
 import { esIOS, instalada, registrarSW } from '@/lib/app-instalable'
 import { estadoAlAbrir, trasPedirPermiso, type EstadoAvisos } from '@/lib/avisos-del-navegador'
+import { Icon } from '@/components/ui'
 
 /** La clave pública VAPID viene en base64url; el navegador la quiere en bytes. */
 function bytes(base64url: string): Uint8Array<ArrayBuffer> {
@@ -11,10 +12,18 @@ function bytes(base64url: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
 }
 
-/** "Avisos": para que los codazos lleguen como notificación. En iPhone solo anda con GiftR agregado a inicio. */
-export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
+/**
+ * "Avisos": para que los codazos lleguen como notificación. En iPhone solo anda con GiftR agregado a inicio.
+ * bienvenida: la pregunta de la primera vez (ver /bienvenida/avisos): un botón grande para activarlos y, ya activados,
+ * solo la confirmación (probarlos y desactivarlos queda para Perfil). alCambiar: el estado, cada vez que cambia.
+ */
+export function ActivarAvisos({ vapidPublica, bienvenida = false, alCambiar }: {
+  vapidPublica: string; bienvenida?: boolean; alCambiar?: (estado: EstadoAvisos) => void
+}) {
   const [estado, setEstado] = useState<EstadoAvisos>('cargando')
   const [mensaje, setMensaje] = useState<string | null>(null)
+
+  useEffect(() => { alCambiar?.(estado) }, [estado, alCambiar])
 
   useEffect(() => {
     const soporta = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
@@ -64,7 +73,7 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
       {estado === 'cargando' && <p className="text-[13px] font-medium text-gr-muted">Fijándonos si este dispositivo puede recibir avisos…</p>}
       {estado === 'ios-instalar' && (
         <p className="text-[13px] font-medium leading-snug">
-          En iPhone los avisos andan con GiftR en la pantalla de inicio: tocá <span className="font-semibold">Compartir → Agregar a inicio</span>, abrilo desde ahí y activalos.
+          En iPhone los avisos andan con GiftR en la pantalla de inicio: tocá <span className="font-semibold">Compartir → Agregar a inicio</span>, abrilo desde ahí y activalos{bienvenida ? ' en Perfil' : ''}.
         </p>
       )}
       {estado === 'no-soportado' && <p className="text-[13px] font-medium text-gr-muted">Este navegador no puede recibir avisos. Igual vas a ver los codazos al entrar.</p>}
@@ -72,9 +81,16 @@ export function ActivarAvisos({ vapidPublica }: { vapidPublica: string }) {
         <p className="text-[13px] font-medium leading-snug">Los avisos están bloqueados para GiftR. Habilitalos en los ajustes del navegador y volvé acá.</p>
       )}
       {estado === 'apagado' && (
-        <button type="button" onClick={activar} className="gr-btn-primary gr-btn--sm w-full">Activar avisos</button>
+        <button type="button" onClick={activar} className={`gr-btn-primary w-full ${bienvenida ? '' : 'gr-btn--sm'}`}>
+          {bienvenida ? 'Sí, activar avisos' : 'Activar avisos'}
+        </button>
       )}
-      {estado === 'activado' && (
+      {estado === 'activado' && bienvenida && (
+        <p role="status" className="flex items-center gap-2 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-semibold">
+          <Icon name="check" size={18} strokeWidth={2.6} className="flex-none" />¡Listo! Te vamos a avisar en este dispositivo.
+        </p>
+      )}
+      {estado === 'activado' && !bienvenida && (
         <div className="flex items-center gap-3">
           <span className="flex-1 text-sm font-semibold">Avisos activados ✓</span>
           <button type="button" onClick={probar} className="gr-btn min-h-11 px-3 text-[13px]">Probar</button>

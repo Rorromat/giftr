@@ -211,8 +211,10 @@ export async function saveGustosAction(formData: FormData) {
   // Lo demás ya se guardó: vuelve al primer paso a avisar, en vez de seguir como si el cumple estuviera. Con "Más tarde"
   // (o "Guardar" desde Perfil) quería salir: va a Perfil, que avisa al lado de su cumple, en vez de dejarlo adentro.
   if (!cumpleOk) redirect(corte ? '/perfil?cumple=invalido#cumple' : `/bienvenida?${desdePerfil ? 'editar=1&' : ''}paso=0&cumple=invalido`)
-  if (corte) redirect(desdePerfil ? '/perfil' : '/mi-lista')
-  redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/listo')
+  // La primera vez, antes de terminar, le pregunta si quiere avisos (ver /bienvenida/avisos); con "Más tarde", después
+  // sigue a su lista, como antes.
+  if (corte) redirect(desdePerfil ? '/perfil' : '/bienvenida/avisos?luego=lista')
+  redirect(desdePerfil ? '/bienvenida/listo?desde=perfil' : '/bienvenida/avisos')
 }
 
 export async function joinGroupAction(formData: FormData) {
