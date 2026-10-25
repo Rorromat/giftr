@@ -12,9 +12,13 @@ const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; c
   { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user', columna: 4 },
 ]
 
-/** La sección del menú a la que pertenece una pantalla (todo el año es de Inicio; un grupo, un deseo y el perfil, de Vos). */
+/**
+ * La sección del menú a la que pertenece una pantalla: todo el año es de Inicio; un grupo, un deseo y el perfil, de Vos; la
+ * lista de alguien, de Gente.
+ */
 function seccionDe(path: string) {
   if (path === '/eventos') return '/inicio'
+  if (path.startsWith('/l/')) return '/gente'
   if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil') return '/mi-lista'
   return path
 }
