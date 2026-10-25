@@ -8,6 +8,9 @@ import { misCuentas } from '@/lib/regalos'
 import { Banners } from '@/components/Banners'
 import { CargaTuCumple, CuentasPendientes, Proximos } from '@/components/Eventos'
 import { miFoto } from '@/lib/perfil'
+import { misAmigos } from '@/lib/amigos'
+import { novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
+import { CarruselNovedades } from '@/components/Novedades'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 // Inicio: lo que viene (los avisos, las cuentas, los próximos cumples y fechas de tu gente, con lo que ya hiciste para
@@ -16,9 +19,9 @@ export default async function Inicio() {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, foto] = await Promise.all([
+  const [bienvenida, eventos, cumple, cuentas, foto, { novedades }, amigos] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
-    miFoto(db, session.userId),
+    miFoto(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
@@ -49,6 +52,25 @@ export default async function Inicio() {
             <Link href="/agregar" className="gr-btn-primary">Armá tu lista</Link>
           </div>
         </div>
+      )}
+
+      {/* lo nuevo de tus amigos: pasa solo; cada uno abre el feed en ese deseo */}
+      {novedades.length > 0 ? (
+        <section aria-labelledby="novedades" className="flex flex-col gap-3">
+          <SectionHeader id="novedades" title="Lo nuevo de tus amigos" href="/novedades" linkLabel="Ver todo" />
+          <CarruselNovedades items={novedades.map((n) => ({
+            id: n.item.id, titulo: n.item.titulo, foto: n.item.fotoUrl, nombre: n.dueno.nombre, duenoFoto: n.dueno.foto,
+          }))} />
+        </section>
+      ) : !amigos.size && (
+        <Link href="/gente/agregar" className="gr-card flex items-center gap-3 p-4">
+          <span className="gr-row__icon"><Icon name="users" size={20} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base leading-tight font-semibold">Sumá a tus amigos</span>
+            <span className="block text-[13px] leading-snug text-gr-muted">Acá vas a ver lo que se van agregando a sus listas.</span>
+          </span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
       )}
 
       {!cumple && <CargaTuCumple />}

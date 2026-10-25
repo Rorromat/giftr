@@ -7,6 +7,7 @@ import { getViewer } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import { relacionCon } from '@/lib/amigos'
 import { AmigoEnLista, AvisoAmigo } from '@/components/Amigos'
+import { BotonRobar } from '@/components/Novedades'
 import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
 import { nombreDeViewer } from '@/lib/guest'
@@ -200,6 +201,8 @@ export default async function ListaAjena({
           <div className="relative">
             <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
             <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
+            {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
+            {viewer.userId && <BotonRobar token={token} itemId={hero.id} variante="icono" className="absolute right-3 top-3 z-[2]" />}
           </div>
           <div className="flex flex-col gap-3 p-4">
             <div className="flex flex-col gap-1">
@@ -227,6 +230,7 @@ export default async function ListaAjena({
               <li key={item.id} className="gr-card relative flex flex-col">
                 <div className="relative">
                   <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                  {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
                   {!item.disponible && (
                     <span className="absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
                       {estadoNoDisponible(item)}

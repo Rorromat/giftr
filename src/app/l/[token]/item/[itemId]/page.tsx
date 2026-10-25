@@ -6,6 +6,7 @@ import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { boughtAction, commentAction, releaseAction, unboughtAction } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
+import { BotonRobar } from '@/components/Novedades'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, CartelCorreccion, RegaloGrupal } from '@/components/RegaloGrupal'
 import { enDolares, parseDolares, parsePesos } from '@/lib/pesos'
@@ -119,6 +120,8 @@ export default async function DetalleItem({ params, searchParams }: {
                 Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
               </a>
             )}
+            {/* "Me lo robo": con tu cuenta, sumarlo a tu lista (querés lo mismo) */}
+            {logueado && <BotonRobar token={token} itemId={item.id} className="min-w-36" />}
             {/* Mandárselo a alguien: WhatsApp arma la vista previa con la foto (opengraph-image) */}
             <a target="_blank" className="gr-btn gap-2 text-sm"
                href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
