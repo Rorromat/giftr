@@ -6,24 +6,27 @@ import {
   masNovedadesAction, reservarNovedadAction, robarDeseoAction, type EstadoReservaNovedad, type EstadoRobo, type NovedadVista,
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { AvatarSticker, Icon, ItemPhoto, PriorityTag, Starburst } from '@/components/ui'
 
-// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas grandes que pasan solas de a una, y se pueden deslizar con el
-// dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el botón "Me lo robo".
+// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas grandes que pasan solas de a una, un segundo en cada una, y se
+// pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
+// botón "Me lo robo".
 
 export type MiniNovedad = {
   id: string; titulo: string; foto: string | null; precio: string | null; hace: string; nombre: string; duenoFoto: string | null
 }
 
-/** Cada cuánto pasa sola a la tarjeta siguiente. */
-const CADA_MS = 3500
-/** Después de tocarlo (o de llegar con el teclado), cuánto espera para volver a pasar solo. */
-const PAUSA_MS = 6000
+/** Cada cuánto pasa sola a la tarjeta siguiente: un segundo quieta en cada una, más lo que tarda en deslizarse. */
+const CADA_MS = 1700
+/** Después de soltarlo (o de moverlo con la ruedita), cuánto espera para volver a pasar solo. */
+const PAUSA_MS = 2500
 
 /**
  * El carrusel de Inicio: los últimos deseos de tus amigos en tarjetas grandes, una al lado de la otra (como los Próximos).
- * Pasa solo de a una tarjeta y, al llegar a la última, vuelve a la primera; se frena mientras lo tocás y un rato después.
- * Con movimiento reducido no se mueve solo. Cada una abre el feed en ese deseo.
+ * Pasa solo de a una tarjeta, un segundo en cada una, y al llegar a la última vuelve a la primera. Mientras lo tenés
+ * apretado (o recorrés las tarjetas con el teclado) no se mueve, y al soltarlo espera un poco. Con movimiento reducido no
+ * se mueve solo. Cada una abre el feed en ese deseo.
  */
 export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
   const ref = useRef<HTMLUListElement>(null)
@@ -31,10 +34,21 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
   useEffect(() => {
     const el = ref.current
     if (!el || items.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let tocando = false
+    let conTeclado = false
     let quietoHasta = 0
     const frenar = () => { quietoHasta = Date.now() + PAUSA_MS }
+    const tocar = () => { tocando = true }
+    // el dedo se puede soltar afuera del carrusel (o el navegador cancelarlo al hacer scroll): se escucha en toda la página
+    const soltar = () => {
+      if (!tocando) return
+      tocando = false
+      frenar()
+    }
+    const entra = (e: FocusEvent) => { conTeclado = (e.target as Element).matches(':focus-visible') }
+    const sale = () => { conTeclado = false }
     const t = setInterval(() => {
-      if (Date.now() < quietoHasta || document.hidden) return
+      if (tocando || conTeclado || Date.now() < quietoHasta || document.hidden) return
       const tarjetas = [...el.children] as HTMLElement[]
       // la que está en el medio ahora, y la que sigue (después de la última, la primera)
       const centro = el.scrollLeft + el.clientWidth / 2
@@ -43,11 +57,21 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
       const sig = tarjetas[alFinal || ahora < 0 ? 0 : (ahora + 1) % tarjetas.length]
       el.scrollTo({ left: sig.offsetLeft - (el.clientWidth - sig.offsetWidth) / 2, behavior: 'smooth' })
     }, CADA_MS)
-    const eventos = ['pointerdown', 'touchstart', 'wheel', 'focusin'] as const
-    for (const ev of eventos) el.addEventListener(ev, frenar, { passive: true })
+    el.addEventListener('pointerdown', tocar)
+    el.addEventListener('touchstart', tocar, { passive: true })
+    el.addEventListener('wheel', frenar, { passive: true })
+    el.addEventListener('focusin', entra)
+    el.addEventListener('focusout', sale)
+    const finales = ['pointerup', 'pointercancel', 'touchend', 'touchcancel'] as const
+    for (const ev of finales) window.addEventListener(ev, soltar)
     return () => {
       clearInterval(t)
-      for (const ev of eventos) el.removeEventListener(ev, frenar)
+      el.removeEventListener('pointerdown', tocar)
+      el.removeEventListener('touchstart', tocar)
+      el.removeEventListener('wheel', frenar)
+      el.removeEventListener('focusin', entra)
+      el.removeEventListener('focusout', sale)
+      for (const ev of finales) window.removeEventListener(ev, soltar)
     }
   }, [items.length])
 
@@ -139,7 +163,10 @@ function Reservar({ n }: { n: NovedadVista }) {
   )
 }
 
-/** Un deseo nuevo de un amigo, en su tarjeta, como una foto de Instagram: quién y cuándo, la foto, y reservar o robarlo. */
+/**
+ * Un deseo nuevo de un amigo, en su tarjeta, como una foto de Instagram: quién y cuándo, la foto (tocándola se ve entera),
+ * y reservar o robarlo. El nombre lleva al deseo.
+ */
 export function TarjetaNovedad({ n }: { n: NovedadVista }) {
   const precio = n.item.precio ?? n.item.rangoPrecio
   const href = `/l/${n.token}/item/${n.item.id}`
@@ -152,10 +179,10 @@ export function TarjetaNovedad({ n }: { n: NovedadVista }) {
           <span className="text-xs font-medium text-gr-muted">agregó a su lista · {n.hace}</span>
         </span>
       </Link>
-      <Link href={href} className="relative block overflow-hidden rounded-[18px]">
+      <FotoAmpliable src={n.item.fotoUrl} titulo={n.item.titulo} className="overflow-hidden rounded-[18px]">
         <ItemPhoto src={n.item.fotoUrl} titulo={n.item.titulo} height={320} />
         <PriorityTag prioridad={n.item.prioridad} className="absolute left-3 top-3 h-[30px]" />
-      </Link>
+      </FotoAmpliable>
       <div className="flex flex-col gap-0.5 px-0.5">
         <Link href={href} className="text-lg leading-snug font-semibold [overflow-wrap:anywhere]">{n.item.titulo}</Link>
         {precio && <p className="text-[15px] font-semibold">{precio}</p>}

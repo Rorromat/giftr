@@ -462,6 +462,45 @@
   100% { opacity: 0; transform: translate(-50%, 6px); visibility: hidden; }
 }
 
+/* La foto de un deseo entera (<FotoAmpliable>): a pantalla completa, sin recortar, sobre fondo oscuro. */
+.gr-foto-grande {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(56px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom));
+  border: 0;
+  background: #0b0b0b;
+}
+.gr-foto-grande[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: gr-foto-grande 180ms ease-out;
+}
+.gr-foto-grande::backdrop { background: transparent; }
+/* toda la pantalla, aunque la foto sea chica: contain la agranda sin recortarla */
+.gr-foto-grande__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.gr-foto-grande__cerrar {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+}
+@keyframes gr-foto-grande { from { opacity: 0; } }
+
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
    un <main aria-busy>), la estrella del ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de
    30° la deja igual, así que aguanta lo que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de
@@ -530,6 +569,7 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
   .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }
+  .gr-foto-grande[open] { animation: none; }
   /* la estrella quieta mientras carga, y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }

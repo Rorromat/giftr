@@ -17,6 +17,7 @@ import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
+import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { LARGO } from '@/lib/limites'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
@@ -97,9 +98,9 @@ export default async function DetalleItem({ params, searchParams }: {
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
       <article className="gr-card">
-        <div className="relative">
+        <FotoAmpliable src={item.fotoUrl} titulo={item.titulo}>
           <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
-        </div>
+        </FotoAmpliable>
         <div className="flex flex-col gap-3 p-3.5">
           <div className="flex flex-col gap-1.5">
             <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{item.titulo}</h1>
