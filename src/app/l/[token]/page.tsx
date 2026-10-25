@@ -260,10 +260,13 @@ export default async function ListaAjena({
         <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>
       )}
 
-      <div className="gr-floatbar">
-        <p className="text-sm font-medium">¿Y vos qué querés?</p>
-        <Link href="/" className="gr-btn gr-btn--accent gr-btn--sm">Armá tu lista →</Link>
-      </div>
+      {/* con cuenta ya tiene su lista, y abajo va la barra (ver el layout) */}
+      {!viewer.userId && (
+        <div className="gr-floatbar">
+          <p className="text-sm font-medium">¿Y vos qué querés?</p>
+          <Link href="/" className="gr-btn gr-btn--accent gr-btn--sm">Armá tu lista →</Link>
+        </div>
+      )}
     </main>
   )
 }
