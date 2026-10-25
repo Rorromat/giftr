@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import {
-  comprasParaCorregir, misCuentas, pesos, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
+  comprasParaCorregir, misCuentas, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
 } from '@/lib/regalos'
+import { plata } from '@/lib/pesos'
 import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
@@ -19,7 +20,7 @@ function Linea({ l }: { l: LineaCuenta }) {
         <span className={`font-semibold [overflow-wrap:anywhere] ${l.href ? 'underline underline-offset-2' : ''}`}>{l.itemTitulo}</span>
         <span className="block text-xs font-medium text-gr-muted">para {l.para} · {l.tipo === 'debes' ? 'tu parte' : 'su parte'}</span>
       </QuizasLink>
-      <span className="text-base font-semibold tabular-nums">{pesos(l.monto)}</span>
+      <span className="text-base font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
       <form action={markPaidAction}>
         <input type="hidden" name="giftId" value={l.giftId} />
         <input type="hidden" name="deudorId" value={l.deudorId} />
@@ -40,7 +41,7 @@ function Persona({ p }: { p: CuentaPersona }) {
       <div className="flex items-center gap-3">
         <AvatarSticker nombre={p.nombre} size={44} />
         <p className="min-w-0 flex-1 text-base leading-snug font-semibold [overflow-wrap:anywhere]">
-          {p.neto === 0 ? `Con ${p.nombre} están a mano` : leDebo ? `Le debés ${pesos(-p.neto)} a ${p.nombre}` : `${p.nombre} te debe ${pesos(p.neto)}`}
+          {p.neto === 0 ? `Con ${p.nombre} están a mano` : leDebo ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}
         </p>
       </div>
       {ambas && <p className="text-xs font-semibold text-gr-muted">Ya está descontado lo que se deben entre los dos.</p>}
@@ -50,10 +51,11 @@ function Persona({ p }: { p: CuentaPersona }) {
       {p.lineas.length > 1 && (
         <form action={settleUpAction}>
           <input type="hidden" name="otroId" value={p.id} />
+          <input type="hidden" name="moneda" value={p.moneda ?? 'ARS'} />
           {/* lo que dice el botón: si cambió mientras tanto, no salda nada */}
           <input type="hidden" name="neto" value={p.neto} />
           <BotonEnviar className={`${leDebo ? 'gr-btn-primary' : 'gr-btn '} gr-btn--sm mt-1 w-full`}>
-            {p.neto === 0 ? 'Marcar todo como saldado' : leDebo ? `Ya le pagué todo (${pesos(-p.neto)})` : `Me pagó todo (${pesos(p.neto)})`}
+            {p.neto === 0 ? 'Marcar todo como saldado' : leDebo ? `Ya le pagué todo (${plata(-p.neto, p.moneda)})` : `Me pagó todo (${plata(p.neto, p.moneda)})`}
           </BotonEnviar>
         </form>
       )}
@@ -62,6 +64,17 @@ function Persona({ p }: { p: CuentaPersona }) {
 }
 
 const linkSubrayado = 'min-h-11 font-semibold underline underline-offset-4'
+
+/** Un total de arriba: en pesos, y lo de dólares abajo y aparte (si solo hay dólares, va eso solo). */
+function Total({ pesos, dolares, className = '' }: { pesos: number; dolares: number; className?: string }) {
+  const soloDolares = !pesos && dolares > 0
+  return (
+    <>
+      <span className={`gr-number text-[30px] tabular-nums ${className}`}>{soloDolares ? plata(dolares, 'USD') : plata(pesos)}</span>
+      {!soloDolares && dolares > 0 && <span className={`gr-number text-xl tabular-nums ${className}`}>+ {plata(dolares, 'USD')}</span>}
+    </>
+  )
+}
 
 function CancelarRegalo({ giftId }: { giftId: string }) {
   return (
@@ -131,16 +144,16 @@ function Corregir({ c }: { c: CompraParaCorregir }) {
       <p className="text-sm leading-snug">
         <span className="font-semibold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
         <span className="block text-xs font-medium text-gr-muted">
-          Lo compraste por {pesos(c.total)} · {alguienDebe ? 'nadie te pagó todavía' : 'los demás quedaron en $0'}
+          Lo compraste por {plata(c.total, c.moneda)} · {alguienDebe ? 'nadie te pagó todavía' : `los demás quedaron en ${plata(0, c.moneda)}`}
         </span>
       </p>
-      <details key={`${c.total}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
+      <details key={`${c.total}:${c.moneda}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
         <summary className={`${linkSubrayado} flex cursor-pointer list-none items-center text-sm [&::-webkit-details-marker]:hidden`}>
           Corregir la compra
         </summary>
         <div className="mt-2">
           <CompraGrupalForm giftId={c.giftId} miembros={c.miembros} sugerido={null}
-                            corregir={{ total: c.total, nota: c.nota, partes: Object.fromEntries(c.miembros.map((m) => [m.userId, m.monto])) }} />
+                            corregir={{ total: c.total, moneda: c.moneda ?? 'ARS', nota: c.nota, partes: Object.fromEntries(c.miembros.map((m) => [m.userId, m.monto])) }} />
         </div>
       </details>
     </li>
@@ -166,11 +179,11 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
       <div className="grid grid-cols-2 gap-3">
         <div className="gr-hero flex flex-col gap-1.5 p-4">
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
-          <span className="gr-number text-[30px] text-gr-hero-detail tabular-nums">{pesos(c.debes)}</span>
+          <Total pesos={c.debes} dolares={c.dolares?.debes ?? 0} className="text-gr-hero-detail" />
         </div>
         <div className="flex flex-col gap-1.5 rounded-[26px] bg-gr-accent p-4 shadow-card">
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-ink/60 uppercase">Te deben</span>
-          <span className="gr-number text-[30px] tabular-nums">{pesos(c.teDeben)}</span>
+          <Total pesos={c.teDeben} dolares={c.dolares?.teDeben ?? 0} />
         </div>
       </div>
 
@@ -190,7 +203,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
         </p>
       )}
 
-      {c.personas.length > 0 && <ul className="flex flex-col gap-4">{c.personas.map((p) => <Persona key={p.id} p={p} />)}</ul>}
+      {c.personas.length > 0 && <ul className="flex flex-col gap-4">{c.personas.map((p) => <Persona key={`${p.id}-${p.moneda}`} p={p} />)}</ul>}
 
       {c.enCurso.length > 0 && (
         <section className="flex flex-col gap-2.5">
@@ -232,7 +245,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                   {l.tipo === 'debes' ? `Le pagaste a ${l.con}` : `${l.con} te pagó`} · {l.itemTitulo}
                 </span>
-                <span className="font-semibold tabular-nums">{pesos(l.monto)}</span>
+                <span className="font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
               </li>
             ))}
           </ul>

@@ -8,7 +8,7 @@ import {
 } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
-import { dividir } from '@/lib/pesos'
+import { dividir, type Moneda } from '@/lib/pesos'
 import { notaDeCompra } from '@/lib/limites'
 import { accesoALista } from '@/lib/acceso'
 import { dejarAviso } from '@/lib/notifications'
@@ -44,6 +44,8 @@ export type RegaloView = {
   soyParte: boolean
   soyEncargado: boolean
   montoTotal: number | null
+  /** en qué se cuenta, si no son pesos (lo elige el encargado al comprarlo) */
+  moneda?: Moneda
   /** El encargado todavía puede corregir la compra (ver corregirCompra). */
   corregible: boolean
   /** Solo para el encargado y mientras está abierto: a quiénes sacó (los puede dejar volver). */
@@ -51,6 +53,9 @@ export type RegaloView = {
   /** Al que mira lo sacó el encargado de este regalo, que sigue abierto: no se le ofrece "Me sumo". */
   meSacaron: boolean
 }
+
+/** La moneda de un regalo para lo que se muestra: nada si son pesos (lo de siempre), USD si son dólares. */
+const enSuMoneda = (m: Moneda): Moneda | undefined => (m === 'ARS' ? undefined : m)
 
 export type IniciarResult = { ok: true; giftId: string } | Exclude<ReserveResult, { ok: true }> | { ok: false; reason: 'ya_comprado' }
 
@@ -236,9 +241,9 @@ export type CompraResult =
 
 /**
  * Lo que cargó el encargado. miembros: con quiénes vio la división (los ids de la pantalla). partes: "A mano"; si no,
- * partes iguales.
+ * partes iguales. moneda: pesos (si no viene) o dólares; el total y las partes son enteros en esa moneda.
  */
-export type DatosCompra = { total: number; miembros?: string[]; partes?: Record<string, number>; nota?: string }
+export type DatosCompra = { total: number; miembros?: string[]; partes?: Record<string, number>; nota?: string; moneda?: Moneda }
 
 const montoValido = (n: number) => Number.isSafeInteger(n) && n > 0 && n <= MONTO_MAXIMO
 
@@ -317,7 +322,7 @@ export async function comprarRegalo(db: Db, giftId: string, userId: string, p: D
 
     const ahora = new Date()
     await fijarPartes(t, giftId, userId, ids, r.montos)
-    await t.update(groupGifts).set({ estado: 'comprado', montoTotal: p.total, compradoAt: ahora }).where(eq(groupGifts.id, giftId))
+    await t.update(groupGifts).set({ estado: 'comprado', montoTotal: p.total, moneda: p.moneda ?? 'ARS', compradoAt: ahora }).where(eq(groupGifts.id, giftId))
     await t.update(claims).set({ estado: 'comprado', notaQueCompre: notaDeCompra(p.nota), updatedAt: ahora }).where(eq(claims.id, g.claimId))
     return { ok: true }
   })
@@ -363,7 +368,7 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
     }
 
     await fijarPartes(t, giftId, userId, ids, r.montos)
-    await t.update(groupGifts).set({ montoTotal: p.total }).where(eq(groupGifts.id, giftId))
+    await t.update(groupGifts).set({ montoTotal: p.total, ...(p.moneda && { moneda: p.moneda }) }).where(eq(groupGifts.id, giftId))
     await t.update(claims).set({ notaQueCompre: notaDeCompra(p.nota) }).where(eq(claims.id, g.claimId))
     await dejarAviso(t, itemId, 'compra_corregida', cambiaron.map((id) => ({ userId: id, guestId: null })))
     return { ok: true }
@@ -401,20 +406,21 @@ export async function marcarPagado(db: Db, giftId: string, deudorId: string, act
 const enCuentasDe = (db: Db, userId: string) => and(eq(groupGifts.estado, 'comprado'), noEsNiFueDuenoSql(db, userId))
 
 /**
- * Saldar todo con alguien: marca pagadas las deudas pendientes entre los dos, en las dos direcciones. Solo las que Cuentas
+ * Saldar todo con alguien, en una moneda: marca pagadas las deudas pendientes entre los dos, en las dos direcciones (las
+ * de la otra moneda, no: son otra tarjeta en Cuentas). Solo las que Cuentas
  * le muestra al que toca el botón (el monto del botón): nunca una que no ve, como la de un regalo de un grupo al que se
  * sumó después. Esa la sigue viendo el otro, que la puede saldar desde su lado.
  * visto: el neto del botón (positivo, te debe). Si cambió (justo corrigieron una compra), no salda nada: la pantalla
  * vuelve con el de ahora. Si es el mismo, saldar las partes nuevas da lo mismo que lo que se pagó.
  */
-export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number): Promise<number> {
+export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number, moneda: Moneda = 'ARS'): Promise<number> {
   if (userId === otroId || !esUuid(otroId)) return 0
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const deEncargado = (encargado: string) => t.select({ id: groupGifts.id }).from(groupGifts)
       .innerJoin(items, eq(groupGifts.itemId, items.id))
       .innerJoin(lists, eq(items.listId, lists.id))
-      .where(and(eq(groupGifts.organizerUserId, encargado), enCuentasDe(t, userId)))
+      .where(and(eq(groupGifts.organizerUserId, encargado), eq(groupGifts.moneda, moneda), enCuentasDe(t, userId)))
     // Con lock y en orden: una corrección a la vez (corregirCompra) o espera, o ya se ve acá con las partes nuevas.
     const filas = await t.select({ giftId: groupGiftMembers.giftId, userId: groupGiftMembers.userId, monto: groupGiftMembers.monto })
       .from(groupGiftMembers)
@@ -474,6 +480,7 @@ export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Pro
       soyParte,
       soyEncargado,
       montoTotal: soyParte ? gift.montoTotal : null,
+      moneda: enSuMoneda(gift.moneda),
       corregible: soyEncargado && gift.estado === 'comprado' && sePuedeCorregir(suyos.map((x) => x.m), gift.organizerUserId, gift.compradoAt),
       sacados: soyEncargado ? fuera.map(({ id, nombre }) => ({ id, nombre })) : [],
       meSacaron: !!viewer.userId && fuera.some((x) => x.id === viewer.userId),
@@ -497,13 +504,18 @@ export type LineaCuenta = {
   /** null: cambiaron el link para regalar y no lo tiene (ver columnasDestino). */
   href: string | null
   monto: number
+  /** si no son pesos */
+  moneda?: Moneda
   /** debes: vos le debés al encargado. te_deben: sos el encargado y el otro te debe. */
   tipo: 'debes' | 'te_deben'
   deudorId: string
   fecha: Date
 }
 
+/** Con alguien, en una moneda: con quien hay cuentas en pesos y en dólares, hay dos (no se mezclan). */
 export type CuentaPersona = Persona & {
+  /** si no son pesos */
+  moneda?: Moneda
   /** Positivo: te debe. Negativo: le debés. */
   neto: number
   lineas: LineaCuenta[]
@@ -524,8 +536,11 @@ export type RegaloEnCurso = {
 }
 
 export type Cuentas = {
+  /** en pesos */
   debes: number
   teDeben: number
+  /** lo mismo en dólares, si hay algo en dólares */
+  dolares?: { debes: number; teDeben: number }
   personas: CuentaPersona[]
   enCurso: RegaloEnCurso[]
   saldadas: (LineaCuenta & { con: string })[]
@@ -567,7 +582,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre,
     deudorId: groupGiftMembers.userId, deudorNombre: deudores.nombre,
     monto: groupGiftMembers.monto, pagado: groupGiftMembers.pagado, pagadoAt: groupGiftMembers.pagadoAt,
-    compradoAt: groupGifts.compradoAt, ...columnasDestino(db, userId),
+    compradoAt: groupGifts.compradoAt, moneda: groupGifts.moneda, ...columnasDestino(db, userId),
   }).from(groupGiftMembers)
     .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
     .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
@@ -590,17 +605,18 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     const debo = r.deudorId === userId
     const otro = debo ? { id: r.encargadoId, nombre: r.encargadoNombre } : { id: r.deudorId, nombre: r.deudorNombre }
     const linea: LineaCuenta = {
-      giftId: r.giftId, itemTitulo: r.itemTitulo, ...destino(r), monto,
+      giftId: r.giftId, itemTitulo: r.itemTitulo, ...destino(r), monto, moneda: enSuMoneda(r.moneda),
       tipo: debo ? 'debes' : 'te_deben', deudorId: r.deudorId, fecha: r.compradoAt ?? new Date(0),
     }
     if (r.pagado) {
       saldadas.push({ ...linea, con: otro.nombre, fecha: r.pagadoAt ?? linea.fecha })
       continue
     }
-    const persona = porPersona.get(otro.id) ?? { ...otro, neto: 0, lineas: [] }
+    const clave = `${otro.id}|${r.moneda}`
+    const persona = porPersona.get(clave) ?? { ...otro, moneda: enSuMoneda(r.moneda), neto: 0, lineas: [] }
     persona.neto += debo ? -monto : monto
     persona.lineas.push(linea)
-    porPersona.set(otro.id, persona)
+    porPersona.set(clave, persona)
   }
 
   const abiertos = await db.select({
@@ -630,11 +646,15 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
   // Los totales salen del neto con cada uno, como las tarjetas ("ya está descontado lo que se deben entre los dos"): si
   // Sofi te debe 30.000 y vos le debés 10.000, arriba no dice "Debés $10.000".
   const personas = [...porPersona.values()]
+  const total = (moneda: Moneda | undefined, signo: 1 | -1) =>
+    personas.filter((p) => p.moneda === moneda).reduce((s, p) => s + Math.max(0, signo * p.neto), 0)
+  const hayDolares = personas.some((p) => p.moneda === 'USD')
   return {
-    debes: personas.reduce((s, p) => s + Math.max(0, -p.neto), 0),
-    teDeben: personas.reduce((s, p) => s + Math.max(0, p.neto), 0),
-    // primero a quien más le debés, después quien más te debe
-    personas: personas.sort((a, b) => a.neto - b.neto),
+    debes: total(undefined, -1),
+    teDeben: total(undefined, 1),
+    ...(hayDolares && { dolares: { debes: total('USD', -1), teDeben: total('USD', 1) } }),
+    // los pesos antes que los dólares; primero a quien más le debés, después quien más te debe
+    personas: personas.sort((a, b) => Number(!!a.moneda) - Number(!!b.moneda) || a.neto - b.neto),
     enCurso: abiertos.map((a) => {
       const miembros = nombres.filter((n) => n.giftId === a.giftId)
       // Sin el link tampoco para el encargado: con el nuevo volvería a abrir (y seguir) la lista que le quisieron cerrar.
@@ -657,7 +677,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
 }
 
 export type CompraParaCorregir = {
-  giftId: string; itemTitulo: string; para: string; total: number; nota: string | null
+  giftId: string; itemTitulo: string; para: string; total: number; moneda?: Moneda; nota: string | null
   /** El encargado primero y después por orden de llegada, como en comprarRegalo. */
   miembros: { userId: string; nombre: string; esYo: boolean; monto: number }[]
 }
@@ -670,7 +690,7 @@ export type CompraParaCorregir = {
  */
 export async function comprasParaCorregir(db: Db, userId: string): Promise<CompraParaCorregir[]> {
   const compras = await db.select({
-    giftId: groupGifts.id, total: groupGifts.montoTotal, nota: claims.notaQueCompre, compradoEl: claims.updatedAt, compradoAt: groupGifts.compradoAt,
+    giftId: groupGifts.id, total: groupGifts.montoTotal, moneda: groupGifts.moneda, nota: claims.notaQueCompre, compradoEl: claims.updatedAt, compradoAt: groupGifts.compradoAt,
     listId: lists.id, tipoDeseo: items.tipo, repetible: items.repetible, ocupaDesde: items.ocupaDesde, ...columnasDestino(db, userId),
   }).from(groupGifts)
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
@@ -702,7 +722,7 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
     const suyos = filas.filter((f) => f.m.giftId === c.giftId)
     if (!sePuedeCorregir(suyos.map((f) => f.m), userId, c.compradoAt)) return []
     return [{
-      giftId: c.giftId, itemTitulo: c.itemTitulo, para: destino(c).para, total: c.total ?? 0, nota: c.nota,
+      giftId: c.giftId, itemTitulo: c.itemTitulo, para: destino(c).para, total: c.total ?? 0, moneda: enSuMoneda(c.moneda), nota: c.nota,
       miembros: [...suyos.filter((f) => f.m.userId === userId), ...suyos.filter((f) => f.m.userId !== userId)]
         .map((f) => ({ userId: f.m.userId, nombre: f.nombre, esYo: f.m.userId === userId, monto: f.m.monto ?? 0 })),
     }]

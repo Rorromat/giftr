@@ -219,7 +219,9 @@ export const groupGifts = pgTable('group_gifts', {
   claimId: uuid('claim_id').notNull().references(() => claims.id).unique(),
   organizerUserId: uuid('organizer_user_id').notNull().references(() => users.id),
   estado: text('estado', { enum: ['abierto', 'comprado', 'cancelado'] }).notNull().default('abierto'),
-  montoTotal: integer('monto_total'), // pesos; se fija al comprar
+  montoTotal: integer('monto_total'), // en su moneda; se fija al comprar
+  // en qué se cuenta: el total, las partes de los miembros y lo de Cuentas (enteros: pesos o dólares)
+  moneda: text('moneda', { enum: ['ARS', 'USD'] }).notNull().default('ARS'),
   compradoAt: timestamp('comprado_at', { withTimezone: true }),
   // el encargado dijo "Sigue en pie" al recordatorio de cerrarlo: el próximo cuenta desde acá (ver regalosParaCerrar)
   recordatorioAt: timestamp('recordatorio_at', { withTimezone: true }),

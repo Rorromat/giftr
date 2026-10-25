@@ -8,7 +8,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ArmarRegaloGrupal, CartelCorreccion, RegaloGrupal } from '@/components/RegaloGrupal'
-import { parsePesos } from '@/lib/pesos'
+import { enDolares, parseDolares, parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { nombreDeViewer } from '@/lib/guest'
@@ -187,7 +187,8 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {regalos.map((r) => (
           <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={ownerNombre}
-                        precio={parsePesos(precio)} logueado={logueado} ocupado={ocupado}
+                        precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
+                        logueado={logueado} ocupado={ocupado}
                         nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre} />
         ))}
 

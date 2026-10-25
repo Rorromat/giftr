@@ -5,7 +5,7 @@ import {
   startGroupGiftAction,
 } from '@/app/actions'
 import { juntarNombres } from '@/lib/groups'
-import { pesos } from '@/lib/pesos'
+import { plata, type Moneda } from '@/lib/pesos'
 import type { RegaloView } from '@/lib/regalos'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { BotonEnviar } from '@/components/BotonEnviar'
@@ -139,11 +139,13 @@ export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: 
   )
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, nota, logueado, ocupado }: Ctx & {
+export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado }: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
   precio: number | null
+  /** en qué está el precio del deseo (para la cuenta de cuánto sale cada uno y para arrancar la compra) */
+  monedaPrecio?: Moneda
   /** Lo que anotó el encargado al comprarlo. */
   nota?: string | null
   logueado: boolean
@@ -158,7 +160,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   const nombres = regalo.miembros.map((m) => (m.esYo ? 'vos' : m.nombre))
   const encargado = regalo.soyEncargado ? 'Lo organizás vos' : `Lo organiza ${regalo.encargado.nombre}`
   // cambia con cada corrección: el formulario vuelve a arrancar cerrado y con lo nuevo
-  const compra = `${regalo.montoTotal}:${regalo.miembros.map((m) => m.monto).join(',')}`
+  const compra = `${regalo.montoTotal}:${regalo.moneda}:${regalo.miembros.map((m) => m.monto).join(',')}`
 
   if (regalo.estado === 'comprado' && !regalo.soyParte) {
     return (
@@ -177,7 +179,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
         <AvatarStack nombres={regalo.miembros.map((m) => m.nombre)} size={36} />
         <div className="min-w-0 flex-1">
           <p className="text-lg leading-tight font-semibold">
-            Regalo grupal{regalo.estado === 'comprado' && regalo.montoTotal ? ` · ${pesos(regalo.montoTotal)}` : ''}
+            Regalo grupal{regalo.estado === 'comprado' && regalo.montoTotal ? ` · ${plata(regalo.montoTotal, regalo.moneda)}` : ''}
           </p>
           <p className="text-[13px] font-medium leading-snug">
             {regalo.estado === 'comprado' ? (regalo.soyEncargado ? 'Lo compraste vos' : `Lo compró ${regalo.encargado.nombre}`) : encargado}
@@ -191,8 +193,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
           <p className="text-sm font-medium leading-snug">
             {n === 1 ? `Por ahora ${nombres[0] === 'vos' ? 'estás solo vos' : `está ${nombres[0]}`}.` : `Están ${juntarNombres(nombres)}.`}
             {precio && (regalo.soyParte
-              ? ` Si quedan así, sale ~${pesos(Math.ceil(precio / n))} cada uno.`
-              : !noSeSuma && ` Si te sumás, son ${n + 1}: ~${pesos(Math.ceil(precio / (n + 1)))} cada uno.`)}
+              ? ` Si quedan así, sale ~${plata(Math.ceil(precio / n), monedaPrecio)} cada uno.`
+              : !noSeSuma && ` Si te sumás, son ${n + 1}: ~${plata(Math.ceil(precio / (n + 1)), monedaPrecio)} cada uno.`)}
           </p>
 
           {!regalo.soyParte && (noSeSuma ? <p className="text-xs font-semibold leading-snug text-gr-muted">{noSeSuma}</p> : logueado ? (
@@ -225,7 +227,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                   Ya lo compré: dividir
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
-                  <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={precio}
+                  <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={precio} monedaSugerida={monedaPrecio}
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
               </details>
@@ -253,7 +255,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                     {m.esYo ? 'Vos' : m.nombre}
                     {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                   </span>
-                  <span className="text-lg font-semibold tabular-nums">{pesos(m.monto ?? 0)}</span>
+                  <span className="text-lg font-semibold tabular-nums">{plata(m.monto ?? 0, regalo.moneda)}</span>
                   <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-brand text-gr-bg'}`}>
                     {m.esEncargado ? 'Puso' : m.pagado ? 'Pagó ✓' : 'Debe'}
                   </span>
@@ -283,7 +285,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                 <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={null}
                                   miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))}
                                   corregir={{
-                                    total: regalo.montoTotal ?? 0, nota: nota ?? null,
+                                    total: regalo.montoTotal ?? 0, moneda: regalo.moneda ?? 'ARS', nota: nota ?? null,
                                     partes: Object.fromEntries(regalo.miembros.map((m) => [m.userId, m.monto ?? 0])),
                                   }} />
               </div>
