@@ -114,7 +114,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       </details>
 
       <div className="sticky bottom-[26px] z-10 mt-2">
-        <BotonEnviar pendiente="Guardando…" className="gr-btn-primary h-[60px] w-full rounded-[20px] text-[21px]">{boton}</BotonEnviar>
+        <BotonEnviar pendiente="Guardando…" className="gr-btn-primary h-14 w-full text-[17px]">{boton}</BotonEnviar>
       </div>
     </form>
   )

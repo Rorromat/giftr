@@ -92,7 +92,7 @@ export function AgregarDesdeApps({ plataforma, base, atajo }: { plataforma: Plat
               <li key={paso}>
                 {antes.trim()}
                 <span className="mt-1 flex items-center gap-2">
-                  <code className="min-w-0 flex-1 select-all break-all">{entrada}</code>
+                  <code className="min-w-0 flex-1 select-all break-all font-sans font-bold">{entrada}</code>
                   <CopyLinkButton url={entrada} />
                 </span>
                 {despues.trim()}
