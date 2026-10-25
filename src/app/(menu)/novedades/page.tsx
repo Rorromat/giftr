@@ -20,7 +20,7 @@ export default async function Novedades() {
   ])
 
   return (
-    <Seccion className="flex flex-col gap-8 pb-36 pt-2">
+    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <PageHeader title="Lo nuevo de tus amigos" back="/inicio" backLabel="Volver a Inicio" />
       {novedades.length ? (
         <>

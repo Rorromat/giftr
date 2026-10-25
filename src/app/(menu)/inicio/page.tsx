@@ -9,7 +9,7 @@ import { Banners } from '@/components/Banners'
 import { CargaTuCumple, CuentasPendientes, Proximos } from '@/components/Eventos'
 import { miFoto } from '@/lib/perfil'
 import { misAmigos } from '@/lib/amigos'
-import { novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
+import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
@@ -54,12 +54,13 @@ export default async function Inicio() {
         </div>
       )}
 
-      {/* lo nuevo de tus amigos: pasa solo; cada uno abre el feed en ese deseo */}
+      {/* lo nuevo de tus amigos: tarjetas grandes que pasan solas; cada una abre el feed en ese deseo */}
       {novedades.length > 0 ? (
         <section aria-labelledby="novedades" className="flex flex-col gap-3">
           <SectionHeader id="novedades" title="Lo nuevo de tus amigos" href="/novedades" linkLabel="Ver todo" />
           <CarruselNovedades items={novedades.map((n) => ({
-            id: n.item.id, titulo: n.item.titulo, foto: n.item.fotoUrl, nombre: n.dueno.nombre, duenoFoto: n.dueno.foto,
+            id: n.item.id, titulo: n.item.titulo, foto: n.item.fotoUrl, precio: n.item.precio ?? n.item.rangoPrecio, hace: hace(n.creado),
+            nombre: n.dueno.nombre, duenoFoto: n.dueno.foto,
           }))} />
         </section>
       ) : !amigos.size && (
