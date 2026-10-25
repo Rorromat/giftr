@@ -117,9 +117,13 @@ export default async function ListaAjena({
   const aqui = `/l/${token}${filtros ? `?${filtros}` : ''}`
   // Sin nombre, "Reservar" lo pide. Un invitado que todavía no dijo que esta lista no es suya, primero lo dice (así ve
   // qué está libre de verdad); en un navegador donde entró con su cuenta alguien de la lista, no (ver accesoALista).
+  // Con cuenta o con su nombre, "Reservar" lleva al deseo, que pregunta cómo: lo compra él o lo dividen con amigos (ver
+  // ComoLoRegalas). Un invitado sin nombre solo puede reservarlo: lo hace acá, como siempre.
   const reservar = (itemId: string, variant?: 'primary') => vista.role === 'anonimo' && vista.motivo !== 'sin_identidad'
     ? null
-    : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
+    : vista.role === 'giver'
+      ? <Link href={`/l/${token}/item/${itemId}?reservar=1#reservar`} className={variant === 'primary' ? 'gr-btn-primary w-full min-h-12' : 'gr-btn gr-btn--sm w-full'}>Reservar</Link>
+      : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
 
   const heroAccion = hero && (hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
     ? <YaLoReservaste item={hero} />

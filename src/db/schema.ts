@@ -252,6 +252,22 @@ export const groupGiftSacados = pgTable('group_gift_sacados', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.giftId, t.userId] })])
 
+// Invitaciones a dividir un regalo grupal: el que lo arma ("Lo dividimos") elige amigos y a cada uno le llega la propuesta
+// (un aviso y la tarjeta en Inicio), que acepta (se suma al regalo, ver sumarseARegalo) o no. Una por regalo y persona.
+export const invitacionesRegalo = pgTable('invitaciones_regalo', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  giftId: uuid('gift_id').notNull().references(() => groupGifts.id),
+  deUserId: uuid('de_user_id').notNull().references(() => users.id),
+  paraUserId: uuid('para_user_id').notNull().references(() => users.id),
+  estado: text('estado', { enum: ['pendiente', 'aceptada', 'rechazada'] }).notNull().default('pendiente'),
+  respondidaAt: timestamp('respondida_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('invitaciones_regalo_par_idx').on(t.giftId, t.paraUserId),
+  // las que le esperan a cada uno (Inicio)
+  index('invitaciones_regalo_para_user_id_idx').on(t.paraUserId),
+])
+
 // Configuración que genera la app sola (las claves VAPID de los avisos push): nadie las carga a mano.
 export const config = pgTable('config', {
   clave: text('clave').primaryKey(),

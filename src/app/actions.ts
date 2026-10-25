@@ -27,6 +27,7 @@ import { guardarGustos } from '@/lib/bienvenida'
 import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
+import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import {
   aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
   pedirAmistadPorMail, responderSolicitud,
@@ -501,6 +502,46 @@ export async function startGroupGiftAction(formData: FormData) {
   if (!r.ok && r.reason === 'muchas') redirect(`/l/${token}/item/${itemId}?reserva=muchas`)
 }
 
+/** Los amigos que tildó en el formulario ("amigo", uno por casilla). */
+const amigosDelForm = (fd: FormData) => fd.getAll('amigo').filter((v): v is string => typeof v === 'string')
+
+/**
+ * "Lo dividimos": arma el regalo grupal (como "Armar regalo grupal") y les propone dividirlo a los amigos que eligió (ver
+ * invitarARegalo). Vuelve al deseo, que ya muestra el regalo con a quiénes invitó.
+ */
+export async function dividirRegaloAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await listaDelItem(itemId, token))) return
+  const r = await iniciarRegaloGrupal(db, itemId, userId)
+  if (r.ok) await invitarARegalo(db, r.giftId, userId, amigosDelForm(formData))
+  revalidarRegalo(formData)
+  if (!r.ok && r.reason === 'muchas') redirect(`/l/${token}/item/${itemId}?reserva=muchas`)
+}
+
+/** El que organiza les propone dividirlo a más amigos (desde el regalo). */
+export async function invitarAmigosAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  if (!(await listaDelItem(str(formData, 'itemId') ?? '', str(formData, 'token') ?? ''))) return
+  await invitarARegalo(db, str(formData, 'giftId') ?? '', userId, amigosDelForm(formData))
+  revalidarRegalo(formData)
+}
+
+/** Contestar una propuesta de dividir un regalo (Inicio). Si se suma, va al deseo a ver el regalo. */
+export async function responderInvitacionAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const acepta = str(formData, 'acepta') === '1'
+  const r = await responderInvitacion(db, userId, str(formData, 'id') ?? '', acepta)
+  revalidatePath('/inicio')
+  revalidatePath('/regalos')
+  if (r.ok && acepta) {
+    revalidatePath(`/l/${r.token}/item/${r.itemId}`)
+    redirect(`/l/${r.token}/item/${r.itemId}?regalo=sumado#regalo`)
+  }
+  if (!r.ok && r.reason === 'no_se_pudo') redirect('/inicio?invitacion=no_se_pudo#invitaciones')
+}
+
 export async function joinGroupGiftAction(formData: FormData) {
   const userId = await usuarioRegalador()
   // Pide lo mismo que armar uno: el deseo, con el link para regalar de ahora (y el regalo, de ese deseo). Si no, a quien le
@@ -777,27 +818,4 @@ export async function robarDeseoAction(_: EstadoRobo, formData: FormData): Promi
     return { ok: true, itemId: r.itemId, yaLoTenias: r.yaLoTenias, n: Date.now() }
   }
   return { ok: false, texto: r.reason === 'propio' ? 'Ese ya es tuyo 🙂' : 'Ese deseo ya no está en la lista.', n: Date.now() }
-}
-
-export type EstadoReservaNovedad = { ok: true } | { ok: false; texto: string } | null
-
-const NO_SE_RESERVO: Record<string, string> = {
-  sin_stock: 'Recién lo reservó otra persona.',
-  archivado: 'Ese deseo ya no está en la lista.',
-  no_existe: 'Ese deseo ya no está en la lista.',
-  propio: 'En tu propia lista no podés reservar.',
-  muchas: 'Ya tenés muchas cosas reservadas de esta lista: marcá las que compraste o soltá alguna.',
-}
-
-/** Reservar desde lo nuevo de tus amigos: como en su lista, pero contesta en la tarjeta (el feed no se recarga). */
-export async function reservarNovedadAction(_: EstadoReservaNovedad, formData: FormData): Promise<EstadoReservaNovedad> {
-  const session = await auth()
-  if (!session?.userId || !(await existeUsuario(db, session.userId))) return { ok: false, texto: 'Entrá con tu cuenta para reservar.' }
-  const token = str(formData, 'token') ?? ''
-  const itemId = str(formData, 'itemId') ?? ''
-  if (!(await listaDelItem(itemId, token))) return { ok: false, texto: NO_SE_RESERVO.no_existe }
-  const r = await reserveItem(db, itemId, { userId: session.userId })
-  revalidatePath(`/l/${token}`)
-  revalidatePath(`/l/${token}/item/${itemId}`)
-  return r.ok ? { ok: true } : { ok: false, texto: NO_SE_RESERVO[r.reason] ?? 'No se pudo reservar.' }
 }

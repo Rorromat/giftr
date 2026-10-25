@@ -11,17 +11,20 @@ import { miFoto } from '@/lib/perfil'
 import { misAmigos } from '@/lib/amigos'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
+import { InvitacionesRegalo } from '@/components/Dividir'
+import { invitacionesPendientes } from '@/lib/invitaciones'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 // Inicio: lo que viene (los avisos, las cuentas, los próximos cumples y fechas de tu gente, con lo que ya hiciste para
 // cada uno). Tu lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
-export default async function Inicio() {
+export default async function Inicio({ searchParams }: { searchParams: Promise<{ invitacion?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, foto, { novedades }, amigos] = await Promise.all([
+  const [bienvenida, eventos, cumple, cuentas, foto, { novedades }, amigos, invitaciones, { invitacion }] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
     miFoto(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
+    invitacionesPendientes(db, session.userId), searchParams,
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
@@ -36,6 +39,8 @@ export default async function Inicio() {
       </div>
 
       <Banners />
+      {/* te proponen dividir un regalo: te sumás o no */}
+      <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} />
       <CuentasPendientes cuentas={cuentas} />
 
       {eventos.length > 0 ? (
