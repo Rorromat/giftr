@@ -26,7 +26,7 @@ export type ListView =
 export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
 
 /** Las reservas de unos deseos de una lista, como las ve quien regala. */
-async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer) {
+export async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer) {
   if (!deseos.length) return new Map<string, ClaimView[]>()
   // Lo de este evento: en una idea que se puede repetir (o en un deseo que volvió a la lista), lo comprado para uno
   // anterior ya no se cuenta (ver ocupaSql), y una compra se deshace solo si es de este (ver desmarcarComprado).
@@ -88,7 +88,7 @@ async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inf
   return map
 }
 
-function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimView[]): GiverItemView {
+export function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: ClaimView[]): GiverItemView {
   return { ...row, claims: itemClaims, ...cupoDe(row, itemClaims.length) }
 }
 

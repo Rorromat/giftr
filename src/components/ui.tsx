@@ -260,6 +260,8 @@ const ICONS = {
   cup: <><path d="M4.5 9h12v4.5a6 6 0 0 1-12 0z" /><path d="M16.5 10h1.3a2.5 2.5 0 0 1 0 5h-1.6" /><path d="M8.5 2.8c-.8 1 .8 2 0 3.2M12.5 2.8c-.8 1 .8 2 0 3.2" /></>,
   ban: <><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></>,
   note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" /><path d="M8 9h8M8 12.5h5" /></>,
+  // "Me lo robo": copiarlo a tu lista
+  copiar: <><rect x="8.5" y="8.5" width="12" height="12" rx="3" /><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" /></>,
 } as const
 
 export type IconName = keyof typeof ICONS

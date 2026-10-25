@@ -26,6 +26,7 @@ import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
+import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
 import {
   aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
   pedirAmistadPorMail, responderSolicitud,
@@ -723,4 +724,58 @@ export async function cambiarUsuarioAction(formData: FormData) {
   const r = await cambiarUsuario(db, session.userId, formData.get('usuario'))
   revalidatePath('/perfil')
   redirect(`/perfil?usuario=${r.ok ? 'ok' : r.error}#usuario`)
+}
+
+// ---------------------------------------------------------------- lo nuevo de tus amigos y "Me lo robo"
+
+/** Lo que muestra la tarjeta de una novedad (con el "hace 3 h" ya escrito: así el servidor y el teléfono dicen lo mismo). */
+export type NovedadVista = Novedad & { hace: string }
+
+/** La página siguiente de lo nuevo de tus amigos (el scroll infinito de /novedades). */
+export async function masNovedadesAction(despues: string): Promise<{ novedades: NovedadVista[]; siguiente: string | null }> {
+  const session = await auth()
+  if (!session?.userId) return { novedades: [], siguiente: null }
+  const r = await novedadesDeAmigos(db, session.userId, { despues, limite: 8 })
+  return { novedades: r.novedades.map((n) => ({ ...n, hace: hace(n.creado) })), siguiente: r.siguiente }
+}
+
+/** n: para que el aviso de la tarjeta vuelva a aparecer aunque el resultado sea el mismo. */
+export type EstadoRobo =
+  | { ok: true; itemId: string; yaLoTenias: boolean; n: number }
+  | { ok: false; texto: string; n: number }
+  | null
+
+/** "Me lo robo": el deseo de otro pasa a tu lista (ver robarDeseo). Contesta en la tarjeta, sin irse de donde está. */
+export async function robarDeseoAction(_: EstadoRobo, formData: FormData): Promise<EstadoRobo> {
+  const session = await auth()
+  if (!session?.userId || !(await existeUsuario(db, session.userId))) return { ok: false, texto: 'Entrá con tu cuenta para sumarlo a tu lista.', n: Date.now() }
+  const r = await robarDeseo(db, session.userId, str(formData, 'token') ?? '', str(formData, 'itemId') ?? '')
+  if (r.ok) {
+    revalidatePath('/mi-lista')
+    return { ok: true, itemId: r.itemId, yaLoTenias: r.yaLoTenias, n: Date.now() }
+  }
+  return { ok: false, texto: r.reason === 'propio' ? 'Ese ya es tuyo 🙂' : 'Ese deseo ya no está en la lista.', n: Date.now() }
+}
+
+export type EstadoReservaNovedad = { ok: true } | { ok: false; texto: string } | null
+
+const NO_SE_RESERVO: Record<string, string> = {
+  sin_stock: 'Recién lo reservó otra persona.',
+  archivado: 'Ese deseo ya no está en la lista.',
+  no_existe: 'Ese deseo ya no está en la lista.',
+  propio: 'En tu propia lista no podés reservar.',
+  muchas: 'Ya tenés muchas cosas reservadas de esta lista: marcá las que compraste o soltá alguna.',
+}
+
+/** Reservar desde lo nuevo de tus amigos: como en su lista, pero contesta en la tarjeta (el feed no se recarga). */
+export async function reservarNovedadAction(_: EstadoReservaNovedad, formData: FormData): Promise<EstadoReservaNovedad> {
+  const session = await auth()
+  if (!session?.userId || !(await existeUsuario(db, session.userId))) return { ok: false, texto: 'Entrá con tu cuenta para reservar.' }
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  if (!(await listaDelItem(itemId, token))) return { ok: false, texto: NO_SE_RESERVO.no_existe }
+  const r = await reserveItem(db, itemId, { userId: session.userId })
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  return r.ok ? { ok: true } : { ok: false, texto: NO_SE_RESERVO[r.reason] ?? 'No se pudo reservar.' }
 }
