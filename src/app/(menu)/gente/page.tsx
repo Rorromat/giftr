@@ -8,7 +8,9 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
 import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
-import { asegurarUsuario, miAmigoToken, misAmigos, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos } from '@/lib/amigos'
+import { asegurarUsuario, miAmigoToken, misAmigos, personas, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos } from '@/lib/amigos'
+import { paraBuscar } from '@/lib/buscar'
+import { Buscador } from '@/components/Buscador'
 import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { AvatarStack, AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
@@ -26,7 +28,7 @@ function cuando(c: Contacto, hoy: Date) {
   return [`${c.tipo === 'personal' ? 'Cumple el' : 'El'} ${dia}`, falta].filter(Boolean).join(' · ')
 }
 
-function Persona({ c, hoy, amigo }: { c: Contacto; hoy: Date; amigo: boolean }) {
+function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: boolean; usuario?: string | null }) {
   const dueno = c.tipo === 'personal' ? c.duenos[0] : undefined
   const detalle = [
     c.tipo === 'grupo' && `De ${juntarNombres(c.duenos.map((d) => d.nombre.split(' ')[0]))}`,
@@ -34,7 +36,8 @@ function Persona({ c, hoy, amigo }: { c: Contacto; hoy: Date; amigo: boolean }) 
   ].filter(Boolean).join(' · ')
   const fecha = cuando(c, hoy)
   return (
-    <li className="gr-card flex items-center gap-1 overflow-visible py-3 pl-3.5 pr-1.5">
+    <li data-buscar={paraBuscar([c.nombre, ...c.duenos.map((d) => d.nombre), ...(usuario ? [usuario] : [])].join(' '))}
+        className="gr-card flex items-center gap-1 overflow-visible py-3 pl-3.5 pr-1.5">
       <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">
         {c.tipo === 'personal'
           ? <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={48} />
@@ -93,6 +96,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
     miGente(db, yo, hoy), miFoto(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
     asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo),
   ])
+  // el @usuario de cada uno, para encontrarlo también así en el buscador
+  const usuarios = new Map((await personas(db, gente.flatMap((c) => (c.tipo === 'personal' && c.duenos[0] ? [c.duenos[0].id] : []))))
+    .map((p) => [p.id, p.usuario]))
   const linkAmigo = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/amigo/${token ?? ''}`
   const esAmigo = (c: Contacto) => c.tipo === 'personal' && !!c.duenos[0] && amigos.has(c.duenos[0].id)
 
@@ -125,9 +131,18 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
           <p className="text-gr-muted">Tocá “Agregar” y buscalos por su @usuario o su mail.</p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {gente.map((c) => <Persona key={c.listId} c={c} hoy={hoy} amigo={esAmigo(c)} />)}
-        </ul>
+        <>
+          {/* buscar a alguien de tu gente (por su nombre o su @usuario); si no está, buscarlo para sumarlo */}
+          {gente.length > 1 && (
+            <Buscador ambito="mi-gente" placeholder="Buscar en tu gente" vacio="No hay nadie con «%s» en tu gente."
+                      masAlla={{ href: '/gente/agregar?q=', texto: 'Buscarlo para sumarlo como amigo' }} />
+          )}
+          <ul id="mi-gente" className="flex flex-col gap-3">
+            {gente.map((c) => (
+              <Persona key={c.listId} c={c} hoy={hoy} amigo={esAmigo(c)} usuario={c.tipo === 'personal' ? usuarios.get(c.duenos[0]?.id ?? '') : null} />
+            ))}
+          </ul>
+        </>
       )}
 
       {enviadas.length > 0 && (
