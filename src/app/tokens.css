@@ -50,6 +50,8 @@
 @layer base {
   body {
     margin: 0;
+    /* sin el tirón del sistema (en el navegador recargaba todo): donde tiene sentido va el nuestro (<Refrescar>) */
+    overscroll-behavior-y: none;
     background: var(--gr-bg);
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
@@ -391,6 +393,48 @@
 .gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
 
+/* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y la estrella gira y
+   crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
+   girando mientras llega lo nuevo y se vuelve "Al día". Fija arriba, encima de todo; no mueve la página. */
+.gr-refrescar {
+  --tiron: 0px;
+  --avance: 0;
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 9px;
+  border-radius: var(--gr-radius-pill);
+  background: var(--gr-surface);
+  box-shadow: var(--gr-shadow-float);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: min(1, calc(var(--avance) * 1.6));
+  transform: translate(-50%, calc(var(--tiron) - 52px));
+  transition: transform 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 200ms ease-out, background-color 200ms;
+}
+.gr-refrescar[data-fase="tirando"] { transition: none; }
+.gr-refrescar__estrella {
+  transform: rotate(calc(var(--avance) * 300deg)) scale(calc(0.55 + var(--avance) * 0.45));
+  transition: transform 160ms ease-out;
+}
+.gr-refrescar[data-suelta] .gr-refrescar__estrella { transform: rotate(300deg) scale(1.18); }
+.gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: gr-gira 700ms linear infinite; }
+.gr-refrescar[data-fase="listo"], .gr-refrescar[data-fase="sin-red"] {
+  padding: 0 16px 0 13px;
+  background: var(--gr-brand);
+  color: var(--gr-on-brand);
+  animation: gr-aparece 160ms ease-out;
+}
+@keyframes gr-gira { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
    un <main aria-busy>), la estrella del ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de
    30° la deja igual, así que aguanta lo que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de
@@ -456,6 +500,8 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav a > .gr-nav__add { transition: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja { animation: none; }
+  .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
+  .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
   /* la estrella quieta mientras carga, y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }
