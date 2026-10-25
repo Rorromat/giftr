@@ -183,8 +183,9 @@ export function queCompletar(
     const resto = enTitulo.resto === puesto?.titulo || enTitulo.resto === pegadoConElLink ? '' : enTitulo.resto
     if (resto) campos.titulo = resto
     else if (nombre) campos.titulo = nuevo.titulo = nombre
-    // sin nombre queda el link solo (el servidor pone el del link o el sitio)
-    else if (enTitulo.resto) campos.titulo = link
+    // sin nombre, el que le pondría el servidor (el del link o el sitio): en el nombre no queda "https://…", y se ve lo que
+    // se va a guardar
+    else campos.titulo = nuevo.titulo = nombreDelLink(link)
   } else {
     // el link de la tienda que puso el autocompletado y sigue ahí, también
     if (puesto?.linkTienda && v.linkTienda.trim() === puesto.linkTienda) nuevo.linkTienda = puesto.linkTienda

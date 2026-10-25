@@ -6,7 +6,7 @@ import { claims, comments, items, lists, notifications } from '@/db/schema'
 import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { addComment } from '@/lib/comments'
 import { markBought, reserveItem } from '@/lib/claims'
-import { AVISO_LINK_LARGO, AVISO_NO_ES_LINK, avisoDelLink, avisoDelTitulo, deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
+import { AVISO_LINK_LARGO, AVISO_NO_ES_LINK, avisoDelLink, avisoDelTitulo, deseoDesdeForm, normalizarPrecio, paraAgregar } from '@/lib/deseo-form'
 import { largo, recortar } from '@/lib/limites'
 import { linkHttp } from '@/lib/links'
 import { guardarGustos, misGustos } from '@/lib/bienvenida'
@@ -27,6 +27,9 @@ vi.mock('next/navigation', () => ({
 }))
 
 import { addItemAction, createGroupAction, updateItemAction } from '@/app/actions'
+
+/** Agregar vuelve a Mi lista con el deseo recién agregado marcado (?agregado=<id>). */
+const A_MI_LISTA = /^\/mi-lista\?agregado=[0-9a-f-]{36}$/
 
 function form(campos: Record<string, string>) {
   const fd = new FormData()
@@ -133,8 +136,8 @@ test('links: sin https:// se lo agrega si tiene pinta de dominio; lo que no es u
 test('un link con un carácter de control no rompe al guardar: ni en la tienda, ni en la foto, ni pegado en el título', async () => {
   const { list } = await preparar()
   const conNul = 'https://articulo.mercadolibre.com.ar/MLA-1\u0000x'
-  expect(await redirigeA(addItemAction(form({ titulo: 'Mate', linkTienda: conNul, fotoUrl: conNul })))).toBe('/mi-lista')
-  expect(await redirigeA(addItemAction(form({ titulo: conNul })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: 'Mate', linkTienda: conNul, fotoUrl: conNul })))).toMatch(A_MI_LISTA)
+  expect(await redirigeA(addItemAction(form({ titulo: conNul })))).toMatch(A_MI_LISTA)
   const filas = await h.db.select().from(items).where(eq(items.listId, list.id))
   expect(filas).toHaveLength(2)
   expect(filas.map((f) => [f.linkTienda, f.fotoUrl])).toEqual([[null, null], [null, null]])
@@ -259,7 +262,7 @@ test('agregar sin JS un link en el título y algo que no es link a la tienda: el
   const { list } = await preparar()
   // más largo que el título: quedarse ahí lo cortaba a 120 y se perdían los dos links
   const largo = `${ML}-${'x'.repeat(80)}`
-  expect(await redirigeA(addItemAction(form({ titulo: largo, linkTienda: '@lacasadelmate' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: largo, linkTienda: '@lacasadelmate' })))).toMatch(A_MI_LISTA)
   expect((await h.db.select().from(items).where(eq(items.listId, list.id)))[0]).toMatchObject({ titulo: 'Mate imperial', linkTienda: largo })
   // al editar sigue quedando en el título: el undefined conserva el link guardado (test de arriba)
   expect(deseoDesdeForm(form({ titulo: largo, linkTienda: '@lacasadelmate' }))).toMatchObject({ titulo: largo, linkTienda: undefined })
@@ -269,20 +272,20 @@ test('dos productos de la misma tienda pegados seguidos en el título son dos de
   const { list } = await preparar()
   const mate = 'https://articulo.mercadolibre.com.ar/MLA-111-mate-imperial-_JM'
   const termo = 'https://articulo.mercadolibre.com.ar/MLA-222-termo-stanley-_JM'
-  for (const titulo of [mate, termo]) expect(await redirigeA(addItemAction(form({ titulo })))).toBe('/mi-lista')
+  for (const titulo of [mate, termo]) expect(await redirigeA(addItemAction(form({ titulo })))).toMatch(A_MI_LISTA)
   const filas = await h.db.select().from(items).where(eq(items.listId, list.id))
   expect(filas.map((f) => [f.titulo, f.linkTienda]).sort()).toEqual([['Mate imperial', mate], ['Termo stanley', termo]])
   // el mismo dos veces (un doble toque) sigue siendo uno, y lo mismo con otra foto u otras notas son dos
-  expect(await redirigeA(addItemAction(form({ titulo: termo })))).toBe('/mi-lista')
-  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la roja' })))).toBe('/mi-lista')
-  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toBe('/mi-lista')
-  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: termo })))).toMatch(A_MI_LISTA)
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la roja' })))).toMatch(A_MI_LISTA)
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toMatch(A_MI_LISTA)
+  expect(await redirigeA(addItemAction(form({ titulo: 'Remera', notas: 'la azul' })))).toMatch(A_MI_LISTA)
   expect(await h.db.select().from(items).where(eq(items.listId, list.id))).toHaveLength(4)
 })
 
 test('agregar pegando el link en el título guarda el link a la tienda; una cantidad enorme queda en 99 y no rompe', async () => {
   const { list } = await preparar()
-  expect(await redirigeA(addItemAction(form({ titulo: ML, cantidad: '99999999999' })))).toBe('/mi-lista')
+  expect(await redirigeA(addItemAction(form({ titulo: ML, cantidad: '99999999999' })))).toMatch(A_MI_LISTA)
   const [fila] = await h.db.select().from(items).where(eq(items.listId, list.id))
   expect(fila).toMatchObject({ titulo: 'Mate imperial', linkTienda: ML, cantidad: 99 })
 })
@@ -421,4 +424,23 @@ test('nombres: el de un invitado sin caracteres de control; el de un grupo corta
   const url = await redirigeA(createGroupAction(form({ nombre: `${'g'.repeat(59)}🎉🎉`, descripcion: 'd'.repeat(500) })))
   const [g] = await h.db.select().from(lists).where(eq(lists.id, url.split('/').at(-1)!))
   expect(g).toMatchObject({ nombre: `${'g'.repeat(59)}🎉`, descripcion: 'd'.repeat(120) })
+})
+
+test('el precio escrito solo con números queda como se muestra ($45.000); lo demás, tal cual', () => {
+  for (const [escrito, queda] of [
+    ['45000', '$45.000'], ['45.000', '$45.000'], ['$45000', '$45.000'], ['$ 1.250.000', '$1.250.000'], ['950', '$950'],
+    ['US$ 120', 'US$ 120'], ['$10–30k', '$10–30k'], ['45,50', '45,50'], ['0', '0'], ['4.50', '4.50'],
+  ] as const) expect(normalizarPrecio(escrito), escrito).toBe(queda)
+  expect(normalizarPrecio(null)).toBeNull()
+  expect(deseoDesdeForm(form({ titulo: 'Mate', precio: '45000' }))?.precio).toBe('$45.000')
+})
+
+test('"Me sirve algo parecido": tildado es una idea; sin tildar, el exacto que va después', () => {
+  const conTipo = (tipos: string[]) => {
+    const fd = form({ titulo: 'Mate' })
+    for (const t of tipos) fd.append('tipo', t)
+    return deseoDesdeForm(fd)?.tipo
+  }
+  expect(conTipo(['idea', 'exacto'])).toBe('idea')
+  expect(conTipo(['exacto'])).toBe('exacto')
 })

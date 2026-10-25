@@ -107,7 +107,7 @@ test('?lista= sigue andando con lo compartido (y una lista repetida en la URL no
   const { owner } = await preparar()
   const grupo = await crearGrupo(h.db, owner.id, { nombre: 'Familia' })
   const conLista = await pagina({ lista: grupo, link: ML })
-  const elegida = `name="listaId" checked="" value="${grupo}"`
+  const elegida = `<option value="${grupo}" selected="">`
   expect(conLista).toContain(elegida)
   expect(titulo(conLista)).toContain(`value="${ML}"`)
   expect(await pagina({ lista: [grupo, grupo] })).not.toContain(elegida)

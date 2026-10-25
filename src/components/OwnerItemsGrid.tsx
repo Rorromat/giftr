@@ -27,8 +27,11 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
   )
 }
 
-/** Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas. */
-export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; shareToken: string }) {
+/**
+ * Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas.
+ * agregado: el que se acaba de agregar, marcado (ver RecienAgregado).
+ */
+export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerItemView[]; shareToken: string; agregado?: string }) {
   const porCategoria = Object.groupBy(items, (i) => i.categoria ?? 'Sin categoría')
   return Object.entries(porCategoria).map(([cat, catItems]) => (
     <section key={cat} className="flex flex-col gap-2.5">
@@ -38,9 +41,13 @@ export function OwnerItemsGrid({ items, shareToken }: { items: OwnerItemView[]; 
           const precio = item.precio ?? item.rangoPrecio
           return (
             // Toda la card abre el deseo (el ::after del título la cubre); el menú y la prioridad van por arriba.
-            <li key={item.id} className="gr-card relative">
+            <li key={item.id} id={`d-${item.id}`}
+                className={`gr-card relative scroll-mt-24 ${item.id === agregado ? 'outline-3 outline-offset-2 outline-gr-accent' : ''}`}>
               <div className="relative">
                 <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={ALTO_FOTO} />
+                {item.id === agregado && (
+                  <span className="pointer-events-none absolute left-2 top-2 z-[1] rounded-full bg-gr-accent px-2.5 py-1 text-xs font-semibold">Recién agregado</span>
+                )}
                 <details className="group">
                   <summary aria-label={`Opciones de ${item.titulo}`}
                            className="absolute right-0.5 top-0.5 z-[2] flex size-11 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">

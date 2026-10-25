@@ -36,10 +36,9 @@ export default async function Agregar({ searchParams }: {
   const desdeGrupo = grupos.find((g) => g.id === lista)
 
   return (
-    <main className="gr-hoja flex flex-col gap-1 pb-8 pt-2">
-      <PageHeader title="Agregar deseo" back={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'}
+    <main className="gr-hoja flex flex-col gap-1 pt-2">
+      <PageHeader title="Nuevo deseo" back={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'}
                   backLabel={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
-      <p className="text-center text-sm text-gr-muted">Menos de 30 segundos, prometido.</p>
 
       <DeseoForm action={addItemAction} grupos={grupos} grupoElegido={desdeGrupo?.id} boton="Agregar a mi lista"
                  compartido={hayCompartido ? { buzon, link: enUrl?.link, titulo: enUrl?.titulo, notas: enUrl?.notas, automatico, sinFoto } : undefined} />

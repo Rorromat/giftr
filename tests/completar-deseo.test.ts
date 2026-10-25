@@ -161,9 +161,9 @@ describe('queCompletar', () => {
     expect(queCompletar(valores({ titulo: ML }), ML, ok(), null)!.retenidos).toBeUndefined()
   })
 
-  test('sin nombre, si era solo el link, queda el link (el servidor pone el del link o el sitio); si estaba vacío, el sitio', () => {
+  test('sin nombre, el del link o el sitio (lo que pondría el servidor): en el nombre no queda "https://…"', () => {
     const c = queCompletar(valores({ titulo: 'https://tienda.com.ar/x' }), 'https://tienda.com.ar/x', ok({ titulo: null, precio: null }), null)!
-    expect(c.titulo).toBeUndefined()
+    expect(c.titulo).toBe('tienda.com.ar')
     expect(c.linkTienda).toBe('https://tienda.com.ar/x')
     expect(c.aviso).toBeNull()
     // vacío frenaba "Agregar" ("Completá este campo")
@@ -1364,22 +1364,24 @@ test('la foto que propone el link: se trae una nueva, null saca la que vino así
   }
 })
 
-test('el formulario lleva la línea de estado entre el título y la foto, vacía hasta que haya algo que decir', () => {
+test('la tarjeta del deseo lleva la línea de estado entre la foto y el título, vacía hasta que haya algo que decir', () => {
   const html = renderToStaticMarkup(createElement(DeseoForm, { action: async () => {}, boton: 'Agregar' }))
   const titulo = html.indexOf('name="titulo"')
   const estado = html.indexOf('<p role="status"')
   const foto = html.indexOf('name="fotoUrl"')
-  expect(titulo).toBeGreaterThan(0)
-  expect(estado).toBeGreaterThan(titulo)
-  expect(foto).toBeGreaterThan(estado)
+  expect(foto).toBeGreaterThan(0)
+  expect(estado).toBeGreaterThan(foto)
+  expect(titulo).toBeGreaterThan(estado)
   expect(html).toMatch(/<p role="status" class="[^"]*"><\/p>/)
   expect(html).not.toContain('role="alert"')
 })
 
 test('lo que llega solo (la foto del link mientras se trae, el consejo) va en el lugar de la foto: al llegar no corre nada', () => {
   const sinFoto = renderToStaticMarkup(createElement(FotoField, {}))
-  expect(sinFoto).toMatch(/Acá aparece tu deseo<\/span><span role="status"[^>]*>Sumá una foto: es lo que más ayuda a que acierten.<\/span><\/button>/)
+  // el lugar de la foto: "Pegar link" y "Foto", y abajo, adentro del mismo lugar, lo que pasa
+  expect(sinFoto).toMatch(/Pegar link<\/button><button[^>]*>.*Foto<\/button><\/div><span role="status"[^>]*>Pegá el link de la tienda: traemos nombre, foto y precio.<\/span><div[^>]*><button[^>]*>Pegar una foto copiada/)
   const conFoto = renderToStaticMarkup(createElement(FotoField, { inicial: '/foto/deseo/00000000-0000-4000-8000-000000000001' }))
   expect(conFoto).toContain('alt="Vista previa de la foto"')
-  expect(conFoto).not.toContain('Acá aparece tu deseo')
+  expect(conFoto).toContain('Cambiar foto')
+  expect(conFoto).not.toContain('Pegar link')
 })

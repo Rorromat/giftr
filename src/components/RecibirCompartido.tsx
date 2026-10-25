@@ -24,7 +24,7 @@ export type CompartidoAlForm = {
 export const FOTO_NO_LLEGO = 'La foto no llegó: tocá Foto y elegila de nuevo.'
 
 /**
- * Cómo entra un link que se busca solo en "¿Qué querés?": como un pegado, igual que con "Pegar link copiado" (QueQueres).
+ * Cómo entra un link que se busca solo en "¿Qué querés?": como un pegado, igual que con "Pegar link" (ver pegarLink).
  * Así CompletarDesdeLink lo busca en el momento (ver loQueEntro) y "¿Qué querés?" deja de estar vacío.
  */
 export const comoPegado = (texto: string) => ({ bubbles: true, inputType: 'insertFromPaste', data: texto }) satisfies InputEventInit
