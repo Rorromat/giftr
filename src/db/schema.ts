@@ -22,6 +22,9 @@ export const users = pgTable('users', {
   fotoAt: timestamp('foto_at', { withTimezone: true }),
   // Cuándo tocó "Probar" en Avisos por última vez: uno por minuto (ver probarAviso).
   avisoProbadoAt: timestamp('aviso_probado_at', { withTimezone: true }),
+  // Cuándo le preguntamos si quería avisos: en la bienvenida o, a los que ya estaban, con el cartel de una sola vez (ver
+  // preguntarAvisos). Vacío: todavía no.
+  avisosPreguntadosAt: timestamp('avisos_preguntados_at', { withTimezone: true }),
   // El nombre de usuario ("euge.mateus", sin la @), para que lo encuentren y lo agreguen como amigo. Se le sugiere uno al
   // entrar (ver asegurarUsuario) y lo cambia en Perfil. En minúsculas, único.
   usuario: text('usuario').unique(),

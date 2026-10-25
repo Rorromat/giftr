@@ -7,6 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Pedí lo que querés sin pedirlo.',
     start_url: '/',
     display: 'standalone',
+    // como una app: en vertical (Android la traba así; el iPhone no hace caso, ahí aparece "Girá el teléfono")
+    orientation: 'portrait',
     background_color: '#F4F4F0',
     theme_color: '#F4F4F0',
     // Todos a sangre y sin transparencia (como el apple-touch-icon): si un sistema usa estos en vez del

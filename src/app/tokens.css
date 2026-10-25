@@ -48,6 +48,8 @@
 }
 
 @layer base {
+  /* sin zoom, como una app: deja deslizar para cualquier lado, no pellizcar ni el doble toque (ver viewport en layout) */
+  html { touch-action: pan-x pan-y; }
   body {
     margin: 0;
     /* sin el tirón del sistema (en el navegador recargaba todo): donde tiene sentido va el nuestro (<Refrescar>) */
@@ -462,6 +464,28 @@
   100% { opacity: 0; transform: translate(-50%, 6px); visibility: hidden; }
 }
 
+/* Girá el teléfono: GiftR va en vertical. Solo en un teléfono de costado (pantalla táctil y baja): una tablet o la compu
+   apaisadas, no. */
+.gr-girar { display: none; }
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .gr-girar {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px;
+    background: var(--gr-bg);
+    color: var(--gr-ink);
+    text-align: center;
+  }
+  .gr-girar__tel { margin-bottom: 6px; animation: gr-girar 1.6s ease-in-out infinite; }
+}
+@keyframes gr-girar { 0%, 25% { transform: rotate(-90deg); } 60%, 100% { transform: rotate(0deg); } }
+
 /* La foto de un deseo entera (<FotoAmpliable>): a pantalla completa, sin recortar, sobre fondo oscuro. */
 .gr-foto-grande {
   width: 100vw;
@@ -570,6 +594,7 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }
   .gr-foto-grande[open] { animation: none; }
+  .gr-girar__tel { animation: none; }
   /* la estrella quieta mientras carga, y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }

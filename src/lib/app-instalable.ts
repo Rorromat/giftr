@@ -57,6 +57,9 @@ export async function instalarGiftR(): Promise<boolean> {
  * React hidrate y RegistrarSW se ponga a escuchar, y ese se perdía (sin botón en Perfil). Lo deja en window para
  * escucharPedidoInstalar.
  */
+/** Safari en iPhone no respeta user-scalable=no: el pellizco para hacer zoom se frena acá (gesturestart es solo de Safari). */
+export const SIN_ZOOM = "document.addEventListener('gesturestart',function(e){e.preventDefault()},{passive:false})"
+
 export const ATRAPAR_PEDIDO_INSTALAR =
   "window.addEventListener('beforeinstallprompt',function(e){window.__pedidoInstalar=e});" +
   "window.addEventListener('appinstalled',function(){window.__pedidoInstalar=null})"

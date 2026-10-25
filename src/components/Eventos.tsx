@@ -7,10 +7,15 @@ import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 
 // Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos).
 
+/**
+ * Las fotos de lo que más quiere, una al lado de la otra. La fila mide los 170 px (minmax(0,1fr)): con la fila en auto,
+ * una sola foto vertical la estiraba a su alto y tapaba el nombre y la fecha de la tarjeta.
+ */
 function Fotos({ e }: { e: Evento }) {
   if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={170} />
   return (
-    <div className="grid h-[170px] gap-0.5 bg-gr-surface" style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
+    <div className="grid h-[170px] grid-rows-[minmax(0,1fr)] gap-0.5 overflow-hidden bg-gr-surface"
+         style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
       {e.fotos.map((src, i) => (
         <FotoConRespaldo key={i} src={src} className="size-full object-cover"
                          respaldo={<span className="size-full bg-gr-soft" />} />

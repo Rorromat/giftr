@@ -76,6 +76,22 @@ async function podarSuscripciones(db: Db, userId: string) {
   await db.delete(pushSubs).where(and(eq(pushSubs.userId, userId), notInArray(pushSubs.id, masNuevas)))
 }
 
+/**
+ * Si hay que preguntarle por los avisos con el cartel de una sola vez (a los que ya estaban antes de que la bienvenida lo
+ * preguntara): ya pasó la bienvenida, nunca se le preguntó y no los tiene activados en ningún dispositivo.
+ */
+export async function preguntarAvisos(db: Db, userId: string): Promise<boolean> {
+  const [u] = await db.select({ bienvenida: users.bienvenidaAt, preguntados: users.avisosPreguntadosAt }).from(users).where(eq(users.id, userId))
+  if (!u?.bienvenida || u.preguntados) return false
+  const [sub] = await db.select({ id: pushSubs.id }).from(pushSubs).where(eq(pushSubs.userId, userId)).limit(1)
+  return !sub
+}
+
+/** Ya se le preguntó por los avisos (en la bienvenida o con el cartel): no se le vuelve a preguntar. */
+export async function avisosPreguntados(db: Db, userId: string) {
+  await db.update(users).set({ avisosPreguntadosAt: new Date() }).where(and(eq(users.id, userId), isNull(users.avisosPreguntadosAt)))
+}
+
 /** "Activar avisos" en este dispositivo (si el endpoint ya existía, pasa a ser de este usuario). Pasa a ser el más nuevo. */
 export async function guardarSuscripcion(db: Db, userId: string, s: unknown): Promise<boolean> {
   if (!esSuscripcion(s)) return false
