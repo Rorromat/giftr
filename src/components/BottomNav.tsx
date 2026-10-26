@@ -25,7 +25,7 @@ function seccionDe(path: string) {
   if (path === '/eventos' || path === '/novedades' || path.startsWith('/fechas/')) return '/inicio'
   if (path === '/cuentas' || path.startsWith('/sorpresa/') || path.startsWith('/invisible/')) return '/regalos'
   if (path.startsWith('/l/') || path.startsWith('/gente/')) return '/gente'
-  if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil') return '/mi-lista'
+  if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil' || path.startsWith('/perfil/')) return '/mi-lista'
   return path
 }
 
@@ -73,7 +73,7 @@ function useAnclajeAbajo(ref: RefObject<HTMLElement | null>) {
  * sección marcada se estira en negro con su nombre (las columnas se animan con CSS), desde el toque mismo.
  * Agregar un deseo no es una sección: es la estrella lima que flota arriba de la punta derecha, en Inicio y en lo tuyo
  * (ver BotonAgregar). En Agregar la barra se esconde: la estrella gira y se va mientras la hoja de agregar sube (al
- * editar un deseo, armar una sorpresa o un amigo invisible también se esconde).
+ * editar un deseo o tus gustos, armar una sorpresa o un amigo invisible también se esconde).
  */
 export function BottomNav() {
   const path = usePathname()
@@ -84,7 +84,7 @@ export function BottomNav() {
   const actual = seccionDe(path)
   const marcado = toque && toque.desde === path ? toque.href : actual
   const oculta = marcado === '/agregar' || path.startsWith('/editar/') || path === '/sorpresa/nueva' || /^\/sorpresa\/[^/]+\/editar$/.test(path)
-    || path === '/invisible/nuevo' || /^\/invisible\/[^/]+\/editar$/.test(path)
+    || path === '/invisible/nuevo' || /^\/invisible\/[^/]+\/editar$/.test(path) || /^\/perfil\/gustos\/[^/]+$/.test(path)
   // En Agregar (o Editar) no hay columna marcada: la píldora se queda donde estaba mientras la barra baja.
   const columna = DESTINOS.find((d) => d.href === marcado)?.columna
   const [ultima, setUltima] = useState(columna)

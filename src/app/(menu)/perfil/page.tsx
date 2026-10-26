@@ -16,7 +16,7 @@ import { ActivarAvisos } from '@/components/ActivarAvisos'
 import { AgregarDesdeApps } from '@/components/AgregarDesdeApps'
 import { ATAJO_IPHONE, plataformaDe, TEXTOS_APPS } from '@/lib/agregar-desde-apps'
 import { clavesVapid } from '@/lib/codazos'
-import { seccionesDeGustos } from '@/lib/gustos'
+import { bloquesDeGustos, seccionesDeGustos } from '@/lib/gustos'
 import { adelantoGustos } from '@/components/Gustos'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
@@ -38,6 +38,8 @@ export default async function Perfil({ searchParams }: {
     yo(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers(), asegurarUsuario(db, session.userId),
   ])
   const secciones = seccionesDeGustos(gustos, true)
+  const bloques = bloquesDeGustos(gustos)
+  const cargados = bloques.filter((b) => b.cargado).length
   if (!lista) redirect('/')
 
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
@@ -113,10 +115,13 @@ export default async function Perfil({ searchParams }: {
       <section className="flex flex-col gap-2.5">
         <h2 className="gr-heading">Lo que ve tu gente</h2>
         <div className="gr-card gr-rows">
-          {/* Tus gustos: los ve tu gente arriba de tu lista */}
-          <Row href="/bienvenida?editar=1" icon="heart" title="Tus gustos"
+          {/* Tus gustos: los ve tu gente arriba de tu lista; se ven y se editan en /perfil/gustos */}
+          <Row href="/perfil/gustos" icon="heart" title="Tus gustos"
                sub={secciones.length ? adelantoGustos(secciones) : 'Contale a tu gente qué te gusta: club, talles, marcas…'}>
-            <span className="flex-none text-sm font-semibold">{secciones.length ? 'Editar' : 'Completar'}</span>
+            <span className="flex flex-none items-center gap-1 text-sm font-semibold tabular-nums">
+              {cargados ? `${cargados} de ${bloques.length}` : 'Completar'}
+              <Icon name="chevron" size={18} className="text-gr-muted" />
+            </span>
           </Row>
           <Row href={`/l/${lista.shareToken}/perfil`} icon="eye" title="Ver cómo me ven los demás" />
         </div>

@@ -39,3 +39,19 @@ export function DeseoEliminado() {
     </p>
   )
 }
+
+/** Después de editar un paso de Tus gustos: "Listo, guardado" y la tarjeta de ese paso a la vista. */
+export function GustosGuardados({ paso }: { paso: string }) {
+  useEffect(() => {
+    document.getElementById(`g-${paso}`)?.scrollIntoView({ block: 'center' })
+    const url = new URL(location.href)
+    url.searchParams.delete('guardado')
+    history.replaceState(history.state, '', url)
+  }, [paso])
+  return (
+    <p role="status" className="gr-toast [animation-duration:4s]">
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
+      <span className="min-w-0 flex-1"><span className="font-semibold text-gr-accent">Listo,</span> tu gente ya lo ve</span>
+    </p>
+  )
+}

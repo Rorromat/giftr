@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { SeccionGustos } from '@/lib/gustos'
+import { muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { AvatarSticker, Icon } from '@/components/ui'
 
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
@@ -8,6 +8,17 @@ export function IconoSeccion({ s, size = 36 }: { s: Pick<SeccionGustos, 'icono'>
     <span aria-hidden className="flex flex-none items-center justify-center rounded-full bg-gr-accent"
           style={{ width: size, height: size }}>
       <Icon name={s.icono} size={size * 0.55} strokeWidth={2} />
+    </span>
+  )
+}
+
+/** Un gusto como etiqueta; un color, con su muestra al lado. */
+function Etiqueta({ texto, oscuro = false }: { texto: string; oscuro?: boolean }) {
+  const muestra = muestraDeColor(texto)
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium [overflow-wrap:anywhere] ${oscuro ? 'bg-gr-bg/12' : 'bg-gr-soft'}`}>
+      {muestra && <span aria-hidden className="size-3.5 flex-none rounded-full border border-gr-ink/20" style={{ background: muestra }} />}
+      {texto}
     </span>
   )
 }
@@ -22,9 +33,7 @@ export function SeccionesGustos({ secciones }: { secciones: SeccionGustos[] }) {
           <div className="flex min-w-0 flex-col gap-1.5">
             <dt className="gr-label">{s.titulo}</dt>
             <dd className="flex flex-wrap gap-1.5">
-              {s.items.map((i) => (
-                <span key={i} className="rounded-full bg-gr-soft px-3 py-1 text-[13px] font-medium [overflow-wrap:anywhere]">{i}</span>
-              ))}
+              {s.items.map((i) => <Etiqueta key={i} texto={i} />)}
             </dd>
           </div>
         </div>
@@ -52,6 +61,13 @@ export function ResumenGustos({ secciones }: { secciones: SeccionGustos[] }) {
             <span className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gr-muted">{s.titulo}</span>
           </div>
           <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">
+            {s.clave === 'colores' && (
+              <span aria-hidden className="mb-1.5 flex">
+                {s.items.slice(0, 5).map((c) => (
+                  <span key={c} className="-mr-1.5 size-5 rounded-full border-2 border-gr-surface" style={{ background: muestraDeColor(c) ?? undefined }} />
+                ))}
+              </span>
+            )}
             {s.items.slice(0, 2).join(', ')}
             {s.items.length > 2 && <span className="text-gr-muted"> +{s.items.length - 2}</span>}
           </p>
@@ -79,6 +95,72 @@ export function TarjetaPerfil({ nombre, foto, secciones, href }: { nombre: strin
           : <span className="text-[13px] text-gr-muted">Su cumple, sus talles y lo que le gusta</span>}
       </span>
       <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+    </Link>
+  )
+}
+
+/** Lo que dice cada bloque vacío en Tus gustos, para que den ganas de completarlo. */
+const PISTAS: Record<BloqueGustos['paso'], string> = {
+  deportes: 'Los que hacés o mirás.',
+  futbol: 'Para la camiseta, el buzo, la taza…',
+  hobbies: 'Lo que te gusta hacer, y si hay mascota.',
+  ropa: 'Tus marcas y tu estilo.',
+  colores: 'Así nadie tiene que ir a cambiar nada.',
+  bebidas: 'Para el regalito de último momento.',
+  'no-regalar': 'Tan importante como lo que sí.',
+}
+
+/** Los tres talles en fila, con un guión en el que falta. */
+function TallesEnFila({ talles }: { talles: Talles }) {
+  return (
+    <span className="grid grid-cols-3 gap-2">
+      {(['remera', 'pantalon', 'calzado'] as const).map((k) => (
+        <span key={k} className="flex flex-col rounded-2xl bg-gr-soft px-3 py-2">
+          <span className="text-[12px] font-semibold text-gr-muted">{k === 'remera' ? 'Remera' : k === 'pantalon' ? 'Pantalón' : 'Calzado'}</span>
+          <span className={`font-display text-[22px] leading-tight font-bold ${talles[k] ? '' : 'text-gr-muted'}`}>{talles[k] ?? '—'}</span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * Un bloque de Tus gustos (un paso de la bienvenida): lo que cargaste, y tocarlo lo edita solo. Vacío, punteado y con
+ * "Sumar"; "Lo que no querés", en negro como lo ve tu gente.
+ */
+export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }) {
+  const href = `/perfil/gustos/${b.paso}`
+  if (!b.cargado) {
+    return (
+      <Link href={href} className="flex min-h-[72px] items-center gap-3 rounded-[22px] border-2 border-dashed border-gr-line px-4 py-3">
+        <span aria-hidden className="flex size-[34px] flex-none items-center justify-center rounded-full bg-gr-soft">
+          <Icon name={b.icono} size={19} strokeWidth={2} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">{b.titulo}</span>
+          <span className="block text-[13px] leading-snug text-gr-muted">{PISTAS[b.paso]}</span>
+        </span>
+        <span className="flex flex-none items-center gap-1 text-sm font-semibold"><Icon name="plus" size={16} strokeWidth={2.4} />Sumar</span>
+      </Link>
+    )
+  }
+  const oscuro = b.paso === 'no-regalar'
+  return (
+    <Link href={href} className={`flex flex-col gap-3 rounded-[22px] p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
+      <span className="flex items-center gap-3">
+        <IconoSeccion s={b} size={34} />
+        <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-accent' : ''}`}>{b.titulo}</span>
+        <span className="flex-none text-sm font-semibold underline underline-offset-4">Editar</span>
+      </span>
+      {b.partes.map((p) => (
+        <span key={p.clave} className="flex flex-col gap-1.5">
+          {b.partes.length > 1 && <span className={`gr-label ${oscuro ? 'text-gr-bg/60' : ''}`}>{p.titulo}</span>}
+          {p.clave === 'talles' ? <TallesEnFila talles={talles} />
+            : !p.items.length ? <span className={`text-[13px] ${oscuro ? 'text-gr-bg/60' : 'text-gr-muted'}`}>Sin cargar</span>
+            : p.clave === 'nota' ? <span className="text-sm leading-snug">«{p.items[0]}»</span>
+            : <span className="flex flex-wrap gap-1.5">{p.items.map((i) => <Etiqueta key={i} texto={i} oscuro={oscuro} />)}</span>}
+        </span>
+      ))}
     </Link>
   )
 }
