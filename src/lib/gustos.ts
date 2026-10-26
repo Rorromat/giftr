@@ -46,6 +46,19 @@ export const TODAS_LAS_MARCAS: readonly string[] = MARCAS.flatMap((g) => g.marca
 
 export const ESTILOS = ['Clásico', 'Deportivo', 'Urbano', 'Elegante', 'Relajado', 'Bohemio', 'Minimalista', 'Rockero', 'Colorido'] as const
 
+/**
+ * Una foto de ejemplo de cada estilo (en public/estilos, 360×480). Son de StockSnap, CC0 (dominio público: se pueden usar
+ * sin pedir permiso ni citar), y van con su autor por cortesía: Freestocks.org (clásico), The Lazy Artist Gallery
+ * (deportivo), Crown Labs Agency (urbano), Olu Eletu (elegante), Matt Moloney (relajado), Philip Meurisse (bohemio),
+ * Ylanite Koppens (minimalista), Alex Sheldon (rockero) y Godisable Jacob (colorido).
+ */
+const FOTOS_ESTILOS: Record<(typeof ESTILOS)[number], string> = {
+  Clásico: 'clasico', Deportivo: 'deportivo', Urbano: 'urbano', Elegante: 'elegante', Relajado: 'relajado',
+  Bohemio: 'bohemio', Minimalista: 'minimalista', Rockero: 'rockero', Colorido: 'colorido',
+}
+export const fotoDeEstilo = (estilo: string) =>
+  estilo in FOTOS_ESTILOS ? `/estilos/${FOTOS_ESTILOS[estilo as keyof typeof FOTOS_ESTILOS]}.webp` : null
+
 /** Colores con su muestra. "Estampados" y "Pasteles" se dibujan aparte. */
 export const COLORES = [
   { nombre: 'Negro', hex: '#121212' }, { nombre: 'Blanco', hex: '#FFFFFF' }, { nombre: 'Gris', hex: '#9A9A9A' },

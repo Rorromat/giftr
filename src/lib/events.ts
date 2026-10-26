@@ -5,6 +5,7 @@ import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib
 import { expireStaleClaims, ocupaSql } from '@/lib/claims'
 import { ultimosRegalos } from '@/lib/regalos'
 import { cupoDe } from '@/lib/serialize'
+import { urlFoto } from '@/lib/users'
 
 // Eventos: los cumples de la gente cuyas listas abriste (las que "seguís") y las fechas de tus grupos,
 // más los tuyos. Las fechas se manejan como Date UTC a medianoche para que no se corran con la hora.
@@ -62,16 +63,20 @@ export function anioSiEstaLejos(f: Date, hoy: Date): number | null {
   return esLaProxima && !pasoHacePoco ? null : f.getUTCFullYear()
 }
 
-/** Hasta cuántos días adelante va un evento en el carrusel de Próximos (lo de después, en "Más adelante"). */
+/** Hasta cuántos días adelante va un evento en el carrusel de Próximos (lo de después, en Todo el año). */
 export const HORIZONTE_PROXIMOS = 90
 
+/** Cuántos van en el carrusel de Próximos, en Inicio: más, satura (el resto, en Todo el año). */
+export const PROXIMOS_EN_INICIO = 5
+
 /**
- * Los eventos (ya ordenados por cercanía) para Inicio: los de los próximos tres meses, hasta 6, en el carrusel; el resto,
- * en "Más adelante". Un cumple que pasó hace unos días es el del año que viene: no va como próximo.
+ * Lo que va en el carrusel de Próximos (todo junto y ordenado por cercanía: eventos y fechas especiales): los primeros 5
+ * de los próximos tres meses, y cuántos más hay (para "Todo el año"). Un cumple que pasó hace unos días es el del año que
+ * viene: no va como próximo.
  */
-export function repartirProximos<T extends { dias: number }>(eventos: T[]): { cerca: T[]; despues: T[] } {
-  const cerca = eventos.filter((e) => e.dias <= HORIZONTE_PROXIMOS).slice(0, 6)
-  return { cerca, despues: eventos.slice(cerca.length) }
+export function repartirProximos<T extends { dias: number }>(eventos: T[]): { primeros: T[]; quedan: number } {
+  const primeros = eventos.filter((e) => e.dias <= HORIZONTE_PROXIMOS).slice(0, PROXIMOS_EN_INICIO)
+  return { primeros, quedan: eventos.length - primeros.length }
 }
 
 /** "Sábado 22 de agosto"; con hoy, "Sábado 20 de noviembre de 2027" si está a más de un año. */
@@ -153,6 +158,8 @@ export type Evento = {
   propio: boolean
   href: string
   personas: string[]
+  /** La foto de cada una de personas, en el mismo orden (la suya o la de Google; null, sus iniciales). */
+  caras: (string | null)[]
   contexto: string | null
   /** Hasta 3 fotos de los deseos que más quiere. Si sos regalador, solo los que todavía se pueden reservar. */
   fotos: string[]
@@ -212,7 +219,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   const [owners, miembros] = await Promise.all([
     ownerIds.length ? db.select().from(users).where(inArray(users.id, ownerIds)) : [],
     grupoIds.length
-      ? db.select({ listId: listMembers.listId, nombre: users.nombre })
+      ? db.select({ listId: listMembers.listId, nombre: users.nombre, id: users.id, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl })
         .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
         .where(and(inArray(listMembers.listId, grupoIds), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
       : [],
@@ -230,6 +237,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
         titulo: propio ? 'Tu cumple' : `Cumple de ${primerNombre(owner.nombre)}`,
         href: propio ? '/mi-lista' : `/l/${list.shareToken}`,
         personas: [owner.nombre],
+        caras: [urlFoto(owner)],
         contexto: propio ? 'Tu lista' : null,
       })
     } else {
@@ -238,11 +246,13 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       const fecha = proximaVez(cae, hoy)
       if (!fecha) continue
       const sorpresa = list.tipo === 'sorpresa'
+      const delGrupo = miembros.filter((m) => m.listId === list.id)
       conFecha.push({
         listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
         titulo: sorpresa ? `Sorpresa para ${list.nombre ?? 'alguien'}` : list.nombre ?? 'Grupo',
         href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
-        personas: sorpresa ? [list.nombre ?? 'Alguien'] : miembros.filter((m) => m.listId === list.id).map((m) => m.nombre),
+        personas: sorpresa ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
+        caras: sorpresa ? [null] : delGrupo.map(urlFoto),
         contexto: sorpresa ? 'No usa GiftR' : propio ? 'Tu grupo' : 'Grupo',
       })
     }
