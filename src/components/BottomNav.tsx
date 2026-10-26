@@ -78,7 +78,7 @@ export function BottomNav() {
   if (toque && toque.desde !== path) setToque(null)
   const actual = seccionDe(path)
   const marcado = toque && toque.desde === path ? toque.href : actual
-  const oculta = marcado === '/agregar' || path.startsWith('/editar/') || path === '/sorpresa/nueva'
+  const oculta = marcado === '/agregar' || path.startsWith('/editar/') || path === '/sorpresa/nueva' || /^\/sorpresa\/[^/]+\/editar$/.test(path)
   // En Agregar (o Editar) no hay columna marcada: la píldora se queda donde estaba mientras la barra baja.
   const columna = DESTINOS.find((d) => d.href === marcado)?.columna
   const [ultima, setUltima] = useState(columna)

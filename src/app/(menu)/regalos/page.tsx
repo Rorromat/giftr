@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { misRegalos, type MiRegalo } from '@/lib/mis-regalos'
 import { plata } from '@/lib/pesos'
 import { MESES } from '@/lib/events'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { ArmarSorpresa } from '@/components/Sorpresas'
 import { AppHeader, Icon, ItemPhoto, QuizasLink, Seccion } from '@/components/ui'
@@ -57,11 +57,11 @@ function Fila({ r, pasado = false }: { r: MiRegalo; pasado?: boolean }) {
 export default async function MisRegalos() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [{ porComprar, comprados, historial }, foto] = await Promise.all([misRegalos(db, session.userId), miFoto(db, session.userId)])
+  const [{ porComprar, comprados, historial }, { nombre, foto }] = await Promise.all([misRegalos(db, session.userId), yo(db, session.userId)])
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={session.user?.name ?? session.user?.email ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Tus regalos</h1>
         <p className="text-[15px] text-gr-muted">Lo que reservaste y los regalos grupales en los que estás.</p>

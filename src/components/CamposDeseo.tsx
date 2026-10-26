@@ -43,6 +43,9 @@ export const CampoLink = (props: Props) => (
   }} />
 )
 
+/** El link de un video: entero y que sea un link, como "Link a la tienda" (no tiene que ver con el título). */
+export const CampoVideo = (props: Props) => <CampoConAviso {...props} aviso={avisoDelLink} />
+
 /**
  * Escribir un campo desde el código (lo que completó la lectura del link, ver CompletarDesdeLink). Los campos no son
  * controlados: un .value no dispara onChange, así que se vuelven a mirar el título y el link (si no, quedaba el aviso de

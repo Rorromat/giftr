@@ -7,6 +7,7 @@ import { textoDueno } from '@/lib/compartir'
 import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
 import { Icon, ItemPhoto, PriorityTag, Seccion, PageHeader } from '@/components/ui'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { VideoDeseo } from '@/components/VideoDeseo'
 
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
 // regalos, ni comentarios (la regla de la sorpresa). Desde acá se edita o se saca de la lista.
@@ -45,6 +46,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
               <span className="font-semibold">Nota:</span> {deseo.notas}
             </p>
           )}
+          {deseo.videoUrl && <VideoDeseo url={deseo.videoUrl} titulo={deseo.titulo} />}
           <div className="flex flex-wrap gap-2">
             {deseo.linkTienda && (
               <a href={deseo.linkTienda} target="_blank" className="gr-btn gr-btn--sm">

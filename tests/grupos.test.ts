@@ -19,7 +19,7 @@ import { getUnreadNotifications } from '@/lib/notifications'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { createGuest } from '@/lib/guest'
 
-const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo'].sort()
+const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo', 'videoUrl'].sort()
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })

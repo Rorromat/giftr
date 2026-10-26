@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { misGustos } from '@/lib/bienvenida'
 import { MESES, miCumple } from '@/lib/events'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
 import { NO_FUTBOL, SOLO_SELECCION } from '@/lib/gustos'
 import { TallesIlustrados } from '@/components/TallesIlustrados'
 import { AvatarSticker, Icon, Starburst, type IconName, LogoSticker } from '@/components/ui'
@@ -16,11 +16,11 @@ type Fila = { paso: number; icono: IconName; titulo: string; valor: string | nul
 export default async function Listo({ searchParams }: { searchParams: Promise<{ desde?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [{ desde }, g, cumple, foto, lista] = await Promise.all([
-    searchParams, misGustos(db, session.userId), miCumple(db, session.userId), miFoto(db, session.userId), getOwnList(db, session.userId),
+  const [{ desde }, g, cumple, { nombre: suNombre, foto }, lista] = await Promise.all([
+    searchParams, misGustos(db, session.userId), miCumple(db, session.userId), yo(db, session.userId), getOwnList(db, session.userId),
   ])
   if (!lista) redirect('/')
-  const nombre = session.user?.name ?? ''
+  const nombre = suNombre ?? session.user?.name ?? ''
   const unir = (...partes: (string[] | string | null | undefined)[]) => partes.flat().filter(Boolean).join(', ') || null
   const talles = g && Object.values(g.talles).some(Boolean) ? g.talles : null
 

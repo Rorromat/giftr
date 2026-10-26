@@ -7,7 +7,7 @@ import { hoyLocal, miCumple, misEventos } from '@/lib/events'
 import { misCuentas } from '@/lib/regalos'
 import { Banners } from '@/components/Banners'
 import { CargaTuCumple, CuentasPendientes, Proximos } from '@/components/Eventos'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
 import { misAmigos } from '@/lib/amigos'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
@@ -21,9 +21,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, foto, { novedades }, amigos, invitaciones, { invitacion }] = await Promise.all([
+  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, { invitacion }] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
-    miFoto(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
+    yo(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
     invitacionesPendientes(db, session.userId), searchParams,
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
@@ -31,7 +31,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={session.user?.name ?? session.user?.email ?? 'Vos'} foto={foto}
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto}
                  left={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={20} /></Link>} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Lo que viene</h1>

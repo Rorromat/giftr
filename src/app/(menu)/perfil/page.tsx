@@ -3,11 +3,12 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { cambiarUsuarioAction, newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
+import { cambiarNombreAction, cambiarUsuarioAction, newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
 import { asegurarUsuario } from '@/lib/amigos'
 import { MESES, miCumple } from '@/lib/events'
 import { misGustos } from '@/lib/bienvenida'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
+import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
 import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
 import { BotonEnviar } from '@/components/BotonEnviar'
@@ -24,22 +25,24 @@ import { invitadoDeEsteNavegador } from '@/lib/viewer'
 import { Icon, PageHeader, Row, Seccion } from '@/components/ui'
 
 
-export default async function Perfil({ searchParams }: { searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string }> }) {
-  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario } = await searchParams
+export default async function Perfil({ searchParams }: {
+  searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string; nombre?: string }>
+}) {
+  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario, nombre: avisoNombre } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, gustos] = await Promise.all([
     getOwnList(db, session.userId), miCumple(db, session.userId), misGustos(db, session.userId),
   ])
-  const [foto, vapid, invitado, pedido, usuario] = await Promise.all([
-    miFoto(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers(), asegurarUsuario(db, session.userId),
+  const [{ nombre: suNombre, foto }, vapid, invitado, pedido, usuario] = await Promise.all([
+    yo(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers(), asegurarUsuario(db, session.userId),
   ])
   const secciones = seccionesDeGustos(gustos, true)
   if (!lista) redirect('/')
 
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
   const email = session.user?.email ?? ''
-  const nombre = session.user?.name ?? email
+  const nombre = suNombre ?? session.user?.name ?? email
   const plataforma = plataformaDe(pedido.get('user-agent') ?? '')
 
   return (
@@ -53,6 +56,20 @@ export default async function Perfil({ searchParams }: { searchParams: Promise<{
           {email && <p className="truncate text-sm text-gr-muted">{email}</p>}
         </div>
       </div>
+
+      {/* el nombre que ven los demás (en su gente, las listas, los regalos): si no, el de Google (ver cambiarNombre) */}
+      <form id="nombre" action={cambiarNombreAction} className="gr-card flex scroll-mt-6 flex-col gap-2 p-4">
+        <label htmlFor="nombre-campo" className="text-base font-semibold">Tu nombre</label>
+        <div className="flex gap-2">
+          <input id="nombre-campo" name="nombre" defaultValue={nombre} required maxLength={NOMBRE_INVITADO_MAXIMO} autoComplete="name"
+                 className="gr-input min-w-0 flex-1" />
+          <BotonEnviar className="gr-btn gr-btn--sm flex-none">Guardar</BotonEnviar>
+        </div>
+        {avisoNombre === 'ok' ? <p role="status" className="text-[13px] font-semibold">Listo, ahora te ven como {nombre}.</p>
+          : avisoNombre === 'vacio' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Poné tu nombre así los demás saben quién sos.</p>
+          : avisoNombre === 'largo' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Hasta {NOMBRE_INVITADO_MAXIMO} letras.</p>
+          : <p className="text-[13px] text-gr-muted">Así te ven tus amigos y los que abren tu lista.</p>}
+      </form>
 
       {/* el @usuario: con esto te encuentran para sumarte como amigo (ver amigos.ts) */}
       <form id="usuario" action={cambiarUsuarioAction} className="gr-card flex scroll-mt-6 flex-col gap-2 p-4">

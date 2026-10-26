@@ -18,6 +18,7 @@ import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { VideoDeseo } from '@/components/VideoDeseo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
 import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
@@ -128,6 +129,7 @@ export default async function DetalleItem({ params, searchParams }: {
               <span className="font-semibold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
             </p>
           )}
+          {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
           <div className="flex flex-wrap gap-2">
             {item.linkTienda && (
               <a href={item.linkTienda} target="_blank" className="gr-btn text-sm">

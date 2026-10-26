@@ -9,7 +9,7 @@ import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAc
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
 
@@ -164,12 +164,12 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
   const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, aCorregir, foto] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), miFoto(db, session.userId)])
+  const [c, aCorregir, { nombre, foto }] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), yo(db, session.userId)])
   const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={session.user?.name ?? session.user?.email ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Cuentas</h1>
         <p className="text-[15px] text-gr-muted">Los regalos grupales: quién le debe a quién.</p>

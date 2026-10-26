@@ -22,13 +22,14 @@ import { markNotificationsRead } from '@/lib/notifications'
 import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario } from '@/lib/users'
+import { cambiarNombre } from '@/lib/perfil'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
 import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
-import { crearSorpresa, type ParaElegido } from '@/lib/sorpresas'
+import { crearSorpresa, editarSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
   aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
   pedirAmistadPorMail, responderSolicitud,
@@ -569,6 +570,23 @@ export async function crearSorpresaAction(formData: FormData) {
   redirect(`/sorpresa/${r.token}`)
 }
 
+/** "Guardar cambios" de una sorpresa: solo quien la armó (ver editarSorpresa). Vuelve a la sorpresa. */
+export async function editarSorpresaAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const token = str(formData, 'token') ?? ''
+  const deseo = deseoDesdeForm(formData)
+  // para alguien sin GiftR vienen su nombre y la fecha (vacía, la saca)
+  const deAfuera = formData.has('paraNombre')
+  const ok = !!deseo && await editarSorpresa(db, token, userId, {
+    deseo, ...(deAfuera && { nombre: str(formData, 'paraNombre') ?? '', fecha: str(formData, 'paraFecha') ?? null }),
+  })
+  if (!ok) redirect(`/sorpresa/${encodeURIComponent(token)}/editar?error=1`)
+  revalidatePath(`/sorpresa/${token}`)
+  revalidatePath('/regalos')
+  revalidatePath('/inicio')
+  redirect(`/sorpresa/${token}`)
+}
+
 export async function joinGroupGiftAction(formData: FormData) {
   const userId = await usuarioRegalador()
   // Pide lo mismo que armar uno: el deseo, con el link para regalar de ahora (y el regalo, de ese deseo). Si no, a quien le
@@ -808,6 +826,15 @@ export async function aceptarLinkDeAmigoAction(formData: FormData) {
 }
 
 /** Perfil: cambiar el @usuario. */
+/** "Tu nombre" en Perfil: el que ven los demás (ver cambiarNombre). */
+export async function cambiarNombreAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const r = await cambiarNombre(db, session.userId, formData.get('nombre'))
+  revalidatePath('/', 'layout')
+  redirect(`/perfil?nombre=${r.ok ? 'ok' : r.error}#nombre`)
+}
+
 export async function cambiarUsuarioAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')

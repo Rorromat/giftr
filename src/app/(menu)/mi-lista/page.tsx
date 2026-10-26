@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
-import { miFoto } from '@/lib/perfil'
+import { yo } from '@/lib/perfil'
 import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/events'
 import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
@@ -19,8 +19,8 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const { agregado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida, grupos, foto, cumple] = await Promise.all([
-    getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), miFoto(db, session.userId),
+  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple] = await Promise.all([
+    getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), yo(db, session.userId),
     miCumple(db, session.userId),
   ])
   if (!lista) redirect('/')
@@ -30,7 +30,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
   const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
-  const nombre = session.user?.name ?? session.user?.email ?? 'Vos'
+  const nombre = suNombre ?? session.user?.name ?? 'Vos'
   const hoy = hoyLocal()
   const fechaCumple = cumple ? proximaFecha(cumple.dia, cumple.mes, hoy) : null
   const dias = fechaCumple ? diasEntre(hoy, fechaCumple) : null

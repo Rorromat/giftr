@@ -28,6 +28,7 @@ const TEXTOS = {
 export function textoDeAviso(tipo: string, itemTitulo: string, sorpresa = false): string | null {
   // una sorpresa cancelada se va (ver cancelarRegalo): no hay deseo para reservar
   if (sorpresa && tipo === 'regalo_cancelado') return `Se canceló la sorpresa "${itemTitulo}": quien la armó la dio de baja.`
+  if (sorpresa && tipo === 'item_editado') return `La sorpresa "${itemTitulo}" cambió: quien la armó la editó — revisá los detalles.`
   return Object.hasOwn(TEXTOS, tipo) ? TEXTOS[tipo as keyof typeof TEXTOS](itemTitulo) : null
 }
 

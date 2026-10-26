@@ -6,6 +6,7 @@ import { duenosDeLista, esToken, esUuid } from '@/lib/groups'
 import { diasEntre, hoyLocal, proximaFecha } from '@/lib/events'
 import { seccionesDeGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { urlFoto } from '@/lib/users'
+import { validarNombre } from '@/lib/guest'
 
 export { urlFoto }
 
@@ -43,6 +44,28 @@ export async function leerFoto(db: Db, userId: string): Promise<Buffer | null> {
   if (!esUuid(userId)) return null
   const [f] = await db.select({ datos: fotosPerfil.datos }).from(fotosPerfil).where(eq(fotosPerfil.userId, userId))
   return f?.datos ?? null
+}
+
+/**
+ * Su nombre (el que eligió en Perfil, o el de Google) y su foto, para sus pantallas. El de la sesión es el de Google al
+ * entrar: no cambia cuando elige otro.
+ */
+export async function yo(db: Db, userId: string): Promise<{ nombre: string | null; foto: string | null }> {
+  const [u] = await db.select({ id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, userId))
+  return { nombre: u?.nombre ?? null, foto: u ? urlFoto(u) : null }
+}
+
+export type CambioNombre = { ok: true; nombre: string } | { ok: false; error: 'vacio' | 'largo' }
+
+/**
+ * "Tu nombre" en Perfil: el que ven los demás (en su gente, las listas, los regalos). Desde ahora entrar con Google no lo
+ * pisa (ver upsertUserFromGoogle). Las mismas reglas que el nombre de un invitado (ver validarNombre).
+ */
+export async function cambiarNombre(db: Db, userId: string, escrito: unknown): Promise<CambioNombre> {
+  const v = validarNombre(escrito)
+  if (!v.ok) return { ok: false, error: v.motivo }
+  await db.update(users).set({ nombre: v.nombre, nombreElegidoAt: new Date() }).where(eq(users.id, userId))
+  return { ok: true, nombre: v.nombre }
 }
 
 export async function miFoto(db: Db, userId: string): Promise<string | null> {
