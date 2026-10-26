@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Cuentas } from '@/lib/regalos'
 import { plata } from '@/lib/pesos'
-import { calendarioDelAnio, fechaCorta, fechaLarga, MESES, type Evento } from '@/lib/events'
+import { calendarioDelAnio, fechaCorta, fechaLarga, MESES, repartirProximos, type Evento } from '@/lib/events'
 import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
 import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
@@ -109,26 +109,34 @@ function FilaEvento({ e }: { e: Evento }) {
   )
 }
 
-/** Los próximos, en un carrusel (con las fechas especiales, por cercanía); los que vienen después, en filas por mes. */
+/**
+ * Los de los próximos tres meses, en un carrusel (con las fechas especiales, por cercanía); los que vienen después, en filas
+ * por mes (con el año, si no es este). Ver repartirProximos.
+ */
 export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: TarjetaEspecial[] }) {
+  const { cerca, despues } = repartirProximos(eventos)
   const primeros = [
-    ...eventos.slice(0, 6).map((e) => ({ dias: e.dias, tarjeta: <CardProximo key={e.listId} e={e} hoy={hoy} /> })),
+    ...cerca.map((e) => ({ dias: e.dias, tarjeta: <CardProximo key={e.listId} e={e} hoy={hoy} /> })),
     ...especiales.map((t) => ({
       dias: t.dias, tarjeta: <CardEspecial key={t.tipo === 'fecha' ? t.fecha.id : t.juego.id} t={t} hoy={hoy} />,
     })),
   ].sort((a, b) => a.dias - b.dias)
-  const porMes = Object.entries(Object.groupBy(eventos.slice(6), (e) => `${e.fecha.getUTCFullYear()}-${String(e.fecha.getUTCMonth()).padStart(2, '0')}`))
+  const porMes = Object.entries(Object.groupBy(despues, (e) => `${e.fecha.getUTCFullYear()}-${String(e.fecha.getUTCMonth()).padStart(2, '0')}`))
   return (
     <>
-      <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
-        {primeros.map((p) => p.tarjeta)}
-      </ul>
+      {primeros.length > 0 ? (
+        <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
+          {primeros.map((p) => p.tarjeta)}
+        </ul>
+      ) : (
+        <p className="gr-empty px-4 py-4 text-center text-sm">Nada en los próximos tres meses.</p>
+      )}
       {porMes.length > 0 && (
         <>
           <SectionHeader title="Más adelante" />
           {porMes.map(([clave, delMes]) => (
             <section key={clave} className="flex flex-col gap-2.5">
-              <h3 className="gr-label">{MESES[Number(clave.slice(5))]}</h3>
+              <h3 className="gr-label">{MESES[Number(clave.slice(5))]}{Number(clave.slice(0, 4)) !== hoy.getUTCFullYear() && ` ${clave.slice(0, 4)}`}</h3>
               <ul className="flex flex-col gap-2.5">{delMes!.map((e) => <FilaEvento key={e.listId} e={e} />)}</ul>
             </section>
           ))}
