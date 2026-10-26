@@ -7,7 +7,7 @@ import type { Enviar } from '@/lib/codazos'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal } from '@/lib/events'
 import { esToken, esUuid, fechaDeGrupoValida } from '@/lib/groups'
 import { invitarARegalo } from '@/lib/invitaciones'
-import { acotarDeseo, type NewItemData } from '@/lib/items'
+import { acotarDeseo, cambiarDeseo, type CambiosDeseo, type NewItemData } from '@/lib/items'
 import { LARGO, recortar } from '@/lib/limites'
 import { comentariosDe, loadClaimViews, type CommentView } from '@/lib/lists'
 import { iniciarRegaloGrupal, regalosDeItem, type RegaloView } from '@/lib/regalos'
@@ -40,6 +40,13 @@ export type ParaElegido = { token: string } | { amigo: string } | { nombre: stri
 
 export type SorpresaCreada = { ok: true; token: string } | { ok: false; reason: 'para' | 'deseo' }
 
+/** El nombre de alguien sin GiftR, como se guarda; '' si no queda nada. */
+const nombreDeAfuera = (escrito: string) => recortar(escrito, LARGO.paraSorpresa)
+
+/** La fecha en que se la dan a alguien sin GiftR: una que existe y que no pasó; si no, null. */
+const fechaQueViene = (f: string | null | undefined) =>
+  f && fechaDeGrupoValida(f) && f >= hoyLocal().toISOString().slice(0, 10) ? f : null
+
 async function destinatario(db: Db, creadorId: string, para: ParaElegido) {
   if ('token' in para) {
     if (!esToken(para.token)) return null
@@ -50,11 +57,9 @@ async function destinatario(db: Db, creadorId: string, para: ParaElegido) {
     const ok = esUuid(para.amigo) && para.amigo !== creadorId && (await misAmigos(db, creadorId)).has(para.amigo)
     return ok ? { paraUserId: para.amigo, nombre: null, fecha: null } : null
   }
-  const nombre = recortar(para.nombre ?? '', LARGO.paraSorpresa)
-  if (!nombre) return null
+  const nombre = nombreDeAfuera(para.nombre ?? '')
   // una fecha que ya pasó no es para cuándo se la dan
-  const fecha = para.fecha && fechaDeGrupoValida(para.fecha) && para.fecha >= hoyLocal().toISOString().slice(0, 10) ? para.fecha : null
-  return { paraUserId: null, nombre, fecha }
+  return nombre ? { paraUserId: null, nombre, fecha: fechaQueViene(para.fecha) } : null
 }
 
 /**
@@ -156,6 +161,8 @@ export type VistaSorpresa =
   | {
     estado: 'abierta'
     token: string
+    /** la armó el que mira: la puede editar */
+    esCreador: boolean
     para: ParaSorpresa
     /** cuándo se la dan: el próximo cumple de quien la recibe, o la fecha que cargaron */
     fecha: { fecha: Date; dias: number } | null
@@ -199,10 +206,51 @@ export async function sorpresaParaViewer(db: Db, token: string, viewer: Viewer):
     personas(db, list.creadaPor ? [list.creadaPor] : []), eventoDeLista(db, list.id),
   ])
   return {
-    estado: 'abierta', token, para, creador: creador[0]?.nombre ?? 'Alguien', item: pickItemFields(item), regalos,
+    estado: 'abierta', token, esCreador: list.creadaPor === viewer.userId, para, creador: creador[0]?.nombre ?? 'Alguien',
+    item: pickItemFields(item), regalos,
     nota: reservas.get(item.id)?.find((c) => c.grupal)?.notaQueCompre ?? null, comments,
     fecha: fecha && { fecha: fecha.fecha, dias: fecha.dias },
   }
+}
+
+/** La sorpresa de quien la armó, que sigue en pie, con su deseo. Null si no la armó, se canceló o no existe. */
+async function deQuienLaArmo(db: Db, token: string, userId: string) {
+  if (!esToken(token)) return null
+  const [row] = await db.select({ list: lists, item: items }).from(lists).innerJoin(items, eq(items.listId, lists.id))
+    .where(and(eq(lists.shareToken, token), eq(lists.tipo, 'sorpresa'), eq(lists.creadaPor, userId), eq(items.estadoDueno, 'activo')))
+    .orderBy(asc(items.createdAt)).limit(1)
+  return row ?? null
+}
+
+export type SorpresaParaEditar = { token: string; para: ParaSorpresa; deseo: OwnerItemView; fecha: string | null }
+
+/** Para "Editar" la sorpresa: solo quien la armó, y mientras sigue en pie. */
+export async function sorpresaParaEditar(db: Db, token: string, userId: string): Promise<SorpresaParaEditar | null> {
+  const row = await deQuienLaArmo(db, token, userId)
+  if (!row) return null
+  return { token, para: await paraDe(db, row.list, userId), deseo: pickItemFields(row.item), fecha: row.list.eventoFecha }
+}
+
+/**
+ * Quien la armó la edita: qué le regalan (nombre, foto, precio, detalles, link y video; sigue siendo uno solo) y, si es
+ * para alguien sin GiftR, su nombre y la fecha (null la saca; undefined la deja). A los que están se les avisa si cambió
+ * algo que les importa (ver cambiarDeseo), a él no. Para quién (alguien de GiftR) no cambia: sería otra sorpresa.
+ */
+export async function editarSorpresa(
+  db: Db, token: string, userId: string, datos: { deseo: CambiosDeseo; nombre?: string; fecha?: string | null },
+): Promise<boolean> {
+  const row = await deQuienLaArmo(db, token, userId)
+  if (!row) return false
+  if (!row.list.paraUserId && (datos.nombre !== undefined || datos.fecha !== undefined)) {
+    const nombre = datos.nombre === undefined ? undefined : nombreDeAfuera(datos.nombre)
+    if (nombre === '') return false
+    await db.update(lists).set({
+      ...(nombre !== undefined && { nombre }),
+      ...(datos.fecha !== undefined && { eventoFecha: fechaQueViene(datos.fecha) }),
+    }).where(eq(lists.id, row.list.id))
+  }
+  const { titulo, notas, fotoUrl, precio, linkTienda, videoUrl } = datos.deseo
+  return cambiarDeseo(db, row.item.id, { titulo, notas, fotoUrl, precio, linkTienda, videoUrl }, userId)
 }
 
 /** Si el link es de una sorpresa (las páginas de /l/ la mandan a la suya). */

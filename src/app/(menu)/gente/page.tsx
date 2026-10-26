@@ -3,7 +3,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { miFoto } from '@/lib/perfil'
+import { yo as quienSoy } from '@/lib/perfil'
 import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
@@ -93,8 +93,8 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
   const yo = session.userId
-  const [gente, foto, amigos, recibidas, enviadas, usuario, token, sugerencias] = await Promise.all([
-    miGente(db, yo, hoy), miFoto(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
+  const [gente, { nombre, foto }, amigos, recibidas, enviadas, usuario, token, sugerencias] = await Promise.all([
+    miGente(db, yo, hoy), quienSoy(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
     asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo),
   ])
   // el @usuario de cada uno, para encontrarlo también así en el buscador
@@ -105,7 +105,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={session.user?.name ?? session.user?.email ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="gr-title">Tu gente</h1>
@@ -115,6 +115,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
       </div>
 
       <AvisoAmigo amigo={amigo} />
+
+      {/* invitar a alguien que todavía no usa GiftR: arriba, que se vea */}
+      {token && <InvitarAmigos link={linkAmigo} usuario={usuario} />}
 
       {recibidas.length > 0 && (
         <section id="solicitudes" aria-labelledby="solicitudes-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
@@ -179,7 +182,6 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
       {/* un regalo que no está en la lista de nadie: para un amigo, o para alguien que no usa GiftR */}
       <ArmarSorpresa />
 
-      {token && <InvitarAmigos link={linkAmigo} usuario={usuario} />}
     </Seccion>
   )
 }

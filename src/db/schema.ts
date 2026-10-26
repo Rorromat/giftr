@@ -31,6 +31,9 @@ export const users = pgTable('users', {
   // El link para sumarse como amigo (/amigo/<token>): quien lo abre y acepta queda amigo sin otra solicitud. Se crea la
   // primera vez que se comparte.
   amigoToken: text('amigo_token').unique(),
+  // Cuándo eligió su nombre en Perfil (vacío: usa el de Google, que se pone al día al entrar). Con uno elegido, entrar con
+  // Google no se lo pisa (ver upsertUserFromGoogle).
+  nombreElegidoAt: timestamp('nombre_elegido_at', { withTimezone: true }),
 }, (t) => [
   // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
   index('users_email_lower_idx').on(sql`lower(${t.email})`),
@@ -141,6 +144,8 @@ export const items = pgTable('items', {
   repetible: boolean('repetible').notNull().default(false),
   estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
   linkTienda: text('link_tienda'),
+  // Un video del producto (YouTube, TikTok, Instagram, Vimeo…): se ve en el deseo (ver VideoDeseo).
+  videoUrl: text('video_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   // Al volverlo a poner (ver restoreItem), lo comprado para un evento anterior ya se regaló: lo de antes de esta fecha no
   // ocupa (ver ocupaSql). Null: nunca volvió, ocupa todo lo comprado (salvo en una idea que se puede repetir).

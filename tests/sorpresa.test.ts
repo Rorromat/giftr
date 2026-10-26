@@ -12,7 +12,7 @@ import { crearGrupo } from '@/lib/groups'
 import { createItem } from '@/lib/items'
 import type { Viewer } from '@/lib/types'
 
-const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo'].sort()
+const OWNER_KEYS = ['categoria', 'cantidad', 'estadoDueno', 'fotoUrl', 'id', 'linkTienda', 'notas', 'precio', 'prioridad', 'rangoPrecio', 'repetible', 'tipo', 'titulo', 'videoUrl'].sort()
 
 async function setup() {
   const db = await createTestDb()

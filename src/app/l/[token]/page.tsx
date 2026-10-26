@@ -50,6 +50,15 @@ function cupo(item: Tarjeta) {
   return c.deMas ? `Pide ${item.cantidad} y hay ${c.reservas} reservas: arréglenlo en el deseo` : `quedan ${c.quedan} de ${item.cantidad}`
 }
 
+/** Sobre la foto: el deseo tiene un video (se ve en el deseo, ver VideoDeseo). */
+function ConVideo({ className }: { className: string }) {
+  return (
+    <span className={`pointer-events-none inline-flex items-center gap-1 rounded-full bg-gr-brand/90 px-2 py-1 text-xs font-semibold text-gr-on-brand ${className}`}>
+      <Icon name="play" size={14} strokeWidth={2.2} />Video
+    </span>
+  )
+}
+
 function YaLoReservaste({ item }: { item: Tarjeta }) {
   const grupal = item.claims.some((c) => c.grupal?.soyParte)
   const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
@@ -217,8 +226,12 @@ export default async function ListaAjena({
         {hero && (
           <article data-buscar={paraBuscar(`${hero.titulo} ${hero.categoria ?? ''} ${hero.notas ?? ''}`)} className="gr-card relative">
             <div className="relative">
-              <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
-              <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
+              {/* la foto lleva al deseo, como "Ver más" (que ya lo dice para los lectores de pantalla) */}
+              <Link href={`/l/${token}/item/${hero.id}`} aria-hidden tabIndex={-1} className="block">
+                <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
+              </Link>
+              <PriorityTag prioridad={hero.prioridad} className="pointer-events-none absolute left-3 top-3 h-[30px]" />
+              {hero.videoUrl && <ConVideo className="absolute bottom-3 left-3" />}
               {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
               {viewer.userId && <BotonRobar token={token} itemId={hero.id} variante="icono" className="absolute right-3 top-3 z-[2]" />}
             </div>
@@ -247,10 +260,13 @@ export default async function ListaAjena({
               return (
                 <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="gr-card relative flex flex-col">
                   <div className="relative">
-                    <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                    <Link href={`/l/${token}/item/${item.id}`} aria-hidden tabIndex={-1} className="block">
+                      <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                    </Link>
+                    {item.videoUrl && <ConVideo className="absolute left-2 top-2" />}
                     {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
                     {!item.disponible && (
-                      <span className="absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
+                      <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
                         {estadoNoDisponible(item)}
                       </span>
                     )}

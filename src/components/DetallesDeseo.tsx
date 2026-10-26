@@ -1,20 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CampoLink } from '@/components/CamposDeseo'
+import { CampoLink, CampoVideo } from '@/components/CamposDeseo'
 import { Icon } from '@/components/ui'
 import { CANTIDAD_MAXIMA, LARGO } from '@/lib/limites'
 import type { OwnerItemView } from '@/lib/serialize'
 
 const CATEGORIAS = ['Tecnología', 'Casa', 'Ropa', 'Libros', 'Experiencias', 'Hobbies']
 
-export type Detalle = 'notas' | 'cantidad' | 'categoria' | 'link'
+export type Detalle = 'notas' | 'cantidad' | 'categoria' | 'link' | 'video'
 
 const CHIPS: { detalle: Detalle; texto: string }[] = [
   { detalle: 'notas', texto: 'Talle o color' },
   { detalle: 'cantidad', texto: 'Cantidad' },
   { detalle: 'categoria', texto: 'Categoría' },
   { detalle: 'link', texto: 'Link de la tienda' },
+  { detalle: 'video', texto: 'Video' },
 ]
 
 /**
@@ -35,6 +36,7 @@ export function DetallesDeseo({ deseo, notas, solo, textoNotas = 'Talle o color'
     ...((deseo?.cantidad ?? 1) > 1 ? ['cantidad' as const] : []),
     ...(deseo?.categoria ? ['categoria' as const] : []),
     ...(deseo?.linkTienda ? ['link' as const] : []),
+    ...(deseo?.videoUrl ? ['video' as const] : []),
   ]))
   const cambiar = (d: Detalle) => setAbiertos((a) => {
     const n = new Set(a)
@@ -97,6 +99,12 @@ export function DetallesDeseo({ deseo, notas, solo, textoNotas = 'Talle o color'
         <CampoLink name="linkTienda" placeholder="Link a la tienda" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"
                    aria-label="Link a la tienda" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
       </div>
+      {/* un video del producto: el link de YouTube, TikTok, Instagram… (se ve adentro del deseo, ver VideoDeseo) */}
+      {hay('video') && <div id="detalle-video" hidden={ver('video')} className="flex flex-col gap-1.5">
+        <CampoVideo name="videoUrl" placeholder="Link del video" defaultValue={deseo?.videoUrl ?? ''} className="gr-input"
+                   aria-label="Link del video" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+        <p className="text-xs leading-snug text-gr-muted">De YouTube, TikTok, Instagram o Vimeo se ve ahí mismo en el deseo.</p>
+      </div>}
     </div>
   )
 }

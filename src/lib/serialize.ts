@@ -18,6 +18,7 @@ export type OwnerItemView = {
   repetible: boolean
   estadoDueno: 'activo' | 'lo_tengo' | 'no_lo_quiero'
   linkTienda: string | null
+  videoUrl: string | null
 }
 
 export type ClaimView = {
@@ -75,6 +76,6 @@ export function pickItemFields(i: ItemRow): OwnerItemView {
     id: i.id, tipo: i.tipo, titulo: i.titulo, notas: i.notas, fotoUrl: i.fotoUrl,
     precio: i.precio, rangoPrecio: i.rangoPrecio, categoria: i.categoria,
     prioridad: i.prioridad, cantidad: i.cantidad, repetible: esRepetible(i),
-    estadoDueno: i.estadoDueno, linkTienda: i.linkTienda,
+    estadoDueno: i.estadoDueno, linkTienda: i.linkTienda, videoUrl: i.videoUrl,
   }
 }

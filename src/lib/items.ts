@@ -21,6 +21,7 @@ export type NewItemData = {
   cantidad?: number
   repetible?: boolean
   linkTienda?: string
+  videoUrl?: string
 }
 
 /**
@@ -35,7 +36,7 @@ export function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANT
     const v = r[k]
     if (typeof v === 'string') r[k] = recortar(v, LARGO[k]) || null
   }
-  for (const k of ['linkTienda', 'fotoUrl'] as const) {
+  for (const k of ['linkTienda', 'fotoUrl', 'videoUrl'] as const) {
     const v = r[k]
     if (typeof v === 'string' && v.length > LARGO.link) r[k] = undefined
   }
@@ -106,16 +107,28 @@ async function genteDelDeseo(db: Db, itemId: string, listId: string) {
 }
 
 /** Lo que se puede cambiar de un deseo; null borra un campo opcional (las notas, el precio, la foto…). */
-export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', 'categoria', 'linkTienda'] as const
+export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', 'categoria', 'linkTienda', 'videoUrl'] as const
 type Opcional = (typeof CAMPOS_OPCIONALES)[number]
 export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null }
 
-/** Lo que le importa a quien regala (qué comprar). La prioridad y la categoría no le cambian el regalo: no le avisan. */
+/**
+ * Lo que le importa a quien regala (qué comprar). La prioridad, la categoría y el video no le cambian el regalo: no le
+ * avisan.
+ */
 const AVISAN: (keyof CambiosDeseo)[] = ['titulo', 'notas', 'fotoUrl', 'linkTienda', 'precio', 'rangoPrecio', 'cantidad', 'tipo', 'repetible']
 
 export async function updateItem(db: Db, itemId: string, userId: string, deseo: CambiosDeseo): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
+  return cambiarDeseo(db, itemId, deseo)
+}
+
+/**
+ * Los cambios de un deseo, sin mirar de quién es (lo mira quien llama: updateItem, o editarSorpresa con quien la armó).
+ * A los que lo regalan se les avisa si cambió algo que les importa; noAvisarA: el que lo editó, si también lo regala.
+ */
+export async function cambiarDeseo(db: Db, itemId: string, deseo: CambiosDeseo, noAvisarA?: string): Promise<boolean> {
   const [antes] = await db.select().from(items).where(eq(items.id, itemId))
+  if (!antes) return false
   // Uno archivado no se edita (una pantalla vieja, la prioridad desde Mi lista): avisaría de algo que ya no está.
   if (antes.estadoDueno !== 'activo') return false
   // Solo lo que cambió: guardar sin tocar nada no les manda un aviso a los que lo reservaron. Y solo eso se acota: un
@@ -132,7 +145,7 @@ export async function updateItem(db: Db, itemId: string, userId: string, deseo: 
   // La marca de repetible, solo si cambia de verdad: un "Quiero ESTO" de antes que la tenía no se repetía igual.
   const despues = { ...antes, ...cambios }
   const avisar = AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
-  if (avisar) await dejarAviso(db, itemId, 'item_editado', await genteDelDeseo(db, itemId, antes.listId))
+  if (avisar) await dejarAviso(db, itemId, 'item_editado', (await genteDelDeseo(db, itemId, antes.listId)).filter((d) => d.userId !== noAvisarA))
   return true
 }
 

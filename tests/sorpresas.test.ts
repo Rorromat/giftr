@@ -10,7 +10,8 @@ import { pedirAmistad } from '@/lib/amigos'
 import { guardarSuscripcion, type Aviso, type Enviar } from '@/lib/codazos'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, misCuentas, regalosDeItem, sumarseARegalo } from '@/lib/regalos'
 import { amigosParaDividir, invitacionesPendientes, responderInvitacion } from '@/lib/invitaciones'
-import { crearSorpresa, duenoDelLink, esSorpresa, sorpresaParaViewer, sorpresasPara } from '@/lib/sorpresas'
+import { crearSorpresa, duenoDelLink, editarSorpresa, esSorpresa, sorpresaParaEditar, sorpresaParaViewer, sorpresasPara } from '@/lib/sorpresas'
+import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { misRegalos } from '@/lib/mis-regalos'
 import { guardarCumple, misEventos } from '@/lib/events'
@@ -242,4 +243,47 @@ test('si el que la armó cancela el regalo, la sorpresa se va', async () => {
   expect(await sorpresasPara(s.db, s.rodri.id, s.ana.id)).toEqual([])
   expect(await invitacionesPendientes(s.db, s.sofi.id)).toEqual([])
   expect((await misEventos(s.db, s.euge.id)).find((e) => e.titulo === 'Cumple de Rodri')).toMatchObject({ misSorpresas: 0 })
+})
+
+test('editar: solo quien la armó; a los que están les avisa (a él no); el que la recibe sigue sin enterarse', async () => {
+  const s = await setup()
+  const { token, itemId } = await sorpresaDeEuge(s)
+  const [inv] = await invitacionesPendientes(s.db, s.sofi.id)
+  await responderInvitacion(s.db, s.sofi.id, inv.id, true, pushFalso().enviar)
+
+  expect(await sorpresaParaEditar(s.db, token, s.sofi.id)).toBeNull()
+  expect(await sorpresaParaEditar(s.db, token, s.rodri.id)).toBeNull()
+  expect(await sorpresaParaEditar(s.db, token, s.euge.id)).toMatchObject({ token, para: { nombre: 'Rodri' }, deseo: { titulo: 'Tocadiscos vintage' } })
+  expect(await editarSorpresa(s.db, token, s.sofi.id, { deseo: { titulo: 'Otra cosa' } })).toBe(false)
+
+  const cambios = { titulo: 'Tocadiscos Crosley', precio: '$135.000', notas: null, videoUrl: 'https://youtu.be/dQw4w9WgXcQ', cantidad: 5 }
+  expect(await editarSorpresa(s.db, token, s.euge.id, { deseo: cambios })).toBe(true)
+  const vista = await sorpresaParaViewer(s.db, token, { userId: s.sofi.id })
+  // sigue siendo uno solo: la cantidad no se toca
+  expect(vista).toMatchObject({ estado: 'abierta', item: { titulo: 'Tocadiscos Crosley', precio: '$135.000', notas: null, cantidad: 1, videoUrl: 'https://youtu.be/dQw4w9WgXcQ' } })
+  const avisos = async (userId: string) => (await getUnreadNotifications(s.db, { userId })).filter((n) => n.tipo === 'item_editado')
+  expect(await avisos(s.sofi.id)).toEqual([expect.objectContaining({ sorpresa: true, href: `/sorpresa/${token}` })])
+  expect(textoDeAviso('item_editado', 'Tocadiscos Crosley', true)).toContain('La sorpresa "Tocadiscos Crosley" cambió')
+  expect(await avisos(s.euge.id)).toEqual([])
+  expect(await avisos(s.rodri.id)).toEqual([])
+  expect(JSON.stringify(await getOwnList(s.db, s.rodri.id))).not.toContain('Crosley')
+
+  // cancelada, ya no se edita
+  await cancelarRegalo(s.db, vistaGift(vista), s.euge.id)
+  expect(await sorpresaParaEditar(s.db, token, s.euge.id)).toBeNull()
+  expect(await editarSorpresa(s.db, token, s.euge.id, { deseo: { titulo: 'X' } })).toBe(false)
+  expect(itemId).toBeTruthy()
+})
+
+test('editar la de alguien sin GiftR: su nombre y la fecha (vacía la saca); sin nombre, no', async () => {
+  const s = await setup()
+  const fecha = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
+  const r = await crearSorpresa(s.db, s.euge.id, { para: { nombre: 'Tío Juan' }, deseo: { tipo: 'exacto', titulo: 'Bata' }, invitar: [] })
+  if (!r.ok) throw new Error('no se armó')
+  expect(await editarSorpresa(s.db, r.token, s.euge.id, { deseo: { titulo: 'Bata' }, nombre: 'el tío Juan', fecha })).toBe(true)
+  expect(await sorpresaParaEditar(s.db, r.token, s.euge.id)).toMatchObject({ para: { nombre: 'el tío Juan' }, fecha })
+  expect(await editarSorpresa(s.db, r.token, s.euge.id, { deseo: { titulo: 'Bata' }, nombre: 'el tío Juan', fecha: null })).toBe(true)
+  expect((await sorpresaParaEditar(s.db, r.token, s.euge.id))?.fecha).toBeNull()
+  expect(await editarSorpresa(s.db, r.token, s.euge.id, { deseo: { titulo: 'Bata' }, nombre: '  ' })).toBe(false)
+  expect((await sorpresaParaEditar(s.db, r.token, s.euge.id))?.para.nombre).toBe('el tío Juan')
 })

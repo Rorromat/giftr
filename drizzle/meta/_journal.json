@@ -197,6 +197,13 @@
       "when": 1792981699403,
       "tag": "0027_sorpresas",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792984366210,
+      "tag": "0028_video_y_nombre",
+      "breakpoints": true
     }
   ]
 }

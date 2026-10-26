@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { crearSorpresaAction } from '@/app/actions'
+import { crearSorpresaAction, editarSorpresaAction } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { Buscador } from '@/components/Buscador'
 import { CampoPrecio } from '@/components/CamposDeseo'
@@ -13,6 +13,7 @@ import type { Persona } from '@/lib/amigos'
 import { BUSCAR_DESDE, paraBuscar } from '@/lib/buscar'
 import { LARGO } from '@/lib/limites'
 import type { SorpresaEnLista } from '@/lib/sorpresas'
+import type { OwnerItemView } from '@/lib/serialize'
 
 // Sorpresas: un regalo para alguien que no está en su lista, dividido entre varios (ver sorpresas.ts). Acá, lo que se ve
 // en la lista de esa persona, elegir para quién y el formulario para armarla.
@@ -54,10 +55,10 @@ export function SorpresasEnLista({ token, nombre, sorpresas }: { token: string; 
           <ul className="grid grid-cols-2 items-stretch gap-3">
             {sorpresas.map((s) => (
               <li key={s.token} className="gr-card relative flex flex-col">
-                <div className="relative">
+                <Link href={`/sorpresa/${s.token}`} aria-hidden tabIndex={-1} className="relative block">
                   <ItemPhoto src={s.foto} titulo={s.titulo} height={150} />
                   <EtiquetaSorpresa className="absolute left-2 top-2" />
-                </div>
+                </Link>
                 <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
                   <Link href={`/sorpresa/${s.token}`} className="line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
                     {s.titulo}
@@ -144,17 +145,27 @@ export type ParaDelForm =
  * Armar la sorpresa: para quién (ya elegido, o el nombre de alguien sin GiftR y para cuándo), qué (la tarjeta, como en
  * Agregar: pegar el link trae nombre, foto y precio) y con qué amigos dividirla. Se arma aunque no elija a nadie: se suman
  * con el link o, si es de alguien de GiftR, desde su lista.
+ * editar: la que ya armó, con lo que tiene (sin elegir amigos: a más se les propone desde el regalo).
  */
-export function FormSorpresa({ para, amigos, hoy, error }: { para: ParaDelForm; amigos: Persona[]; hoy: string; error: boolean }) {
+export function FormSorpresa({ para, amigos, hoy, error, editar }: {
+  para: ParaDelForm
+  amigos: Persona[]
+  hoy: string
+  error: boolean
+  editar?: { token: string; deseo: OwnerItemView; nombre: string | null; fecha: string | null }
+}) {
   const quien = para.tipo === 'sin' ? null : primerNombre(para.nombre)
+  const deseo = editar?.deseo
   return (
-    <form action={crearSorpresaAction} className="group/deseo mt-1 flex flex-col gap-4">
-      {para.tipo === 'lista' && <input type="hidden" name="paraLista" value={para.token} />}
-      {para.tipo === 'amigo' && <input type="hidden" name="paraAmigo" value={para.id} />}
+    <form action={editar ? editarSorpresaAction : crearSorpresaAction} className="group/deseo mt-1 flex flex-col gap-4">
+      {editar && <input type="hidden" name="token" value={editar.token} />}
+      {!editar && para.tipo === 'lista' && <input type="hidden" name="paraLista" value={para.token} />}
+      {!editar && para.tipo === 'amigo' && <input type="hidden" name="paraAmigo" value={para.id} />}
 
       {error && (
         <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
-          No la pudimos armar. Fijate que tenga nombre (y para quién) y probá de nuevo.
+          {editar ? 'No la pudimos guardar. Fijate que tenga nombre (y para quién) y probá de nuevo.'
+            : 'No la pudimos armar. Fijate que tenga nombre (y para quién) y probá de nuevo.'}
         </p>
       )}
 
@@ -167,25 +178,26 @@ export function FormSorpresa({ para, amigos, hoy, error }: { para: ParaDelForm; 
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1.5">
             <span className="gr-label">¿Para quién?</span>
-            <input name="paraNombre" required maxLength={LARGO.paraSorpresa} placeholder="La abuela Marta" autoComplete="off" className="gr-input" />
+            <input name="paraNombre" required maxLength={LARGO.paraSorpresa} placeholder="La abuela Marta" autoComplete="off" className="gr-input"
+                   defaultValue={editar?.nombre ?? ''} />
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="gr-label">¿Cuándo se la dan? (si saben)</span>
-            <input name="paraFecha" type="date" min={hoy} className="gr-input" />
+            <input name="paraFecha" type="date" min={hoy} className="gr-input" defaultValue={editar?.fecha ?? ''} />
           </label>
         </div>
       )}
 
       <div className="gr-card flex flex-col gap-1.5 overflow-visible p-2.5 pb-2">
-        <FotoField />
-        <CompletarDesdeLink guardado={null} />
-        <QueQueres placeholder="¿Qué le regalan?" />
-        <CampoPrecio name="precio" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Precio" aria-label="Precio"
+        <FotoField inicial={deseo?.fotoUrl} />
+        <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} tituloGuardado={deseo?.titulo ?? null} />
+        <QueQueres placeholder="¿Qué le regalan?" defaultValue={deseo?.titulo} />
+        <CampoPrecio name="precio" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Precio" aria-label="Precio" defaultValue={deseo?.precio ?? ''}
                      className="min-h-11 w-full rounded-xl bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
       </div>
-      <DetallesDeseo solo={['notas', 'link']} textoNotas="Detalles" />
+      <DetallesDeseo deseo={deseo} solo={['notas', 'link', 'video']} textoNotas="Detalles" />
 
-      <div className="flex flex-col gap-2.5">
+      {!editar && <div className="flex flex-col gap-2.5">
         <p className="gr-label">¿Con quién la dividís?</p>
         {amigos.length > 0 ? (
           <>
@@ -201,13 +213,13 @@ export function FormSorpresa({ para, amigos, hoy, error }: { para: ParaDelForm; 
             <Link href="/gente/agregar" className="font-semibold underline underline-offset-2">sumá amigos</Link>.
           </p>
         )}
-      </div>
+      </div>}
 
       <div className="sticky bottom-0 z-10 -mx-[18px] mt-1 bg-gradient-to-t from-gr-bg from-70% to-transparent px-[18px] pb-[max(18px,env(safe-area-inset-bottom))] pt-3">
         {/* #que-queres: el título (ID_TITULO), escrito tal cual para que Tailwind arme la clase */}
-        <BotonEnviar pendiente="Armando…"
+        <BotonEnviar pendiente={editar ? 'Guardando…' : 'Armando…'}
                      className="gr-btn-primary h-14 w-full text-[17px] group-has-[#que-queres:placeholder-shown]/deseo:border-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:bg-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:text-gr-muted">
-          {amigos.length ? 'Proponerles la sorpresa' : 'Armar la sorpresa'}
+          {editar ? 'Guardar cambios' : amigos.length ? 'Proponerles la sorpresa' : 'Armar la sorpresa'}
         </BotonEnviar>
         <p className="mt-1.5 hidden text-center text-xs font-medium text-gr-muted group-has-[#que-queres:placeholder-shown]/deseo:block">
           Escribí qué le regalan o pegá un link

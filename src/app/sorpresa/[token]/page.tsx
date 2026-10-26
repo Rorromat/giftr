@@ -12,6 +12,7 @@ import { LARGO } from '@/lib/limites'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { InvitadosDelRegalo } from '@/components/Dividir'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { VideoDeseo } from '@/components/VideoDeseo'
 import { EntrarConGoogle } from '@/components/Identidad'
 import { RegaloGrupal } from '@/components/RegaloGrupal'
 import { EtiquetaSorpresa } from '@/components/Sorpresas'
@@ -110,10 +111,17 @@ export default async function Sorpresa({ params, searchParams }: {
               <span className="font-semibold">{primerNombre(s.creador)} dice:</span> {item.notas}
             </p>
           )}
-          {item.linkTienda && (
-            <a href={item.linkTienda} target="_blank" className="gr-btn self-start text-sm">
-              Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
-            </a>
+          {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
+          {(item.linkTienda || s.esCreador) && (
+            <div className="flex flex-wrap gap-2">
+              {item.linkTienda && (
+                <a href={item.linkTienda} target="_blank" className="gr-btn text-sm">
+                  Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
+                </a>
+              )}
+              {/* la armó el que mira: la puede cambiar (a los que están les avisa) */}
+              {s.esCreador && <Link href={`/sorpresa/${token}/editar`} className="gr-btn text-sm">Editar</Link>}
+            </div>
           )}
         </div>
       </article>

@@ -42,22 +42,35 @@ export function SolicitudRecibida({ id, de }: { id: string; de: Persona }) {
 }
 
 /** El link de amigo por WhatsApp: quien lo abre y acepta queda amigo, sin solicitud. */
+/**
+ * La invitación a GiftR por WhatsApp: qué es, cómo tenerla como app (es una web que se instala desde el navegador, sin
+ * tienda) y el link de amigo, así al entrar ya quedan amigos.
+ */
+export function mensajeDeInvitacion(link: string) {
+  return [
+    '🎁 Te invito a GiftR: armás tu lista de deseos, ves la de tu gente y coordinan los regalos sin repetir y sin arruinar la sorpresa.',
+    '',
+    `1. Abrí este link y entrá con tu Google (así ya quedamos como amigos): ${link}`,
+    '2. Para tenerla como app: en iPhone, tocá Compartir y "Agregar a inicio"; en Android, el menú ⋮ y "Instalar app".',
+  ].join('\n')
+}
+
+/** "Invitar a un amigo a GiftR" (en Tu gente): por WhatsApp, con qué es la app, cómo instalarla y tu link de amigo. */
 export function InvitarAmigos({ link, usuario }: { link: string; usuario: string | null }) {
-  const wa = encodeURIComponent(`🤝 Sumate a mi gente en GiftR: así vemos nuestras listas de deseos y sabemos qué regalarnos. ${link}`)
   return (
-    <section className="gr-card flex flex-col gap-3 p-4">
+    <section aria-labelledby="invitar-titulo" className="gr-card flex flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
-        <span className="gr-row__icon"><Icon name="users" size={20} /></span>
+        <span className="gr-row__icon"><Icon name="gift" size={20} /></span>
         <div>
-          <p className="text-base leading-tight font-semibold">Sumá a tu gente</p>
+          <h2 id="invitar-titulo" className="text-base leading-tight font-semibold">Invitar a un amigo a GiftR</h2>
           <p className="mt-0.5 text-[13px] leading-snug text-gr-muted">
-            Mandales tu link de amigo: lo abren, aceptan y ya se ven las listas.
-            {usuario && <> También te encuentran por <span className="font-semibold text-gr-ink">@{usuario}</span>.</>}
+            Le llega por WhatsApp qué es y cómo instalarla. Cuando entra, ya quedan amigos.
+            {usuario && <> Si ya la usa, te encuentra por <span className="font-semibold text-gr-ink">@{usuario}</span>.</>}
           </p>
         </div>
       </div>
-      <a href={`https://wa.me/?text=${wa}`} target="_blank" className="gr-btn gr-btn--sm gap-2">
-        <Icon name="chat" size={18} strokeWidth={2} />Mandar mi link de amigo
+      <a href={`https://wa.me/?text=${encodeURIComponent(mensajeDeInvitacion(link))}`} target="_blank" className="gr-btn-primary gr-btn--sm gap-2">
+        <Icon name="chat" size={18} strokeWidth={2} />Invitar por WhatsApp
       </a>
     </section>
   )

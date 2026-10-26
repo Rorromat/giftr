@@ -89,8 +89,8 @@ export function hace(fecha: Date, ahora = new Date()): string {
 export type Robo = { ok: true; itemId: string; yaLoTenias: boolean } | { ok: false; reason: 'no_existe' | 'propio' }
 
 /**
- * "Me lo robo": copia a tu lista un deseo de la lista de otro (con su link): el nombre, la foto, el precio y el link de
- * la tienda. Lo que el otro escribió para los suyos (las notas) no, ni sus reservas: es un deseo nuevo, tuyo. Si ya lo
+ * "Me lo robo": copia a tu lista un deseo de la lista de otro (con su link): el nombre, la foto, el precio, el link de
+ * la tienda y el video. Lo que el otro escribió para los suyos (las notas) no, ni sus reservas: es un deseo nuevo, tuyo. Si ya lo
  * tenías (mismo nombre y foto en tu lista), es ese. Al otro no le llega nada.
  */
 export async function robarDeseo(db: Db, userId: string, token: string, itemId: string): Promise<Robo> {
@@ -114,6 +114,7 @@ export async function robarDeseo(db: Db, userId: string, token: string, itemId: 
   const nuevo = await createItem(db, userId, {
     tipo: it.tipo, titulo: it.titulo, fotoUrl: it.fotoUrl ?? undefined, precio: it.precio ?? undefined,
     rangoPrecio: it.rangoPrecio ?? undefined, categoria: it.categoria ?? undefined, linkTienda: it.linkTienda ?? undefined,
+    videoUrl: it.videoUrl ?? undefined,
   })
   return nuevo ? { ok: true, itemId: nuevo.id, yaLoTenias: false } : { ok: false, reason: 'no_existe' }
 }

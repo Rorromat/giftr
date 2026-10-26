@@ -25,7 +25,7 @@ function link(fd: FormData, k: string) {
   return v === null ? null : linkHttp(v) ?? undefined
 }
 
-export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'rangoPrecio' | 'categoria' | 'linkTienda'> & CambiosDeseo
+export type DeseoDelForm = Omit<NewItemData, 'notas' | 'fotoUrl' | 'precio' | 'rangoPrecio' | 'categoria' | 'linkTienda' | 'videoUrl'> & CambiosDeseo
 
 /**
  * El link del título que pasa a "Link a la tienda" (con lo que queda del título), o null si se queda en el título: pasa si
@@ -87,6 +87,8 @@ export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | 
     // solo las ideas se repiten (en "Quiero ESTO" el casillero se esconde, pero puede venir tildado de antes)
     repetible: tipo === 'idea' && fd.get('repetible') === 'on',
     linkTienda,
+    // el link de un video del producto (ver VideoDeseo)
+    videoUrl: link(fd, 'videoUrl'),
     // una foto subida desde el teléfono (/foto/deseo/:id, en minúsculas como la ruta) o el link de una foto
     fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto.toLowerCase() : linkHttp(foto) ?? undefined,
   }
