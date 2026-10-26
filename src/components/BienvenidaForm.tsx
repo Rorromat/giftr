@@ -6,22 +6,24 @@ import { saveGustosAction } from '@/app/actions'
 import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { Icon, PageHeader, type IconName } from '@/components/ui'
+import { IlustracionGusto } from '@/components/IlustracionGusto'
+import { Icon, PageHeader } from '@/components/ui'
+import { paletaGusto } from '@/lib/colores-gustos'
 import {
   BEBIDAS, CLUBES, CLUBES_SIN_BUSCAR, COLORES, DEPORTES, ESTILOS, HOBBIES, MARCAS, MASCOTAS, NO_FUTBOL, NO_REGALAR,
   PASOS_GUSTOS, POPULARES, SOLO_SELECCION, TALLES, TODAS_LAS_MARCAS, type Gustos, type PasoGustos,
 } from '@/lib/gustos'
 
-/** Uno por cada paso de PASOS_GUSTOS, en el mismo orden. */
-const PASOS: { titulo: string; sub: string; icono: IconName }[] = [
-  { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.', icono: 'cake' },
-  { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.', icono: 'ball' },
-  { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…', icono: 'shield' },
-  { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.', icono: 'star' },
-  { titulo: '¿Qué ropa te gusta?', sub: 'Tus marcas y tu estilo.', icono: 'bag' },
-  { titulo: 'Colores y talles', sub: 'Así nadie tiene que ir a cambiar nada.', icono: 'shirt' },
-  { titulo: 'Bebidas y antojos', sub: 'Para el regalito de último momento.', icono: 'cup' },
-  { titulo: 'Lo que NO querés', sub: 'Tan importante como lo que sí.', icono: 'ban' },
+/** Uno por cada paso de PASOS_GUSTOS, en el mismo orden (cada uno con su color y su ilustración, ver IlustracionGusto). */
+const PASOS: { titulo: string; sub: string }[] = [
+  { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.' },
+  { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.' },
+  { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…' },
+  { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.' },
+  { titulo: '¿Qué ropa te gusta?', sub: 'Tus marcas y tu estilo.' },
+  { titulo: 'Colores y talles', sub: 'Así nadie tiene que ir a cambiar nada.' },
+  { titulo: 'Bebidas y antojos', sub: 'Para el regalito de último momento.' },
+  { titulo: 'Lo que NO querés', sub: 'Tan importante como lo que sí.' },
 ]
 
 function Chip({ name, value, checked, type = 'checkbox', className = '', alCambiar, children }: {
@@ -169,16 +171,14 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         </div>
       )}
 
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="mt-0.5 flex size-12 flex-none items-center justify-center rounded-full bg-gr-accent">
-          <Icon name={PASOS[paso].icono} size={24} />
-        </span>
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">
-            {paso === 0 ? (solo ? 'Tu foto y tu cumple' : `¡Hola, ${nombre}!`) : PASOS[paso].titulo}
-          </h1>
-          <p className="text-[15px] leading-snug text-gr-muted">{paso === 0 && solo ? 'Así te reconocen y saben cuándo regalarte.' : PASOS[paso].sub}</p>
-        </div>
+      {/* el cartel del paso, con su color y su ilustración */}
+      <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-[26px] py-5 pl-5 pr-[124px] text-white shadow-card"
+           style={{ background: paletaGusto(PASOS_GUSTOS[paso]).fondo }}>
+        <IlustracionGusto paso={PASOS_GUSTOS[paso]} size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
+        <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em]">
+          {paso === 0 ? (solo ? 'Tu foto y tu cumple' : `¡Hola, ${nombre}!`) : PASOS[paso].titulo}
+        </h1>
+        <p className="text-sm leading-snug text-white/85">{paso === 0 && solo ? 'Así te reconocen y saben cuándo regalarte.' : PASOS[paso].sub}</p>
       </div>
 
       {/* Todos los pasos están en el mismo formulario: los ocultos también se mandan al final. */}
