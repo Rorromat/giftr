@@ -9,6 +9,7 @@ import { datosDe, esFechaEspecial, vistaDe } from '@/lib/fechas-especiales'
 import { miGente } from '@/lib/gente'
 import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
+import { paletaDe } from '@/lib/colores-fechas'
 import { AvatarSticker, Icon, PageHeader, Seccion } from '@/components/ui'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -38,9 +39,10 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <PageHeader title={v.nombre} back="/inicio" backLabel="Volver a Inicio" />
 
-      <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-[26px] bg-gr-blue p-[18px] pr-[132px] text-gr-on-blue shadow-card">
+      <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-[26px] p-[18px] pr-[132px] text-white shadow-card"
+           style={{ background: paletaDe(slug).fondo }}>
         <IlustracionFecha fecha={slug} size={150} className="absolute -right-3 -bottom-3" />
-        <span className="self-start whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gr-blue">
+        <span className="self-start whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold" style={{ color: paletaDe(slug).fondo }}>
           Fecha especial · {v.dias === 0 ? 'es hoy' : v.dias === 1 ? 'mañana' : `en ${v.dias} días`}
         </span>
         <h2 className="font-display text-[30px] leading-none font-bold tracking-tight">{v.nombre}</h2>
