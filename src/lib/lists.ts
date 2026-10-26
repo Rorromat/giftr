@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm'
 import { claims, comments, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -109,9 +109,9 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
     accesoALista(db, list.id, viewer),
   ])
 
-  // Cualquier dueño (también un co-dueño del grupo) ve la vista sin reservas.
+  // Cualquier dueño (también un co-dueño del grupo) ve la vista sin reservas, sin los que eliminó (ver borrarDeseo).
   if (acceso === 'dueno') {
-    return { role: 'owner', listId: list.id, tipo: list.tipo, shareToken, items: allItems.map(pickItemFields) }
+    return { role: 'owner', listId: list.id, tipo: list.tipo, shareToken, items: allItems.filter((i) => !i.borradoAt).map(pickItemFields) }
   }
 
   const activos = allItems.filter((i) => i.estadoDueno === 'activo')
@@ -153,7 +153,8 @@ export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: str
 export async function getOwnList(db: Db, userId: string) {
   const list = await asegurarListaPropia(db, userId)
   if (!list) return null
-  const rows = await db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt))
+  // sin los que eliminó (ver borrarDeseo)
+  const rows = await db.select().from(items).where(and(eq(items.listId, list.id), isNull(items.borradoAt))).orderBy(asc(items.createdAt))
   return { id: list.id, shareToken: list.shareToken, items: rows.map(pickItemFields) }
 }
 
@@ -177,6 +178,7 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
 
   const [duenos, acceso] = await Promise.all([duenosDeLista(db, row.list), accesoALista(db, row.list.id, viewer)])
   if (acceso === 'dueno') {
+    if (row.item.borradoAt) return null
     return { role: 'owner', listId: row.list.id, tipo: row.list.tipo, item: pickItemFields(row.item) }
   }
 

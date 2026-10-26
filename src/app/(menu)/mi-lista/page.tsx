@@ -10,13 +10,13 @@ import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/e
 import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { ListaHero } from '@/components/ListaHero'
-import { RecienAgregado } from '@/components/RecienAgregado'
+import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
-export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string }> }) {
-  const { agregado } = await searchParams
+export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string; eliminado?: string }> }) {
+  const { agregado, eliminado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple] = await Promise.all([
@@ -77,6 +77,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
       </div>
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
       {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro="/agregar" />}
+      {eliminado === '1' && <DeseoEliminado />}
     </Seccion>
   )
 }

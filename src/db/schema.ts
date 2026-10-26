@@ -143,6 +143,9 @@ export const items = pgTable('items', {
   cantidad: integer('cantidad').notNull().default(1),
   repetible: boolean('repetible').notNull().default(false),
   estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
+  // "Eliminar" (ver borrarDeseo): para los que regalan es "Ya no lo quiero" (estadoDueno), así nadie pierde lo que ya
+  // compró ni el dueño se entera de si alguien lo había reservado; para el dueño desaparece, también de los archivados.
+  borradoAt: timestamp('borrado_at', { withTimezone: true }),
   linkTienda: text('link_tienda'),
   // Un video del producto (YouTube, TikTok, Instagram, Vimeo…): se ve en el deseo (ver VideoDeseo).
   videoUrl: text('video_url'),
