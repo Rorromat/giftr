@@ -30,7 +30,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   if (bienvenida) redirect('/bienvenida')
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
+    <Seccion className="flex flex-col gap-5 pb-48 pt-2">
       <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto}
                  left={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={20} /></Link>} />
       <div className="flex flex-col gap-1">

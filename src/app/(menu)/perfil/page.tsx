@@ -46,7 +46,7 @@ export default async function Perfil({ searchParams }: {
   const plataforma = plataformaDe(pedido.get('user-agent') ?? '')
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
+    <Seccion className="flex flex-col gap-5 pb-48 pt-2">
       <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" />
 
       <div className="gr-card flex items-center gap-4 p-4">
