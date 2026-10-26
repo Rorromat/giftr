@@ -11,7 +11,7 @@ import { Icon, PageHeader } from '@/components/ui'
 import { paletaGusto } from '@/lib/colores-gustos'
 import {
   BEBIDAS, CLUBES, CLUBES_SIN_BUSCAR, COLORES, DEPORTES, ESTILOS, HOBBIES, MARCAS, MASCOTAS, NO_FUTBOL, NO_REGALAR,
-  PASOS_GUSTOS, POPULARES, SOLO_SELECCION, TALLES, TODAS_LAS_MARCAS, type Gustos, type PasoGustos,
+  PASOS_GUSTOS, POPULARES, SOLO_SELECCION, TALLES, TODAS_LAS_MARCAS, fotoDeEstilo, type Gustos, type PasoGustos,
 } from '@/lib/gustos'
 
 /** Uno por cada paso de PASOS_GUSTOS, en el mismo orden (cada uno con su color y su ilustración, ver IlustracionGusto). */
@@ -20,7 +20,7 @@ const PASOS: { titulo: string; sub: string }[] = [
   { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.' },
   { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…' },
   { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.' },
-  { titulo: '¿Qué ropa te gusta?', sub: 'Tus marcas y tu estilo.' },
+  { titulo: '¿Qué ropa te gusta?', sub: 'Tu estilo y tus marcas.' },
   { titulo: 'Colores y talles', sub: 'Así nadie tiene que ir a cambiar nada.' },
   { titulo: 'Bebidas y antojos', sub: 'Para el regalito de último momento.' },
   { titulo: 'Lo que NO querés', sub: 'Tan importante como lo que sí.' },
@@ -253,6 +253,22 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
       </section>
 
       <section className={ver(4, 'flex flex-col gap-2')}>
+        {/* el estilo se elige mirando: una foto de ejemplo de cada uno */}
+        <Subtitulo>Tu estilo</Subtitulo>
+        <div className="grid grid-cols-3 gap-2">
+          {ESTILOS.map((e) => (
+            <label key={e} className="group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-gr-soft has-[:checked]:ring-[3px] has-[:checked]:ring-gr-ink has-[:checked]:ring-offset-2 has-[:checked]:ring-offset-gr-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-gr-ink">
+              <input type="checkbox" name="estilos" value={e} defaultChecked={inicial.estilos.includes(e)} className="sr-only" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/, ya del tamaño justo */}
+              <img src={fotoDeEstilo(e)!} alt="" width={360} height={480} className="size-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent px-2.5 pb-2 pt-8 text-sm font-semibold text-white">{e}</span>
+              <span className="absolute right-1.5 top-1.5 hidden size-6 items-center justify-center rounded-full bg-gr-accent text-gr-ink group-has-[:checked]:flex">
+                <Icon name="check" size={14} strokeWidth={3} />
+              </span>
+            </label>
+          ))}
+        </div>
+        <Subtitulo>Tus marcas</Subtitulo>
         <input type="search" value={buscaMarca} onChange={(e) => setBuscaMarca(e.target.value)} placeholder="Buscá una marca"
                aria-label="Buscar marca" className="gr-input" />
         {MARCAS.map((g) => (
@@ -266,8 +282,6 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
         )}
         <input name="marcasOtras" defaultValue={marcasPropias.join(', ')} maxLength={100}
                placeholder="¿Otra? Escribila (separadas por coma)" aria-label="Otras marcas" className="gr-input mt-1" />
-        <Subtitulo>Tu estilo</Subtitulo>
-        <Chips name="estilos" opciones={ESTILOS} elegidos={inicial.estilos} />
       </section>
 
       <section ref={talles} className={ver(5, 'flex flex-col gap-2')}>

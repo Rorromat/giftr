@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import type { Cuentas } from '@/lib/regalos'
 import { plata } from '@/lib/pesos'
-import { calendarioDelAnio, fechaCorta, fechaLarga, MESES, repartirProximos, type Evento } from '@/lib/events'
+import { calendarioDelAnio, fechaCorta, fechaLarga, repartirProximos, type Evento } from '@/lib/events'
 import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
-import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/components/ui'
+import { AvatarStack, Icon, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { CardEspecial } from '@/components/AmigoInvisible'
 import { IconoFecha } from '@/components/IconoFecha'
@@ -17,7 +17,10 @@ import { paletaDe } from '@/lib/colores-fechas'
  * una sola foto vertical la estiraba a su alto y tapaba el nombre y la fecha de la tarjeta.
  */
 function Fotos({ e }: { e: Evento }) {
-  if (!e.fotos.length) return <ItemPhoto src={null} titulo={e.titulo} height={170} />
+  // sin deseos con foto, un regalo: la inicial del título ("C" de "Cumple de…") se confundía con la de la persona
+  if (!e.fotos.length) {
+    return <div className="flex h-[170px] items-center justify-center bg-gr-soft text-gr-muted"><Icon name="gift" size={48} strokeWidth={1.6} /></div>
+  }
   return (
     <div className="grid h-[170px] grid-rows-[minmax(0,1fr)] gap-0.5 overflow-hidden bg-gr-surface"
          style={{ gridTemplateColumns: `repeat(${e.fotos.length}, minmax(0, 1fr))` }}>
@@ -70,12 +73,11 @@ function CardProximo({ e, hoy }: { e: Evento; hoy: Date }) {
                      className="absolute right-2 top-2 drop-shadow-sm">
             {e.dias === 0 ? '¡Hoy!' : e.dias}
           </Starburst>
+          {/* de quién es: su foto (en un grupo, la de cada uno), montada sobre el borde de las fotos de los deseos */}
+          <AvatarStack nombres={e.personas.slice(0, 3)} fotos={e.caras.slice(0, 3)} size={52} className="absolute -bottom-6 left-3 drop-shadow-sm" />
         </div>
-        <div className="flex flex-1 flex-col gap-1 p-3.5">
-          <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</h2>
-            <AvatarStack nombres={e.personas.slice(0, 3)} size={30} />
-          </div>
+        <div className="flex flex-1 flex-col gap-1 p-3.5 pt-8">
+          <h2 className="text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</h2>
           <p className="flex items-center gap-1.5 text-[13px] text-gr-muted">
             <Icon name="calendar" size={15} className="flex-none" />{fechaLarga(e.fecha, hoy)}
           </p>
@@ -87,62 +89,37 @@ function CardProximo({ e, hoy }: { e: Evento; hoy: Date }) {
   )
 }
 
-/** Fila de la lista por mes: la fecha en una cajita, el nombre y cuánto falta. */
-function FilaEvento({ e }: { e: Evento }) {
-  return (
-    <li>
-      <Link href={e.href} className="gr-card flex min-h-[72px] items-center gap-3 p-2.5 pr-4">
-        <span className="flex size-14 flex-none flex-col items-center justify-center rounded-2xl bg-gr-soft leading-none">
-          <span className="text-xl font-semibold">{e.fecha.getUTCDate()}</span>
-          <span className="text-[11px] font-medium text-gr-muted uppercase">{MESES[e.fecha.getUTCMonth()].slice(0, 3)}</span>
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</span>
-          <span className="flex items-center gap-1.5 text-[13px] text-gr-muted">
-            <Icon name="clock" size={14} className="flex-none" />{e.dias === 0 ? 'Hoy' : e.dias === 1 ? 'Mañana' : `En ${e.dias} días`}
-            {e.contexto && <span className="truncate">· {e.contexto}</span>}
-          </span>
-        </span>
-        <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
-      </Link>
-    </li>
-  )
-}
-
 /**
- * Los de los próximos tres meses, en un carrusel (con las fechas especiales, por cercanía); los que vienen después, en filas
- * por mes (con el año, si no es este). Ver repartirProximos.
+ * Los próximos 5 (eventos y fechas especiales, por cercanía) en un carrusel; si hay más, la última tarjeta lleva a Todo el
+ * año. Ver repartirProximos.
  */
 export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: TarjetaEspecial[] }) {
-  const { cerca, despues } = repartirProximos(eventos)
-  const primeros = [
-    ...cerca.map((e) => ({ dias: e.dias, tarjeta: <CardProximo key={e.listId} e={e} hoy={hoy} /> })),
+  const { primeros, quedan } = repartirProximos([
+    ...eventos.map((e) => ({ dias: e.dias, tarjeta: <CardProximo key={e.listId} e={e} hoy={hoy} /> })),
     ...especiales.map((t) => ({
       dias: t.dias, tarjeta: <CardEspecial key={t.tipo === 'fecha' ? t.fecha.id : t.juego.id} t={t} hoy={hoy} />,
     })),
-  ].sort((a, b) => a.dias - b.dias)
-  const porMes = Object.entries(Object.groupBy(despues, (e) => `${e.fecha.getUTCFullYear()}-${String(e.fecha.getUTCMonth()).padStart(2, '0')}`))
+  ].sort((a, b) => a.dias - b.dias))
+  if (!primeros.length) {
+    return (
+      <p className="gr-empty px-4 py-4 text-center text-sm">
+        Nada en los próximos tres meses. <Link href="/eventos" className="font-semibold underline underline-offset-2">Ver todo el año</Link>
+      </p>
+    )
+  }
   return (
-    <>
-      {primeros.length > 0 ? (
-        <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
-          {primeros.map((p) => p.tarjeta)}
-        </ul>
-      ) : (
-        <p className="gr-empty px-4 py-4 text-center text-sm">Nada en los próximos tres meses.</p>
+    <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
+      {primeros.map((p) => p.tarjeta)}
+      {quedan > 0 && (
+        <li className="w-[160px] flex-none snap-start">
+          <Link href="/eventos" className="gr-card flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+            <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-gr-accent"><Icon name="calendar" size={26} /></span>
+            <span className="text-[17px] leading-tight font-semibold">{quedan === 1 ? '1 más' : `${quedan} más`}</span>
+            <span className="text-[13px] font-semibold underline underline-offset-4">Todo el año</span>
+          </Link>
+        </li>
       )}
-      {porMes.length > 0 && (
-        <>
-          <SectionHeader title="Más adelante" />
-          {porMes.map(([clave, delMes]) => (
-            <section key={clave} className="flex flex-col gap-2.5">
-              <h3 className="gr-label">{MESES[Number(clave.slice(5))]}{Number(clave.slice(0, 4)) !== hoy.getUTCFullYear() && ` ${clave.slice(0, 4)}`}</h3>
-              <ul className="flex flex-col gap-2.5">{delMes!.map((e) => <FilaEvento key={e.listId} e={e} />)}</ul>
-            </section>
-          ))}
-        </>
-      )}
-    </>
+    </ul>
   )
 }
 

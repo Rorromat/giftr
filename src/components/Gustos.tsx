@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
+import { fotoDeEstilo, muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { paletaGusto } from '@/lib/colores-gustos'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
 import { AvatarSticker, Icon } from '@/components/ui'
@@ -14,12 +14,15 @@ export function IconoSeccion({ s, size = 36 }: { s: Pick<SeccionGustos, 'icono'>
   )
 }
 
-/** Un gusto como etiqueta; un color, con su muestra al lado. */
+/** Un gusto como etiqueta; un color, con su muestra al lado; un estilo, con su foto de ejemplo. */
 function Etiqueta({ texto, oscuro = false }: { texto: string; oscuro?: boolean }) {
   const muestra = muestraDeColor(texto)
+  const foto = fotoDeEstilo(texto)
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium [overflow-wrap:anywhere] ${oscuro ? 'bg-gr-bg/12' : 'bg-gr-soft'}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium [overflow-wrap:anywhere] ${foto ? 'pl-1' : ''} ${oscuro ? 'bg-gr-bg/12' : 'bg-gr-soft'}`}>
       {muestra && <span aria-hidden className="size-3.5 flex-none rounded-full border border-gr-ink/20" style={{ background: muestra }} />}
+      {/* eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/ */}
+      {foto && <img src={foto} alt="" className="size-6 flex-none rounded-full object-cover" />}
       {texto}
     </span>
   )
@@ -67,6 +70,14 @@ export function ResumenGustos({ secciones }: { secciones: SeccionGustos[] }) {
               <span aria-hidden className="mb-1.5 flex">
                 {s.items.slice(0, 5).map((c) => (
                   <span key={c} className="-mr-1.5 size-5 rounded-full border-2 border-gr-surface" style={{ background: muestraDeColor(c) ?? undefined }} />
+                ))}
+              </span>
+            )}
+            {s.clave === 'estilos' && (
+              <span aria-hidden className="mb-1.5 flex">
+                {s.items.slice(0, 3).map((e) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/
+                  <img key={e} src={fotoDeEstilo(e) ?? ''} alt="" className="-mr-2 h-10 w-[30px] rounded-lg border-2 border-gr-surface object-cover" />
                 ))}
               </span>
             )}

@@ -530,11 +530,29 @@ test('el 29/2 en la grilla del año: el 28 en los años que no son bisiestos, el
   expect(calendarioDelAnio(eventos, hoy)[1].eventos).toEqual([28])
 })
 
-test('Próximos: en el carrusel, lo de los próximos tres meses (hasta 6); lo de después, en Más adelante', () => {
+test('Próximos: en el carrusel de Inicio, los próximos 5 de los tres meses que vienen; el resto, en Todo el año', () => {
   const ev = (dias: number) => ({ dias })
-  expect(repartirProximos([ev(3), ev(40), ev(90), ev(91), ev(341)])).toEqual({ cerca: [ev(3), ev(40), ev(90)], despues: [ev(91), ev(341)] })
+  expect(repartirProximos([ev(3), ev(40), ev(90), ev(91), ev(341)])).toEqual({ primeros: [ev(3), ev(40), ev(90)], quedan: 2 })
   // un cumple que pasó hace unos días es el del año que viene: no va como próximo
-  expect(repartirProximos([ev(341)])).toEqual({ cerca: [], despues: [ev(341)] })
+  expect(repartirProximos([ev(341)])).toEqual({ primeros: [], quedan: 1 })
   const muchos = [1, 2, 3, 4, 5, 6, 7, 8].map(ev)
-  expect(repartirProximos(muchos)).toEqual({ cerca: muchos.slice(0, 6), despues: muchos.slice(6) })
+  expect(repartirProximos(muchos)).toEqual({ primeros: muchos.slice(0, 5), quedan: 3 })
+  expect(repartirProximos([])).toEqual({ primeros: [], quedan: 0 })
+})
+
+test('Próximos: cada evento trae la foto de quién es (la subida, la de Google o ninguna), en el orden de personas', async () => {
+  const { db, euge, rodri, sofi, caro, lista, mellizos } = await setup()
+  await db.update(users).set({ avatarUrl: 'https://lh3.googleusercontent.com/euge' }).where(eq(users.id, euge.id))
+  const subida = new Date('2026-07-01T12:00:00Z')
+  await db.update(users).set({ fotoAt: subida }).where(eq(users.id, caro.id))
+  await guardarCumple(db, rodri.id, 1, 9)
+  await seguir(db, sofi.id, (await listaDe(db, rodri.id)).id)
+  const deSofi = await misEventos(db, sofi.id, HOY)
+  const de = (listId: string) => deSofi.find((e) => e.listId === listId)!
+  expect(de(lista.id).caras).toEqual(['https://lh3.googleusercontent.com/euge'])
+  expect(de((await listaDe(db, rodri.id)).id).caras).toEqual([null]) // sin foto: sus iniciales
+  // un grupo: la de cada uno, en el orden de personas (la subida va por /foto, versionada)
+  expect(de(mellizos)).toMatchObject({ personas: ['Caro'], caras: [`/foto/${caro.id}?v=${subida.getTime()}`] })
+  // la propia, también
+  expect((await misEventos(db, euge.id, HOY)).find((e) => e.listId === lista.id)?.caras).toEqual(['https://lh3.googleusercontent.com/euge'])
 })
