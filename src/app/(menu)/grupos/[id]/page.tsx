@@ -9,7 +9,7 @@ import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
-import { RecienAgregado } from '@/components/RecienAgregado'
+import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AvatarStack, Icon, PageHeader, Seccion, SectionHeader } from '@/components/ui'
@@ -25,9 +25,9 @@ const AVISOS: Record<string, string> = {
 
 export default async function Grupo({ params, searchParams }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ fecha?: string; nuevo?: string; agregado?: string }>
+  searchParams: Promise<{ fecha?: string; nuevo?: string; agregado?: string; eliminado?: string }>
 }) {
-  const [{ id }, { fecha: errorFecha, nuevo, agregado }] = await Promise.all([params, searchParams])
+  const [{ id }, { fecha: errorFecha, nuevo, agregado, eliminado }] = await Promise.all([params, searchParams])
   const session = await auth()
   if (!session?.userId) redirect('/')
   const grupo = await grupoParaDueno(db, id, session.userId)
@@ -142,6 +142,7 @@ export default async function Grupo({ params, searchParams }: {
       </div>
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
       {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro={`/agregar?lista=${grupo.id}`} />}
+      {eliminado === '1' && <DeseoEliminado />}
 
       <div className="flex flex-col gap-1">
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}

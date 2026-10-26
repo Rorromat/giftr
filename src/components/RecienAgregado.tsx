@@ -24,3 +24,18 @@ export function RecienAgregado({ id, otro }: { id: string; otro: string }) {
     </p>
   )
 }
+
+/** Después de eliminar un deseo (ver EliminarDeseo): "Listo, lo eliminaste". El ?eliminado= se saca de la dirección. */
+export function DeseoEliminado() {
+  useEffect(() => {
+    const url = new URL(location.href)
+    url.searchParams.delete('eliminado')
+    history.replaceState(history.state, '', url)
+  }, [])
+  return (
+    <p role="status" className="gr-toast [animation-duration:4s]">
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
+      <span className="min-w-0 flex-1"><span className="font-semibold text-gr-accent">Listo,</span> lo eliminaste</span>
+    </p>
+  )
+}

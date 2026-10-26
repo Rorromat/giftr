@@ -262,6 +262,8 @@ const ICONS = {
   cup: <><path d="M4.5 9h12v4.5a6 6 0 0 1-12 0z" /><path d="M16.5 10h1.3a2.5 2.5 0 0 1 0 5h-1.6" /><path d="M8.5 2.8c-.8 1 .8 2 0 3.2M12.5 2.8c-.8 1 .8 2 0 3.2" /></>,
   ban: <><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></>,
   note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" /><path d="M8 9h8M8 12.5h5" /></>,
+  // eliminar
+  basura: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12.4a2 2 0 0 0 2 1.6h6a2 2 0 0 0 2-1.6L18 7" /><path d="M9 7V4.5h6V7" /></>,
   // un secreto (el amigo invisible): un antifaz
   antifaz: <><path d="M2.5 11c0-3.2 4.6-4.4 9.5-1.9 4.9-2.5 9.5-1.3 9.5 1.9 0 3.9-4.6 5.2-7.3 2.7-1.2-1.1-3.2-1.1-4.4 0C7.1 16.2 2.5 14.9 2.5 11z" /><ellipse cx="7.6" cy="11.3" rx="1.9" ry="1.3" /><ellipse cx="16.4" cy="11.3" rx="1.9" ry="1.3" /></>,
   // "Me lo robo": copiarlo a tu lista

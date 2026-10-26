@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "borrado_at" timestamp with time zone;

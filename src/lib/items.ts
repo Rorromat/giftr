@@ -180,12 +180,12 @@ export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
  *   "Ya no lo quiero", tampoco el de que ahora organiza un regalo grupal: se canceló (con "Ya lo tengo" sigue, en Cuentas).
  * Al dueño no le llega nada y su respuesta es la misma haya o no reservas.
  */
-export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero'): Promise<boolean> {
+export async function archiveItem(db: Db, itemId: string, userId: string, estado: 'lo_tengo' | 'no_lo_quiero', { borrar = false } = {}): Promise<boolean> {
   if (!(await itemDelDueno(db, itemId, userId))) return false
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     // el update bloquea el deseo, como reserveItem: una reserva que llega a la vez espera y lo encuentra archivado
-    const [archivado] = await t.update(items).set({ estadoDueno: estado })
+    const [archivado] = await t.update(items).set({ estadoDueno: estado, ...(borrar && { borradoAt: new Date() }) })
       .where(and(eq(items.id, itemId), eq(items.estadoDueno, 'activo')))
       .returning({ id: items.id, listId: items.listId })
     if (!archivado) return false
@@ -223,6 +223,16 @@ export async function archiveItem(db: Db, itemId: string, userId: string, estado
 const YA_NO_VALEN_AL_SACARLO: TipoAviso[] = ['item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'item_editado', 'regalo_cancelado']
 
 /**
+ * "Eliminar" (desde Editar): para los que regalan es lo mismo que "Ya no lo quiero" (se les liberan las reservas, se
+ * cancelan los regalos grupales abiertos y les llega el aviso; lo que ya compraron sigue en su historial y en Cuentas), así
+ * el dueño no se entera de si alguien lo había reservado. Para el dueño desaparece: no queda en los archivados y no se
+ * puede volver a poner. Solo uno activo (el que se puede editar); devuelve si lo eliminó ahora.
+ */
+export async function borrarDeseo(db: Db, itemId: string, userId: string): Promise<boolean> {
+  return archiveItem(db, itemId, userId, 'no_lo_quiero', { borrar: true })
+}
+
+/**
  * "Volver a mi lista": un deseo archivado vuelve a estar activo, con lo que ya tenía para este evento (lo comprado sigue a
  * su nombre, un regalo grupal que quedó abierto sigue abierto). Lo comprado para un evento anterior ya se regaló: deja de
  * ocuparlo (ocupa_desde, ver ocupaSql), y el que lo vuelve a pedir porque se le gastó o se le rompió no lo tiene comprado y
@@ -239,9 +249,9 @@ export async function restoreItem(db: Db, itemId: string, userId: string): Promi
   if (!(await itemDelDueno(db, itemId, userId))) return false
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
-    // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez
+    // lock del deseo, como archiveItem: un doble toque lo vuelve a poner (y avisa) una sola vez. Uno eliminado no vuelve.
     const [antes] = await t.select().from(items).where(eq(items.id, itemId)).for('update')
-    if (!antes || antes.estadoDueno === 'activo') return false
+    if (!antes || antes.estadoDueno === 'activo' || antes.borradoAt) return false
     // El corte solo avanza: si borraron o cambiaron la fecha de la lista, desdeElUltimoEvento puede dar uno anterior, y lo
     // que ya se había liberado volvería a ocupar el deseo.
     const corte = await desdeElUltimoEvento(t, antes.listId)

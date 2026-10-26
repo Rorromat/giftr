@@ -143,7 +143,8 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
   const otros = alias(listMembers, 'otros')
   const [duenos, rows, despues] = await Promise.all([
     duenosDeLista(db, list),
-    db.select().from(items).where(eq(items.listId, list.id)).orderBy(asc(items.createdAt)),
+    // sin los que eliminaron (ver borrarDeseo)
+    db.select().from(items).where(and(eq(items.listId, list.id), isNull(items.borradoAt))).orderBy(asc(items.createdAt)),
     // los que siguen en el grupo y se sumaron después que él: a esos los puede sacar (ver sacarDelGrupo)
     db.select({ id: users.id, nombre: users.nombre }).from(listMembers)
       .innerJoin(otros, and(eq(otros.listId, listMembers.listId), gt(otros.createdAt, listMembers.createdAt), isNull(otros.salioAt)))

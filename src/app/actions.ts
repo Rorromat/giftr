@@ -12,7 +12,7 @@ import {
   OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarNoSoy,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
-import { createItem, archiveItem, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
+import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
 import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
@@ -135,6 +135,20 @@ export async function archiveItemAction(formData: FormData) {
 }
 
 /** "Volver a mi lista" desde Archivados. */
+/** "Eliminar" desde Editar (ver borrarDeseo): vuelve a su lista (la propia o la del grupo), que dice que lo eliminó. */
+export async function borrarDeseoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const itemId = str(formData, 'itemId') ?? ''
+  const editable = await deseoParaEditar(db, itemId, session.userId)
+  if (editable) await borrarDeseo(db, itemId, session.userId)
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+  revalidatePath('/inicio')
+  redirect(editable?.grupo ? `/grupos/${editable.grupo.id}?eliminado=1` : `/mi-lista${editable ? '?eliminado=1' : ''}`)
+}
+
 export async function restoreItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
