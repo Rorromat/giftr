@@ -340,3 +340,56 @@ export const codazos = pgTable('codazos', {
   // los topes del codazo: los de una lista en las últimas 24 horas
   index('codazos_list_id_created_at_idx').on(t.listId, t.createdAt),
 ])
+
+// Amigo invisible: alguien arma el juego (con un nombre, una temática, presupuesto y la fecha en que se dan los regalos;
+// puede ser de una fecha especial, ver fechas-especiales.ts), invita amigos suyos y, cuando están, lo sortea. Cada uno ve
+// solo a quién le regala (ver amigo-invisible.ts).
+export const amigosInvisibles = pgTable('amigos_invisibles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizadorId: uuid('organizador_id').notNull().references(() => users.id),
+  nombre: text('nombre').notNull(),
+  // la temática o lo que quieran decir ("algo hecho a mano", "todo de la Selección")
+  descripcion: text('descripcion'),
+  presupuesto: integer('presupuesto'), // en pesos; vacío: sin tope
+  // cuándo se dan los regalos
+  fecha: date('fecha').notNull(),
+  // de qué fecha especial es (navidad, amigo, padre, madre, ninos); vacío: de ninguna
+  fechaEspecial: text('fecha_especial'),
+  sorteadoAt: timestamp('sorteado_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('amigos_invisibles_organizador_id_idx').on(t.organizadorId)])
+
+// Los que juegan (o los invitados que todavía no contestaron). regalaA: a quién le regala, desde el sorteo; solo lo ve él.
+export const amigoInvisibleGente = pgTable('amigo_invisible_gente', {
+  amigoInvisibleId: uuid('amigo_invisible_id').notNull().references(() => amigosInvisibles.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  estado: text('estado', { enum: ['invitado', 'juega', 'no_juega'] }).notNull().default('invitado'),
+  regalaA: uuid('regala_a').references(() => users.id),
+  // cuándo vio a quién le regala (para que el que organiza sepa si falta alguien)
+  vioAt: timestamp('vio_at', { withTimezone: true }),
+  // cuándo pidió saber quién le regaló (solo después de la fecha, y solo si lo pide)
+  reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.amigoInvisibleId, t.userId] }),
+  index('amigo_invisible_gente_user_id_idx').on(t.userId),
+])
+
+// "Que no se toquen": dos que no pueden regalarse entre sí (parejas, hermanos). El par va ordenado (a < b).
+export const amigoInvisibleExcluidos = pgTable('amigo_invisible_excluidos', {
+  amigoInvisibleId: uuid('amigo_invisible_id').notNull().references(() => amigosInvisibles.id, { onDelete: 'cascade' }),
+  a: uuid('a').notNull().references(() => users.id),
+  b: uuid('b').notNull().references(() => users.id),
+}, (t) => [primaryKey({ columns: [t.amigoInvisibleId, t.a, t.b] })])
+
+// Preguntas anónimas: el que regala (de) le pregunta algo al que le toca (para), que contesta sin saber quién es.
+export const amigoInvisiblePreguntas = pgTable('amigo_invisible_preguntas', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  amigoInvisibleId: uuid('amigo_invisible_id').notNull().references(() => amigosInvisibles.id, { onDelete: 'cascade' }),
+  deUserId: uuid('de_user_id').notNull().references(() => users.id),
+  paraUserId: uuid('para_user_id').notNull().references(() => users.id),
+  texto: text('texto').notNull(),
+  respuesta: text('respuesta'),
+  respondidaAt: timestamp('respondida_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('amigo_invisible_preguntas_juego_idx').on(t.amigoInvisibleId, t.createdAt)])
