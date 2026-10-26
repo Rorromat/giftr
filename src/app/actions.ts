@@ -31,8 +31,8 @@ import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedad
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import { crearSorpresa, editarSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
-  borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego, preguntar, responderJuego,
-  responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo, type DatosJuego,
+  borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego, marcarYaLoTengo, preguntar,
+  responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo, type DatosJuego,
 } from '@/lib/amigo-invisible'
 import { esFechaEspecial } from '@/lib/fechas-especiales'
 import {
@@ -892,9 +892,10 @@ function datosJuego(fd: FormData): DatosJuego {
 
 const rutaJuego = (id: string) => `/invisible/${encodeURIComponent(id)}`
 
-/** Lo que cambia en un juego se ve en su pantalla, en Inicio y en las fechas especiales. */
+/** Lo que cambia en un juego se ve en su pantalla, en Regalos, en Inicio y en las fechas especiales. */
 function revalidarJuego(id: string) {
   revalidatePath(rutaJuego(id))
+  revalidatePath('/regalos')
   revalidatePath('/inicio')
   revalidatePath('/fechas', 'layout')
 }
@@ -922,8 +923,7 @@ export async function borrarAmigoInvisibleAction(formData: FormData) {
   const id = str(formData, 'id') ?? ''
   await borrarAmigoInvisible(db, id, userId)
   revalidarJuego(id)
-  const f = str(formData, 'fechaEspecial')
-  redirect(esFechaEspecial(f) ? `/fechas/${f}` : '/inicio')
+  redirect('/regalos')
 }
 
 /** "Juego" o "No juego" (desde Inicio o desde el juego). Al decir que sí, va al juego. */
@@ -983,6 +983,15 @@ export async function responderPreguntaAction(formData: FormData) {
   if (!id) return
   revalidatePath(rutaJuego(id))
   redirect(`${rutaJuego(id)}#preguntas`)
+}
+
+/** "Ya tengo el regalo" (tengo=1) o todavía no: desde Regalos o desde el juego, se queda donde está. */
+export async function yaLoTengoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await marcarYaLoTengo(db, id, userId, str(formData, 'tengo') === '1')
+  revalidatePath(rutaJuego(id))
+  revalidatePath('/regalos')
 }
 
 /** "¿Quién me regaló?": solo si lo pide (ver revelarQuienMeRegalo). */

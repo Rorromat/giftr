@@ -2,28 +2,48 @@ import Link from 'next/link'
 import {
   borrarAmigoInvisibleAction, cambiarExcluidosAction, crearAmigoInvisibleAction, editarAmigoInvisibleAction, invitarAlJuegoAction,
   preguntarAction, responderJuegoAction, responderPreguntaAction, revelarQuienMeRegaloAction, sortearAction, verAQuienLeRegaloAction,
+  yaLoTengoAction,
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CampoPrecio } from '@/components/CamposDeseo'
 import { Confirmar } from '@/components/Confirmar'
 import { ElegirAmigos } from '@/components/Dividir'
+import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
 import { AvatarSticker, Icon, Starburst } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 import { estadoDeJuegos, MIN_JUGADORES, type MiJuego, type VistaJuego } from '@/lib/amigo-invisible'
-import { fechaLarga } from '@/lib/events'
-import { datosDe, type FechaEspecial, type TarjetaEspecial } from '@/lib/fechas-especiales'
+import { fechaCorta, fechaLarga } from '@/lib/events'
+import { datosDe, FECHAS_ESPECIALES, type FechaEspecial, type TarjetaEspecial } from '@/lib/fechas-especiales'
 import { LARGO } from '@/lib/limites'
 import { pesos } from '@/lib/pesos'
 
-// Fechas especiales y amigo invisible (ver fechas-especiales.ts y amigo-invisible.ts): la tarjeta azul de Lo que viene,
-// las invitaciones en Inicio, el formulario para armarlo y las partes de la pantalla de cada juego.
-// A quién le toca a cada uno no aparece nunca afuera de la pantalla del juego, y ahí solo después de tocar "Ver".
+// Fechas especiales y amigo invisible (ver fechas-especiales.ts y amigo-invisible.ts): las tarjetas de Lo que viene, las
+// invitaciones en Inicio, los juegos en Regalos, el formulario para armarlo y las partes de la pantalla de cada juego.
+// Los de una fecha especial van en azul con su emoji; los "aparte" (sin fecha especial), en negro con lima y 🎁.
+// A quién le toca a cada uno no aparece en Inicio; en Regalos va tapado hasta tocar "Ver", y en el juego, después de "Ver".
 
 const primerNombre = (n: string) => n.split(' ')[0]
 const enDias = (dias: number) => (dias === 0 ? 'es hoy' : dias === 1 ? 'mañana' : `en ${dias} días`)
-const emojiDe = (f: FechaEspecial | null) => (f ? datosDe(f).emoji : '🎅')
+const emojiDe = (f: FechaEspecial | null) => (f ? datosDe(f).emoji : '🎁')
+const diaDe = (fecha: string) => new Date(`${fecha}T00:00:00Z`)
 
-/** La tarjeta azul del carrusel de Próximos: una fecha especial (con tus amigos invisibles de esa fecha) o un amigo invisible. */
+/** El cuadradito de un juego: azul con el emoji de su fecha, o negro con 🎁 si es aparte; abajo, de qué es. */
+function TileJuego({ f }: { f: FechaEspecial | null }) {
+  return (
+    <span aria-hidden className={`relative flex size-[52px] flex-none items-center justify-center rounded-2xl text-[26px] ${f ? 'bg-gr-blue' : 'bg-gr-brand'}`}>
+      {emojiDe(f)}
+      <span className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full px-1.5 py-px text-[9px] font-extrabold tracking-wide whitespace-nowrap ${
+        f ? 'bg-white text-gr-blue' : 'bg-gr-accent text-gr-ink'}`}>
+        {f ? datosDe(f).nombre.replace(/^Día de(l| la) /, '').toUpperCase() : 'APARTE'}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * La tarjeta del carrusel de Próximos: una fecha especial en azul (con tus amigos invisibles de esa fecha) o un amigo
+ * invisible aparte en negro, con su nombre.
+ */
 export function CardEspecial({ t, hoy }: { t: TarjetaEspecial; hoy: Date }) {
   const fecha = t.tipo === 'fecha' ? t.fecha : null
   const juegos = t.tipo === 'fecha' ? t.juegos : [t.juego]
@@ -31,12 +51,14 @@ export function CardEspecial({ t, hoy }: { t: TarjetaEspecial; hoy: Date }) {
   return (
     <li className="w-[252px] flex-none snap-start">
       <Link href={fecha ? `/fechas/${fecha.id}` : `/invisible/${juegos[0].id}`}
-            className="relative flex h-full flex-col overflow-hidden rounded-[22px] bg-gr-blue text-gr-on-blue shadow-card">
-        <div className="relative flex h-[170px] items-center justify-center bg-[radial-gradient(circle_at_30%_30%,#4a74ff,var(--gr-blue)_70%)]">
-          <span className="absolute left-3 top-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold tracking-wide text-gr-blue">
+            className={`relative flex h-full flex-col overflow-hidden rounded-[22px] shadow-card ${fecha ? 'bg-gr-blue text-gr-on-blue' : 'bg-gr-brand text-gr-on-brand'}`}>
+        <div className={`relative flex h-[170px] items-center justify-center ${fecha
+          ? 'bg-[radial-gradient(circle_at_30%_30%,#4a74ff,var(--gr-blue)_70%)]'
+          : 'bg-[radial-gradient(circle_at_30%_30%,#3a3a36,var(--gr-brand)_70%)]'}`}>
+          <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white text-gr-blue' : 'bg-gr-accent text-gr-ink'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
-          <span aria-hidden className="text-[76px] leading-none">{fecha ? fecha.emoji : '🎅'}</span>
+          <span aria-hidden className="text-[76px] leading-none">{fecha ? fecha.emoji : '🎁'}</span>
           <Starburst size={64} fontSize={t.dias > 99 ? 26 : 32} sub={t.dias === 0 ? undefined : t.dias === 1 ? 'día' : 'días'}
                      label={t.dias === 0 ? 'Es hoy' : `Faltan ${t.dias} ${t.dias === 1 ? 'día' : 'días'}`}
                      className="absolute right-2 top-2 drop-shadow-sm">
@@ -47,7 +69,7 @@ export function CardEspecial({ t, hoy }: { t: TarjetaEspecial; hoy: Date }) {
           <h2 className="text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{fecha ? fecha.nombre : juegos[0].nombre}</h2>
           <p className="flex items-center gap-1.5 text-[13px] opacity-85">
             <Icon name="calendar" size={15} className="flex-none" />
-            {fecha ? fecha.cuando : fechaLarga(new Date(`${juegos[0].fecha}T00:00:00Z`), hoy)}
+            {fecha ? fecha.cuando : fechaLarga(diaDe(juegos[0].fecha), hoy)}
           </p>
           {estado
             ? <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-xs font-semibold text-gr-ink">{estado}</p>
@@ -70,13 +92,13 @@ export function JuegosEnInicio({ invitaciones, pasados }: { invitaciones: MiJueg
       {invitaciones.map((j) => (
         <article key={j.id} className="gr-card flex flex-col gap-3 p-3.5">
           <Link href={`/invisible/${j.id}`} className="flex items-center gap-3">
-            <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-blue text-2xl">{emojiDe(j.fechaEspecial)}</span>
+            <TileJuego f={j.fechaEspecial} />
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] leading-snug text-gr-muted">
                 <span className="font-semibold text-gr-ink">{primerNombre(j.organizador)}</span> te invita a un amigo invisible
               </span>
               <span className="block text-base leading-snug font-semibold [overflow-wrap:anywhere]">{j.nombre}</span>
-              <span className="block text-[13px] leading-snug text-gr-muted">{fechaLarga(new Date(`${j.fecha}T00:00:00Z`))}</span>
+              <span className="block text-[13px] leading-snug text-gr-muted">{fechaLarga(diaDe(j.fecha))}</span>
             </span>
           </Link>
           <div className="grid grid-cols-2 gap-2">
@@ -107,38 +129,127 @@ export function JuegosEnInicio({ invitaciones, pasados }: { invitaciones: MiJueg
   )
 }
 
-/** Lo que dice cada juego en la pantalla de su fecha (sin a quién le toca). */
-function accionDe(j: MiJuego) {
-  if (j.dias < 0) return j.revelado ? 'Ya sabés quién te regaló' : '¿Quién te regaló?'
-  if (j.miEstado === 'invitado') return 'Te invitaron: ¿jugás?'
-  if (!j.sorteado) return 'Falta sortear'
-  return j.vi ? 'Ya sabés a quién le regalás' : 'Ya se sorteó: mirá a quién le regalás'
+/** "Ya tengo el regalo": lo marcás vos, para no perderte entre varios (no lo ve nadie más). */
+function YaLoTengo({ id, tengo }: { id: string; tengo: boolean }) {
+  return (
+    <form action={yaLoTengoAction}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="tengo" value={tengo ? '0' : '1'} />
+      <BotonEnviar aria-pressed={tengo}
+                   className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ${tengo ? 'bg-gr-accent' : 'bg-gr-soft'}`}>
+        <span aria-hidden className={`flex size-4 items-center justify-center rounded border-[1.5px] border-gr-ink ${tengo ? 'bg-gr-ink text-gr-accent' : ''}`}>
+          {tengo && <Icon name="check" size={11} strokeWidth={3.4} />}
+        </span>
+        Ya tengo el regalo
+      </BotonEnviar>
+    </form>
+  )
 }
 
-/** Un amigo invisible en la pantalla de una fecha especial. */
-export function TarjetaJuego({ j }: { j: MiJuego }) {
+/**
+ * Un amigo invisible en tu lista (Regalos y la pantalla de su fecha), con lo que te toca hacer: contestar, esperar el
+ * sorteo, ver a quién le regalás, marcar que ya tenés el regalo o, pasada la fecha, ver quién te regaló. A quién le
+ * regalás va tapado hasta tocar "Ver". tambien: los otros juegos donde te tocó la misma persona.
+ */
+export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] }) {
+  const href = `/invisible/${j.id}`
+  const datos = [
+    fechaCorta(diaDe(j.fecha)), j.presupuesto && `hasta ${pesos(j.presupuesto)}`,
+    j.soyOrganizador ? 'organizás vos' : `organiza ${primerNombre(j.organizador)}`,
+  ].filter(Boolean).join(' · ')
+  const pasado = j.dias < 0
   return (
-    <Link href={`/invisible/${j.id}`} className="gr-card flex flex-col gap-3 p-3.5">
-      <span className="flex items-center gap-3">
-        <span aria-hidden className="text-[28px] leading-none">🎅</span>
+    <article className="gr-card flex flex-col gap-3 p-3">
+      <Link href={href} className="flex items-center gap-3">
+        <TileJuego f={j.fechaEspecial} />
         <span className="min-w-0 flex-1">
           <span className="block text-base leading-snug font-semibold [overflow-wrap:anywhere]">{j.nombre}</span>
-          <span className="block text-[13px] leading-snug text-gr-muted">
-            {fechaLarga(new Date(`${j.fecha}T00:00:00Z`))} · organiza {primerNombre(j.organizador)}
-          </span>
+          <span className="block text-[13px] leading-snug text-gr-muted">{datos}</span>
         </span>
+        {j.preguntasSinContestar > 0 && (
+          <span className="flex-none rounded-full bg-gr-blue px-2.5 py-1 text-xs font-bold text-gr-on-blue">
+            {j.preguntasSinContestar === 1 ? '1 pregunta' : `${j.preguntasSinContestar} preguntas`}
+          </span>
+        )}
+        <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+      </Link>
+
+      {pasado ? (
+        <Link href={`${href}#me-regalo`} className="self-start rounded-full bg-gr-soft px-3 py-1.5 text-[13px] font-bold">
+          {j.revelado ? 'Ya sabés quién te regaló' : '¿Quién te regaló? ›'}
+        </Link>
+      ) : j.miEstado === 'invitado' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <form action={responderJuegoAction}>
+            <input type="hidden" name="id" value={j.id} />
+            <input type="hidden" name="juega" value="0" />
+            <BotonEnviar className="gr-btn gr-btn--sm w-full">No juego</BotonEnviar>
+          </form>
+          <form action={responderJuegoAction}>
+            <input type="hidden" name="id" value={j.id} />
+            <input type="hidden" name="juega" value="1" />
+            <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Juego</BotonEnviar>
+          </form>
+        </div>
+      ) : !j.sorteado ? (
+        <p className="self-start rounded-full bg-gr-soft px-3 py-1.5 text-[13px] font-bold">
+          {j.soyOrganizador ? 'Falta que sortees' : 'Falta sortear'} · {j.contestaron} de {j.invitados} contestaron
+        </p>
+      ) : !j.meToca ? (
+        <Link href={`${href}#te-toco`} className="self-start rounded-full bg-gr-accent px-3 py-1.5 text-[13px] font-bold">
+          Ya se sorteó: mirá a quién le regalás ›
+        </Link>
+      ) : (
+        <>
+          <details className="group rounded-2xl bg-gr-soft">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 text-sm [&::-webkit-details-marker]:hidden">
+              <span aria-hidden>🤫</span>
+              <span className="flex-none">Le regalás a</span>
+              <span aria-hidden className="min-w-0 flex-1 font-extrabold tracking-[3px] text-gr-muted group-open:hidden">●●●●●</span>
+              <span className="hidden min-w-0 flex-1 truncate font-bold group-open:inline">{j.meToca.nombre}</span>
+              <span className="flex-none rounded-full border border-gr-line bg-gr-surface px-3 py-1 text-[13px] font-bold">
+                <span className="group-open:hidden">Ver</span><span className="hidden group-open:inline">Tapar</span>
+              </span>
+            </summary>
+            {tambien.length > 0 && (
+              <p className="px-3 pb-3 text-[13px] leading-snug font-medium">
+                Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.
+              </p>
+            )}
+          </details>
+          <div className="flex flex-wrap items-center gap-2">
+            <YaLoTengo id={j.id} tengo={j.yaLoTengo} />
+            <span className="text-[13px] text-gr-muted">{enDias(j.dias)}</span>
+          </div>
+        </>
+      )}
+    </article>
+  )
+}
+
+/** "Armar un amigo invisible", aparte o para una fecha (en Regalos, cuando no estás en ninguno). */
+export function ArmarJuego({ fecha }: { fecha?: FechaEspecial }) {
+  return (
+    <Link href={fecha ? `/invisible/nuevo?fecha=${fecha}` : '/invisible/nuevo'}
+          className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
+      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-accent text-xl">{fecha ? '🎅' : '🎁'}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] leading-snug font-semibold">Armar un amigo invisible</span>
+        <span className="block text-[13px] leading-snug text-gr-muted">Con tus amigos de GiftR. Se sortea y cada uno ve solo a quién le regala.</span>
       </span>
-      <span className="gr-btn gr-btn--sm gr-btn--accent w-full">{accionDe(j)}</span>
+      <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
     </Link>
   )
 }
 
 /**
- * Armar (o editar) un amigo invisible: nombre, temática, presupuesto, cuándo se dan los regalos y, al armarlo, a qué
- * amigos invitar. editar: el que ya está (sin elegir amigos: a más se los invita desde el juego).
+ * Armar (o editar) un amigo invisible: si es para una fecha especial o aparte, nombre, temática, presupuesto, cuándo se dan
+ * los regalos y, al armarlo, a qué amigos invitar. editar: el que ya está (sin elegir amigos: a más se los invita desde el
+ * juego). propuestas: el día de cada fecha especial, para completarlo al elegirla.
  */
-export function FormJuego({ fechaEspecial, amigos, hoy, error, inicial, editar }: {
+export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inicial, editar }: {
   fechaEspecial: FechaEspecial | null
+  propuestas: Partial<Record<FechaEspecial, string>>
   amigos: Persona[]
   hoy: string
   error: boolean
@@ -148,16 +259,17 @@ export function FormJuego({ fechaEspecial, amigos, hoy, error, inicial, editar }
   return (
     <form action={editar ? editarAmigoInvisibleAction : crearAmigoInvisibleAction} className="mt-1 flex flex-col gap-4">
       {editar && <input type="hidden" name="id" value={editar.id} />}
-      {fechaEspecial && <input type="hidden" name="fechaEspecial" value={fechaEspecial} />}
       {error && (
         <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
           No lo pudimos guardar. Fijate que tenga nombre y una fecha que no haya pasado.
         </p>
       )}
-      <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-blue px-4 py-3 text-sm font-medium text-gr-on-blue">
+      <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <span aria-hidden>🤫</span>
         Se sortea entre los que juegan y cada uno ve solo a quién le regala. Nadie más lo ve, tampoco vos que lo organizás.
       </p>
+      <ElegirFechaDelJuego inicial={fechaEspecial} propuestas={propuestas}
+                           opciones={FECHAS_ESPECIALES.map((f) => ({ id: f, nombre: datosDe(f).nombre, emoji: datosDe(f).emoji }))} />
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">Nombre</span>
         <input name="nombre" required maxLength={LARGO.nombreGrupo} defaultValue={inicial.nombre} placeholder="Navidad con los chicos"
@@ -388,8 +500,11 @@ export function Organizar({ v, paraInvitar, sorteo, excluirError }: {
   )
 }
 
-/** Después del sorteo: "Ver a quién le regalo" (y desde ahí, a quién, con su lista). */
-export function TeToco({ v }: { v: VistaJuego }) {
+/**
+ * Después del sorteo: "Ver a quién le regalo" (y desde ahí, a quién, con su lista y "Ya tengo el regalo"). tambien: los
+ * otros juegos donde te tocó la misma persona.
+ */
+export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] }) {
   if (!v.sorteado || v.miEstado !== 'juega') return null
   if (!v.meToca) {
     return (
@@ -413,7 +528,11 @@ export function TeToco({ v }: { v: VistaJuego }) {
       <p className="text-[13px] opacity-80">
         Solo vos lo sabés.{v.soyOrganizador ? ' Nadie más lo ve.' : ` Ni ${primerNombre(v.organizador.nombre)} (que lo organiza) lo ve.`}
       </p>
+      {tambien.length > 0 && (
+        <p className="text-[13px] font-semibold text-gr-accent">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
+      )}
       {token && <Link href={`/l/${token}`} className="gr-btn gr-btn--accent mt-1.5 h-12 w-full">Ver su lista y sus talles</Link>}
+      <div className="mt-1 text-gr-ink"><YaLoTengo id={v.id} tengo={v.yaLoTengo} /></div>
     </div>
   )
 }
@@ -509,7 +628,7 @@ export function EditarYBorrar({ v }: { v: VistaJuego }) {
         Cambiar nombre, temática, presupuesto o fecha
       </Link>
       <Confirmar resumen="Borrar este amigo invisible" boton="Sí, borrarlo" action={borrarAmigoInvisibleAction}
-                 ocultos={{ id: v.id, ...(v.fechaEspecial && { fechaEspecial: v.fechaEspecial }) }} className="items-center">
+                 ocultos={{ id: v.id }} className="items-center">
         Se borra para todos, con el sorteo y las preguntas. No se puede deshacer.
       </Confirmar>
     </div>

@@ -8,6 +8,8 @@ import { MESES } from '@/lib/events'
 import { yo } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { ArmarSorpresa } from '@/components/Sorpresas'
+import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
+import { misAmigosInvisibles, tambienTeToco } from '@/lib/amigo-invisible'
 import { AppHeader, Icon, ItemPhoto, QuizasLink, Seccion } from '@/components/ui'
 
 /** Qué pasa con este regalo, en una línea. */
@@ -50,23 +52,40 @@ function Fila({ r, pasado = false }: { r: MiRegalo; pasado?: boolean }) {
 }
 
 /**
- * Mis regalos: lo que reservé y los regalos grupales en los que estoy, de todas las listas, en un solo lugar. Arriba lo
- * que falta comprar, después lo comprado para lo que viene, y aparte el historial: lo de un cumple o una fecha que ya pasó.
- * Cada uno lleva a su deseo, donde se marca comprado o se libera.
+ * Mis regalos: lo que reservé y los regalos grupales en los que estoy, de todas las listas, en un solo lugar. Arriba mis
+ * amigos invisibles (cada uno con lo que me toca hacer), después lo que falta comprar, lo comprado para lo que viene, y
+ * aparte el historial: lo de un cumple o una fecha que ya pasó. Cada regalo lleva a su deseo, donde se marca comprado o
+ * se libera.
  */
+
+/** Cuántos días después de su fecha sigue un amigo invisible acá (para "¿Quién te regaló?"). */
+const JUEGOS_PASADOS = 15
 export default async function MisRegalos() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [{ porComprar, comprados, historial }, { nombre, foto }] = await Promise.all([misRegalos(db, session.userId), yo(db, session.userId)])
+  const [{ porComprar, comprados, historial }, { nombre, foto }, juegos] = await Promise.all([
+    misRegalos(db, session.userId), yo(db, session.userId), misAmigosInvisibles(db, session.userId, undefined, JUEGOS_PASADOS),
+  ])
+  const tambien = tambienTeToco(juegos)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Tus regalos</h1>
-        <p className="text-[15px] text-gr-muted">Lo que reservaste y los regalos grupales en los que estás.</p>
+        <p className="text-[15px] text-gr-muted">Lo que reservaste, los regalos grupales en los que estás y tus amigos invisibles.</p>
       </div>
       <PestanasRegalos actual="regalos" />
+
+      {juegos.length > 0 && (
+        <section aria-labelledby="invisibles" className="flex flex-col gap-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="invisibles" className="gr-heading">Amigos invisibles<span className="text-gr-muted"> · {juegos.length}</span></h2>
+            <Link href="/invisible/nuevo" className="flex min-h-11 items-center text-sm font-semibold">+ Armar uno</Link>
+          </div>
+          {juegos.map((j) => <FilaJuego key={j.id} j={j} tambien={tambien.get(j.id)} />)}
+        </section>
+      )}
 
       {!porComprar.length && !comprados.length && !historial.length ? (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
@@ -105,6 +124,7 @@ export default async function MisRegalos() {
       )}
 
       <ArmarSorpresa />
+      {!juegos.length && <ArmarJuego />}
     </Seccion>
   )
 }
