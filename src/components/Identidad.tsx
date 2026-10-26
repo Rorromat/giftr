@@ -33,7 +33,7 @@ export function QuienSos({ token, volver }: { token: string; volver: string }) {
   )
 }
 
-function EntrarConGoogle({ volver }: { volver: string }) {
+export function EntrarConGoogle({ volver }: { volver: string }) {
   return (
     <form action={entrarConGoogleAction}>
       <input type="hidden" name="volver" value={volver} />

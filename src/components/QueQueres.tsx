@@ -33,12 +33,12 @@ export async function pegarLink(form: HTMLFormElement): Promise<boolean> {
  * "¿Qué querés?", adentro de la tarjeta del deseo: se escribe o se pega el link (pasa a "Link a la tienda" al mandar, ver
  * deseoDesdeForm). Grande, como el nombre del deseo en su tarjeta.
  */
-export function QueQueres({ defaultValue }: { defaultValue?: string }) {
+export function QueQueres({ defaultValue, placeholder = '¿Qué querés?' }: { defaultValue?: string; placeholder?: string }) {
   return (
     <>
-      <label htmlFor={ID_TITULO} className="sr-only">¿Qué querés?</label>
+      <label htmlFor={ID_TITULO} className="sr-only">{placeholder}</label>
       {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); si el texto se pasa, avisa antes de mandar */}
-      <CampoTitulo id={ID_TITULO} name="titulo" required placeholder="¿Qué querés?" defaultValue={defaultValue}
+      <CampoTitulo id={ID_TITULO} name="titulo" required placeholder={placeholder} defaultValue={defaultValue}
                    className="block min-h-12 w-full rounded-xl bg-transparent px-1.5 text-[22px] leading-tight font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
     </>
   )

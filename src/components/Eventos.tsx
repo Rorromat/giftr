@@ -24,13 +24,18 @@ function Fotos({ e }: { e: Evento }) {
   )
 }
 
-/** "Ya reservaste 1 regalo · Estás en un regalo grupal": los sueltos y los grupales por separado (sumarse no es reservar). */
+/**
+ * "Ya reservaste 1 regalo · Estás en un regalo grupal · Estás en una sorpresa": los sueltos, los grupales y las sorpresas
+ * por separado (sumarse no es reservar).
+ */
 function TeOcupas({ e }: { e: Evento }) {
   const grupales = e.misGrupales ?? 0
-  const sueltos = (e.misReservas ?? 0) - grupales
+  const sorpresas = e.misSorpresas ?? 0
+  const sueltos = (e.misReservas ?? 0) - grupales - sorpresas
   const partes = [
     sueltos > 0 && `Ya reservaste ${sueltos} ${sueltos === 1 ? 'regalo' : 'regalos'}`,
     grupales > 0 && `Estás en ${grupales === 1 ? 'un regalo grupal' : `${grupales} regalos grupales`}`,
+    sorpresas > 0 && `Estás en ${sorpresas === 1 ? 'una sorpresa' : `${sorpresas} sorpresas`}`,
   ].filter(Boolean)
   return <p className="text-[13px] font-medium">{partes.join(' · ')}</p>
 }

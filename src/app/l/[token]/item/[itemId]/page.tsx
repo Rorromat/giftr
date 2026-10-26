@@ -22,6 +22,7 @@ import { ComoLoRegalas } from '@/components/ComoLoRegalas'
 import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { LARGO } from '@/lib/limites'
+import { esSorpresa } from '@/lib/sorpresas'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
 function ultimoDia(hasta: Date) {
@@ -58,7 +59,11 @@ export default async function DetalleItem({ params, searchParams }: {
   const [{ token, itemId }, { reserva, correccion, reservar, regalo: deRegalo }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
-  if (!detalle) notFound()
+  if (!detalle) {
+    // el deseo de una sorpresa (un aviso, la vuelta de una acción del regalo): a la suya, con lo que traía
+    if (await esSorpresa(db, token)) redirect(`/sorpresa/${token}${deRegalo === 'sumado' ? '?regalo=sumado#regalo' : ''}`)
+    notFound()
+  }
   if (detalle.role === 'owner') redirect(detalle.tipo === 'grupo' ? `/grupos/${detalle.listId}` : '/mi-lista')
 
   const { item, ownerNombre } = detalle

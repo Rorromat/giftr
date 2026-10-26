@@ -139,7 +139,7 @@ export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: 
   )
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado, invitar }: Ctx & {
+export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado, invitar, sorpresa = false }: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
@@ -153,6 +153,8 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   ocupado?: string | null
   /** Para el que lo organiza: a quiénes les propuso dividirlo y proponérselo a más (ver InvitadosDelRegalo). */
   invitar?: React.ReactNode
+  /** El regalo de una sorpresa (ver sorpresas.ts): el link es el de la sorpresa, que no dice qué es, y cancelarlo la borra. */
+  sorpresa?: boolean
 }) {
   // al que sacó el encargado no se le ofrece volver con un toque (ver sumarseARegalo)
   const noSeSuma = regalo.meSacaron
@@ -222,7 +224,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
             <>
               {invitar}
               <a target="_blank" className="gr-btn min-h-11 gap-2 px-3.5 text-[15px]"
-                 href={`https://wa.me/?text=${encodeURIComponent(`Armé un regalo grupal para ${ownerNombre}: "${titulo}". ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${itemId}`)}`}>
+                 href={`https://wa.me/?text=${encodeURIComponent(sorpresa
+                   // sin decir qué es: el mensaje puede terminar en un chat donde está quien la recibe
+                   ? `Estoy armando una sorpresa para ${ownerNombre} en GiftR 🤫 ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/sorpresa/${token}`
+                   : `Armé un regalo grupal para ${ownerNombre}: "${titulo}". ¿Te sumás? ${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${itemId}`)}`}>
                 <Icon name="chat" size={18} strokeWidth={2} />Invitar por WhatsApp
               </a>
               <details className="group flex flex-col">
@@ -237,11 +242,18 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               <SacarDelRegalo giftId={regalo.id} token={token} itemId={itemId} sacados={regalo.sacados}
                               otros={regalo.miembros.filter((m) => !m.esEncargado)} />
               {/* cancelarlo suelta el deseo (también si antes era una reserva suya): que no lo descubra después */}
-              <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction}
-                         ocultos={{ token, itemId, giftId: regalo.id }}>
-                El deseo vuelve a quedar libre para cualquiera{n > 1 ? ' y les avisamos a los que se sumaron' : ''}. Si lo
-                querés regalar solo, después lo reservás de nuevo.
-              </Confirmar>
+              {sorpresa ? (
+                <Confirmar resumen="Cancelar la sorpresa" boton="Sí, cancelarla" action={cancelGroupGiftAction}
+                           ocultos={{ token, itemId, giftId: regalo.id }}>
+                  La sorpresa se borra{n > 1 ? ' y les avisamos a los que se sumaron' : ''}.
+                </Confirmar>
+              ) : (
+                <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction}
+                           ocultos={{ token, itemId, giftId: regalo.id }}>
+                  El deseo vuelve a quedar libre para cualquiera{n > 1 ? ' y les avisamos a los que se sumaron' : ''}. Si lo
+                  querés regalar solo, después lo reservás de nuevo.
+                </Confirmar>
+              )}
             </>
           )}
         </>

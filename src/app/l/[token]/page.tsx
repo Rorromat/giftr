@@ -22,6 +22,8 @@ import { BUSCAR_DESDE, paraBuscar } from '@/lib/buscar'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
+import { SorpresasEnLista } from '@/components/Sorpresas'
+import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag, LogoSticker } from '@/components/ui'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
@@ -78,23 +80,29 @@ export default async function ListaAjena({
   const { cat, disp, codazo, reserva, amigo } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
-  if (!vista) notFound()
+  if (!vista) {
+    // el link de una sorpresa (un aviso, Cuentas de antes): a la suya, que decide quién la ve
+    if (await esSorpresa(db, token)) redirect(`/sorpresa/${token}`)
+    notFound()
+  }
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
   // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
   const veTodo = vista.role === 'giver'
   const identified = identificado(viewer)
-  const [evento, historial, gustos, quien] = await Promise.all([
+  // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista) y regalarle algo que no está en
+  // su lista (las sorpresas, solo para los que ven la coordinación con sesión)
+  const dueno = !vista.grupoNombre && vista.perfiles.length === 1 ? vista.perfiles[0] : null
+  const [evento, historial, gustos, quien, sorpresas] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
     veTodo ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
+    veTodo && viewer.userId && dueno ? sorpresasPara(db, dueno.id, viewer.userId) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
-  // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista)
-  const dueno = !vista.grupoNombre && vista.perfiles.length === 1 ? vista.perfiles[0] : null
   const relacion = viewer.userId && dueno ? await relacionCon(db, viewer.userId, dueno.id) : null
   const cuenta = evento && evento.dias <= 60
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
@@ -270,6 +278,8 @@ export default async function ListaAjena({
           </ul>
         )}
       </div>
+
+      {sorpresas && dueno && <SorpresasEnLista token={token} nombre={dueno.nombre} sorpresas={sorpresas} />}
 
       <div className="mt-2">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}

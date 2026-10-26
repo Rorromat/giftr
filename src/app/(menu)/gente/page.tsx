@@ -11,6 +11,7 @@ import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, un
 import { asegurarUsuario, miAmigoToken, misAmigos, personas, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos } from '@/lib/amigos'
 import { paraBuscar } from '@/lib/buscar'
 import { Buscador } from '@/components/Buscador'
+import { ArmarSorpresa } from '@/components/Sorpresas'
 import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { AvatarStack, AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
@@ -174,6 +175,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
           </ul>
         </section>
       )}
+
+      {/* un regalo que no está en la lista de nadie: para un amigo, o para alguien que no usa GiftR */}
+      <ArmarSorpresa />
 
       {token && <InvitarAmigos link={linkAmigo} usuario={usuario} />}
     </Seccion>

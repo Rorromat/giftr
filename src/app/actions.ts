@@ -28,6 +28,7 @@ import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSusc
 import { gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
+import { crearSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
   aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
   pedirAmistadPorMail, responderSolicitud,
@@ -468,6 +469,7 @@ export async function commentAction(formData: FormData) {
   if (!(await listaDelItem(itemId, token))) return
   await addComment(db, itemId, viewer, str(formData, 'texto') ?? '')
   revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath(`/sorpresa/${token}`)
 }
 
 export async function markNotifsReadAction() {
@@ -488,6 +490,8 @@ function revalidarRegalo(fd: FormData) {
   const itemId = str(fd, 'itemId')
   if (token) revalidatePath(`/l/${token}`)
   if (token && itemId) revalidatePath(`/l/${token}/item/${itemId}`)
+  // el regalo de una sorpresa está en su página (con el mismo token)
+  if (token) revalidatePath(`/sorpresa/${token}`)
   revalidatePath('/cuentas')
   revalidatePath('/perfil')
   revalidatePath('/eventos')
@@ -538,10 +542,31 @@ export async function responderInvitacionAction(formData: FormData) {
   revalidatePath('/inicio')
   revalidatePath('/regalos')
   if (r.ok && acepta) {
-    revalidatePath(`/l/${r.token}/item/${r.itemId}`)
-    redirect(`/l/${r.token}/item/${r.itemId}?regalo=sumado#regalo`)
+    revalidatePath(r.href)
+    redirect(`${r.href}?regalo=sumado#regalo`)
   }
   if (!r.ok && r.reason === 'no_se_pudo') redirect('/inicio?invitacion=no_se_pudo#invitaciones')
+}
+
+/**
+ * "Proponerles la sorpresa": un regalo para alguien que no está en su lista (ver crearSorpresa). Para quién: el dueño del
+ * link de su lista (se armó desde ahí), un amigo, o alguien sin GiftR (su nombre y, si la saben, la fecha). Va a la sorpresa.
+ */
+export async function crearSorpresaAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const [lista, amigo, nombre] = [str(formData, 'paraLista'), str(formData, 'paraAmigo'), str(formData, 'paraNombre')]
+  const para: ParaElegido | null = lista ? { token: lista } : amigo ? { amigo } : nombre ? { nombre, fecha: str(formData, 'paraFecha') ?? null } : null
+  const deseo = deseoDesdeForm(formData, true)
+  const r = para && deseo ? await crearSorpresa(db, userId, { para, deseo: paraAgregar(deseo), invitar: amigosDelForm(formData) }) : null
+  if (!r?.ok) {
+    const volver = lista ? `?para=${encodeURIComponent(lista)}` : amigo ? `?amigo=${encodeURIComponent(amigo)}` : '?sin=1'
+    redirect(`/sorpresa/nueva${volver}&error=1`)
+  }
+  revalidatePath('/inicio')
+  revalidatePath('/regalos')
+  revalidatePath('/cuentas')
+  if (lista) revalidatePath(`/l/${lista}`)
+  redirect(`/sorpresa/${r.token}`)
 }
 
 export async function joinGroupGiftAction(formData: FormData) {

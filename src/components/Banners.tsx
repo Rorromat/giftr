@@ -28,7 +28,7 @@ export async function Banners() {
     viewer.userId ? cuantasRecibidas(db, viewer.userId) : { n: 0, primero: null },
   ])
   const notifs = todas.flatMap((n) => {
-    const texto = textoDeAviso(n.tipo, n.itemTitulo)
+    const texto = textoDeAviso(n.tipo, n.itemTitulo, n.sorpresa)
     return texto ? [{ id: n.id, texto, href: n.href }] : []
   })
   if (!notifs.length && !warnings.length && !sinCerrar.length && !codazos.length && !invitado && !solicitudes.n) return null

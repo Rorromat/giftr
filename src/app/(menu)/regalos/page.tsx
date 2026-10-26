@@ -7,14 +7,16 @@ import { plata } from '@/lib/pesos'
 import { MESES } from '@/lib/events'
 import { miFoto } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
+import { ArmarSorpresa } from '@/components/Sorpresas'
 import { AppHeader, Icon, ItemPhoto, QuizasLink, Seccion } from '@/components/ui'
 
 /** Qué pasa con este regalo, en una línea. */
 function estado(r: MiRegalo): { texto: string; urgente?: boolean } {
   if (r.tipo === 'grupal') {
-    if (r.estado === 'comprado') return { texto: r.miParte != null ? `Regalo grupal · tu parte ${plata(r.miParte, r.moneda)}` : 'Regalo grupal · comprado' }
+    const que = r.sorpresa ? 'Sorpresa' : 'Regalo grupal'
+    if (r.estado === 'comprado') return { texto: r.miParte != null ? `${que} · tu parte ${plata(r.miParte, r.moneda)}` : `${que} · comprado` }
     const quien = r.soyEncargado ? 'lo organizás vos' : `organiza ${r.encargado?.split(' ')[0] ?? 'alguien'}`
-    return { texto: `Regalo grupal · ${r.personas} ${r.personas === 1 ? 'persona' : 'personas'} · ${quien}` }
+    return { texto: `${que} · ${r.personas} ${r.personas === 1 ? 'persona' : 'personas'} · ${quien}` }
   }
   if (r.estado === 'comprado') return { texto: 'Comprado' }
   if (r.venceEnDias == null) return { texto: 'Reservado' }
@@ -35,7 +37,7 @@ function Fila({ r, pasado = false }: { r: MiRegalo; pasado?: boolean }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{r.titulo}</p>
-          <p className="text-[13px] font-medium text-gr-muted">para {r.para}{pasado && ` · ${mesDe(r.fecha)}`}</p>
+          <p className="text-[13px] font-medium text-gr-muted">{r.sorpresa && '🤫 '}para {r.para}{pasado && ` · ${mesDe(r.fecha)}`}</p>
           <p className={`flex items-center gap-1.5 text-[13px] font-semibold ${e.urgente ? 'text-red-700' : ''}`}>
             <Icon name={r.estado === 'comprado' ? 'check' : r.tipo === 'grupal' ? 'users' : 'clock'} size={14} strokeWidth={2.4} className="flex-none" />
             {e.texto}
@@ -101,6 +103,8 @@ export default async function MisRegalos() {
           )}
         </>
       )}
+
+      <ArmarSorpresa />
     </Seccion>
   )
 }

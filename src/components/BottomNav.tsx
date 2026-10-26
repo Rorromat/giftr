@@ -15,11 +15,11 @@ const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; c
 
 /**
  * La sección del menú a la que pertenece una pantalla: todo el año y lo nuevo de tus amigos son de Inicio; un grupo, un deseo y el perfil, de Vos; la
- * lista de alguien y agregar un amigo, de Gente; Cuentas, de Regalos.
+ * lista de alguien y agregar un amigo, de Gente; Cuentas y una sorpresa, de Regalos.
  */
 function seccionDe(path: string) {
   if (path === '/eventos' || path === '/novedades') return '/inicio'
-  if (path === '/cuentas') return '/regalos'
+  if (path === '/cuentas' || path.startsWith('/sorpresa/')) return '/regalos'
   if (path.startsWith('/l/') || path.startsWith('/gente/')) return '/gente'
   if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil') return '/mi-lista'
   return path
@@ -68,7 +68,7 @@ function useAnclajeAbajo(ref: RefObject<HTMLElement | null>) {
  * Píldora blanca flotante. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección: la
  * sección marcada se estira en negro con su nombre (las columnas se animan con CSS), desde el toque mismo.
  * En Agregar se esconde: el + gira hasta ser una × y la barra baja mientras la hoja de agregar sube
- * (al editar un deseo también se esconde).
+ * (al editar un deseo o armar una sorpresa también se esconde).
  */
 export function BottomNav() {
   const path = usePathname()
@@ -78,7 +78,7 @@ export function BottomNav() {
   if (toque && toque.desde !== path) setToque(null)
   const actual = seccionDe(path)
   const marcado = toque && toque.desde === path ? toque.href : actual
-  const oculta = marcado === '/agregar' || path.startsWith('/editar/')
+  const oculta = marcado === '/agregar' || path.startsWith('/editar/') || path === '/sorpresa/nueva'
   // En Agregar (o Editar) no hay columna marcada: la píldora se queda donde estaba mientras la barra baja.
   const columna = DESTINOS.find((d) => d.href === marcado)?.columna
   const [ultima, setUltima] = useState(columna)

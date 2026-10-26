@@ -17,16 +17,23 @@ export const INVITADOS_POR_REGALO = 20
 
 const primerNombre = (n: string) => n.split(' ')[0]
 
-/** El deseo, su lista y para quién es ("Rodri", "Delfina y Martín"), de un regalo. */
+/**
+ * El deseo, su lista y para quién es ("Rodri", "Delfina y Martín"; en una sorpresa, quien la recibe), de un regalo, y
+ * adónde lleva (el deseo, o la sorpresa).
+ */
 async function delRegalo(db: Db, giftId: string) {
   const [r] = await db.select({
     giftId: groupGifts.id, organizador: groupGifts.organizerUserId, estado: groupGifts.estado, itemId: items.id, titulo: items.titulo,
     foto: items.fotoUrl, itemEstado: items.estadoDueno, listId: lists.id, ownerId: lists.ownerId, token: lists.shareToken,
+    tipo: lists.tipo, paraUserId: lists.paraUserId, listaNombre: lists.nombre,
   }).from(groupGifts).innerJoin(items, eq(groupGifts.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
     .where(eq(groupGifts.id, giftId))
   if (!r) return null
-  const para = juntarNombres((await duenosDeLista(db, { id: r.listId, ownerId: r.ownerId })).map((d) => primerNombre(d.nombre)))
-  return { ...r, para }
+  const sorpresa = r.tipo === 'sorpresa'
+  // el nombre de alguien sin GiftR va como lo escribieron ("la abuela Marta")
+  const para = !sorpresa ? juntarNombres((await duenosDeLista(db, { id: r.listId, ownerId: r.ownerId })).map((d) => primerNombre(d.nombre)))
+    : r.paraUserId ? primerNombre((await personas(db, [r.paraUserId]))[0]?.nombre ?? 'Alguien') : r.listaNombre ?? 'Alguien'
+  return { ...r, para, sorpresa, href: sorpresa ? `/sorpresa/${r.token}` : `/l/${r.token}/item/${r.itemId}` }
 }
 
 /** De mis amigos, a los que les puedo proponer dividir un deseo: nunca a los dueños de su lista (es la sorpresa). */
@@ -66,11 +73,18 @@ export async function invitarARegalo(db: Db, giftId: string, deUserId: string, p
   const insertados = await db.insert(invitacionesRegalo).values(nuevos.map((paraUserId) => ({ giftId, deUserId, paraUserId })))
     .onConflictDoNothing().returning({ para: invitacionesRegalo.paraUserId })
   const [de] = await personas(db, [deUserId])
-  await Promise.all(insertados.map((i) => avisar(db, i.para, {
-    title: `🎁 ${primerNombre(de?.nombre ?? 'Alguien')} te propone dividir un regalo`,
-    body: `"${r.titulo}" para ${r.para}, en partes iguales. ¿Te sumás?`,
-    url: '/inicio#invitaciones',
-  }, enviar).catch(() => 0)))
+  const quien = primerNombre(de?.nombre ?? 'Alguien')
+  await Promise.all(insertados.map((i) => avisar(db, i.para, r.sorpresa
+    ? {
+      title: `🤫 ${quien} te propone una sorpresa`,
+      body: `"${r.titulo}" para ${r.para}: no está en su lista y no se entera. En partes iguales, ¿te sumás?`,
+      url: '/inicio#invitaciones',
+    }
+    : {
+      title: `🎁 ${quien} te propone dividir un regalo`,
+      body: `"${r.titulo}" para ${r.para}, en partes iguales. ¿Te sumás?`,
+      url: '/inicio#invitaciones',
+    }, enviar).catch(() => 0)))
   return insertados.length
 }
 
@@ -83,8 +97,12 @@ export type Invitacion = {
   foto: string | null
   /** el link de su lista, para ver el deseo y el regalo */
   token: string
+  /** al deseo, o a la sorpresa */
+  href: string
   /** para quién es ("Rodri", "Delfina y Martín") */
   para: string
+  /** un regalo que no está en su lista (ver sorpresas.ts) */
+  sorpresa: boolean
   /** cuántos están en el regalo hoy (el que lo armó incluido) */
   somos: number
 }
@@ -108,12 +126,15 @@ export async function invitacionesPendientes(db: Db, userId: string): Promise<In
     const r = await delRegalo(db, f.giftId)
     const de = deQuien.get(f.de)
     if (!r || !de) return null
-    return { id: f.id, de, giftId: f.giftId, itemId: r.itemId, titulo: r.titulo, foto: r.foto, token: r.token, para: r.para, somos: enEl.length }
+    return {
+      id: f.id, de, giftId: f.giftId, itemId: r.itemId, titulo: r.titulo, foto: r.foto, token: r.token, href: r.href, para: r.para,
+      sorpresa: r.sorpresa, somos: enEl.length,
+    }
   }))
   return vistas.filter((v): v is Invitacion => !!v)
 }
 
-export type Respuesta = { ok: true; token: string; itemId: string } | { ok: false; reason: 'no_existe' | 'no_se_pudo' }
+export type Respuesta = { ok: true; token: string; itemId: string; href: string } | { ok: false; reason: 'no_existe' | 'no_se_pudo' }
 
 /**
  * Contestar una propuesta. Si acepta, se suma al regalo (con las mismas reglas que "Me sumo": si cerró, si ya lo tenía por
@@ -133,10 +154,10 @@ export async function responderInvitacion(db: Db, userId: string, id: string, ac
   const [yo] = await personas(db, [userId])
   const quien = primerNombre(yo?.nombre ?? 'Alguien')
   await avisar(db, inv.deUserId, sumado
-    ? { title: `🤝 ${quien} se suma a "${r.titulo}"`, body: `Lo dividen en partes iguales para ${r.para}.`, url: `/l/${r.token}/item/${r.itemId}` }
-    : { title: `${quien} no se suma a "${r.titulo}"`, body: 'Podés invitar a alguien más desde el regalo.', url: `/l/${r.token}/item/${r.itemId}` },
+    ? { title: `🤝 ${quien} se suma a "${r.titulo}"`, body: `Lo dividen en partes iguales para ${r.para}.`, url: r.href }
+    : { title: `${quien} no se suma a "${r.titulo}"`, body: 'Podés invitar a alguien más desde el regalo.', url: r.href },
   enviar).catch(() => 0)
-  return { ok: true, token: r.token, itemId: r.itemId }
+  return { ok: true, token: r.token, itemId: r.itemId, href: r.href }
 }
 
 export type Invitado = { persona: Persona; estado: 'esperando' | 'se_sumo' | 'no_puede' | 'se_bajo' }

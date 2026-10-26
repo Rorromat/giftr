@@ -74,15 +74,19 @@ export const pedidosAfuera = pgTable('pedidos_afuera', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('pedidos_afuera_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
-// Dos tipos de lista:
+// Tres tipos de lista:
 // - personal: una por usuario, su dueño es owner_id (único).
 // - grupo: una lista en común ("Nuestra casa"); owner_id queda vacío y sus dueños están en list_members.
 //   Los que regalan la ven como una sola lista por share_token; invite_token suma co-dueños.
+// - sorpresa: un regalo que alguien le arma a otro y no está en su lista (ver sorpresas.ts). Sin dueños: un solo deseo,
+//   el regalo grupal que lo divide y su link (share_token), que solo se abre con sesión. Para quién: un usuario
+//   (para_user_id), que para todo lo de la capa oculta cuenta como dueño y nunca la ve, o alguien sin GiftR (su nombre,
+//   en nombre, y la fecha si la saben, en evento_fecha).
 export const lists = pgTable('lists', {
   id: uuid('id').defaultRandom().primaryKey(),
   ownerId: uuid('owner_id').references(() => users.id).unique(),
   shareToken: text('share_token').notNull().unique(),
-  tipo: text('tipo', { enum: ['personal', 'grupo'] }).notNull().default('personal'),
+  tipo: text('tipo', { enum: ['personal', 'grupo', 'sorpresa'] }).notNull().default('personal'),
   nombre: text('nombre'),
   descripcion: text('descripcion'),
   inviteToken: text('invite_token').unique(),
@@ -94,8 +98,14 @@ export const lists = pgTable('lists', {
   // Al cambiar o quitar la fecha del grupo, desde cuándo lo comprado era para el evento que venía (vacío: sin corte): lo
   // de antes es del que ya pasó aunque la fecha nueva no lo encuentre (ver desdeElUltimoEvento).
   corteEvento: timestamp('corte_evento', { withTimezone: true }),
+  // Solo en una sorpresa: para quién es (vacío si no usa GiftR) y quién la armó.
+  paraUserId: uuid('para_user_id').references(() => users.id),
+  creadaPor: uuid('creada_por').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [
+  // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
+  index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
+])
 
 // Listas que un usuario abrió como regalador: su gente. Sus cumples y fechas aparecen en Eventos.
 // Índice por lista: al cambiar el link para regalar se borran los que la seguían (la clave empieza por el usuario).

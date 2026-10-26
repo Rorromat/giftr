@@ -220,6 +220,9 @@ export async function cancelarRegalo(db: Db, giftId: string, userId: string): Pr
       .returning({ claimId: groupGifts.claimId, itemId: groupGifts.itemId })
     if (!g) return false
     await t.update(claims).set({ estado: 'liberado', updatedAt: new Date() }).where(eq(claims.id, g.claimId))
+    // una sorpresa es su regalo: cancelado, se va (no queda un deseo suelto para regalarle a alguien, ver sorpresas.ts)
+    await t.update(items).set({ estadoDueno: 'no_lo_quiero' })
+      .where(and(eq(items.id, g.itemId), inArray(items.listId, t.select({ id: lists.id }).from(lists).where(eq(lists.tipo, 'sorpresa')))))
     // a todos los del regalo, también al encargado
     await t.update(notifications).set({ leida: true }).where(and(avisosDelRegaloSinLeer(g.itemId),
       inArray(notifications.userId, t.select({ id: groupGiftMembers.userId }).from(groupGiftMembers).where(eq(groupGiftMembers.giftId, giftId)))))
@@ -551,16 +554,23 @@ const deudores = alias(users, 'deudores')
 const duenosPersonales = alias(users, 'duenos_personales')
 
 type Destino = {
-  tipo: 'personal' | 'grupo'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string
+  tipo: 'personal' | 'grupo' | 'sorpresa'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string
   activo: boolean; tieneElLink: boolean
 }
 
+/**
+ * Para quién y adónde lleva. duenoNombre es el del dueño de la lista personal o el de quien recibe la sorpresa (ver
+ * duenoOParaSql); una sorpresa para alguien sin GiftR lleva su nombre en el de la lista.
+ */
 function destino(r: Destino, conLink = r.tieneElLink) {
   return {
-    para: r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? 'Alguien',
-    href: !conLink ? null : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`,
+    para: r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? r.listaNombre ?? 'Alguien',
+    href: !conLink ? null : r.tipo === 'sorpresa' ? `/sorpresa/${r.shareToken}` : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`,
   }
 }
+
+/** Para el join con el dueño de una lista: el de la personal, o el que recibe una sorpresa (solo uno de los dos está). */
+export const duenoOParaSql = sql`coalesce(${lists.ownerId}, ${lists.paraUserId})`
 
 /**
  * Para qué deseo y lista es cada línea. Si cambiaron el link para regalar, el nuevo solo va en las líneas de quien sigue
@@ -589,7 +599,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     .innerJoin(deudores, eq(groupGiftMembers.userId, deudores.id))
     .innerJoin(items, eq(groupGifts.itemId, items.id))
     .innerJoin(lists, eq(items.listId, lists.id))
-    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .leftJoin(duenosPersonales, eq(duenoOParaSql, duenosPersonales.id))
     .where(and(
       enCuentasDe(db, userId),
       ne(groupGiftMembers.userId, groupGifts.organizerUserId),
@@ -626,7 +636,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
     .innerJoin(items, eq(groupGifts.itemId, items.id))
     .innerJoin(lists, eq(items.listId, lists.id))
-    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .leftJoin(duenosPersonales, eq(duenoOParaSql, duenosPersonales.id))
     .where(and(eq(groupGiftMembers.userId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
     .orderBy(desc(groupGifts.createdAt))
   const nombres = abiertos.length
@@ -696,7 +706,7 @@ export async function comprasParaCorregir(db: Db, userId: string): Promise<Compr
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
     .innerJoin(items, eq(groupGifts.itemId, items.id))
     .innerJoin(lists, eq(items.listId, lists.id))
-    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .leftJoin(duenosPersonales, eq(duenoOParaSql, duenosPersonales.id))
     .where(and(
       eq(groupGifts.organizerUserId, userId), enCuentasDe(db, userId),
       // de entrada, solo las que alguien todavía le debe (la parte del encargado queda paga al comprar) o las del último mes
@@ -766,7 +776,7 @@ export async function regalosParaCerrar(db: Db, userId: string): Promise<{ giftI
     .from(groupGifts)
     .innerJoin(items, eq(groupGifts.itemId, items.id))
     .innerJoin(lists, eq(items.listId, lists.id))
-    .leftJoin(duenosPersonales, eq(lists.ownerId, duenosPersonales.id))
+    .leftJoin(duenosPersonales, eq(duenoOParaSql, duenosPersonales.id))
     .where(and(eq(groupGifts.organizerUserId, userId), eq(groupGifts.estado, 'abierto'), noEsNiFueDuenoSql(db, userId)))
     .orderBy(asc(groupGifts.createdAt))
   if (!abiertos.length) return []

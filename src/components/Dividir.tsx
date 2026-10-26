@@ -14,7 +14,7 @@ import { paraBuscar } from '@/lib/buscar'
 const BUSCAR_DESDE = 7
 
 /** Los amigos para tildar: cada uno con su foto. Con muchos, un buscador arriba (lo tildado y escondido se manda igual). */
-function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: string }) {
+export function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: string }) {
   return (
     <>
       {amigos.length >= BUSCAR_DESDE && <Buscador ambito={ambito} placeholder="Buscar un amigo" vacio="No tenés un amigo con «%s»." />}
@@ -118,17 +118,18 @@ export function InvitacionesRegalo({ invitaciones, noSePudo }: { invitaciones: I
       )}
       {invitaciones.map((i) => (
         <article key={i.id} className="gr-card flex flex-col gap-3 p-3.5">
-          <Link href={`/l/${i.token}/item/${i.itemId}`} className="flex items-center gap-3">
+          <Link href={i.href} className="flex items-center gap-3">
             <div className="w-16 flex-none overflow-hidden rounded-2xl">
               <ItemPhoto src={i.foto} titulo={i.titulo} height={64} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-medium leading-snug text-gr-muted">
-                <span className="font-semibold text-gr-ink">{i.de.nombre.split(' ')[0]}</span> te propone dividir
+                <span className="font-semibold text-gr-ink">{i.de.nombre.split(' ')[0]}</span>
+                {i.sorpresa ? ' te propone una sorpresa 🤫' : ' te propone dividir'}
               </p>
               <p className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{i.titulo}</p>
               <p className="text-[13px] leading-snug text-gr-muted">
-                Para {i.para} · en partes iguales{i.somos > 1 ? ` · ya son ${i.somos}` : ''}
+                Para {i.para}{i.sorpresa ? ' · no está en su lista' : ''} · en partes iguales{i.somos > 1 ? ` · ya son ${i.somos}` : ''}
               </p>
             </div>
           </Link>
