@@ -5,6 +5,7 @@ import { PrioritySelect } from '@/components/PrioritySelect'
 import { Icon, ItemPhoto } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
 import { textoDueno } from '@/lib/compartir'
+import { paraBuscar } from '@/lib/buscar'
 
 /** El alto de las fotos de la grilla: todas iguales, para que la lista se lea de un vistazo. */
 const ALTO_FOTO = 176
@@ -34,14 +35,14 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
 export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerItemView[]; shareToken: string; agregado?: string }) {
   const porCategoria = Object.groupBy(items, (i) => i.categoria ?? 'Sin categoría')
   return Object.entries(porCategoria).map(([cat, catItems]) => (
-    <section key={cat} className="flex flex-col gap-2.5">
+    <section key={cat} data-buscar-grupo className="flex flex-col gap-2.5">
       <h3 className="gr-label">{cat}</h3>
       <ul className="grid grid-cols-2 items-start gap-3">
         {catItems!.map((item) => {
           const precio = item.precio ?? item.rangoPrecio
           return (
             // Toda la card abre el deseo (el ::after del título la cubre); el menú y la prioridad van por arriba.
-            <li key={item.id} id={`d-${item.id}`}
+            <li key={item.id} id={`d-${item.id}`} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)}
                 className={`gr-card relative scroll-mt-24 ${item.id === agregado ? 'outline-3 outline-offset-2 outline-gr-accent' : ''}`}>
               <div className="relative">
                 <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={ALTO_FOTO} />

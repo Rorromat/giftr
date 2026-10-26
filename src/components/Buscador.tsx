@@ -7,7 +7,7 @@ import { coincide } from '@/lib/buscar'
 
 /**
  * Un buscador que filtra en el momento lo que ya está en la pantalla: lo que tiene data-buscar (su texto, con paraBuscar)
- * adentro de #ambito. Lo que no coincide se esconde (sigue en el formulario: un amigo tildado y escondido se manda igual);
+ * adentro de #ambito; un data-buscar-grupo (una categoría con su título) sin nada a la vista se esconde entero. Lo que no coincide se esconde (sigue en el formulario: un amigo tildado y escondido se manda igual);
  * si no queda nada, lo dice y, con masAlla, ofrece buscarlo afuera (a masAlla.href se le agrega lo escrito).
  */
 export function Buscador({ ambito, placeholder, vacio, masAlla }: {
@@ -29,6 +29,10 @@ export function Buscador({ ambito, placeholder, vacio, masAlla }: {
       const si = coincide(item.dataset.buscar ?? '', escrito)
       item.hidden = !si
       if (si) n++
+    }
+    // un grupo (una categoría, con su título) sin nada a la vista, se va entero
+    for (const grupo of document.getElementById(ambito)?.querySelectorAll<HTMLElement>('[data-buscar-grupo]') ?? []) {
+      grupo.hidden = !grupo.querySelector('[data-buscar]:not([hidden])')
     }
     setHay(n > 0 || !items.length)
   }

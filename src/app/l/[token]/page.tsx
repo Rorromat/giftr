@@ -17,6 +17,8 @@ import { gustosDeLista } from '@/lib/bienvenida'
 import { TarjetaPerfil } from '@/components/Gustos'
 import { Codazo } from '@/components/Codazo'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
+import { Buscador } from '@/components/Buscador'
+import { BUSCAR_DESDE, paraBuscar } from '@/lib/buscar'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
@@ -200,69 +202,74 @@ export default async function ListaAjena({
         </p>
       )}
 
-      {hero && (
-        <article className="gr-card relative">
-          <div className="relative">
-            <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
-            <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
-            {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
-            {viewer.userId && <BotonRobar token={token} itemId={hero.id} variante="icono" className="absolute right-3 top-3 z-[2]" />}
-          </div>
-          <div className="flex flex-col gap-3 p-4">
-            <div className="flex flex-col gap-1">
-              <Link href={`/l/${token}/item/${hero.id}`} className="text-xl leading-snug font-semibold [overflow-wrap:anywhere]">
-                {hero.titulo}
-              </Link>
-              {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-semibold">{hero.precio ?? hero.rangoPrecio}</p>}
-              {hero.notas && <p className="text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">{hero.notas}</p>}
-              {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
-            </div>
-            <div className="flex items-center gap-2">
-              {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
-              <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn gr-btn--sm flex-1">Ver más</Link>
-            </div>
-          </div>
-        </article>
-      )}
+      {/* una lista larga: buscar algo puntual (en lo que se ve con el filtro elegido) */}
+      {mostrados.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
 
-      {resto.length > 0 && (
-        <ul className="grid grid-cols-2 items-stretch gap-3">
-          {resto.map((item) => {
-            const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
-            const cuantas = cupo(item)
-            return (
-              <li key={item.id} className="gr-card relative flex flex-col">
-                <div className="relative">
-                  <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
-                  {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
-                  {!item.disponible && (
-                    <span className="absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
-                      {estadoNoDisponible(item)}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
-                  <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
-                    {item.titulo}
-                  </Link>
-                  <div className="flex items-center gap-1.5">
-                    {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-semibold">{item.precio ?? item.rangoPrecio}</p>}
-                    {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
+      <div id="su-lista" className="flex flex-col gap-4">
+        {hero && (
+          <article data-buscar={paraBuscar(`${hero.titulo} ${hero.categoria ?? ''} ${hero.notas ?? ''}`)} className="gr-card relative">
+            <div className="relative">
+              <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
+              <PriorityTag prioridad={hero.prioridad} className="absolute left-3 top-3 h-[30px]" />
+              {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
+              {viewer.userId && <BotonRobar token={token} itemId={hero.id} variante="icono" className="absolute right-3 top-3 z-[2]" />}
+            </div>
+            <div className="flex flex-col gap-3 p-4">
+              <div className="flex flex-col gap-1">
+                <Link href={`/l/${token}/item/${hero.id}`} className="text-xl leading-snug font-semibold [overflow-wrap:anywhere]">
+                  {hero.titulo}
+                </Link>
+                {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-semibold">{hero.precio ?? hero.rangoPrecio}</p>}
+                {hero.notas && <p className="text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">{hero.notas}</p>}
+                {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                {heroAccion && <div className="flex-[1.3]">{heroAccion}</div>}
+                <Link href={`/l/${token}/item/${hero.id}`} className="gr-btn gr-btn--sm flex-1">Ver más</Link>
+              </div>
+            </div>
+          </article>
+        )}
+
+        {resto.length > 0 && (
+          <ul data-buscar-grupo className="grid grid-cols-2 items-stretch gap-3">
+            {resto.map((item) => {
+              const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
+              const cuantas = cupo(item)
+              return (
+                <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="gr-card relative flex flex-col">
+                  <div className="relative">
+                    <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                    {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
+                    {!item.disponible && (
+                      <span className="absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
+                        {estadoNoDisponible(item)}
+                      </span>
+                    )}
                   </div>
-                  {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
-                  <div className="mt-auto flex flex-col items-stretch gap-0.5 pt-1.5">
-                    {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
-                    <Link href={`/l/${token}/item/${item.id}`}
-                          className="inline-flex min-h-11 items-center justify-center text-[13px] font-semibold">
-                      Ver más
+                  <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
+                    <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
+                      {item.titulo}
                     </Link>
+                    <div className="flex items-center gap-1.5">
+                      {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-semibold">{item.precio ?? item.rangoPrecio}</p>}
+                      {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
+                    </div>
+                    {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
+                    <div className="mt-auto flex flex-col items-stretch gap-0.5 pt-1.5">
+                      {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
+                      <Link href={`/l/${token}/item/${item.id}`}
+                            className="inline-flex min-h-11 items-center justify-center text-[13px] font-semibold">
+                        Ver más
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
       <div className="mt-2">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
