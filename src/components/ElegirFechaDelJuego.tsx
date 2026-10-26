@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
+import { IconoFecha } from '@/components/IconoFecha'
 import type { FechaEspecial } from '@/lib/fechas-especiales'
 
 /**
@@ -9,7 +10,7 @@ import type { FechaEspecial } from '@/lib/fechas-especiales'
  * Sin JavaScript se elige igual; solo no se completa el día.
  */
 export function ElegirFechaDelJuego({ opciones, inicial, propuestas }: {
-  opciones: { id: FechaEspecial; nombre: string; emoji: string }[]
+  opciones: { id: FechaEspecial; nombre: string }[]
   inicial: FechaEspecial | null
   /** el día que se propone para cada fecha ('YYYY-MM-DD') */
   propuestas: Partial<Record<FechaEspecial, string>>
@@ -21,10 +22,11 @@ export function ElegirFechaDelJuego({ opciones, inicial, propuestas }: {
     if (dia && propuesta && (!dia.value || dia.value === propuestas[elegida.current as FechaEspecial])) dia.value = propuesta
     elegida.current = nueva
   }
-  const chip = (valor: string, texto: string) => (
+  const chip = (valor: FechaEspecial | '', texto: string) => (
     <label key={valor} className="gr-chip">
       <input type="radio" name="fechaEspecial" value={valor} defaultChecked={(inicial ?? '') === valor} onChange={() => cambiar(valor)}
              className="sr-only" />
+      <IconoFecha fecha={valor || null} size={18} acento="currentColor" className="-ml-1 flex-none" />
       {texto}
     </label>
   )
@@ -32,8 +34,8 @@ export function ElegirFechaDelJuego({ opciones, inicial, propuestas }: {
     <fieldset className="flex flex-col gap-2">
       <legend className="gr-label mb-2">¿Es para una fecha especial?</legend>
       <div className="flex flex-wrap gap-2">
-        {chip('', '🎁 No, es aparte')}
-        {opciones.map((o) => chip(o.id, `${o.emoji} ${o.nombre}`))}
+        {chip('', 'No, es aparte')}
+        {opciones.map((o) => chip(o.id, o.nombre))}
       </div>
     </fieldset>
   )
