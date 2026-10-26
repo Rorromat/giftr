@@ -7,6 +7,7 @@ import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/compon
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { CardEspecial } from '@/components/AmigoInvisible'
 import { IconoFecha } from '@/components/IconoFecha'
+import { paletaDe } from '@/lib/colores-fechas'
 
 // Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos). Las fechas especiales (Navidad,
 // Día del Amigo…) y los amigos invisibles van entre ellos, en azul.
@@ -137,12 +138,12 @@ export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[];
   )
 }
 
-/** Todo el año: la grilla de los meses (las fechas especiales en azul) y la lista, con todo por cercanía. */
+/** Todo el año: la grilla de los meses (las fechas especiales, cada una con su color) y la lista, con todo por cercanía. */
 export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: FechaEspecialVista[] }) {
   const meses = calendarioDelAnio(eventos, hoy)
   // en la grilla, el día de este año (la próxima vez puede ser el año que viene)
-  const esteAnio = especiales.map((f) => diaEn(f.id, hoy.getUTCFullYear()))
-  const azules = (m: number) => esteAnio.filter((d) => d.getUTCMonth() === m).map((d) => d.getUTCDate())
+  const esteAnio = especiales.map((f) => ({ dia: diaEn(f.id, hoy.getUTCFullYear()), color: paletaDe(f.id).fondo }))
+  const colorDeEspecial = (m: number, d: number) => esteAnio.find((e) => e.dia.getUTCMonth() === m && e.dia.getUTCDate() === d)?.color
   const lista = [
     ...eventos.map((e) => ({ dias: e.dias, fila: (
       <li key={e.listId}>
@@ -156,9 +157,11 @@ export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[
     ...especiales.map((f) => ({ dias: f.dias, fila: (
       <li key={f.id}>
         <Link href={`/fechas/${f.id}`} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
-          <span className="flex-none rounded-full bg-gr-blue px-2.5 py-1 text-[13px] font-semibold text-gr-on-blue">{fechaCorta(f.fecha, hoy)}</span>
+          <span className="flex-none rounded-full px-2.5 py-1 text-[13px] font-semibold text-white" style={{ background: paletaDe(f.id).fondo }}>
+            {fechaCorta(f.fecha, hoy)}
+          </span>
           <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{f.nombre}</span>
-          <IconoFecha fecha={f.id} size={22} acento="var(--gr-blue)" className="flex-none text-gr-blue" />
+          <span style={{ color: paletaDe(f.id).fondo }}><IconoFecha fecha={f.id} size={22} acento="currentColor" className="flex-none" /></span>
           <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
         </Link>
       </li>
@@ -172,17 +175,24 @@ export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[
             <li key={m.nombre} className="flex flex-col gap-1.5">
               <span className={`self-start text-[13px] font-semibold ${m.actual ? 'rounded-full bg-gr-brand px-2 text-gr-on-brand' : ''}`}>{m.nombre}</span>
               <div aria-hidden className="grid grid-cols-7 gap-[3px]">
-                {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => (
-                  <span key={d} className={`aspect-square rounded-full ${
-                    azules(i).includes(d) ? 'bg-gr-blue' : m.eventos.includes(d) ? 'bg-gr-accent ring-1 ring-gr-ink/30' : m.hoy === d ? 'bg-gr-ink' : 'bg-gr-dot'}`} />
-                ))}
+                {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => {
+                  const especial = colorDeEspecial(i, d)
+                  return (
+                    <span key={d} style={especial ? { background: especial } : undefined} className={`aspect-square rounded-full ${
+                      especial ? '' : m.eventos.includes(d) ? 'bg-gr-accent ring-1 ring-gr-ink/30' : m.hoy === d ? 'bg-gr-ink' : 'bg-gr-dot'}`} />
+                  )
+                })}
               </div>
             </li>
           ))}
         </ul>
         <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-gr-line pt-3 text-xs text-gr-muted">
           <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-accent ring-1 ring-gr-ink/30" />Evento o cumple</span>
-          {especiales.length > 0 && <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-blue" />Fecha especial</span>}
+          {especiales.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="size-3 rounded-full" style={{ background: `conic-gradient(${esteAnio.map((e) => e.color).join(', ')})` }} />Fecha especial
+            </span>
+          )}
           <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-ink" />Hoy</span>
         </p>
       </div>

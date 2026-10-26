@@ -11,6 +11,7 @@ import { ElegirAmigos } from '@/components/Dividir'
 import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
+import { paletaDe } from '@/lib/colores-fechas'
 import { AvatarSticker, Icon, Starburst } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 import { estadoDeJuegos, MIN_JUGADORES, type MiJuego, type VistaJuego } from '@/lib/amigo-invisible'
@@ -21,39 +22,40 @@ import { pesos } from '@/lib/pesos'
 
 // Fechas especiales y amigo invisible (ver fechas-especiales.ts y amigo-invisible.ts): las tarjetas de Lo que viene, las
 // invitaciones en Inicio, los juegos en Regalos, el formulario para armarlo y las partes de la pantalla de cada juego.
-// Los de una fecha especial van en azul con su ilustración; los "aparte" (sin fecha especial), en negro con lima y el regalo
-// con antifaz (ver IlustracionFecha; en chico, IconoFecha).
+// Cada fecha especial va con sus colores y su ilustración; los "aparte" (sin fecha especial), en negro con lima y el regalo
+// con antifaz (ver colores-fechas.ts e IlustracionFecha; en chico, IconoFecha).
 // A quién le toca a cada uno no aparece en Inicio; en Regalos va tapado hasta tocar "Ver", y en el juego, después de "Ver".
 
 const primerNombre = (n: string) => n.split(' ')[0]
 const enDias = (dias: number) => (dias === 0 ? 'es hoy' : dias === 1 ? 'mañana' : `en ${dias} días`)
 const diaDe = (fecha: string) => new Date(`${fecha}T00:00:00Z`)
 
-/** El cuadradito de un juego: el ícono de su fecha sobre azul, o el regalo con antifaz sobre negro si es aparte. */
+/** El cuadradito de un juego: el ícono de su fecha sobre su color, o el regalo con antifaz sobre negro si es aparte. */
 function TileJuego({ f }: { f: FechaEspecial | null }) {
+  const p = paletaDe(f)
   return (
-    <span aria-hidden className={`flex size-[52px] flex-none items-center justify-center rounded-2xl text-gr-on-blue ${f ? 'bg-gr-blue' : 'bg-gr-brand'}`}>
-      <IconoFecha fecha={f} size={28} />
+    <span aria-hidden className="flex size-[52px] flex-none items-center justify-center rounded-2xl text-white" style={{ background: p.fondo }}>
+      <IconoFecha fecha={f} size={28} acento={p.acento} />
     </span>
   )
 }
 
 /**
- * La tarjeta del carrusel de Próximos: una fecha especial en azul (con tus amigos invisibles de esa fecha) o un amigo
- * invisible aparte en negro, con su nombre.
+ * La tarjeta del carrusel de Próximos: una fecha especial con sus colores (con tus amigos invisibles de esa fecha) o un
+ * amigo invisible aparte en negro, con su nombre.
  */
 export function CardEspecial({ t, hoy }: { t: TarjetaEspecial; hoy: Date }) {
   const fecha = t.tipo === 'fecha' ? t.fecha : null
   const juegos = t.tipo === 'fecha' ? t.juegos : [t.juego]
   const estado = estadoDeJuegos(juegos)
+  const p = paletaDe(fecha?.id ?? null)
   return (
     <li className="w-[252px] flex-none snap-start">
-      <Link href={fecha ? `/fechas/${fecha.id}` : `/invisible/${juegos[0].id}`}
-            className={`relative flex h-full flex-col overflow-hidden rounded-[22px] shadow-card ${fecha ? 'bg-gr-blue text-gr-on-blue' : 'bg-gr-brand text-gr-on-brand'}`}>
-        <div className={`relative flex h-[170px] items-center justify-center ${fecha
-          ? 'bg-[radial-gradient(circle_at_30%_30%,#4a74ff,var(--gr-blue)_70%)]'
-          : 'bg-[radial-gradient(circle_at_30%_30%,#3a3a36,var(--gr-brand)_70%)]'}`}>
-          <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white text-gr-blue' : 'bg-gr-accent text-gr-ink'}`}>
+      <Link href={fecha ? `/fechas/${fecha.id}` : `/invisible/${juegos[0].id}`} style={{ background: p.fondo }}
+            className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
+        <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
+          <span style={fecha ? { color: p.fondo } : undefined}
+                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-ink'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
           <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
@@ -115,7 +117,9 @@ export function JuegosEnInicio({ invitaciones, pasados }: { invitaciones: MiJueg
       ))}
       {pasados.map((j) => (
         <Link key={j.id} href={`/invisible/${j.id}#me-regalo`} className="gr-card flex items-center gap-3 p-3.5">
-          <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-blue text-gr-on-blue"><Icon name="antifaz" size={22} /></span>
+          <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full text-white" style={{ background: paletaDe(j.fechaEspecial).fondo }}>
+            <Icon name="antifaz" size={22} />
+          </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">¿Quién te regaló en «{j.nombre}»?</span>
             <span className="block text-[13px] leading-snug text-gr-muted">Si querés saberlo, entrá y pedilo. Si no, no se dice.</span>
