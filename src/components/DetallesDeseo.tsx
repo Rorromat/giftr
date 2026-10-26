@@ -8,7 +8,7 @@ import type { OwnerItemView } from '@/lib/serialize'
 
 const CATEGORIAS = ['Tecnología', 'Casa', 'Ropa', 'Libros', 'Experiencias', 'Hobbies']
 
-type Detalle = 'notas' | 'cantidad' | 'categoria' | 'link'
+export type Detalle = 'notas' | 'cantidad' | 'categoria' | 'link'
 
 const CHIPS: { detalle: Detalle; texto: string }[] = [
   { detalle: 'notas', texto: 'Talle o color' },
@@ -22,7 +22,14 @@ const CHIPS: { detalle: Detalle; texto: string }[] = [
  * abierto. Cerrado no se borra: los campos siguen en el formulario (con hidden), así un chip que se cierra no pierde lo
  * escrito, y "Link de la tienda" lo llena la lectura del link aunque no se vea (ver CompletarDesdeLink).
  */
-export function DetallesDeseo({ deseo, notas }: { deseo?: OwnerItemView; notas?: string | null }) {
+export function DetallesDeseo({ deseo, notas, solo, textoNotas = 'Talle o color' }: {
+  deseo?: OwnerItemView
+  notas?: string | null
+  /** cuáles (una sorpresa no tiene cantidad ni categoría); si no, todos */
+  solo?: Detalle[]
+  textoNotas?: string
+}) {
+  const hay = (d: Detalle) => !solo || solo.includes(d)
   const [abiertos, setAbiertos] = useState<Set<Detalle>>(() => new Set([
     ...(deseo?.notas || notas ? ['notas' as const] : []),
     ...((deseo?.cantidad ?? 1) > 1 ? ['cantidad' as const] : []),
@@ -52,28 +59,28 @@ export function DetallesDeseo({ deseo, notas }: { deseo?: OwnerItemView; notas?:
   return (
     <div ref={raiz} className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
-        {CHIPS.map(({ detalle, texto }) => {
+        {CHIPS.filter(({ detalle }) => hay(detalle)).map(({ detalle, texto }) => {
           const abierto = abiertos.has(detalle)
           return (
             <button key={detalle} type="button" aria-expanded={abierto} aria-controls={`detalle-${detalle}`} onClick={() => cambiar(detalle)}
                     className={`flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold ${abierto ? 'border-gr-ink bg-gr-surface' : 'border-dashed border-gr-line-strong bg-transparent'}`}>
-              <Icon name={abierto ? 'check' : 'plus'} size={15} strokeWidth={2.4} />{texto}
+              <Icon name={abierto ? 'check' : 'plus'} size={15} strokeWidth={2.4} />{detalle === 'notas' ? textoNotas : texto}
             </button>
           )
         })}
       </div>
 
-      <div id="detalle-notas" hidden={ver('notas')}>
+      {hay('notas') && <div id="detalle-notas" hidden={ver('notas')}>
         <textarea name="notas" maxLength={LARGO.notas} placeholder="Talle, color, modelo… lo que ayude a acertar" aria-label="Notas: talle, color"
                   defaultValue={deseo?.notas ?? notas ?? ''} className="gr-input min-h-24" />
-      </div>
-      <div id="detalle-cantidad" hidden={ver('cantidad')} className="flex items-center gap-3">
+      </div>}
+      {hay('cantidad') && <div id="detalle-cantidad" hidden={ver('cantidad')} className="flex items-center gap-3">
         <label htmlFor="cantidad" className="text-sm font-semibold">¿Cuántos?</label>
         {/* uno de antes del tope con más se sigue pudiendo editar (si no se toca, queda como estaba) */}
         <input id="cantidad" name="cantidad" type="number" inputMode="numeric" min="1" max={Math.max(CANTIDAD_MAXIMA, deseo?.cantidad ?? 0)}
                defaultValue={deseo?.cantidad ?? 1} className="gr-input w-28" />
-      </div>
-      <div id="detalle-categoria" hidden={ver('categoria')} role="radiogroup" aria-label="Categoría" className="flex flex-wrap gap-2">
+      </div>}
+      {hay('categoria') && <div id="detalle-categoria" hidden={ver('categoria')} role="radiogroup" aria-label="Categoría" className="flex flex-wrap gap-2">
         {CATEGORIAS.map((c) => (
           <label key={c} className="gr-chip">
             <input type="radio" name="categoria" value={c} defaultChecked={deseo?.categoria === c} className="sr-only" />{c}
@@ -83,7 +90,8 @@ export function DetallesDeseo({ deseo, notas }: { deseo?: OwnerItemView; notas?:
         <label className="gr-chip">
           <input type="radio" name="categoria" value="" defaultChecked={!deseo?.categoria} className="sr-only" />Sin categoría
         </label>
-      </div>
+      </div>}
+      {/* el link siempre está, aunque no se vea: ahí deja el suyo la lectura del link (ver CompletarDesdeLink) */}
       <div id="detalle-link" hidden={ver('link')}>
         {/* sin https:// también vale (el servidor se lo agrega); lo que el servidor no tomaría como link avisa antes de mandar */}
         <CampoLink name="linkTienda" placeholder="Link a la tienda" defaultValue={deseo?.linkTienda ?? ''} className="gr-input"

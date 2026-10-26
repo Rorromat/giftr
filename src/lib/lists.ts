@@ -100,7 +100,8 @@ function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaR
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {
   if (!esToken(shareToken)) return null
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, shareToken))
-  if (!list) return null
+  // una sorpresa se abre solo por sorpresas.ts (con sesión, y nunca para quien la recibe)
+  if (!list || list.tipo === 'sorpresa') return null
 
   const [duenos, allItems, acceso] = await Promise.all([
     duenosDeLista(db, list),
@@ -172,7 +173,7 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     .from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, shareToken)))
-  if (!row) return null
+  if (!row || row.list.tipo === 'sorpresa') return null
 
   const [duenos, acceso] = await Promise.all([duenosDeLista(db, row.list), accesoALista(db, row.list.id, viewer)])
   if (acceso === 'dueno') {
@@ -187,7 +188,18 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     loadClaimViews(db, row.list.id, [row.item], viewer), regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
   ])
   const itemClaims = claimMap.get(itemId) ?? []
-  const commentRows = await db.select({
+  return {
+    role: 'giver', ...paraRegalador(row.list, duenos),
+    item: toGiverView(pickItemFields(row.item), itemClaims),
+    regalos,
+    miVencida: itemClaims.some((c) => c.esMia) || regalos.some((r) => r.soyParte) ? null : vencida,
+    comments: await comentariosDe(db, itemId),
+  }
+}
+
+/** El hilo de un deseo (lo que no ve el dueño): solo para quien ve la capa oculta. */
+export async function comentariosDe(db: Db, itemId: string): Promise<CommentView[]> {
+  const filas = await db.select({
     id: comments.id, texto: comments.texto, createdAt: comments.createdAt,
     userNombre: users.nombre, guestNombre: guestIdentities.nombre,
   }).from(comments)
@@ -195,15 +207,5 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     .leftJoin(guestIdentities, eq(comments.authorGuestId, guestIdentities.id))
     .where(eq(comments.itemId, itemId))
     .orderBy(comments.createdAt)
-
-  return {
-    role: 'giver', ...paraRegalador(row.list, duenos),
-    item: toGiverView(pickItemFields(row.item), itemClaims),
-    regalos,
-    miVencida: itemClaims.some((c) => c.esMia) || regalos.some((r) => r.soyParte) ? null : vencida,
-    comments: commentRows.map((c) => ({
-      id: c.id, texto: c.texto, createdAt: c.createdAt,
-      autorNombre: c.userNombre ?? c.guestNombre ?? 'Alguien',
-    })),
-  }
+  return filas.map((c) => ({ id: c.id, texto: c.texto, createdAt: c.createdAt, autorNombre: c.userNombre ?? c.guestNombre ?? 'Alguien' }))
 }

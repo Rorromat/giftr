@@ -28,7 +28,7 @@ export type NewItemData = {
  * no desborda la columna ni rompe las tarjetas de todos. Un link no se corta (cortado no anda): si se pasa del largo, no va
  * (al editar, queda el que había).
  */
-function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANTIDAD_MAXIMA): T {
+export function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANTIDAD_MAXIMA): T {
   const r: CambiosDeseo = { ...data }
   if (typeof r.titulo === 'string') r.titulo = recortar(r.titulo, LARGO.titulo) || undefined
   for (const k of ['notas', 'precio', 'rangoPrecio', 'categoria'] as const) {

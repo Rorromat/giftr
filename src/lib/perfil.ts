@@ -72,7 +72,8 @@ export type PerfilPublico = {
 export async function perfilPublico(db: Db, token: string, quien?: string, hoy = hoyLocal()): Promise<PerfilPublico | null> {
   if (!esToken(token)) return null
   const [list] = await db.select({ id: lists.id, ownerId: lists.ownerId, tipo: lists.tipo }).from(lists).where(eq(lists.shareToken, token))
-  if (!list) return null
+  // una sorpresa no tiene dueños (y abrirla con sesión la seguiría): no hay perfil
+  if (!list || list.tipo === 'sorpresa') return null
   const duenos = await duenosDeLista(db, list)
   const elegido = (quien && duenos.find((d) => d.id === quien)) || duenos[0]
   if (!elegido) return null

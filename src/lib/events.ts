@@ -144,12 +144,30 @@ export type Evento = {
   misReservas?: number
   /** Solo para el regalador: de esos, en cuántos estás en un regalo grupal. */
   misGrupales?: number
+  /** Solo para el regalador: y en cuántas sorpresas para esa persona (regalos que no están en su lista, ver sorpresas.ts). */
+  misSorpresas?: number
   /** Solo para el regalador: el último regalo comprado de esa lista y quién se ocupó. */
   ultimo?: { encargado: string; titulo: string; fecha: Date }
 }
 
 type ListaRow = typeof lists.$inferSelect
 const PESO = { mucho: 0, gustaria: 1, suelta: 2 } as const
+
+/**
+ * Las sorpresas en las que está (como encargado o sumado) que siguen en pie: el regalo abierto o comprado. Las de alguien
+ * de GiftR van en su cumple (misSorpresas); las de alguien sin GiftR con fecha, como un evento propio de esa sorpresa.
+ */
+async function sorpresasEnLasQueEsta(db: Db, userId: string) {
+  return db.select({ list: lists, estado: groupGifts.estado, compradoEl: claims.updatedAt }).from(groupGiftMembers)
+    .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
+    .innerJoin(claims, eq(groupGifts.claimId, claims.id))
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
+    .innerJoin(lists, eq(items.listId, lists.id))
+    .where(and(
+      eq(groupGiftMembers.userId, userId), inArray(groupGifts.estado, ['abierto', 'comprado']), eq(lists.tipo, 'sorpresa'),
+      eq(items.estadoDueno, 'activo'), noEsNiFueDuenoSql(db, userId),
+    ))
+}
 
 /** Los eventos del usuario ordenados por cercanía: los suyos y los de las listas que sigue. */
 export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Promise<Evento[]> {
@@ -159,10 +177,13 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
     .innerJoin(lists, eq(listFollows.listId, lists.id))
     .where(and(eq(listFollows.userId, userId), noEsNiFueDuenoSql(db, userId)))
     .then((rows) => rows.map((r) => r.list))
+  const sorpresas = await sorpresasEnLasQueEsta(db, userId)
 
   const todas: { list: ListaRow; propio: boolean }[] = [
     ...propias.map((list) => ({ list, propio: true })),
-    ...seguidas.map((list) => ({ list, propio: false })),
+    ...seguidas.filter((list) => list.tipo !== 'sorpresa').map((list) => ({ list, propio: false })),
+    // las de alguien sin GiftR, que tienen su propia fecha
+    ...sorpresas.filter((r) => !r.list.paraUserId && r.list.eventoFecha).map(({ list }) => ({ list, propio: false })),
   ]
   if (!todas.length) return []
 
@@ -197,12 +218,13 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       const cae = fechaDeGrupo(list.eventoFecha, list.eventoAnual)
       const fecha = proximaVez(cae, hoy)
       if (!fecha) continue
+      const sorpresa = list.tipo === 'sorpresa'
       conFecha.push({
         listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
-        titulo: list.nombre ?? 'Grupo',
-        href: propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
-        personas: miembros.filter((m) => m.listId === list.id).map((m) => m.nombre),
-        contexto: propio ? 'Tu grupo' : 'Grupo',
+        titulo: sorpresa ? `Sorpresa para ${list.nombre ?? 'alguien'}` : list.nombre ?? 'Grupo',
+        href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
+        personas: sorpresa ? [list.nombre ?? 'Alguien'] : miembros.filter((m) => m.listId === list.id).map((m) => m.nombre),
+        contexto: sorpresa ? 'No usa GiftR' : propio ? 'Tu grupo' : 'Grupo',
       })
     }
   }
@@ -239,10 +261,12 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   for (const c of ocupados) porDeseo.set(c.itemId, (porDeseo.get(c.itemId) ?? 0) + 1)
   const cortes = new Map(todas.map(({ list }) => [list.id, list.corteEvento]))
 
+  const esSorpresa = new Set(sorpresas.map((r) => r.list.id))
   return conFecha.map((e) => {
-    // para el regalador, como en su lista: lo que ya no tiene lugar no se muestra (una idea que se puede repetir, sí)
+    // para el regalador, como en su lista: lo que ya no tiene lugar no se muestra (una idea que se puede repetir, sí). De
+    // una sorpresa, lo que le regalan.
     const fotos = deseos
-      .filter((d) => d.listId === e.listId && d.fotoUrl && (e.propio || cupoDe(d, porDeseo.get(d.id) ?? 0).disponible))
+      .filter((d) => d.listId === e.listId && d.fotoUrl && (e.propio || esSorpresa.has(e.listId) || cupoDe(d, porDeseo.get(d.id) ?? 0).disponible))
       .sort((a, b) => PESO[a.prioridad] - PESO[b.prioridad] || a.createdAt.getTime() - b.createdAt.getTime())
       .slice(0, 3).map((d) => d.fotoUrl!)
     if (e.propio) return { ...e, fotos }
@@ -256,9 +280,16 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       (c.estado === 'reservado' || c.updatedAt >= desde))
     const grupales = new Set(suyos.filter((c) => enGrupales.has(c.id)).map((c) => c.itemId))
     const u = ultimos.get(e.listId)
+    // una sorpresa es un regalo grupal; en el cumple de alguien, también las sorpresas para él de este evento
+    const enSorpresa = esSorpresa.has(e.listId)
+    const paraEl = enSorpresa ? 0 : sorpresas.filter((r) => {
+      const l = todas.find((t) => t.list.id === e.listId)?.list
+      return !!l?.ownerId && r.list.paraUserId === l.ownerId && (r.estado === 'abierto' || r.compradoEl >= desde)
+    }).length
     return {
-      ...e, fotos, misReservas: new Set(suyos.map((c) => c.itemId)).size, misGrupales: grupales.size,
-      ...(u && { ultimo: { encargado: u.encargado, titulo: u.titulo, fecha: u.fecha } }),
+      ...e, fotos, misReservas: new Set(suyos.map((c) => c.itemId)).size + paraEl,
+      misGrupales: enSorpresa ? 0 : grupales.size, misSorpresas: enSorpresa ? grupales.size : paraEl,
+      ...(u && !enSorpresa && { ultimo: { encargado: u.encargado, titulo: u.titulo, fecha: u.fecha } }),
     }
   }).sort((a, b) => a.dias - b.dias || a.titulo.localeCompare(b.titulo))
 }
@@ -283,14 +314,17 @@ export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
   await db.delete(listFollows).where(and(eq(listFollows.userId, userId), eq(listFollows.listId, listId)))
 }
 
-/** La fecha de una lista (el cumple del dueño, todos los años, o la del grupo; null si no tiene) y su corteEvento. */
+/**
+ * La fecha de una lista (el cumple del dueño, todos los años, o la del grupo; null si no tiene) y su corteEvento. La de
+ * una sorpresa: el cumple de quien la recibe o, si no usa GiftR, la que cargaron (una sola vez).
+ */
 async function fechaDeLista(db: Db, listId: string): Promise<{ f: (FechaEvento & { esCumple: boolean }) | null; corte: Date | null }> {
   if (!esUuid(listId)) return { f: null, corte: null }
   const [row] = await db.select({ list: lists, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes })
-    .from(lists).leftJoin(users, eq(lists.ownerId, users.id)).where(eq(lists.id, listId))
+    .from(lists).leftJoin(users, eq(sql`coalesce(${lists.ownerId}, ${lists.paraUserId})`, users.id)).where(eq(lists.id, listId))
   if (!row) return { f: null, corte: null }
   const corte = row.list.corteEvento
-  if (row.list.tipo === 'personal') {
+  if (row.list.tipo === 'personal' || row.list.paraUserId) {
     return { corte, f: row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null }
   }
   return { corte, f: row.list.eventoFecha ? { esCumple: false, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) } : null }

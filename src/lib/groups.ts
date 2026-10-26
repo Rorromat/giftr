@@ -39,6 +39,8 @@ export function juntarNombres(nombres: string[]): string {
 // - esOFueDuenoSql: también el que salió del grupo (o lo sacaron). Para la sorpresa: cargó esos deseos, así que sigue sin
 //   ver quién regala qué, sin reservar, comentar ni sumarse a un regalo grupal. Si no, salir, mirar y volver con la
 //   invitación la arruinaría. No hay vuelta atrás a regalador: nadie sabe si la lista también era suya.
+//   Y el que recibe una sorpresa (para_user_id, ver sorpresas.ts): no la edita ni figura como dueño, pero todo lo que no le
+//   llega al dueño de una lista tampoco le llega a él (ni la sorpresa misma: solo se abre por sorpresas.ts).
 
 const gruposDe = (db: Db, userId: string, soloActivos: boolean) => db.select({ id: listMembers.listId }).from(listMembers)
   .where(soloActivos ? and(eq(listMembers.userId, userId), isNull(listMembers.salioAt)) : eq(listMembers.userId, userId))
@@ -48,14 +50,17 @@ export function esDuenoSql(db: Db, userId: string) {
   return or(eq(lists.ownerId, userId), inArray(lists.id, gruposDe(db, userId, true)))!
 }
 
-/** Condición SQL: es dueño o co-dueño, o lo fue y salió del grupo (para todo lo de la capa oculta). */
+/** Condición SQL: es dueño o co-dueño, o lo fue y salió del grupo, o es una sorpresa para él (para todo lo de la capa oculta). */
 export function esOFueDuenoSql(db: Db, userId: string) {
-  return or(eq(lists.ownerId, userId), inArray(lists.id, gruposDe(db, userId, false)))!
+  return or(eq(lists.ownerId, userId), eq(lists.paraUserId, userId), inArray(lists.id, gruposDe(db, userId, false)))!
 }
 
-/** Lo contrario de esOFueDuenoSql, sin el NULL de owner_id vacío en los grupos (NOT NULL descartaría la fila). */
+/** Lo contrario de esOFueDuenoSql, sin el NULL de owner_id (o para_user_id) vacío (NOT NULL descartaría la fila). */
 export function noEsNiFueDuenoSql(db: Db, userId: string) {
-  return and(or(isNull(lists.ownerId), ne(lists.ownerId, userId)), notInArray(lists.id, gruposDe(db, userId, false)))!
+  return and(
+    or(isNull(lists.ownerId), ne(lists.ownerId, userId)), or(isNull(lists.paraUserId), ne(lists.paraUserId, userId)),
+    notInArray(lists.id, gruposDe(db, userId, false)),
+  )!
 }
 
 /** Dueños de una lista en orden: el de la lista personal, o los co-dueños activos del grupo por antigüedad. */
@@ -68,13 +73,16 @@ export async function duenosDeLista(db: Db, list: { id: string; ownerId: string 
   return filas.map((u) => ({ id: u.id, nombre: u.nombre, foto: urlFoto(u) }))
 }
 
-/** 'dueno' si hoy es dueño o co-dueño, 'ex' si salió del grupo, null si la lista no es ni fue suya. */
+/**
+ * 'dueno' si hoy es dueño o co-dueño (o la lista es una sorpresa para él: no ve nada de lo que no ve un dueño), 'ex' si
+ * salió del grupo, null si la lista no es ni fue suya.
+ */
 export async function relacionConLista(db: Db, listId: string, userId: string): Promise<'dueno' | 'ex' | null> {
-  const [row] = await db.select({ ownerId: lists.ownerId, miembro: listMembers.userId, salioAt: listMembers.salioAt })
+  const [row] = await db.select({ ownerId: lists.ownerId, paraUserId: lists.paraUserId, miembro: listMembers.userId, salioAt: listMembers.salioAt })
     .from(lists).leftJoin(listMembers, and(eq(listMembers.listId, lists.id), eq(listMembers.userId, userId)))
     .where(eq(lists.id, listId))
   if (!row) return null
-  if (row.ownerId === userId || (row.miembro && !row.salioAt)) return 'dueno'
+  if (row.ownerId === userId || row.paraUserId === userId || (row.miembro && !row.salioAt)) return 'dueno'
   return row.miembro ? 'ex' : null
 }
 

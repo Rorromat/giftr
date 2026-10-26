@@ -30,7 +30,8 @@ const PESO = { mucho: 0, gustaria: 1, suelta: 2 } as const
 async function listaPorToken(db: Db, token: string) {
   if (!esToken(token)) return null
   const [list] = await db.select().from(lists).where(eq(lists.shareToken, token))
-  if (!list) return null
+  // la vista previa de una sorpresa no dice qué es: el link puede terminar en un chat donde está el que la recibe
+  if (!list || list.tipo === 'sorpresa') return null
   const duenos = await duenosDeLista(db, list)
   return { list, para: juntarNombres(duenos.map((d) => d.nombre)), grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
 }

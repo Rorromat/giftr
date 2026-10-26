@@ -1,4 +1,4 @@
-import { and, eq, gte, notExists, or, sql } from 'drizzle-orm'
+import { and, eq, gte, ne, notExists, or, sql } from 'drizzle-orm'
 import { listasDeInvitado, listMembers, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -39,9 +39,11 @@ export async function accesoALista(db: Db, listId: string, viewer: Viewer): Prom
   // Que no es suya vale si lo dijo después de que el último co-dueño se sumó: Martín reservó en "Casa" como invitado desde
   // el navegador de WhatsApp y después se sumó al grupo con su Google. El servidor no puede unir a los dos, así que a los
   // invitados de la lista se les vuelve a preguntar; el que es dueño entra con Google.
+  // Una sorpresa, nunca sin sesión (ver sorpresas.ts): el invitado no la abre aunque diga que no es suya.
   const [abierta] = await db.select({ listId: listasDeInvitado.listId }).from(listasDeInvitado)
+    .innerJoin(lists, eq(lists.id, listasDeInvitado.listId))
     .where(and(
-      eq(listasDeInvitado.guestId, viewer.guestId), eq(listasDeInvitado.listId, listId),
+      eq(listasDeInvitado.guestId, viewer.guestId), eq(listasDeInvitado.listId, listId), ne(lists.tipo, 'sorpresa'),
       notExists(db.select({ uno: sql`1` }).from(listMembers)
         .where(and(eq(listMembers.listId, listasDeInvitado.listId), gte(listMembers.unidoAt, listasDeInvitado.createdAt)))),
     ))

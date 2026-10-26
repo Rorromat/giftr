@@ -26,7 +26,8 @@ export async function miGente(db: Db, userId: string, hoy = hoyLocal()): Promise
   const seguidas = await db.select({ list: lists }).from(listFollows)
     .innerJoin(lists, eq(listFollows.listId, lists.id))
     .where(and(eq(listFollows.userId, userId), noEsNiFueDuenoSql(db, userId)))
-    .then((rows) => rows.map((r) => r.list))
+    // una sorpresa no se sigue (no es la lista de nadie, ver sorpresas.ts)
+    .then((rows) => rows.flatMap((r) => (r.list.tipo === 'sorpresa' ? [] : [{ ...r.list, tipo: r.list.tipo }])))
   if (!seguidas.length) return []
 
   const ids = seguidas.map((l) => l.id)

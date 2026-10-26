@@ -76,13 +76,13 @@ test('aceptar suma al regalo; no, no; y al que lo armó le avisa las dos', async
   const { enviados, enviar } = pushFalso()
 
   const [deSofi] = await invitacionesPendientes(db, sofi.id)
-  expect(await responderInvitacion(db, sofi.id, deSofi.id, true, enviar)).toEqual({ ok: true, token, itemId: mate.id })
+  expect(await responderInvitacion(db, sofi.id, deSofi.id, true, enviar)).toEqual({ ok: true, token, itemId: mate.id, href: `/l/${token}/item/${mate.id}` })
   expect(await miembros(db, r.giftId)).toEqual([euge.id, sofi.id].sort())
   expect(await invitacionesPendientes(db, sofi.id)).toEqual([])
   // Juan ve que ya son dos
   const [deJuan] = await invitacionesPendientes(db, juan.id)
   expect(deJuan.somos).toBe(2)
-  expect(await responderInvitacion(db, juan.id, deJuan.id, false, enviar)).toEqual({ ok: true, token, itemId: mate.id })
+  expect(await responderInvitacion(db, juan.id, deJuan.id, false, enviar)).toEqual({ ok: true, token, itemId: mate.id, href: `/l/${token}/item/${mate.id}` })
   expect(await miembros(db, r.giftId)).toEqual([euge.id, sofi.id].sort())
   expect(enviados.map((e) => [e.para, e.aviso.title])).toEqual([
     [euge.id, '🤝 Sofi se suma a "Mate imperial"'],

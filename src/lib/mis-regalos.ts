@@ -5,6 +5,7 @@ import type { Db } from '@/db/types'
 import { expireStaleClaims } from '@/lib/claims'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { noEsNiFueDuenoSql } from '@/lib/groups'
+import { duenoOParaSql } from '@/lib/regalos'
 import type { Moneda } from '@/lib/pesos'
 
 // Mis regalos: todo lo que reservé (suelto) y los regalos grupales en los que estoy, de las listas de los demás, para
@@ -23,8 +24,10 @@ export type MiRegalo = {
   estado: 'reservado' | 'comprado'
   titulo: string
   foto: string | null
-  /** el nombre del dueño, o el del grupo */
+  /** el nombre del dueño, o el del grupo (en una sorpresa, el de quien la recibe) */
   para: string
+  /** un regalo que no está en su lista (ver sorpresas.ts) */
+  sorpresa: boolean
   /** al deseo (o a la lista, si el deseo ya no está); null si cambiaron el link y no lo tiene */
   href: string | null
   /** reservado suelto: en cuántos días vence */
@@ -52,9 +55,14 @@ const columnasLista = (db: Db, userId: string, desde: ReturnType<typeof sql<Date
     inArray(lists.id, db.select({ id: listFollows.listId }).from(listFollows).where(eq(listFollows.userId, userId))))}`,
 })
 
-type Fila = { tipo: 'personal' | 'grupo'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string; activo: boolean; conLink: boolean }
-const para = (r: Fila) => (r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? 'Alguien')
-const href = (r: Fila) => (!r.conLink ? null : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`)
+type Fila = {
+  tipo: 'personal' | 'grupo' | 'sorpresa'; listaNombre: string | null; duenoNombre: string | null; shareToken: string; itemId: string
+  activo: boolean; conLink: boolean
+}
+// en una sorpresa, duenoNombre es el de quien la recibe; si no usa GiftR, su nombre está en el de la lista
+const para = (r: Fila) => (r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? r.listaNombre ?? 'Alguien')
+const href = (r: Fila) => (!r.conLink ? null : r.tipo === 'sorpresa' ? `/sorpresa/${r.shareToken}`
+  : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`)
 
 export type MisRegalos = {
   porComprar: MiRegalo[]
@@ -75,7 +83,7 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
     }).from(claims)
       .innerJoin(items, eq(claims.itemId, items.id))
       .innerJoin(lists, eq(items.listId, lists.id))
-      .leftJoin(duenos, eq(lists.ownerId, duenos.id))
+      .leftJoin(duenos, eq(duenoOParaSql, duenos.id))
       .where(and(
         eq(claims.claimerUserId, userId),
         // la reserva de un regalo grupal (la del encargado) va con el grupal
@@ -94,7 +102,7 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
       .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
       .innerJoin(items, eq(groupGifts.itemId, items.id))
       .innerJoin(lists, eq(items.listId, lists.id))
-      .leftJoin(duenos, eq(lists.ownerId, duenos.id))
+      .leftJoin(duenos, eq(duenoOParaSql, duenos.id))
       .where(and(
         eq(groupGiftMembers.userId, userId),
         ne(groupGifts.estado, 'cancelado'),
@@ -106,13 +114,13 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
   const todos: MiRegalo[] = [
     ...sueltos.map((r): MiRegalo => ({
       id: r.id, tipo: 'suelto', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,
-      para: para(r), href: href(r),
+      para: para(r), href: href(r), sorpresa: r.tipo === 'sorpresa',
       venceEnDias: r.estado === 'reservado' && r.expiresAt ? Math.max(0, Math.ceil((r.expiresAt.getTime() - ahora.getTime()) / DIA)) : null,
       personas: null, encargado: null, soyEncargado: false, miParte: null, moneda: 'ARS', fecha: r.fecha, listId: r.listId,
     })),
     ...grupales.map((r): MiRegalo => ({
       id: r.id, tipo: 'grupal', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,
-      para: para(r), href: href(r), venceEnDias: null, personas: r.personas, encargado: r.encargado,
+      para: para(r), href: href(r), sorpresa: r.tipo === 'sorpresa', venceEnDias: null, personas: r.personas, encargado: r.encargado,
       soyEncargado: r.encargadoId === userId, miParte: r.estado === 'comprado' ? r.miParte : null, moneda: r.moneda, fecha: r.compradoAt ?? r.creado,
       listId: r.listId,
     })),

@@ -25,7 +25,9 @@ const TEXTOS = {
  * El texto del cartel de un aviso. Null si esta versión no conoce el tipo (lo escribió una más nueva y se volvió atrás el
  * deploy): ese no se muestra, en vez de tirar abajo la página donde está el botón para marcarlos como leídos.
  */
-export function textoDeAviso(tipo: string, itemTitulo: string): string | null {
+export function textoDeAviso(tipo: string, itemTitulo: string, sorpresa = false): string | null {
+  // una sorpresa cancelada se va (ver cancelarRegalo): no hay deseo para reservar
+  if (sorpresa && tipo === 'regalo_cancelado') return `Se canceló la sorpresa "${itemTitulo}": quien la armó la dio de baja.`
   return Object.hasOwn(TEXTOS, tipo) ? TEXTOS[tipo as keyof typeof TEXTOS](itemTitulo) : null
 }
 
@@ -81,19 +83,20 @@ export async function getUnreadNotifications(db: Db, viewer: Viewer) {
   if (!viewer.userId && !viewer.guestId) return []
   const filas = await db.select({
     id: notifications.id, tipo: notifications.tipo, itemTitulo: items.titulo, itemId: items.id, token: lists.shareToken,
-    activo: sql<boolean>`${items.estadoDueno} = 'activo'`, conLink: sql<boolean>`${tieneElLinkSql(db, viewer)}`,
+    activo: sql<boolean>`${items.estadoDueno} = 'activo'`, conLink: sql<boolean>`${tieneElLinkSql(db, viewer)}`, tipoLista: lists.tipo,
   }).from(notifications).innerJoin(items, eq(notifications.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
     // un aviso sobre un deseo propio le diría al dueño que alguien lo reservó
     .where(and(eq(notifications.leida, false), notifDe(viewer), listasAjenasSql(db, viewer)))
     .orderBy(desc(notifications.createdAt))
-  return filas.map(({ itemId, token, activo, conLink, ...n }) => ({
+  return filas.map(({ itemId, token, activo, conLink, tipoLista, ...n }) => ({
     ...n,
+    sorpresa: tipoLista === 'sorpresa',
     // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro. El regalo
     // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista), y una parte corregida se ve ahí.
     // El encargo de un regalo cuyo deseo ya no se abre (salió de la lista, o no tiene el link) también: se divide o se
     // cancela desde Cuentas, como el recordatorio (ver regalosParaCerrar)
     href: A_CUENTAS.has(n.tipo) || (n.tipo === 'regalo_encargo' && !(activo && conLink)) ? '/cuentas'
-      : !conLink ? null : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
+      : !conLink ? null : tipoLista === 'sorpresa' ? `/sorpresa/${token}` : activo ? `/l/${token}/item/${itemId}` : `/l/${token}`,
   }))
 }
 
