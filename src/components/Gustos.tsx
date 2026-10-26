@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
+import { paletaGusto } from '@/lib/colores-gustos'
+import { IlustracionGusto } from '@/components/IlustracionGusto'
 import { AvatarSticker, Icon } from '@/components/ui'
 
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
@@ -110,6 +112,15 @@ const PISTAS: Record<BloqueGustos['paso'], string> = {
   'no-regalar': 'Tan importante como lo que sí.',
 }
 
+/** La ilustración del paso en un cuadradito de su color (la misma del cartel de la bienvenida). */
+function MiniIlustracion({ paso }: { paso: BloqueGustos['paso'] }) {
+  return (
+    <span aria-hidden className="flex size-12 flex-none items-center justify-center overflow-hidden rounded-2xl" style={{ background: paletaGusto(paso).fondo }}>
+      <IlustracionGusto paso={paso} size={58} />
+    </span>
+  )
+}
+
 /** Los tres talles en fila, con un guión en el que falta. */
 function TallesEnFila({ talles }: { talles: Talles }) {
   return (
@@ -132,10 +143,8 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
   const href = `/perfil/gustos/${b.paso}`
   if (!b.cargado) {
     return (
-      <Link href={href} className="flex min-h-[72px] items-center gap-3 rounded-[22px] border-2 border-dashed border-gr-line px-4 py-3">
-        <span aria-hidden className="flex size-[34px] flex-none items-center justify-center rounded-full bg-gr-soft">
-          <Icon name={b.icono} size={19} strokeWidth={2} />
-        </span>
+      <Link href={href} className="flex min-h-[76px] items-center gap-3 rounded-[22px] border-2 border-dashed border-gr-line px-4 py-3">
+        <MiniIlustracion paso={b.paso} />
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">{b.titulo}</span>
           <span className="block text-[13px] leading-snug text-gr-muted">{PISTAS[b.paso]}</span>
@@ -148,7 +157,7 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
   return (
     <Link href={href} className={`flex flex-col gap-3 rounded-[22px] p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
       <span className="flex items-center gap-3">
-        <IconoSeccion s={b} size={34} />
+        <MiniIlustracion paso={b.paso} />
         <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-accent' : ''}`}>{b.titulo}</span>
         <span className="flex-none text-sm font-semibold underline underline-offset-4">Editar</span>
       </span>
