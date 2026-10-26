@@ -3,15 +3,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { Icon, type IconName } from '@/components/ui'
+import { Icon, Starburst, type IconName } from '@/components/ui'
 import { instalada } from '@/lib/app-instalable'
 
 const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; columna: number }[] = [
   { href: '/inicio', label: 'Inicio', nombre: 'Inicio', icon: 'home', columna: 0 },
   { href: '/gente', label: 'Tu gente', nombre: 'Gente', icon: 'users', columna: 1 },
-  { href: '/regalos', label: 'Tus regalos y cuentas', nombre: 'Regalos', icon: 'gift', columna: 3 },
-  { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user', columna: 4 },
+  { href: '/regalos', label: 'Tus regalos y cuentas', nombre: 'Regalos', icon: 'gift', columna: 2 },
+  { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user', columna: 3 },
 ]
+
+/** Dónde está el botón de agregar un deseo (ver BotonAgregar): en Inicio y en lo tuyo (tu lista y tu perfil). */
+const CON_AGREGAR = new Set(['/inicio', '/mi-lista', '/perfil'])
 
 /**
  * La sección del menú a la que pertenece una pantalla: todo el año y lo nuevo de tus amigos son de Inicio; un grupo, un deseo y el perfil, de Vos; la
@@ -67,8 +70,9 @@ function useAnclajeAbajo(ref: RefObject<HTMLElement | null>) {
 /**
  * Píldora blanca flotante. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección: la
  * sección marcada se estira en negro con su nombre (las columnas se animan con CSS), desde el toque mismo.
- * En Agregar se esconde: el + gira hasta ser una × y la barra baja mientras la hoja de agregar sube
- * (al editar un deseo o armar una sorpresa también se esconde).
+ * Agregar un deseo no es una sección: es la estrella lima que flota arriba de la punta derecha, en Inicio y en lo tuyo
+ * (ver BotonAgregar). En Agregar la barra se esconde: la estrella gira y se va mientras la hoja de agregar sube (al
+ * editar un deseo o armar una sorpresa también se esconde).
  */
 export function BottomNav() {
   const path = usePathname()
@@ -95,12 +99,22 @@ export function BottomNav() {
   return (
     <nav ref={ref} aria-label="Navegación principal" className="gr-nav" data-columna={columnaMarca} data-oculta={oculta || undefined} inert={oculta}>
       {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
-      {DESTINOS.slice(0, 2).map(destino)}
-      <Link href="/agregar" prefetch aria-label="Agregar deseo" onNavigate={() => setToque({ href: '/agregar', desde: path })}>
-        <span className="gr-nav__add"><Icon name="plus" size={22} strokeWidth={2.6} /></span>
-      </Link>
-      {DESTINOS.slice(2).map(destino)}
+      {DESTINOS.map(destino)}
+      {/* adentro de la barra: se esconde con ella (en Agregar, con el teclado) y se corre con su --anclaje */}
+      {(CON_AGREGAR.has(path) || marcado === '/agregar') && (
+        <BotonAgregar onNavigate={() => setToque({ href: '/agregar', desde: path })} />
+      )}
     </nav>
+  )
+}
+
+/** Agregar un deseo: una estrella lima (la de la marca) con un +, que flota abajo a la derecha. */
+function BotonAgregar({ onNavigate }: { onNavigate: () => void }) {
+  return (
+    <Link href="/agregar" prefetch aria-label="Agregar deseo" onNavigate={onNavigate} className="gr-fab">
+      <Starburst size={72} className="gr-fab__estrella" />
+      <Icon name="plus" size={30} strokeWidth={2.8} className="relative" />
+    </Link>
   )
 }
 

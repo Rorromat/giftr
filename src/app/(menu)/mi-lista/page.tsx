@@ -36,7 +36,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const dias = fechaCumple ? diasEntre(hoy, fechaCumple) : null
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
+    <Seccion className="flex flex-col gap-5 pb-48 pt-2">
       {/* Vos: tu lista y, tocando tu foto, tu perfil. La barra mide 56 y la tarjeta arranca a 84 de arriba: su estrella
           queda donde la busca la animación de inicio (ver ListaHero). */}
       <AppHeader nombre={nombre} foto={foto} />

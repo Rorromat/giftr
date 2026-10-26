@@ -337,7 +337,7 @@
 
   /* Navegación inferior: píldora blanca flotante. La sección marcada se estira en negro y muestra su nombre (las columnas
      se reparten con grid-template-columns, que se anima: la píldora negra crece en la nueva y se achica en la vieja).
-     El + del medio, en lima, no cambia de ancho. */
+     Agregar un deseo es la estrella lima de arriba a la derecha (.gr-fab), que va adentro: se esconde y se corre con ella. */
   .gr-nav {
     position: fixed;
     left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
@@ -351,17 +351,17 @@
     border: 1px solid var(--gr-line);
     box-shadow: var(--gr-shadow-float);
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: center;
     gap: 2px;
     padding: 0 7px;
     transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1), grid-template-columns 320ms cubic-bezier(0.3, 0, 0.2, 1);
   }
-  .gr-nav[data-columna="0"] { grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr; }
-  .gr-nav[data-columna="1"] { grid-template-columns: 1fr 2.5fr 1fr 1fr 1fr; }
-  .gr-nav[data-columna="3"] { grid-template-columns: 1fr 1fr 1fr 2.5fr 1fr; }
-  .gr-nav[data-columna="4"] { grid-template-columns: 1fr 1fr 1fr 1fr 2.5fr; }
-  /* En Agregar la barra se esconde: primero el + gira hasta ser una × y enseguida la barra baja.
+  .gr-nav[data-columna="0"] { grid-template-columns: 2.2fr 1fr 1fr 1fr; }
+  .gr-nav[data-columna="1"] { grid-template-columns: 1fr 2.2fr 1fr 1fr; }
+  .gr-nav[data-columna="2"] { grid-template-columns: 1fr 1fr 2.2fr 1fr; }
+  .gr-nav[data-columna="3"] { grid-template-columns: 1fr 1fr 1fr 2.2fr; }
+  /* En Agregar la barra se esconde: primero la estrella gira y se achica, y enseguida la barra baja.
      Al salir de Agregar vuelve a subir, sin esperar. */
   .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
   /* con el teclado abierto (iOS instalado) no flota arriba del teclado: se va */
@@ -379,14 +379,19 @@
   /* el nombre aparece cuando la píldora ya creció */
   .gr-nav__nombre { display: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { display: inline; animation: gr-aparece 200ms ease-out 80ms both; }
-  .gr-nav a > .gr-nav__add {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: var(--gr-accent); color: var(--gr-ink);
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 240ms cubic-bezier(0.34, 1.4, 0.5, 1);
+  /* Agregar un deseo: la estrella de la marca con un +, flotando arriba de la punta derecha de la barra (en Inicio y en
+     lo tuyo). Aparece con un rebote; se hunde al apretarla; en Agregar gira y se achica mientras la barra baja. */
+  .gr-nav a.gr-fab {
+    position: absolute; right: -2px; bottom: calc(100% + 12px);
+    width: 72px; height: 72px; border-radius: 0; overflow: visible;
+    color: var(--gr-ink);
+    filter: drop-shadow(0 6px 12px rgb(20 20 20 / 0.24));
+    animation: gr-fab-entra 320ms cubic-bezier(0.34, 1.5, 0.5, 1);
+    transition: transform 260ms cubic-bezier(0.34, 1.4, 0.5, 1), opacity 200ms ease;
   }
-  .gr-nav a:active > .gr-nav__add { transform: scale(0.88); } /* se hunde al apretarlo */
-  .gr-nav[data-oculta] a > .gr-nav__add { transform: rotate(45deg) scale(0.92); }
+  .gr-fab__estrella { position: absolute; inset: 0; }
+  .gr-nav a.gr-fab:active { transform: scale(0.88) rotate(-15deg); }
+  .gr-nav[data-oculta] a.gr-fab { transform: rotate(90deg) scale(0.5); opacity: 0; }
 
 }
 
@@ -397,6 +402,8 @@
 /* Agregar sube como una hoja desde abajo, desde donde estaba el +, mientras la barra se esconde. */
 .gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
+/* la estrella de agregar aparece girando, con un rebote (ver .gr-fab) */
+@keyframes gr-fab-entra { from { transform: scale(0.4) rotate(-60deg); opacity: 0; } }
 
 /* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y la estrella gira y
    crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
@@ -460,6 +467,8 @@
   transform: translateX(-50%);
   animation: gr-toast 3.6s ease both;
 }
+/* con la estrella de agregar en la pantalla (ver .gr-fab), el cartel va arriba de ella */
+body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 170px); }
 @keyframes gr-toast-quieto { 0%, 86% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 @keyframes gr-toast {
   0% { opacity: 0; transform: translate(-50%, 14px); }
@@ -590,7 +599,8 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a, .gr-nav a > .gr-nav__add { transition: none; }
+  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a { transition: none; }
+  .gr-nav a.gr-fab { transition: none; animation: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja { animation: none; }
   .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
