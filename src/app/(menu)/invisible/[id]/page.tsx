@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { amigoInvisibleParaViewer } from '@/lib/amigo-invisible'
+import { amigoInvisibleParaViewer, misAmigosInvisibles, tambienTeToco } from '@/lib/amigo-invisible'
 import { misAmigos, personas } from '@/lib/amigos'
 import {
   DatosDelJuego, EditarYBorrar, GenteDelJuego, MiRespuesta, Organizar, Preguntas, QuienMeRegalo, TeToco,
@@ -24,16 +24,20 @@ export default async function AmigoInvisiblePage({ params, searchParams }: {
   const v = await amigoInvisibleParaViewer(db, id, session.userId)
   if (!v) notFound()
   const estan = new Set(v.gente.map((g) => g.persona.id))
-  const paraInvitar = v.soyOrganizador && !v.sorteado
-    ? (await personas(db, [...await misAmigos(db, session.userId)].filter((a) => !estan.has(a)))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-    : []
+  const [paraInvitar, juegos] = await Promise.all([
+    v.soyOrganizador && !v.sorteado
+      ? personas(db, [...await misAmigos(db, session.userId)].filter((a) => !estan.has(a))).then((p) => p.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')))
+      : [],
+    // si le toca la misma persona en otro juego, se lo avisa
+    v.meToca ? misAmigosInvisibles(db, session.userId) : [],
+  ])
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <PageHeader title="Amigo invisible" back={v.fechaEspecial ? `/fechas/${v.fechaEspecial}` : '/inicio'} backLabel="Volver" />
+      <PageHeader title="Amigo invisible" back="/regalos" backLabel="Volver a Regalos" />
       <DatosDelJuego v={v} />
       <MiRespuesta v={v} />
-      <TeToco v={v} />
+      <TeToco v={v} tambien={tambienTeToco(juegos).get(v.id)} />
       <Preguntas v={v} error={uno(q.pregunta) === 'error'} />
       <QuienMeRegalo v={v} />
       {v.sorteado && v.miEstado === 'no_juega' && (

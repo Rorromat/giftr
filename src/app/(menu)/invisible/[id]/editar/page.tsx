@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { amigoInvisibleParaViewer } from '@/lib/amigo-invisible'
+import { amigoInvisibleParaViewer, propuestasDeFechas } from '@/lib/amigo-invisible'
 import { hoyLocal } from '@/lib/events'
 import { pesos } from '@/lib/pesos'
 import { FormJuego } from '@/components/AmigoInvisible'
@@ -19,7 +19,7 @@ export default async function EditarAmigoInvisible({ params, searchParams }: {
   return (
     <main className="gr-hoja flex flex-col gap-1 pt-2 pb-8">
       <PageHeader title="Editar amigo invisible" back={`/invisible/${v.id}`} backLabel="Volver" />
-      <FormJuego fechaEspecial={v.fechaEspecial} amigos={[]} hoy={hoyLocal().toISOString().slice(0, 10)} error={q.error === '1'} editar={{ id: v.id }}
+      <FormJuego fechaEspecial={v.fechaEspecial} propuestas={propuestasDeFechas()} amigos={[]} hoy={hoyLocal().toISOString().slice(0, 10)} error={q.error === '1'} editar={{ id: v.id }}
                  inicial={{ nombre: v.nombre, descripcion: v.descripcion ?? '', presupuesto: v.presupuesto ? pesos(v.presupuesto) : '', fecha: v.fecha }} />
     </main>
   )

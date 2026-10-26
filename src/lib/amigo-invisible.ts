@@ -1,11 +1,11 @@
 import { randomInt } from 'node:crypto'
-import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { amigoInvisibleExcluidos, amigoInvisibleGente, amigoInvisiblePreguntas, amigosInvisibles, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { misAmigos, personas, type Persona } from '@/lib/amigos'
 import { avisar, type Enviar } from '@/lib/codazos'
 import { diasEntre, fechaLarga, hoyLocal } from '@/lib/events'
-import { esFechaEspecial, proximaEspecial, type FechaEspecial } from '@/lib/fechas-especiales'
+import { esFechaEspecial, FECHAS_ESPECIALES, proximaEspecial, type FechaEspecial } from '@/lib/fechas-especiales'
 import { esUuid, fechaDeGrupoValida } from '@/lib/groups'
 import { LARGO, recortar } from '@/lib/limites'
 import { recienHecho } from '@/lib/repetido'
@@ -256,6 +256,8 @@ export type VistaJuego = {
   puedoRevelar: boolean
   /** quién me regaló, si lo pedí */
   meRegalo: Persona | null
+  /** marqué "Ya tengo el regalo" */
+  yaLoTengo: boolean
 }
 
 /** El juego para uno que está (también un invitado que no contestó) o el que organiza; null para cualquier otro. */
@@ -305,6 +307,7 @@ export async function amigoInvisibleParaViewer(db: Db, id: string, userId: strin
     preguntasParaMi: preguntas.filter((p) => p.paraUserId === userId).map(anon),
     puedoRevelar: !!j.sorteadoAt && juego && hoyIso() > j.fecha && !mia.reveladoAt,
     meRegalo: mia.reveladoAt && quienMeRegala ? gente.get(quienMeRegala) ?? null : null,
+    yaLoTengo: !!mia.yaLoTengoAt,
   }
 }
 
@@ -325,6 +328,16 @@ export async function revelarQuienMeRegalo(db: Db, id: string, userId: string): 
   if (!j?.sorteadoAt || !(hoyIso() > j.fecha)) return false
   const filas = await db.update(amigoInvisibleGente).set({ reveladoAt: new Date() })
     .where(and(eq(amigoInvisibleGente.amigoInvisibleId, id), eq(amigoInvisibleGente.userId, userId), eq(amigoInvisibleGente.estado, 'juega')))
+    .returning({ id: amigoInvisibleGente.userId })
+  return filas.length > 0
+}
+
+/** "Ya tengo el regalo" (o todavía no): desde que vio a quién le regala. Lo ve solo él. */
+export async function marcarYaLoTengo(db: Db, id: string, userId: string, tengo: boolean): Promise<boolean> {
+  if (!esUuid(id)) return false
+  const filas = await db.update(amigoInvisibleGente).set({ yaLoTengoAt: tengo ? new Date() : null })
+    .where(and(eq(amigoInvisibleGente.amigoInvisibleId, id), eq(amigoInvisibleGente.userId, userId), eq(amigoInvisibleGente.estado, 'juega'),
+      sql`${amigoInvisibleGente.vioAt} is not null`))
     .returning({ id: amigoInvisibleGente.userId })
   return filas.length > 0
 }
@@ -367,6 +380,7 @@ export type MiJuego = {
   nombre: string
   fecha: string
   fechaEspecial: FechaEspecial | null
+  presupuesto: number | null
   /** cuántos días faltan (negativo si ya pasó) */
   dias: number
   miEstado: 'invitado' | 'juega'
@@ -375,40 +389,83 @@ export type MiJuego = {
   /** ya pidió saber quién le regaló */
   revelado: boolean
   organizador: string
+  soyOrganizador: boolean
+  /** los invitados (con el que organiza) y cuántos ya contestaron (antes del sorteo: cuántos faltan) */
+  invitados: number
+  contestaron: number
+  /** a quién le regalo: solo si ya lo vi (en pantalla va tapado hasta tocar "Ver") */
+  meToca: Persona | null
+  /** marqué "Ya tengo el regalo" */
+  yaLoTengo: boolean
+  /** las que me hizo mi amigo invisible y todavía no contesté */
+  preguntasSinContestar: number
 }
 
 /**
- * Los juegos en los que estoy (o me invitaron) que todavía no pasaron: para Inicio y la pantalla de cada fecha. Con
- * pasados, también los de esos últimos días (para "¿Quién me regaló?").
+ * Los juegos en los que estoy (o me invitaron) que todavía no pasaron: para Regalos, Inicio y la pantalla de cada fecha.
+ * Con pasados, también los de esos últimos días (para "¿Quién me regaló?"). De los demás solo se cuenta cuántos hay y
+ * cuántos contestaron: a quién le regala cada uno no se lee.
  */
 export async function misAmigosInvisibles(db: Db, userId: string, hoy = hoyLocal(), pasados = 0): Promise<MiJuego[]> {
   const desde = new Date(hoy.getTime() - pasados * 86400_000).toISOString().slice(0, 10)
-  const filas = await db.select({
-    j: amigosInvisibles, estado: amigoInvisibleGente.estado, vioAt: amigoInvisibleGente.vioAt, reveladoAt: amigoInvisibleGente.reveladoAt, org: users.nombre,
-  })
+  const filas = await db.select({ j: amigosInvisibles, mia: amigoInvisibleGente, org: users.nombre })
     .from(amigoInvisibleGente)
     .innerJoin(amigosInvisibles, eq(amigoInvisibleGente.amigoInvisibleId, amigosInvisibles.id))
     .innerJoin(users, eq(amigosInvisibles.organizadorId, users.id))
     .where(and(eq(amigoInvisibleGente.userId, userId), inArray(amigoInvisibleGente.estado, ['invitado', 'juega']), gte(amigosInvisibles.fecha, desde)))
     .orderBy(asc(amigosInvisibles.fecha), desc(amigosInvisibles.createdAt))
-  return filas.map(({ j, estado, vioAt, reveladoAt, org }) => ({
-    id: j.id, nombre: j.nombre, fecha: j.fecha, fechaEspecial: esFechaEspecial(j.fechaEspecial) ? j.fechaEspecial : null,
-    dias: diasEntre(hoy, new Date(`${j.fecha}T00:00:00Z`)), miEstado: estado as 'invitado' | 'juega', sorteado: !!j.sorteadoAt,
-    vi: !!vioAt, revelado: !!reveladoAt, organizador: org,
+  if (!filas.length) return []
+  const ids = filas.map((f) => f.j.id)
+  const [estados, sinContestar, tocan] = await Promise.all([
+    db.select({ id: amigoInvisibleGente.amigoInvisibleId, estado: amigoInvisibleGente.estado, n: sql<number>`count(*)::int` })
+      .from(amigoInvisibleGente).where(inArray(amigoInvisibleGente.amigoInvisibleId, ids))
+      .groupBy(amigoInvisibleGente.amigoInvisibleId, amigoInvisibleGente.estado),
+    db.select({ id: amigoInvisiblePreguntas.amigoInvisibleId, n: sql<number>`count(*)::int` }).from(amigoInvisiblePreguntas)
+      .where(and(inArray(amigoInvisiblePreguntas.amigoInvisibleId, ids), eq(amigoInvisiblePreguntas.paraUserId, userId), isNull(amigoInvisiblePreguntas.respuesta)))
+      .groupBy(amigoInvisiblePreguntas.amigoInvisibleId),
+    personas(db, [...new Set(filas.flatMap((f) => (f.mia.regalaA && f.mia.vioAt ? [f.mia.regalaA] : [])))]),
+  ])
+  const persona = new Map(tocan.map((p) => [p.id, p]))
+  const cuenta = (id: string, cuales: string[]) => estados.filter((e) => e.id === id && cuales.includes(e.estado)).reduce((t, e) => t + e.n, 0)
+  return filas.map(({ j, mia, org }) => ({
+    id: j.id, nombre: j.nombre, fecha: j.fecha, fechaEspecial: esFechaEspecial(j.fechaEspecial) ? j.fechaEspecial : null, presupuesto: j.presupuesto,
+    dias: diasEntre(hoy, new Date(`${j.fecha}T00:00:00Z`)), miEstado: mia.estado as 'invitado' | 'juega', sorteado: !!j.sorteadoAt,
+    vi: !!mia.vioAt, revelado: !!mia.reveladoAt, organizador: org, soyOrganizador: j.organizadorId === userId,
+    invitados: cuenta(j.id, ['invitado', 'juega', 'no_juega']), contestaron: cuenta(j.id, ['juega', 'no_juega']),
+    meToca: mia.regalaA && mia.vioAt ? persona.get(mia.regalaA) ?? null : null,
+    yaLoTengo: !!mia.yaLoTengoAt, preguntasSinContestar: sinContestar.find((p) => p.id === j.id)?.n ?? 0,
   }))
 }
 
 /**
  * Lo que dice la tarjeta de Lo que viene de unos juegos, sin nombres (la pantalla de Inicio la puede ver cualquiera que
- * mire el teléfono): lo más urgente primero.
+ * mire el teléfono): de uno, lo más urgente; de varios, cuántos son y cuántos te esperan.
  */
 export function estadoDeJuegos(juegos: Pick<MiJuego, 'miEstado' | 'sorteado' | 'vi'>[]): string | null {
   if (!juegos.length) return null
-  if (juegos.some((j) => j.miEstado === 'invitado')) return 'Te invitaron a un amigo invisible'
-  if (juegos.some((j) => j.sorteado && !j.vi)) return 'Ya se sorteó: mirá a quién le regalás'
-  if (juegos.some((j) => !j.sorteado)) return 'Amigo invisible: falta sortear'
+  if (juegos.length > 1) {
+    const esperan = juegos.filter((j) => j.miEstado === 'invitado' || (j.sorteado && !j.vi)).length
+    return `${juegos.length} amigos invisibles${esperan ? ` · ${esperan} te ${esperan === 1 ? 'espera' : 'esperan'}` : ''}`
+  }
+  const [j] = juegos
+  if (j.miEstado === 'invitado') return 'Te invitaron a un amigo invisible'
+  if (j.sorteado && !j.vi) return 'Ya se sorteó: mirá a quién le regalás'
+  if (!j.sorteado) return 'Amigo invisible: falta sortear'
   return 'Amigo invisible: ya sabés a quién'
+}
+
+/** Si en dos juegos que vienen te toca la misma persona: de cada juego, los otros donde también te tocó. */
+export function tambienTeToco(juegos: Pick<MiJuego, 'id' | 'nombre' | 'dias' | 'meToca'>[]): Map<string, string[]> {
+  const vienen = juegos.filter((j) => j.meToca && j.dias >= 0)
+  return new Map(vienen.flatMap((j) => {
+    const otros = vienen.filter((o) => o.id !== j.id && o.meToca!.id === j.meToca!.id).map((o) => o.nombre)
+    return otros.length ? [[j.id, otros] as [string, string[]]] : []
+  }))
 }
 
 /** La fecha de entrega que se propone para un juego de una fecha especial: la próxima vez que cae. */
 export const fechaPropuesta = (f: FechaEspecial | null, hoy = hoyLocal()) => (f ? proximaEspecial(f, hoy).toISOString().slice(0, 10) : '')
+
+/** El día que se propone para cada fecha especial (para completarlo al elegirla en el formulario). */
+export const propuestasDeFechas = (hoy = hoyLocal()) =>
+  Object.fromEntries(FECHAS_ESPECIALES.map((f) => [f, fechaPropuesta(f, hoy)])) as Record<FechaEspecial, string>

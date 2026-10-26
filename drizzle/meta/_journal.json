@@ -211,6 +211,13 @@
       "when": 1792988159663,
       "tag": "0029_amigo_invisible",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793022554895,
+      "tag": "0030_ya_lo_tengo",
+      "breakpoints": true
     }
   ]
 }

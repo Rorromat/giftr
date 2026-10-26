@@ -7,7 +7,7 @@ import { pedirAmistad } from '@/lib/amigos'
 import { guardarSuscripcion, type Aviso, type Enviar } from '@/lib/codazos'
 import {
   amigoInvisibleParaViewer, asignar, borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego,
-  estadoDeJuegos, misAmigosInvisibles, preguntar, responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo,
+  estadoDeJuegos, marcarYaLoTengo, misAmigosInvisibles, preguntar, tambienTeToco, responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo,
 } from '@/lib/amigo-invisible'
 import { diaEn, especialesQueVienen, fechasQueVienen, proximaEspecial } from '@/lib/fechas-especiales'
 
@@ -38,8 +38,10 @@ test('aparecen en Lo que viene un tiempo antes: Navidad 30 días, las demás 3 s
 })
 
 test('Lo que viene: las fechas cercanas, las lejanas con un amigo invisible tuyo, y los amigos invisibles sueltos', () => {
-  const juego = (id: string, dias: number, fechaEspecial: 'navidad' | 'amigo' | null) =>
-    ({ id, nombre: id, fecha: '', fechaEspecial, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false, organizador: 'Euge' })
+  const juego = (id: string, dias: number, fechaEspecial: 'navidad' | 'amigo' | null) => ({
+    id, nombre: id, fecha: '', fechaEspecial, presupuesto: null, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false,
+    organizador: 'Euge', soyOrganizador: false, invitados: 3, contestaron: 3, meToca: null, yaLoTengo: false, preguntasSinContestar: 0,
+  })
   const hoy = new Date(Date.UTC(2026, 9, 26)) // Navidad, a 60 días
   const t = especialesQueVienen(hoy, [juego('nav', 59, 'navidad'), juego('oficina', 10, null), juego('viejo', -3, null)])
   expect(t.map((x) => (x.tipo === 'fecha' ? [x.fecha.id, x.dias, x.juegos.map((j) => j.id)] : ['juego', x.dias, [x.juego.id]]))).toEqual([
@@ -50,10 +52,22 @@ test('Lo que viene: las fechas cercanas, las lejanas con un amigo invisible tuyo
   // lo que dice la tarjeta: lo más urgente, sin nombres
   const e = (miEstado: 'invitado' | 'juega', sorteado: boolean, vi: boolean) => ({ miEstado, sorteado, vi })
   expect(estadoDeJuegos([])).toBeNull()
-  expect(estadoDeJuegos([e('juega', true, true), e('invitado', false, false)])).toBe('Te invitaron a un amigo invisible')
-  expect(estadoDeJuegos([e('juega', false, false), e('juega', true, false)])).toBe('Ya se sorteó: mirá a quién le regalás')
+  expect(estadoDeJuegos([e('invitado', false, false)])).toBe('Te invitaron a un amigo invisible')
+  expect(estadoDeJuegos([e('juega', true, false)])).toBe('Ya se sorteó: mirá a quién le regalás')
+  // de varios (en la tarjeta de una fecha): cuántos son y cuántos te esperan (te invitaron, o ya se sorteó y no lo viste)
+  expect(estadoDeJuegos([e('juega', true, true), e('invitado', false, false)])).toBe('2 amigos invisibles · 1 te espera')
+  expect(estadoDeJuegos([e('juega', true, false), e('invitado', false, false), e('juega', false, false)])).toBe('3 amigos invisibles · 2 te esperan')
+  expect(estadoDeJuegos([e('juega', true, true), e('juega', false, false)])).toBe('2 amigos invisibles')
   expect(estadoDeJuegos([e('juega', false, false)])).toBe('Amigo invisible: falta sortear')
   expect(estadoDeJuegos([e('juega', true, true)])).toBe('Amigo invisible: ya sabés a quién')
+})
+
+test('si te toca la misma persona en dos juegos que vienen, se avisa en los dos', () => {
+  const sofi = { id: 's', nombre: 'Sofi', usuario: null, foto: null }
+  const rodri = { id: 'r', nombre: 'Rodri', usuario: null, foto: null }
+  const j = (id: string, dias: number, meToca: typeof sofi | null) => ({ id, nombre: id, dias, meToca })
+  const m = tambienTeToco([j('Familia', 30, sofi), j('Oficina', 20, sofi), j('Club', 10, rodri), j('Viejo', -2, sofi), j('Sin ver', 5, null)])
+  expect([...m]).toEqual([['Familia', ['Oficina']], ['Oficina', ['Familia']]])
 })
 
 test('el sorteo: nadie se regala a sí mismo, cada uno recibe de uno solo, y los que no se tocan no se tocan', () => {
@@ -144,6 +158,10 @@ test('EL TEST DE ORO del amigo invisible: a quién le regala cada uno lo sabe so
     expect(v.sorteado).toBe(true)
     expect(v.meToca).toBeNull()
   }
+  // en Regalos: cuántos contestaron, y a quién le toca recién después de "Ver"; "Ya tengo el regalo", recién ahí
+  const [deSofi] = await misAmigosInvisibles(s.db, s.sofi.id)
+  expect(deSofi).toMatchObject({ sorteado: true, vi: false, meToca: null, invitados: 4, contestaron: 4, presupuesto: 25000, soyOrganizador: false, yaLoTengo: false })
+  expect(await marcarYaLoTengo(s.db, s.id, s.sofi.id, true)).toBe(false)
   const aQuien = new Map<string, string>()
   for (const u of todos) {
     expect(await verAQuienLeRegalo(s.db, s.id, u.id)).toBe(true)
@@ -157,6 +175,14 @@ test('EL TEST DE ORO del amigo invisible: a quién le regala cada uno lo sabe so
     expect(v.meRegalo).toBeNull()
   }
   expect(new Set(aQuien.values()).size).toBe(4)
+  const [despues] = await misAmigosInvisibles(s.db, s.sofi.id)
+  expect(despues.meToca?.id).toBe(aQuien.get(s.sofi.id))
+  expect(await marcarYaLoTengo(s.db, s.id, s.sofi.id, true)).toBe(true)
+  expect((await misAmigosInvisibles(s.db, s.sofi.id))[0].yaLoTengo).toBe(true)
+  expect((await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id))!.yaLoTengo).toBe(true)
+  expect((await amigoInvisibleParaViewer(s.db, s.id, s.rodri.id))!.yaLoTengo).toBe(false) // es de cada uno
+  expect(await marcarYaLoTengo(s.db, s.id, s.sofi.id, false)).toBe(true)
+  expect((await misAmigosInvisibles(s.db, s.sofi.id))[0].yaLoTengo).toBe(false)
   // el que organiza ve quiénes ya vieron, nunca a quién
   const org = (await amigoInvisibleParaViewer(s.db, s.id, s.euge.id))!
   expect(org.gente.every((g) => g.vio)).toBe(true)
@@ -184,9 +210,11 @@ test('preguntas anónimas: le llega de "tu amigo invisible" y la respuesta vuelv
   expect(JSON.stringify(suya.preguntasParaMi)).not.toContain(s.euge.id)
   // solo él contesta
   const pid = suya.preguntasParaMi[0].id
+  expect((await misAmigosInvisibles(s.db, para.id))[0].preguntasSinContestar).toBe(1)
   expect(await responderPregunta(s.db, pid, s.euge.id, 'M', enviar)).toBeNull()
   expect(await responderPregunta(s.db, pid, para.id, 'Talle M', enviar)).toBe(s.id)
   expect(enviados.at(-1)).toEqual({ para: s.euge.id, aviso: expect.objectContaining({ title: '💬 Te contestaron' }) })
+  expect((await misAmigosInvisibles(s.db, para.id))[0].preguntasSinContestar).toBe(0)
   expect((await amigoInvisibleParaViewer(s.db, s.id, s.euge.id))!.preguntasMias).toEqual([{ id: pid, texto: '¿Qué talle usás?', respuesta: 'Talle M' }])
 })
 

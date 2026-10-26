@@ -3,11 +3,11 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { misAmigosInvisibles } from '@/lib/amigo-invisible'
+import { misAmigosInvisibles, tambienTeToco } from '@/lib/amigo-invisible'
 import { hoyLocal } from '@/lib/events'
 import { datosDe, esFechaEspecial, vistaDe } from '@/lib/fechas-especiales'
 import { miGente } from '@/lib/gente'
-import { TarjetaJuego } from '@/components/AmigoInvisible'
+import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
 import { AvatarSticker, Icon, PageHeader, Seccion } from '@/components/ui'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -30,6 +30,7 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
   const v = vistaDe(slug, hoy)
   const [juegos, gente] = await Promise.all([misAmigosInvisibles(db, session.userId, hoy, PASADOS), miGente(db, session.userId, hoy)])
   const mios = juegos.filter((j) => j.fechaEspecial === slug)
+  const tambien = tambienTeToco(juegos)
   const personales = gente.filter((c) => c.tipo === 'personal')
 
   return (
@@ -48,16 +49,8 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
 
       <section aria-labelledby="invisible-titulo" className="flex flex-col gap-2.5">
         <h2 id="invisible-titulo" className="gr-label">Amigo invisible</h2>
-        {mios.map((j) => <TarjetaJuego key={j.id} j={j} />)}
-        <Link href={`/invisible/nuevo?fecha=${slug}`}
-              className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
-          <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-accent text-xl">🎅</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] leading-snug font-semibold">Armar {mios.length ? 'otro' : 'un'} amigo invisible</span>
-            <span className="block text-[13px] leading-snug text-gr-muted">Con tus amigos de GiftR. Se sortea y cada uno ve solo a quién le regala.</span>
-          </span>
-          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
-        </Link>
+        {mios.map((j) => <FilaJuego key={j.id} j={j} tambien={tambien.get(j.id)} />)}
+        <ArmarJuego fecha={slug} />
       </section>
 
       <section aria-labelledby="gente-titulo" className="flex flex-col gap-2.5">

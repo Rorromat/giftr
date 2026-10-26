@@ -1,0 +1,1 @@
+ALTER TABLE "amigo_invisible_gente" ADD COLUMN "ya_lo_tengo_at" timestamp with time zone;

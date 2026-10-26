@@ -369,6 +369,8 @@ export const amigoInvisibleGente = pgTable('amigo_invisible_gente', {
   vioAt: timestamp('vio_at', { withTimezone: true }),
   // cuándo pidió saber quién le regaló (solo después de la fecha, y solo si lo pide)
   reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  // "Ya tengo el regalo": lo marca él, para no perderse entre varios (no lo ve nadie más)
+  yaLoTengoAt: timestamp('ya_lo_tengo_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.amigoInvisibleId, t.userId] }),
