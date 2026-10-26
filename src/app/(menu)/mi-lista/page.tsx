@@ -11,6 +11,8 @@ import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { ListaHero } from '@/components/ListaHero'
 import { RecienAgregado } from '@/components/RecienAgregado'
+import { Buscador } from '@/components/Buscador'
+import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string }> }) {
@@ -69,7 +71,10 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         <SectionHeader title="Tus deseos" href="/agregar" linkLabel="+ Agregar" />
       )}
 
-      <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
+      {activos.length >= BUSCAR_DESDE && <Buscador ambito="mis-deseos" placeholder="Buscar en tu lista" vacio="No tenés ningún deseo con «%s»." />}
+      <div id="mis-deseos" className="flex flex-col gap-5">
+        <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
+      </div>
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
       {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro="/agregar" />}
     </Seccion>

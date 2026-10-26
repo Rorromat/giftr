@@ -10,6 +10,8 @@ import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { RecienAgregado } from '@/components/RecienAgregado'
+import { Buscador } from '@/components/Buscador'
+import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AvatarStack, Icon, PageHeader, Seccion, SectionHeader } from '@/components/ui'
 import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
@@ -134,7 +136,10 @@ export default async function Grupo({ params, searchParams }: {
         <SectionHeader title="Sus deseos" href={`/agregar?lista=${grupo.id}`} linkLabel="+ Agregar" />
       )}
 
-      <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} agregado={agregado} />
+      {activos.length >= BUSCAR_DESDE && <Buscador ambito="sus-deseos" placeholder="Buscar en la lista" vacio="No hay ningún deseo con «%s»." />}
+      <div id="sus-deseos" className="flex flex-col gap-5">
+        <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} agregado={agregado} />
+      </div>
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
       {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro={`/agregar?lista=${grupo.id}`} />}
 
