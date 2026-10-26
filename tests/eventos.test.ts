@@ -11,7 +11,7 @@ import { getListForViewer } from '@/lib/lists'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, salirDeRegalo, sumarseARegalo } from '@/lib/regalos'
 import { miGente } from '@/lib/gente'
 import {
-  calendarioDelAnio, desdeElUltimoEvento, diasEntre, eventoDeLista, fechaCorta, fechaDeGrupo, fechaLarga, fechaParaEditar,
+  calendarioDelAnio, desdeElUltimoEvento, diasEntre, eventoDeLista, fechaCorta, fechaDeGrupo, fechaLarga, fechaParaEditar, repartirProximos,
   guardarCumple, guardarFechaGrupo, hoyLocal, inicioDelDia, misEventos, proximaDeGrupo, proximaFecha, rotuloFechaGrupo,
 } from '@/lib/events'
 
@@ -288,6 +288,10 @@ test('una fecha anual que todavía no cayó nunca cuenta hasta la primera vez, n
   expect(fechaCorta(dia('2027-11-20'), hoy)).toBe('20 nov 2027')
   expect(fechaCorta(dia('2027-02-28'), hoy)).toBe('28 feb')
   expect(fechaLarga(dia('2028-02-29'), dia('2027-06-01'))).toBe('Martes 29 de febrero') // el próximo 29/2
+  // del año que viene, pero este año pasó hace poco: con el año (sin él, parece que ya pasó)
+  expect(fechaLarga(dia('2027-10-02'), dia('2026-10-26'))).toBe('Sábado 2 de octubre de 2027')
+  expect(fechaCorta(dia('2027-10-17'), dia('2026-10-26'))).toBe('17 oct 2027')
+  expect(fechaCorta(dia('2027-08-15'), dia('2026-10-26'))).toBe('15 ago') // a 293 días: se entiende que es el que viene
 
   const { db, caro, rodri } = await setup()
   const casamiento = await crearGrupo(db, caro.id, { nombre: 'Casamiento de Ana y Beto', eventoFecha: '2027-11-20', eventoAnual: true })
@@ -524,4 +528,13 @@ test('el 29/2 en la grilla del año: el 28 en los años que no son bisiestos, el
   const eventos = await misEventos(db, sofi.id, hoy)
   expect(eventos.find((e) => e.titulo === 'Cumple de Martín')!.fecha).toEqual(dia('2028-02-29'))
   expect(calendarioDelAnio(eventos, hoy)[1].eventos).toEqual([28])
+})
+
+test('Próximos: en el carrusel, lo de los próximos tres meses (hasta 6); lo de después, en Más adelante', () => {
+  const ev = (dias: number) => ({ dias })
+  expect(repartirProximos([ev(3), ev(40), ev(90), ev(91), ev(341)])).toEqual({ cerca: [ev(3), ev(40), ev(90)], despues: [ev(91), ev(341)] })
+  // un cumple que pasó hace unos días es el del año que viene: no va como próximo
+  expect(repartirProximos([ev(341)])).toEqual({ cerca: [], despues: [ev(341)] })
+  const muchos = [1, 2, 3, 4, 5, 6, 7, 8].map(ev)
+  expect(repartirProximos(muchos)).toEqual({ cerca: muchos.slice(0, 6), despues: muchos.slice(6) })
 })

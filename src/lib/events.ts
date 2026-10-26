@@ -47,12 +47,31 @@ export const diasEntre = (desde: Date, hasta: Date) => Math.round((hasta.getTime
 const SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
+/** A más de esto, una fecha del año que viene es una que este año pasó hace poco (ver anioSiEstaLejos). */
+const CASI_UN_ANIO = 300
+
 /**
- * El año de una fecha que no es la próxima vez que cae ese día (está a más de un año, como un casamiento a 13 meses), o
- * null: sin el año, "20 de noviembre" se lee como el que viene.
+ * El año de una fecha, si sin él se lee mal; si no, null. Va cuando no es la próxima vez que cae ese día (está a más de un
+ * año, como un casamiento a 13 meses: sin el año, "20 de noviembre" se lee como el que viene) y cuando es del año que viene
+ * pero este año pasó hace poco (el 26 de octubre, un cumple del 2 de octubre es el de 2027: sin el año parece que ya pasó).
+ * Una del año que viene que está más cerca ("5 de enero" en octubre, "29 de febrero" en junio) se entiende sin él.
  */
 export function anioSiEstaLejos(f: Date, hoy: Date): number | null {
-  return f.getTime() === proximaFecha(f.getUTCDate(), f.getUTCMonth() + 1, hoy).getTime() ? null : f.getUTCFullYear()
+  const esLaProxima = f.getTime() === proximaFecha(f.getUTCDate(), f.getUTCMonth() + 1, hoy).getTime()
+  const pasoHacePoco = f.getUTCFullYear() > hoy.getUTCFullYear() && diasEntre(hoy, f) > CASI_UN_ANIO
+  return esLaProxima && !pasoHacePoco ? null : f.getUTCFullYear()
+}
+
+/** Hasta cuántos días adelante va un evento en el carrusel de Próximos (lo de después, en "Más adelante"). */
+export const HORIZONTE_PROXIMOS = 90
+
+/**
+ * Los eventos (ya ordenados por cercanía) para Inicio: los de los próximos tres meses, hasta 6, en el carrusel; el resto,
+ * en "Más adelante". Un cumple que pasó hace unos días es el del año que viene: no va como próximo.
+ */
+export function repartirProximos<T extends { dias: number }>(eventos: T[]): { cerca: T[]; despues: T[] } {
+  const cerca = eventos.filter((e) => e.dias <= HORIZONTE_PROXIMOS).slice(0, 6)
+  return { cerca, despues: eventos.slice(cerca.length) }
 }
 
 /** "Sábado 22 de agosto"; con hoy, "Sábado 20 de noviembre de 2027" si está a más de un año. */
