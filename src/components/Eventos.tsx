@@ -2,10 +2,13 @@ import Link from 'next/link'
 import type { Cuentas } from '@/lib/regalos'
 import { plata } from '@/lib/pesos'
 import { calendarioDelAnio, fechaCorta, fechaLarga, MESES, type Evento } from '@/lib/events'
+import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
 import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { CardEspecial } from '@/components/AmigoInvisible'
 
-// Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos).
+// Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos). Las fechas especiales (Navidad,
+// Día del Amigo…) y los amigos invisibles van entre ellos, en azul.
 
 /**
  * Las fotos de lo que más quiere, una al lado de la otra. La fila mide los 170 px (minmax(0,1fr)): con la fila en auto,
@@ -104,14 +107,19 @@ function FilaEvento({ e }: { e: Evento }) {
   )
 }
 
-/** Los próximos, en un carrusel; los que vienen después, en filas por mes. */
-export function Proximos({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
-  const primeros = eventos.slice(0, 6)
+/** Los próximos, en un carrusel (con las fechas especiales, por cercanía); los que vienen después, en filas por mes. */
+export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: TarjetaEspecial[] }) {
+  const primeros = [
+    ...eventos.slice(0, 6).map((e) => ({ dias: e.dias, tarjeta: <CardProximo key={e.listId} e={e} hoy={hoy} /> })),
+    ...especiales.map((t) => ({
+      dias: t.dias, tarjeta: <CardEspecial key={t.tipo === 'fecha' ? t.fecha.id : t.juego.id} t={t} hoy={hoy} />,
+    })),
+  ].sort((a, b) => a.dias - b.dias)
   const porMes = Object.entries(Object.groupBy(eventos.slice(6), (e) => `${e.fecha.getUTCFullYear()}-${String(e.fecha.getUTCMonth()).padStart(2, '0')}`))
   return (
     <>
       <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
-        {primeros.map((e) => <CardProximo key={e.listId} e={e} hoy={hoy} />)}
+        {primeros.map((p) => p.tarjeta)}
       </ul>
       {porMes.length > 0 && (
         <>
@@ -128,40 +136,55 @@ export function Proximos({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
   )
 }
 
-export function TodoElAnio({ eventos, hoy }: { eventos: Evento[]; hoy: Date }) {
+/** Todo el año: la grilla de los meses (las fechas especiales en azul) y la lista, con todo por cercanía. */
+export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: FechaEspecialVista[] }) {
   const meses = calendarioDelAnio(eventos, hoy)
+  // en la grilla, el día de este año (la próxima vez puede ser el año que viene)
+  const esteAnio = especiales.map((f) => diaEn(f.id, hoy.getUTCFullYear()))
+  const azules = (m: number) => esteAnio.filter((d) => d.getUTCMonth() === m).map((d) => d.getUTCDate())
+  const lista = [
+    ...eventos.map((e) => ({ dias: e.dias, fila: (
+      <li key={e.listId}>
+        <Link href={e.href} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
+          <span className="flex-none rounded-full bg-gr-soft px-2.5 py-1 text-[13px] font-semibold">{fechaCorta(e.fecha, hoy)}</span>
+          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
+      </li>
+    ) })),
+    ...especiales.map((f) => ({ dias: f.dias, fila: (
+      <li key={f.id}>
+        <Link href={`/fechas/${f.id}`} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
+          <span className="flex-none rounded-full bg-gr-blue px-2.5 py-1 text-[13px] font-semibold text-gr-on-blue">{fechaCorta(f.fecha, hoy)}</span>
+          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{f.nombre} <span aria-hidden>{f.emoji}</span></span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
+      </li>
+    ) })),
+  ].sort((a, b) => a.dias - b.dias)
   return (
     <>
       <div className="gr-card flex flex-col gap-3 p-3.5">
         <ul className="grid grid-cols-3 gap-x-3 gap-y-4">
-          {meses.map((m) => (
+          {meses.map((m, i) => (
             <li key={m.nombre} className="flex flex-col gap-1.5">
               <span className={`self-start text-[13px] font-semibold ${m.actual ? 'rounded-full bg-gr-brand px-2 text-gr-on-brand' : ''}`}>{m.nombre}</span>
               <div aria-hidden className="grid grid-cols-7 gap-[3px]">
                 {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => (
                   <span key={d} className={`aspect-square rounded-full ${
-                    m.eventos.includes(d) ? 'bg-gr-accent ring-1 ring-gr-ink/30' : m.hoy === d ? 'bg-gr-ink' : 'bg-gr-dot'}`} />
+                    azules(i).includes(d) ? 'bg-gr-blue' : m.eventos.includes(d) ? 'bg-gr-accent ring-1 ring-gr-ink/30' : m.hoy === d ? 'bg-gr-ink' : 'bg-gr-dot'}`} />
                 ))}
               </div>
             </li>
           ))}
         </ul>
-        <p className="flex gap-4 border-t border-gr-line pt-3 text-xs text-gr-muted">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-gr-line pt-3 text-xs text-gr-muted">
           <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-accent ring-1 ring-gr-ink/30" />Evento o cumple</span>
+          {especiales.length > 0 && <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-blue" />Fecha especial</span>}
           <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-ink" />Hoy</span>
         </p>
       </div>
-      <ul className="flex flex-col gap-2.5">
-        {eventos.map((e) => (
-          <li key={e.listId}>
-            <Link href={e.href} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
-              <span className="flex-none rounded-full bg-gr-soft px-2.5 py-1 text-[13px] font-semibold">{fechaCorta(e.fecha, hoy)}</span>
-              <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</span>
-              <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <ul className="flex flex-col gap-2.5">{lista.map((l) => l.fila)}</ul>
     </>
   )
 }

@@ -204,6 +204,13 @@
       "when": 1792984366210,
       "tag": "0028_video_y_nombre",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792988159663,
+      "tag": "0029_amigo_invisible",
+      "breakpoints": true
     }
   ]
 }

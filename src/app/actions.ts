@@ -31,6 +31,11 @@ import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedad
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import { crearSorpresa, editarSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
+  borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego, preguntar, responderJuego,
+  responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo, type DatosJuego,
+} from '@/lib/amigo-invisible'
+import { esFechaEspecial } from '@/lib/fechas-especiales'
+import {
   aceptarLinkDeAmigo, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, dejarDeSerAmigos, normalizarEmail, pedirAmistad,
   pedirAmistadPorMail, responderSolicitud,
 } from '@/lib/amigos'
@@ -872,4 +877,119 @@ export async function robarDeseoAction(_: EstadoRobo, formData: FormData): Promi
     return { ok: true, itemId: r.itemId, yaLoTenias: r.yaLoTenias, n: Date.now() }
   }
   return { ok: false, texto: r.reason === 'propio' ? 'Ese ya es tuyo 🙂' : 'Ese deseo ya no está en la lista.', n: Date.now() }
+}
+
+// ---------------------------------------------------------------- amigo invisible
+
+/** Lo cargado en el formulario de un amigo invisible (el presupuesto, en pesos como se escriba: "$25.000", "25 mil"). */
+function datosJuego(fd: FormData): DatosJuego {
+  const f = str(fd, 'fechaEspecial')
+  return {
+    nombre: str(fd, 'nombre') ?? '', descripcion: str(fd, 'descripcion') ?? null, presupuesto: parsePesos(str(fd, 'presupuesto')),
+    fecha: str(fd, 'fecha') ?? '', fechaEspecial: esFechaEspecial(f) ? f : null,
+  }
+}
+
+const rutaJuego = (id: string) => `/invisible/${encodeURIComponent(id)}`
+
+/** Lo que cambia en un juego se ve en su pantalla, en Inicio y en las fechas especiales. */
+function revalidarJuego(id: string) {
+  revalidatePath(rutaJuego(id))
+  revalidatePath('/inicio')
+  revalidatePath('/fechas', 'layout')
+}
+
+/** "Armarlo e invitarlos": el juego, con los amigos que eligió (ver crearAmigoInvisible). Va al juego. */
+export async function crearAmigoInvisibleAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const datos = datosJuego(formData)
+  const r = await crearAmigoInvisible(db, userId, datos, amigosDelForm(formData))
+  if (!r.ok) redirect(`/invisible/nuevo?${datos.fechaEspecial ? `fecha=${datos.fechaEspecial}&` : ''}error=1`)
+  revalidarJuego(r.id)
+  redirect(rutaJuego(r.id))
+}
+
+export async function editarAmigoInvisibleAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  if (!(await editarAmigoInvisible(db, id, userId, datosJuego(formData)))) redirect(`${rutaJuego(id)}/editar?error=1`)
+  revalidarJuego(id)
+  redirect(rutaJuego(id))
+}
+
+export async function borrarAmigoInvisibleAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await borrarAmigoInvisible(db, id, userId)
+  revalidarJuego(id)
+  const f = str(formData, 'fechaEspecial')
+  redirect(esFechaEspecial(f) ? `/fechas/${f}` : '/inicio')
+}
+
+/** "Juego" o "No juego" (desde Inicio o desde el juego). Al decir que sí, va al juego. */
+export async function responderJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  const juega = str(formData, 'juega') === '1'
+  await responderJuego(db, id, userId, juega)
+  revalidarJuego(id)
+  if (juega || str(formData, 'desde') === 'juego') redirect(rutaJuego(id))
+}
+
+export async function invitarAlJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await invitarAlJuego(db, id, userId, amigosDelForm(formData))
+  revalidarJuego(id)
+}
+
+/** "Que no se toquen" (excluir=1) o volver a dejar que se toquen. */
+export async function cambiarExcluidosAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  const ok = await cambiarExcluidos(db, id, userId, str(formData, 'a') ?? '', str(formData, 'b') ?? '', str(formData, 'excluir') === '1')
+  revalidatePath(rutaJuego(id))
+  if (!ok) redirect(`${rutaJuego(id)}?excluir=error#no-se-tocan`)
+}
+
+/** "Sortear": si no alcanza o no hay forma, vuelve diciendo por qué. */
+export async function sortearAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  const r = await sortear(db, id, userId)
+  revalidarJuego(id)
+  redirect(r.ok ? rutaJuego(id) : `${rutaJuego(id)}?sorteo=${r.reason}#sortear`)
+}
+
+export async function verAQuienLeRegaloAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await verAQuienLeRegalo(db, id, userId)
+  revalidarJuego(id)
+  redirect(`${rutaJuego(id)}#te-toco`)
+}
+
+export async function preguntarAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  const ok = await preguntar(db, id, userId, str(formData, 'texto') ?? '')
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}${ok ? '' : '?pregunta=error'}#preguntas`)
+}
+
+export async function responderPreguntaAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = await responderPregunta(db, str(formData, 'pregunta') ?? '', userId, str(formData, 'respuesta') ?? '')
+  if (!id) return
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}#preguntas`)
+}
+
+/** "¿Quién me regaló?": solo si lo pide (ver revelarQuienMeRegalo). */
+export async function revelarQuienMeRegaloAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await revelarQuienMeRegalo(db, id, userId)
+  revalidarJuego(id)
+  redirect(`${rutaJuego(id)}#me-regalo`)
 }

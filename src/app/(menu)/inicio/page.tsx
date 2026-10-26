@@ -13,21 +13,29 @@ import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
 import { InvitacionesRegalo } from '@/components/Dividir'
 import { invitacionesPendientes } from '@/lib/invitaciones'
+import { misAmigosInvisibles } from '@/lib/amigo-invisible'
+import { especialesQueVienen } from '@/lib/fechas-especiales'
+import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 // Inicio: lo que viene (los avisos, las cuentas, los próximos cumples y fechas de tu gente, con lo que ya hiciste para
-// cada uno). Tu lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
+// cada uno, y las fechas especiales con tus amigos invisibles). Tu lista está en Vos: en ella, por la regla de la sorpresa,
+// nunca pasa nada que puedas ver.
+
+/** Cuántos días después de su fecha sigue un amigo invisible en Inicio (para "¿Quién te regaló?"). */
+const JUEGOS_PASADOS = 15
 export default async function Inicio({ searchParams }: { searchParams: Promise<{ invitacion?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, { invitacion }] = await Promise.all([
+  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
     yo(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
-    invitacionesPendientes(db, session.userId), searchParams,
+    invitacionesPendientes(db, session.userId), misAmigosInvisibles(db, session.userId, hoy, JUEGOS_PASADOS), searchParams,
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
+  const especiales = especialesQueVienen(hoy, juegos)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
@@ -41,14 +49,18 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       <Banners />
       {/* te proponen dividir un regalo: te sumás o no */}
       <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} />
+      {/* te invitaron a un amigo invisible (juego o no), o ya pasó y podés pedir saber quién te regaló */}
+      <JuegosEnInicio invitaciones={juegos.filter((j) => j.miEstado === 'invitado' && j.dias >= 0)}
+                      pasados={juegos.filter((j) => j.dias < 0 && j.miEstado === 'juega' && j.sorteado && !j.revelado)} />
       <CuentasPendientes cuentas={cuentas} />
 
-      {eventos.length > 0 ? (
+      {(eventos.length > 0 || especiales.length > 0) && (
         <>
           <SectionHeader title="Próximos" href="/eventos" linkLabel="Todo el año" />
-          <Proximos eventos={eventos} hoy={hoy} />
+          <Proximos eventos={eventos} hoy={hoy} especiales={especiales} />
         </>
-      ) : (
+      )}
+      {eventos.length === 0 && (
         <div className="gr-empty flex flex-col items-center gap-3 py-7 text-center">
           <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="calendar" size={26} /></span>
           <p>Acá van a aparecer los cumples de tu gente, con tiempo para elegir. Para eso, abrí con tu cuenta el link de su lista.</p>
