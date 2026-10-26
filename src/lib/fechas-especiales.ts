@@ -10,7 +10,6 @@ export type FechaEspecial = (typeof FECHAS_ESPECIALES)[number]
 
 type Def = {
   nombre: string
-  emoji: string
   /** el día: fijo, o el n-ésimo domingo del mes */
   cae: { mes: number; dia: number } | { mes: number; domingo: number }
   /** cuántos días antes aparece en Lo que viene */
@@ -20,11 +19,11 @@ type Def = {
 }
 
 const DEFS: Record<FechaEspecial, Def> = {
-  navidad: { nombre: 'Navidad', emoji: '🎄', cae: { mes: 12, dia: 25 }, ventana: 30, aQuien: '¿A quién le regalás?' },
-  amigo: { nombre: 'Día del Amigo', emoji: '🤝', cae: { mes: 7, dia: 20 }, ventana: 21, aQuien: '¿A qué amigos les regalás?' },
-  padre: { nombre: 'Día del Padre', emoji: '👔', cae: { mes: 6, domingo: 3 }, ventana: 21, aQuien: 'Para tu papá, o para quien sea tu papá.' },
-  madre: { nombre: 'Día de la Madre', emoji: '💐', cae: { mes: 10, domingo: 3 }, ventana: 21, aQuien: 'Para tu mamá, o para quien sea tu mamá.' },
-  ninos: { nombre: 'Día del Niño', emoji: '🧸', cae: { mes: 8, domingo: 3 }, ventana: 21, aQuien: 'Para los chicos de tu vida.' },
+  navidad: { nombre: 'Navidad', cae: { mes: 12, dia: 25 }, ventana: 30, aQuien: '¿A quién le regalás?' },
+  amigo: { nombre: 'Día del Amigo', cae: { mes: 7, dia: 20 }, ventana: 21, aQuien: '¿A qué amigos les regalás?' },
+  padre: { nombre: 'Día del Padre', cae: { mes: 6, domingo: 3 }, ventana: 21, aQuien: 'Para tu papá, o para quien sea tu papá.' },
+  madre: { nombre: 'Día de la Madre', cae: { mes: 10, domingo: 3 }, ventana: 21, aQuien: 'Para tu mamá, o para quien sea tu mamá.' },
+  ninos: { nombre: 'Día del Niño', cae: { mes: 8, domingo: 3 }, ventana: 21, aQuien: 'Para los chicos de tu vida.' },
 }
 
 export const esFechaEspecial = (s: unknown): s is FechaEspecial => typeof s === 'string' && (FECHAS_ESPECIALES as readonly string[]).includes(s)
@@ -49,7 +48,6 @@ export function proximaEspecial(f: FechaEspecial, hoy: Date): Date {
 export type FechaEspecialVista = {
   id: FechaEspecial
   nombre: string
-  emoji: string
   aQuien: string
   fecha: Date
   dias: number
@@ -60,7 +58,7 @@ export type FechaEspecialVista = {
 export function vistaDe(f: FechaEspecial, hoy: Date): FechaEspecialVista {
   const fecha = proximaEspecial(f, hoy)
   const d = DEFS[f]
-  return { id: f, nombre: d.nombre, emoji: d.emoji, aQuien: d.aQuien, fecha, dias: diasEntre(hoy, fecha), cuando: fechaLarga(fecha, hoy) }
+  return { id: f, nombre: d.nombre, aQuien: d.aQuien, fecha, dias: diasEntre(hoy, fecha), cuando: fechaLarga(fecha, hoy) }
 }
 
 /** Las que ya están cerca (dentro de su ventana), por cercanía: las de Lo que viene. */

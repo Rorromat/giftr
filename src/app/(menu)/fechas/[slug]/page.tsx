@@ -8,6 +8,7 @@ import { hoyLocal } from '@/lib/events'
 import { datosDe, esFechaEspecial, vistaDe } from '@/lib/fechas-especiales'
 import { miGente } from '@/lib/gente'
 import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
+import { IlustracionFecha } from '@/components/IlustracionFecha'
 import { AvatarSticker, Icon, PageHeader, Seccion } from '@/components/ui'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -37,14 +38,14 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <PageHeader title={v.nombre} back="/inicio" backLabel="Volver a Inicio" />
 
-      <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-[26px] bg-gr-blue p-[18px] text-gr-on-blue shadow-card">
-        <span aria-hidden className="absolute -right-1.5 -bottom-3.5 text-[96px] leading-none">{v.emoji}</span>
-        <span className="self-start rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gr-blue">
+      <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-[26px] bg-gr-blue p-[18px] pr-[132px] text-gr-on-blue shadow-card">
+        <IlustracionFecha fecha={slug} size={150} className="absolute -right-3 -bottom-3" />
+        <span className="self-start whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gr-blue">
           Fecha especial · {v.dias === 0 ? 'es hoy' : v.dias === 1 ? 'mañana' : `en ${v.dias} días`}
         </span>
         <h2 className="font-display text-[30px] leading-none font-bold tracking-tight">{v.nombre}</h2>
         <p className="text-sm opacity-90">{v.cuando}</p>
-        <p className="max-w-[230px] text-sm leading-snug">{v.aQuien} Algo de su lista, una sorpresa o un amigo invisible.</p>
+        <p className="text-sm leading-snug">{v.aQuien} Algo de su lista, una sorpresa o un amigo invisible.</p>
       </div>
 
       <section aria-labelledby="invisible-titulo" className="flex flex-col gap-2.5">
@@ -66,7 +67,7 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
                 </span>
                 <Link href={c.href} className="gr-btn gr-btn--sm flex-none px-3">Su lista</Link>
                 <Link href={`/sorpresa/nueva?para=${encodeURIComponent(c.href.slice('/l/'.length))}`} aria-label={`Armarle una sorpresa a ${c.nombre}`}
-                      className="gr-btn gr-btn--sm flex-none px-3"><span aria-hidden>🤫</span></Link>
+                      className="gr-btn gr-btn--sm flex-none px-3"><Icon name="gift" size={18} /></Link>
               </li>
             ))}
           </ul>

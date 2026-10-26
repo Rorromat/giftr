@@ -6,6 +6,7 @@ import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fech
 import { AvatarStack, Icon, ItemPhoto, SectionHeader, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { CardEspecial } from '@/components/AmigoInvisible'
+import { IconoFecha } from '@/components/IconoFecha'
 
 // Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos). Las fechas especiales (Navidad,
 // Día del Amigo…) y los amigos invisibles van entre ellos, en azul.
@@ -156,7 +157,8 @@ export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[
       <li key={f.id}>
         <Link href={`/fechas/${f.id}`} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
           <span className="flex-none rounded-full bg-gr-blue px-2.5 py-1 text-[13px] font-semibold text-gr-on-blue">{fechaCorta(f.fecha, hoy)}</span>
-          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{f.nombre} <span aria-hidden>{f.emoji}</span></span>
+          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{f.nombre}</span>
+          <IconoFecha fecha={f.id} size={22} acento="var(--gr-blue)" className="flex-none text-gr-blue" />
           <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
         </Link>
       </li>
