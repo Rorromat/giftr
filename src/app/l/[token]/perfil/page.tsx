@@ -55,7 +55,7 @@ export default async function Perfil({ params, searchParams }: Props) {
         {propio && (
           <div className="mt-1 flex flex-col items-center gap-2 border-t border-gr-on-hero/10 pt-3.5">
             <p className="text-[13px] text-gr-on-hero/70">Así te ven los que abren tu lista</p>
-            <Link href="/bienvenida?editar=1" className="gr-btn gr-btn--sm">Editar mis gustos</Link>
+            <Link href="/perfil/gustos" className="gr-btn gr-btn--sm">Editar mis gustos</Link>
           </div>
         )}
       </section>
@@ -84,10 +84,10 @@ export default async function Perfil({ params, searchParams }: Props) {
       ) : nadaCargado ? (
         <div className="relative rounded-[22px] bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
           {propio ? 'Todavía no cargaste tus gustos.' : `${primer} todavía no cargó sus gustos.`}
-          {propio && <Link href="/bienvenida?editar=1" className="mt-2 block font-semibold underline underline-offset-4">Cargarlos ahora</Link>}
+          {propio && <Link href="/perfil/gustos" className="mt-2 block font-semibold underline underline-offset-4">Cargarlos ahora</Link>}
         </div>
       ) : propio && (
-        <Link href="/bienvenida?editar=1" className="self-start text-sm font-semibold underline underline-offset-4">
+        <Link href="/perfil/gustos" className="self-start text-sm font-semibold underline underline-offset-4">
           Sumá lo que te gusta: deportes, hobbies, marcas…
         </Link>
       )}

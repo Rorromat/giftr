@@ -44,6 +44,8 @@ import Listo from '@/app/bienvenida/listo/page'
 import Bienvenida from '@/app/bienvenida/page'
 import PerfilPublico from '@/app/l/[token]/perfil/page'
 import Perfil from '@/app/(menu)/perfil/page'
+import TusGustos from '@/app/(menu)/perfil/gustos/page'
+import EditarGustos from '@/app/(menu)/perfil/gustos/[paso]/page'
 
 function form(campos: Record<string, string>) {
   const fd = new FormData()
@@ -118,8 +120,9 @@ test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gu
   expect(await redirige(saveGustosAction(form({ deportes: 'Pádel', dia: '15', mes: '' })))).toBe('/bienvenida?paso=0&cumple=invalido')
   expect((await misGustos(h.db, owner.id))?.deportes).toEqual(['Pádel'])
   expect(await miCumple(h.db, owner.id)).toEqual({ dia: 3, mes: 4 })
-  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil' })))).toBe('/bienvenida?editar=1&paso=0&cumple=invalido')
-  // "Más tarde" (o "Guardar" arriba, desde Perfil) quería salir: sale a Perfil, que avisa al lado de su cumple
+  // la bienvenida entera desde Perfil (como era antes de Tus gustos, en una pestaña que quedó abierta): a Perfil, al lado del cumple
+  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil' })))).toBe('/perfil?cumple=invalido#cumple')
+  // "Más tarde" quería salir: sale a Perfil, que avisa al lado de su cumple
   expect(await redirige(saveGustosAction(form({ hobbies: 'Cocinar', dia: '', mes: '7', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
   expect((await misGustos(h.db, owner.id))?.hobbies).toEqual(['Cocinar'])
   expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
@@ -129,8 +132,8 @@ test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gu
   // con "Más tarde", después sigue a su lista
   expect(await preguntarAvisos(h.db, owner.id)).toBe(false)
   expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', corte: '1' })))).toBe('/bienvenida/avisos?luego=lista')
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil', corte: '1' })))).toBe('/perfil')
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/bienvenida/listo?desde=perfil')
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil', corte: '1' })))).toBe('/perfil/gustos')
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/perfil/gustos')
   expect(await miCumple(h.db, owner.id)).toBeNull()
 })
 
@@ -158,15 +161,74 @@ test('los días del cumple son los del mes elegido (29 en febrero)', () => {
   expect(renderToStaticMarkup(createElement(CumpleCampos, { exigir: true }))).toContain('required')
 })
 
-test('"¡Todo listo!" la primera vez: completar un paso sigue en la bienvenida, no pasa al modo de Perfil', async () => {
+test('"¡Todo listo!": completar uno edita solo ese paso y vuelve ahí (no sigue por los que venían después)', async () => {
   await preparar()
   const primera = await html(Listo({ searchParams: Promise.resolve({}) }))
-  expect(primera).toContain('href="/bienvenida?paso=1"')
-  expect(primera).not.toContain('editar=1')
+  expect(primera).toContain('href="/perfil/gustos/deportes?volver=listo"')
+  expect(primera).toContain('href="/perfil/gustos/cumple?volver=listo"') // la foto y el cumple
   expect(primera).toContain('Agregar mi primer deseo')
   const desdePerfil = await html(Listo({ searchParams: Promise.resolve({ desde: 'perfil' }) }))
-  expect(desdePerfil).toContain('href="/bienvenida?editar=1&amp;paso=1"')
+  expect(desdePerfil).toContain('href="/perfil/gustos/deportes?volver=listo-perfil"')
   expect(desdePerfil).toContain('Volver a Perfil')
+})
+
+test('editar un paso solo: guarda y vuelve a Tus gustos (o a "¡Todo listo!"); el cumple que no se guardó, al mismo paso', async () => {
+  const { owner } = await preparar()
+  expect(await redirige(saveGustosAction(form({ solo: 'deportes', deportes: 'Pádel' })))).toBe('/perfil/gustos?guardado=deportes')
+  expect((await misGustos(h.db, owner.id))?.deportes).toEqual(['Pádel'])
+  expect(await redirige(saveGustosAction(form({ solo: 'bebidas', bebidas: 'Mate', volver: 'listo' })))).toBe('/bienvenida/listo')
+  expect(await redirige(saveGustosAction(form({ solo: 'bebidas', volver: 'listo-perfil' })))).toBe('/bienvenida/listo?desde=perfil')
+  expect(await redirige(saveGustosAction(form({ solo: 'cumple', dia: '31', mes: '4' })))).toBe('/perfil/gustos/cumple?cumple=invalido')
+  expect(await redirige(saveGustosAction(form({ solo: 'cumple', dia: '15', mes: '', volver: 'listo' })))).toBe('/perfil/gustos/cumple?cumple=invalido&volver=listo')
+  // un paso que no existe no arma direcciones: sigue como la bienvenida
+  expect(await redirige(saveGustosAction(form({ solo: '../../afuera' })))).toBe('/bienvenida/avisos')
+})
+
+test('la bienvenida desde Perfil (?editar=1, los links de antes) lleva a Tus gustos, o al paso que pedía', async () => {
+  await preparar()
+  const ir = (sp: Record<string, string>) => redirige(Bienvenida({ searchParams: Promise.resolve(sp) }))
+  expect(await ir({ editar: '1' })).toBe('/perfil/gustos')
+  expect(await ir({ editar: '1', paso: '5' })).toBe('/perfil/gustos/colores')
+  expect(await ir({ editar: '1', paso: '99' })).toBe('/perfil/gustos')
+  expect(await ir({})).toBeNull()
+})
+
+test('Tus gustos: cada bloque con lo cargado y su link para editarlo solo; lo vacío, para sumar', async () => {
+  const { owner, list } = await preparar()
+  await guardarGustos(h.db, owner.id, sanitizarGustos({ deportes: ['Pádel', 'Running'], colores: ['Verde'], talles: { remera: 'M' } }))
+  const p = await html(TusGustos({ searchParams: Promise.resolve({}) }))
+  expect(p).toContain('2 de 7')
+  expect(p).toContain('href="/perfil/gustos/deportes"')
+  expect(p).toContain('Pádel')
+  expect(p).toContain('background:#2E8B57') // la muestra del verde
+  expect(p).toMatch(/Remera<\/span><span[^>]*>M</)
+  expect(p).toMatch(/Calzado<\/span><span[^>]*>—</)
+  expect(p.match(/>Sumar</g)).toHaveLength(5)
+  expect(p).toContain(`href="/l/${list.shareToken}/perfil"`)
+  expect(p).not.toContain('role="status"')
+  expect(await html(TusGustos({ searchParams: Promise.resolve({ guardado: 'deportes' }) }))).toContain('role="status"')
+  // en Perfil, la fila lleva acá y dice cuánto completó
+  const perfil = await html(Perfil({ searchParams: Promise.resolve({}) }))
+  expect(perfil).toContain('href="/perfil/gustos"')
+  expect(perfil).toContain('2 de 7')
+})
+
+test('editar un paso: se ve solo ese, con Guardar y Cancelar (a Tus gustos, o a "¡Todo listo!")', async () => {
+  await preparar()
+  const editar = (paso: string, sp: Record<string, string> = {}) =>
+    html(EditarGustos({ params: Promise.resolve({ paso }), searchParams: Promise.resolve(sp) }))
+  const p = await editar('colores')
+  expect(p).toContain('name="solo" value="colores"')
+  expect(p.match(/<section class="(?!hidden)/g)).toHaveLength(1)
+  expect(p).toContain('Colores y talles')
+  expect(p).not.toContain('Más tarde')
+  expect(p).toContain('>Guardar<')
+  expect(p).toContain('href="/perfil/gustos"')
+  const desdeListo = await editar('bebidas', { volver: 'listo' })
+  expect(desdeListo).toContain('name="volver" value="listo"')
+  expect(desdeListo).toContain('href="/bienvenida/listo"')
+  expect(await editar('bebidas', { volver: 'https://otro.sitio' })).not.toContain('name="volver"')
+  await expect(editar('nada')).rejects.toThrow('NEXT_NOT_FOUND')
 })
 
 test('perfil público: con talles o "lo que no" pero sin gustos, no dice que no cargó nada', async () => {

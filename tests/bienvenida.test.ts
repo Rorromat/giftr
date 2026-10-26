@@ -6,7 +6,9 @@ import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { guardarGustos, gustosDeLista, misGustos, necesitaBienvenida, saltearBienvenida } from '@/lib/bienvenida'
-import { GUSTOS_VACIOS, NO_FUTBOL, SOLO_SELECCION, gustosDesdeForm, sanitizarGustos, seccionesDeGustos } from '@/lib/gustos'
+import {
+  GUSTOS_VACIOS, NO_FUTBOL, PASOS_GUSTOS, SOLO_SELECCION, bloquesDeGustos, esPasoGustos, gustosDesdeForm, sanitizarGustos, seccionesDeGustos,
+} from '@/lib/gustos'
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
@@ -95,4 +97,25 @@ test('en tu perfil los títulos hablan de vos', () => {
   expect(seccionesDeGustos(g, true).map((s) => s.titulo)).toEqual(['No me interesa', 'No me regalen'])
   expect(seccionesDeGustos(g).map((s) => s.titulo)).toEqual(['No le interesa', 'No le regales'])
   expect(seccionesDeGustos(null)).toEqual([])
+})
+
+test('Tus gustos: un bloque por paso de la bienvenida (sin el cumple), con lo que falta a la vista', () => {
+  const vacios = bloquesDeGustos(null)
+  expect(vacios.map((b) => b.paso)).toEqual(PASOS_GUSTOS.slice(1))
+  expect(vacios.every((b) => !b.cargado)).toBe(true)
+
+  const g = sanitizarGustos({
+    deportes: ['Pádel'], club: NO_FUTBOL, mascotas: ['No tengo'], colores: ['Verde'], talles: { calzado: '40' }, nota: 'Ya tengo mil tazas',
+  })
+  const b = Object.fromEntries(bloquesDeGustos(g).map((x) => [x.paso, x]))
+  expect(Object.values(b).filter((x) => x.cargado).map((x) => x.paso)).toEqual(['deportes', 'futbol', 'hobbies', 'colores', 'no-regalar'])
+  expect(b.futbol.partes[0].items).toEqual(['No me interesa'])
+  // las partes vacías también están: en la tarjeta dicen "Sin cargar"
+  expect(b.hobbies.partes.map((p) => [p.titulo, p.items])).toEqual([['Hobbies y planes', []], ['Mascotas', ['Sin mascota']]])
+  expect(b.colores.partes.map((p) => p.items)).toEqual([['Verde'], ['Calzado 40']])
+  expect(b['no-regalar'].partes.map((p) => p.items)).toEqual([[], ['Ya tengo mil tazas']])
+
+  expect(esPasoGustos('colores')).toBe(true)
+  expect(esPasoGustos('../perfil')).toBe(false)
+  expect(esPasoGustos(null)).toBe(false)
 })

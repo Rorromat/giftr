@@ -4,9 +4,10 @@
 
 import { recortar } from '@/lib/limites'
 
+// Las listas largas van de lo más elegido a lo menos: la bienvenida muestra las primeras (ver POPULARES) y "Ver más".
 export const DEPORTES = [
-  'Fútbol', 'Pádel', 'Running', 'Gimnasio', 'Tenis', 'Básquet', 'Vóley', 'Hockey', 'Rugby', 'Natación',
-  'Ciclismo', 'Golf', 'Yoga', 'Pilates', 'Crossfit', 'Boxeo', 'Artes marciales', 'Trekking', 'Escalada',
+  'Fútbol', 'Pádel', 'Running', 'Gimnasio', 'Tenis', 'Yoga', 'Pilates', 'Natación', 'Básquet', 'Vóley', 'Hockey', 'Rugby',
+  'Ciclismo', 'Golf', 'Crossfit', 'Boxeo', 'Artes marciales', 'Trekking', 'Escalada',
   'Surf', 'Esquí y snowboard', 'Handball', 'Skate', 'Pesca', 'Equitación', 'Polo', 'Remo', 'Patín', 'Danza', 'Tenis de mesa',
 ] as const
 
@@ -26,17 +27,17 @@ export const CLUBES = [
 ] as const
 
 export const HOBBIES = [
-  'Leer', 'Cocinar', 'Hacer asado', 'Vinos', 'Café de especialidad', 'Cerveza artesanal', 'Música', 'Ir a recitales',
-  'Tocar un instrumento', 'Cine y series', 'Teatro', 'Videojuegos', 'Juegos de mesa', 'Fotografía', 'Plantas y jardín',
-  'Viajar', 'Escapadas', 'Camping', 'Dibujo y pintura', 'Manualidades', 'Tejer', 'Moda', 'Maquillaje y skincare',
-  'Tecnología', 'Meditación', 'Spa y masajes', 'Idiomas', 'Autos y motos', 'Astrología', 'Salir a comer',
-  'Cursos y talleres', 'Puzzles', 'Podcasts', 'Decoración', 'Coleccionar cosas',
+  'Viajar', 'Leer', 'Cocinar', 'Cine y series', 'Música', 'Salir a comer', 'Hacer asado', 'Plantas y jardín',
+  'Videojuegos', 'Moda', 'Maquillaje y skincare', 'Tecnología', 'Ir a recitales', 'Juegos de mesa',
+  'Vinos', 'Café de especialidad', 'Cerveza artesanal', 'Tocar un instrumento', 'Teatro', 'Fotografía', 'Escapadas',
+  'Camping', 'Dibujo y pintura', 'Manualidades', 'Tejer', 'Meditación', 'Spa y masajes', 'Idiomas', 'Autos y motos',
+  'Astrología', 'Cursos y talleres', 'Puzzles', 'Podcasts', 'Decoración', 'Coleccionar cosas',
 ] as const
 
 export const MASCOTAS = ['Perro', 'Gato', 'Otra mascota', 'No tengo'] as const
 
 export const MARCAS = [
-  { grupo: 'Deportivas', marcas: ['Nike', 'Adidas', 'Puma', 'Topper', 'Fila', 'Under Armour', 'New Balance', 'Reebok', 'Asics', 'Vans', 'Converse', 'Montagne', 'The North Face'] },
+  { grupo: 'Deportivas', marcas: ['Nike', 'Adidas', 'Puma', 'New Balance', 'Vans', 'Converse', 'Topper', 'Fila', 'Under Armour', 'Reebok', 'Asics', 'Montagne', 'The North Face'] },
   { grupo: 'Para ella', marcas: ['Rapsodia', 'Jazmín Chebar', 'Ayres', 'Kosiuko', 'Las Pepas', "Paula Cahen d'Anvers", 'Akiabara', '47 Street', 'Vitamina', 'Sweet Victorian', 'Muaa', 'María Cher', 'Tucci', 'Portsaid', 'Uma', 'Desiderata', 'Complot', 'Prüne', 'Mishka', 'Sarkany'] },
   { grupo: 'Para él', marcas: ['Kevingston', 'Legacy', 'La Martina', 'Bensimon', 'Wanama', 'Cardón', 'Etiqueta Negra', 'Bowen', 'Equus', 'Rever Pass', 'Prototype', 'Taverniti'] },
   { grupo: 'De todos lados', marcas: ['Zara', "Levi's", 'Lacoste', 'Tommy Hilfiger', 'Quiksilver', 'Billabong', 'Rip Curl', 'Volcom', 'Cheeky', 'Grisino', 'Mimo & Co'] },
@@ -56,6 +57,15 @@ export const COLORES = [
   { nombre: 'Estampados', hex: 'repeating-linear-gradient(45deg,#121212 0 4px,#FFF6E5 4px 9px)' },
 ] as const
 
+/** Cuántas opciones se ven antes de "Ver más" (las marcas, por grupo). Lo ya elegido se ve siempre. */
+export const POPULARES = { deportes: 12, hobbies: 14, bebidas: 12, marcas: 6 } as const
+
+/** Los clubes que se ven sin buscar: los grandes (los primeros de CLUBES). */
+export const CLUBES_SIN_BUSCAR = 5
+
+/** La muestra de un color (un hex o un degradado), para dibujarla al lado del nombre. */
+export const muestraDeColor = (nombre: string) => COLORES.find((c) => c.nombre === nombre)?.hex ?? null
+
 export const TALLES = {
   remera: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
   pantalon: ['34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'],
@@ -63,8 +73,8 @@ export const TALLES = {
 } as const
 
 export const BEBIDAS = [
-  'Café', 'Mate', 'Té', 'Vino tinto', 'Vino blanco', 'Rosado', 'Espumante', 'Cerveza', 'Fernet', 'Gin', 'Whisky',
-  'Vermú', 'Aperitivos', 'Ron', 'Nada de alcohol', 'Chocolate', 'Dulce de leche', 'Alfajores', 'Helado', 'Picadas',
+  'Café', 'Mate', 'Té', 'Vino tinto', 'Vino blanco', 'Espumante', 'Cerveza', 'Fernet', 'Gin', 'Nada de alcohol',
+  'Chocolate', 'Alfajores', 'Helado', 'Dulce de leche', 'Rosado', 'Whisky', 'Vermú', 'Aperitivos', 'Ron', 'Picadas',
   'Sushi', 'Pastas', 'Lo dulce', 'Lo salado',
 ] as const
 
@@ -136,6 +146,14 @@ export function gustosDesdeForm(fd: FormData): Gustos {
   })
 }
 
+/**
+ * Los pasos de la bienvenida, en orden. Cada uno se edita también solo, desde Tus gustos (/perfil/gustos/<paso>): para
+ * cambiar el talle no hay que pasar por los ocho.
+ */
+export const PASOS_GUSTOS = ['cumple', 'deportes', 'futbol', 'hobbies', 'ropa', 'colores', 'bebidas', 'no-regalar'] as const
+export type PasoGustos = (typeof PASOS_GUSTOS)[number]
+export const esPasoGustos = (s: unknown): s is PasoGustos => PASOS_GUSTOS.includes(s as PasoGustos)
+
 /** Ícono de cada sección (nombres de <Icon>; acá van como texto para no depender de los componentes). */
 export type IconoGusto = 'cake' | 'ball' | 'shield' | 'star' | 'paw' | 'bag' | 'hanger' | 'palette' | 'shirt' | 'cup' | 'ban' | 'note'
 
@@ -164,4 +182,37 @@ export function seccionesDeGustos(g: Gustos | null, propio = false): SeccionGust
     { clave: 'nota', titulo: 'Algo más', icono: 'note', items: g.nota ? [g.nota] : [] },
   ]
   return secciones.filter((s) => s.items.length)
+}
+
+export type BloqueGustos = {
+  paso: Exclude<PasoGustos, 'cumple'>
+  titulo: string
+  icono: IconoGusto
+  /** Lo cargado, por parte (Hobbies / Mascotas…); vacías también, así se ve qué falta. */
+  partes: { clave: keyof Gustos; titulo: string; items: string[] }[]
+  cargado: boolean
+}
+
+/**
+ * Tus gustos tal cual los cargaste, un bloque por paso de la bienvenida (sin el del cumple, que está en Perfil): lo que
+ * se ve en Tus gustos y en "¡Todo listo!", y cuántos completaste.
+ */
+export function bloquesDeGustos(g: Gustos | null): BloqueGustos[] {
+  const v = g ?? GUSTOS_VACIOS
+  const club = v.club === NO_FUTBOL ? 'No me interesa' : v.club
+  const talles = (['remera', 'pantalon', 'calzado'] as const).filter((k) => v.talles[k])
+    .map((k) => `${k === 'remera' ? 'Remera' : k === 'pantalon' ? 'Pantalón' : 'Calzado'} ${v.talles[k]}`)
+  const bloque = (paso: BloqueGustos['paso'], titulo: string, icono: IconoGusto, ...partes: BloqueGustos['partes']): BloqueGustos =>
+    ({ paso, titulo, icono, partes, cargado: partes.some((p) => p.items.length > 0) })
+  return [
+    bloque('deportes', 'Deportes', 'ball', { clave: 'deportes', titulo: 'Deportes', items: v.deportes }),
+    bloque('futbol', 'Fútbol', 'shield', { clave: 'club', titulo: 'Club', items: club ? [club] : [] }),
+    bloque('hobbies', 'Hobbies y mascotas', 'star',
+      { clave: 'hobbies', titulo: 'Hobbies y planes', items: v.hobbies }, { clave: 'mascotas', titulo: 'Mascotas', items: v.mascotas.map((m) => (m === 'No tengo' ? 'Sin mascota' : m)) }),
+    bloque('ropa', 'Marcas y estilo', 'bag', { clave: 'marcas', titulo: 'Marcas', items: v.marcas }, { clave: 'estilos', titulo: 'Estilo', items: v.estilos }),
+    bloque('colores', 'Colores y talles', 'palette', { clave: 'colores', titulo: 'Colores', items: v.colores }, { clave: 'talles', titulo: 'Talles', items: talles }),
+    bloque('bebidas', 'Bebidas y antojos', 'cup', { clave: 'bebidas', titulo: 'Bebidas y antojos', items: v.bebidas }),
+    bloque('no-regalar', 'Lo que no querés', 'ban',
+      { clave: 'noRegalar', titulo: 'No me regalen', items: v.noRegalar }, { clave: 'nota', titulo: 'Algo más', items: v.nota ? [v.nota] : [] }),
+  ]
 }
