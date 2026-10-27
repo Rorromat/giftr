@@ -167,7 +167,17 @@ async function pedirToken(signal: AbortSignal): Promise<Token | null> {
   return { valor: j.access_token, vence: Date.now() + Math.max(0, segundos - 60) * 1000 }
 }
 
-/** GET a la API con el token; si da 401 (vencido antes de tiempo, revocado), se pide otro una sola vez. Null si no da 200. */
+/** El código de una respuesta de error de la API (" PA_UNAUTHORIZED_RESULT_FROM_POLICIES", " not_found"), para el log. */
+async function codigoDeError(r: Response): Promise<string> {
+  const j: unknown = await r.json().catch(() => null)
+  const codigo = esJson(j) ? j.code ?? j.error : null
+  return typeof codigo === 'string' && /^[\w.-]{1,60}$/.test(codigo) ? ` ${codigo}` : ''
+}
+
+/**
+ * GET a la API con el token; si da 401 (vencido antes de tiempo, revocado), se pide otro una sola vez. Null si no da 200,
+ * con el recurso, el status y el código de la API en el log: ni el id ni el resto de la respuesta.
+ */
 async function deLaApi(ruta: string, signal: AbortSignal, deQuienPide?: AbortSignal): Promise<unknown> {
   for (let intento = 0; intento < 2; intento++) {
     const t = await tokenDeLaApp(signal, deQuienPide)
@@ -176,9 +186,14 @@ async function deLaApi(ruta: string, signal: AbortSignal, deQuienPide?: AbortSig
       headers: { authorization: `Bearer ${t}`, accept: 'application/json', 'user-agent': UA_GIFTR }, redirect: 'error', signal,
     })
     if (r.ok) return r.json()
-    await descartar(r)
-    if (r.status !== 401) return null
-    if (token?.valor === t) token = null
+    if (r.status === 401 && token?.valor === t) token = null
+    if (r.status === 401 && intento === 0) {
+      await descartar(r)
+      continue
+    }
+    // PA_UNAUTHORIZED_RESULT_FROM_POLICIES (un 403): a la aplicación le falta un permiso para ese recurso
+    console.warn(`API de MercadoLibre: ${ruta.split('/')[1]} dio ${r.status}${await codigoDeError(r)}`)
+    return null
   }
   return null
 }
@@ -222,10 +237,15 @@ export async function leerDeLaApi(url: string, signal?: AbortSignal): Promise<Le
   const tiempo = AbortSignal.timeout(API_ML_TIEMPO_MS)
   const s = signal ? AbortSignal.any([tiempo, signal]) : tiempo
   const leer = async (ruta: string, de: (j: unknown, host: string) => Lectura | null) => {
+    const recurso = ruta.split('/')[1]
     try {
-      return de(await deLaApi(ruta, s, signal), host)
-    } catch {
-      // red, tiempo o un JSON roto
+      const j = await deLaApi(ruta, s, signal)
+      const l = j === null ? null : de(j, host)
+      if (j !== null && !l) console.warn(`API de MercadoLibre: ${recurso} contestó sin el nombre`)
+      return l
+    } catch (e) {
+      // red, tiempo o un JSON roto; si se fue el que pidió, no es cosa de la API
+      if (!signal?.aborted) console.warn(`API de MercadoLibre: ${recurso} falló (${e instanceof Error ? e.name : 'error'})`)
       return null
     }
   }
