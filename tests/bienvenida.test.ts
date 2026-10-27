@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { readFileSync } from 'node:fs'
+import { eq, sql } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { lists } from '@/db/schema'
+import { lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
@@ -118,4 +119,23 @@ test('Tus gustos: un bloque por paso de la bienvenida (sin el cumple), con lo qu
   expect(esPasoGustos('colores')).toBe(true)
   expect(esPasoGustos('../perfil')).toBe(false)
   expect(esPasoGustos(null)).toBe(false)
+})
+
+test('talles largos de remera con el número (2XL, 3XS): los de antes (XXL, XXXL…) se pasan solos, al guardar y en la base', async () => {
+  expect(sanitizarGustos({ talles: { remera: '3XS' } }).talles.remera).toBe('3XS')
+  expect(sanitizarGustos({ talles: { remera: 'XXL' } }).talles.remera).toBe('2XL')
+  expect(sanitizarGustos({ talles: { remera: 'XXXL' } }).talles.remera).toBe('3XL')
+  expect(sanitizarGustos({ talles: { remera: '4XL' } }).talles.remera).toBeNull()
+
+  // la migración 0032 pasa los guardados (los demás gustos quedan como estaban)
+  const db = await createTestDb()
+  const ana = await usuario(db, 'Ana'), beto = await usuario(db, 'Beto'), caro = await usuario(db, 'Caro')
+  const viejo = (remera: string) => ({ ...GUSTOS_VACIOS, deportes: ['Pádel'], talles: { remera, pantalon: '40', calzado: null } })
+  await db.update(users).set({ gustos: viejo('XXXL') }).where(eq(users.id, ana.id))
+  await db.update(users).set({ gustos: viejo('XXS') }).where(eq(users.id, beto.id))
+  await db.update(users).set({ gustos: viejo('M') }).where(eq(users.id, caro.id))
+  await db.execute(sql.raw(readFileSync('drizzle/0032_talles_2xl.sql', 'utf8')))
+  expect(await misGustos(db, ana.id)).toEqual({ ...viejo('3XL') })
+  expect((await misGustos(db, beto.id))?.talles.remera).toBe('2XS')
+  expect((await misGustos(db, caro.id))?.talles.remera).toBe('M')
 })

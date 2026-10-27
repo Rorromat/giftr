@@ -307,8 +307,8 @@ test('"Agregar desde otras apps" en Perfil: en Android y en iPhone (con la recet
 })
 
 test('los talles ilustrados: cada prenda con su etiqueta y el talle; el que falta, con un guión (y lo dice para quien no ve)', () => {
-  const svg = renderToStaticMarkup(createElement(TallesIlustrados, { talles: { remera: 'XXXL', pantalon: '40', calzado: null }, nombre: 'Ana' }))
-  expect(svg).toContain('aria-label="Talles de Ana: remera XXXL, pantalón 40, calzado sin cargar"')
+  const svg = renderToStaticMarkup(createElement(TallesIlustrados, { talles: { remera: '3XL', pantalon: '40', calzado: null }, nombre: 'Ana' }))
+  expect(svg).toContain('aria-label="Talles de Ana: remera 3XL, pantalón 40, calzado sin cargar"')
   const etiquetas = [...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1])
-  expect(etiquetas).toEqual(['REMERA', 'XXXL', 'PANTALÓN', '40', 'CALZADO', '—'])
+  expect(etiquetas).toEqual(['REMERA', '3XL', 'PANTALÓN', '40', 'CALZADO', '—'])
 })

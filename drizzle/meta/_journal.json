@@ -225,6 +225,13 @@
       "when": 1793033361473,
       "tag": "0031_borrar_deseo",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793068389790,
+      "tag": "0032_talles_2xl",
+      "breakpoints": true
     }
   ]
 }

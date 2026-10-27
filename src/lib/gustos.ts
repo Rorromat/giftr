@@ -83,7 +83,7 @@ export const CLUBES_SIN_BUSCAR = 5
 export const muestraDeColor = (nombre: string) => COLORES.find((c) => c.nombre === nombre)?.hex ?? null
 
 export const TALLES = {
-  remera: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+  remera: ['3XS', '2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'],
   pantalon: ['34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'],
   calzado: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
 } as const
@@ -98,6 +98,9 @@ export const NO_REGALAR = [
   'Perfumes', 'Ropa', 'Adornos', 'Velas y difusores', 'Cosas de cocina', 'Libros', 'Plantas', 'Alcohol', 'Dulces',
   'Peluches', 'Gift cards', 'Bijou', 'Maquillaje', 'Cosas que ocupan lugar',
 ] as const
+
+/** Los talles largos se escribían con todas las equis; ahora, con el número (ver la migración 0032_talles_2xl). */
+const TALLES_DE_ANTES: Record<string, string> = { XXXS: '3XS', XXS: '2XS', XXL: '2XL', XXXL: '3XL' }
 
 export type Talles = { remera: string | null; pantalon: string | null; calzado: string | null }
 
@@ -132,7 +135,10 @@ const NOMBRES_COLORES: readonly string[] = COLORES.map((c) => c.nombre)
 /** Deja solo valores del catálogo (más un club y hasta 3 marcas escritos a mano, cortos). Nunca tira error. */
 export function sanitizarGustos(raw: Record<string, unknown>): Gustos {
   const t = (raw.talles ?? {}) as Record<string, unknown>
-  const talle = (k: keyof typeof TALLES) => (typeof t[k] === 'string' && (TALLES[k] as readonly string[]).includes(t[k] as string) ? t[k] as string : null)
+  const talle = (k: keyof typeof TALLES) => {
+    const v = typeof t[k] === 'string' ? TALLES_DE_ANTES[t[k] as string] ?? t[k] as string : null
+    return v && (TALLES[k] as readonly string[]).includes(v) ? v : null
+  }
   const marcasPropias = lista(raw.marcasOtras).flatMap((m) => m.split(',')).map((m) => texto(m, 30)).filter((m): m is string => !!m).slice(0, 3)
   return {
     deportes: delCatalogo(raw.deportes, DEPORTES),
