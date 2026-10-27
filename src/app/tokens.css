@@ -412,36 +412,39 @@
   to { transform: rotate(-10deg); }
 }
 
-/* La portada (<Portada>): cinco deseos en ronda, como un mazo, 4,2 s cada uno (21 s la vuelta: si cambia cuántos son,
-   cambian los porcentajes). El que sigue espera abajo, un poco más chico; el de arriba, al rato, recibe el sello y quién
-   se ocupa, y se va volando de costado mientras el de abajo sube. --i es su lugar en la ronda: arrancan todos ya
-   andando (una vuelta para atrás), así desde el principio cada uno está donde le toca y no apilados esperando. */
-.gr-portada__deseo {
+/* La portada (<Portada>): una carta por función, como un mazo. Cada carta tiene su lugar (data-lugar, lo pone Portada):
+   arriba; abajo, la que sigue, un poco más chica; fuera, la anterior, que se fue volando de costado (y vuelve por ahí si
+   van para atrás); escondida, el resto. Al cambiar de lugar se mueven con una transición. Mientras la arrastran, sigue
+   al dedo sin transición. A la del regalo, cuando queda arriba, al rato le cae el sello. */
+.gr-portada__carta {
+  transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 250ms ease;
+}
+.gr-portada__carta[data-lugar="arriba"] { opacity: 1; transform: none; z-index: 3; }
+.gr-portada__carta[data-lugar="abajo"] { opacity: 1; transform: translateY(12px) scale(0.94); z-index: 2; }
+.gr-portada__carta[data-lugar="fuera"] {
   opacity: 0;
-  animation: gr-portada-deseo 21s calc(var(--i) * 4.2s - 21.6s) infinite both;
+  transform: translate(-125%, -12px) rotate(-16deg);
+  z-index: 4;
+  /* se ve mientras vuela, y se apaga al final (en pantallas anchas, si no, quedaría a un costado) */
+  transition: transform 700ms cubic-bezier(0.4, 0, 0.6, 1), opacity 200ms ease 500ms;
 }
-.gr-portada__sello { animation: gr-portada-sello 21s calc(var(--i) * 4.2s - 21.6s) infinite both; }
-.gr-portada__quien { animation: gr-portada-quien 21s calc(var(--i) * 4.2s - 21.6s) infinite both; }
-@keyframes gr-portada-deseo {
-  from { opacity: 1; transform: translateY(12px) scale(0.94); z-index: 1; }
-  4% { opacity: 1; transform: none; z-index: 2; }
-  18% { opacity: 1; transform: none; z-index: 3; }
-  23% { opacity: 1; transform: translate(-125%, -12px) rotate(-16deg); z-index: 3; }
-  23.1%, 95% { opacity: 0; transform: translateY(12px) scale(0.94); z-index: 0; }
-  97%, to { opacity: 1; transform: translateY(12px) scale(0.94); z-index: 1; }
+.gr-portada__carta[data-lugar="escondida"] { opacity: 0; transform: translateY(12px) scale(0.94); z-index: 1; }
+.gr-portada__carta[data-arrastrada] { transition: none; cursor: grabbing; }
+.gr-portada__sello { opacity: 0; }
+.gr-portada__carta[data-lugar="arriba"] .gr-portada__sello {
+  animation: gr-sello-cae 460ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 1.4s both;
 }
-@keyframes gr-portada-sello {
-  from, 8% { opacity: 0; transform: scale(1.9) rotate(-38deg); }
-  10% { opacity: 1; transform: scale(0.9) rotate(-6deg); }
-  11.5% { transform: scale(1.05) rotate(-11deg); }
-  13%, 23% { opacity: 1; transform: rotate(-10deg); }
-  23.1%, to { opacity: 0; transform: scale(1.9) rotate(-38deg); }
+/* los puntitos: el de la carta de arriba, largo y oscuro */
+.gr-portada__punto {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gr-line-strong);
+  opacity: 0.45;
+  transition: width 300ms ease, background-color 300ms ease, opacity 300ms ease;
 }
-@keyframes gr-portada-quien {
-  from, 10% { opacity: 0; transform: translateY(4px); }
-  13%, 23% { opacity: 1; transform: none; }
-  23.1%, to { opacity: 0; transform: translateY(4px); }
-}
+[aria-current="true"] > .gr-portada__punto { width: 22px; background: var(--gr-ink); opacity: 1; }
 
 /* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y la estrella gira y
    crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
@@ -647,10 +650,10 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-nav a.gr-fab { transition: none; animation: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja, .gr-sello--cae { animation: none; }
-  /* la portada, quieta en el primer deseo, ya con su sello */
-  .gr-portada__deseo, .gr-portada__sello, .gr-portada__quien { animation: none; }
-  .gr-portada__deseo:not(:first-of-type) { opacity: 0; }
-  .gr-portada__deseo:first-of-type { opacity: 1; }
+  /* la portada: no pasan solas (ver Portada) y cambian con un fundido, sin volar ni achicarse; el sello, ya puesto */
+  .gr-portada__carta, .gr-portada__carta[data-lugar] { transform: none; transition: opacity 200ms ease; }
+  .gr-portada__carta[data-lugar="abajo"] { opacity: 0; }
+  .gr-portada__carta[data-lugar="arriba"] .gr-portada__sello { animation: none; opacity: 1; }
   .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
   .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }

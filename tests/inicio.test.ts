@@ -109,12 +109,18 @@ test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente,
   expect(sugeridos(await inicio())).toEqual(['Ana (Sofi)'])
 })
 
-test('la portada: cinco deseos de mentira en ronda, cada uno con su sello y quién se ocupa sin que el dueño se entere', () => {
+test('la portada: una carta por función, arriba la primera, con las flechas y un puntito por carta para pasar a mano', () => {
   const html = renderToStaticMarkup(createElement(Portada))
-  // de muestra: los lectores de pantalla van al título y al texto de la página
-  expect(html.startsWith('<div aria-hidden="true"')).toBe(true)
-  expect(html.match(/class="gr-portada__deseo /g)).toHaveLength(5)
-  expect(html.match(/class="gr-sello gr-portada__sello /g)).toHaveLength(5)
-  expect(html.match(/no se entera\./g)).toHaveLength(5)
-  for (const i of [0, 1, 2, 3, 4]) expect(html).toContain(`--i:${i}`)
+  expect(html.startsWith('<section aria-label="Lo que hace GiftR"')).toBe(true)
+  // arriba la primera, abajo la que sigue, la última "volada" (de ahí vuelve si van para atrás) y el resto escondidas
+  expect([...html.matchAll(/data-lugar="(\w+)"/g)].map((m) => m[1])).toEqual(['arriba', 'abajo', 'escondida', 'escondida', 'fuera'])
+  for (const titulo of ['Armá tu lista', 'Te lo regalan en secreto', 'Lo pagan entre todos', 'Amigo invisible sin papelitos', 'Cumples con tiempo']) {
+    expect(html).toContain(`>${titulo}</p>`)
+  }
+  for (const nombre of ['Anterior', 'Siguiente', 'Tu lista', 'En secreto', 'Entre todos', 'Amigo invisible', 'Cumples']) {
+    expect(html).toContain(`aria-label="${nombre}"`)
+  }
+  expect(html.match(/aria-current="true"/g)).toHaveLength(1)
+  expect(html).toContain('aria-label="Tu lista" aria-current="true"')
+  expect(html.match(/class="gr-sello gr-portada__sello /g)).toHaveLength(1)
 })
