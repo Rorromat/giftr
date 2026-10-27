@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNull, lt, or } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or } from 'drizzle-orm'
 import { avisos, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -44,6 +44,8 @@ export type EntradaBandeja = {
   href: string | null
   /** quién lo mandó (su foto); null si es anónimo, de un invitado o sobre un deseo */
   de: { nombre: string; foto: string | null } | null
+  /** qué es, para su ícono (ver IconoAviso); null en los avisos sobre deseos y en los de antes de que tuvieran tipo */
+  tipo: TipoEnBandeja | null
   createdAt: Date
   nuevo: boolean
 }
@@ -75,20 +77,22 @@ async function vistosAt(db: Db, userId: string): Promise<Date | null> {
 
 /** Los de la tabla avisos, con quién lo mandó (en una consulta con leftJoin a users por deUserId). */
 const columnasAviso = {
-  id: avisos.id, titulo: avisos.titulo, cuerpo: avisos.cuerpo, url: avisos.url, createdAt: avisos.createdAt,
-  de: { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl },
+  id: avisos.id, tipo: avisos.tipo, titulo: avisos.titulo, cuerpo: avisos.cuerpo, url: avisos.url, vistoAt: avisos.vistoAt,
+  createdAt: avisos.createdAt, de: { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl },
 }
 
 type FilaAviso = {
-  id: string; titulo: string; cuerpo: string; url: string; createdAt: Date
+  id: string; tipo: TipoEnBandeja | null; titulo: string; cuerpo: string; url: string; vistoAt: Date | null; createdAt: Date
   de: { id: string; nombre: string; fotoAt: Date | null; avatarUrl: string | null } | null
 }
 
-function entrada(a: FilaAviso, nuevo: boolean): EntradaBandeja {
+/** Nuevo: de después de la última vez que abrió la campanita, y no lo limpió de "Para vos". */
+function entrada(a: FilaAviso, vistos: Date | null): EntradaBandeja {
   const { emoji, texto } = separarEmoji(a.titulo)
   return {
     id: a.id, emoji: emoji ?? '🔔', titulo: texto, cuerpo: a.cuerpo || null, href: a.url, createdAt: a.createdAt,
-    de: a.de ? { nombre: a.de.nombre, foto: urlFoto(a.de) } : null, nuevo,
+    de: a.de ? { nombre: a.de.nombre, foto: urlFoto(a.de) } : null, tipo: a.tipo,
+    nuevo: (!vistos || a.createdAt > vistos) && !a.vistoAt,
   }
 }
 
@@ -104,35 +108,59 @@ export async function bandeja(db: Db, viewer: Viewer & { userId: string }): Prom
     avisosDeDeseos(db, viewer, { desde }),
   ])
   const entradas: EntradaBandeja[] = [
-    ...propios.map((a) => entrada(a, !vistos || a.createdAt > vistos)),
+    ...propios.map((a) => entrada(a, vistos)),
     ...deDeseos.flatMap((n) => {
       const texto = textoDeAviso(n.tipo, n.itemTitulo, n.sorpresa)
       if (!texto) return []
-      return [{ id: n.id, emoji: EMOJI_DESEO[n.tipo] ?? '🎁', ...partirTexto(texto), href: n.href, de: null, createdAt: n.createdAt, nuevo: !n.leida }]
+      return [{
+        id: n.id, emoji: EMOJI_DESEO[n.tipo] ?? '🎁', ...partirTexto(texto), href: n.href, de: null, tipo: null, createdAt: n.createdAt, nuevo: !n.leida,
+      }]
     }),
   ]
   entradas.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   return { entradas: entradas.slice(0, EN_BANDEJA), hasta }
 }
 
-/**
- * "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más nuevo primero.
- * Como el número de la campanita: al abrirla deja de ser nuevo y se va de Inicio (sigue en la bandeja).
- */
-export async function paraVos(db: Db, userId: string): Promise<EntradaBandeja[]> {
-  const vistos = await vistosAt(db, userId)
+/** Los de "Para vos": los que te piden algo (ver PARA_VOS), nuevos y de la última semana. */
+function deParaVos(userId: string, vistos: Date | null) {
   const semana = desdeHace(DIAS_PARA_VOS)
-  const filas = await db.select(columnasAviso).from(avisos).leftJoin(users, eq(avisos.deUserId, users.id))
-    .where(and(eq(avisos.userId, userId), inArray(avisos.tipo, PARA_VOS), gt(avisos.createdAt, vistos && vistos > semana ? vistos : semana)))
-    .orderBy(desc(avisos.createdAt)).limit(EN_PARA_VOS)
-  return filas.map((a) => entrada(a, true))
+  return and(eq(avisos.userId, userId), inArray(avisos.tipo, PARA_VOS), isNull(avisos.vistoAt),
+    gt(avisos.createdAt, vistos && vistos > semana ? vistos : semana))
+}
+
+/**
+ * "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más nuevo primero;
+ * cuántos son (se muestran los primeros) y cuándo se armó (lo que se limpia con "Limpiar", ver limpiarParaVos). Como el
+ * número de la campanita: al abrirla dejan de ser nuevos y se van de Inicio (siguen en la bandeja).
+ */
+export async function paraVos(db: Db, userId: string): Promise<{ entradas: EntradaBandeja[]; total: number; hasta: Date }> {
+  const hasta = new Date()
+  const vistos = await vistosAt(db, userId)
+  const [filas, [{ total }]] = await Promise.all([
+    db.select(columnasAviso).from(avisos).leftJoin(users, eq(avisos.deUserId, users.id))
+      .where(deParaVos(userId, vistos)).orderBy(desc(avisos.createdAt)).limit(EN_PARA_VOS),
+    db.select({ total: count() }).from(avisos).where(deParaVos(userId, vistos)),
+  ])
+  return { entradas: filas.map((a) => entrada(a, vistos)), total, hasta }
+}
+
+/**
+ * "Limpiar" en Inicio: los de "Para vos" que había cuando se armó la pantalla (también los que no entraban) ya no son
+ * nuevos, ni ahí ni en la campanita; lo demás de la campanita sigue como estaba. Lo que llegó después, no.
+ */
+export async function limpiarParaVos(db: Db, userId: string, hasta: Date) {
+  const h = new Date(Math.min(hasta.getTime(), Date.now()))
+  if (Number.isNaN(h.getTime())) return
+  await db.update(avisos).set({ vistoAt: new Date() })
+    .where(and(eq(avisos.userId, userId), inArray(avisos.tipo, PARA_VOS), isNull(avisos.vistoAt), lte(avisos.createdAt, h)))
 }
 
 /** Cuántos nuevos tiene (el número de la campanita). */
 export async function avisosSinLeer(db: Db, viewer: Viewer & { userId: string }): Promise<number> {
   const [vistos, deDeseos] = await Promise.all([vistosAt(db, viewer.userId), avisosDeDeseos(db, viewer)])
   const [{ n }] = await db.select({ n: count() }).from(avisos)
-    .where(and(eq(avisos.userId, viewer.userId), gte(avisos.createdAt, desdeHace(DIAS_EN_BANDEJA)), vistos ? gt(avisos.createdAt, vistos) : undefined))
+    .where(and(eq(avisos.userId, viewer.userId), gte(avisos.createdAt, desdeHace(DIAS_EN_BANDEJA)), vistos ? gt(avisos.createdAt, vistos) : undefined,
+      isNull(avisos.vistoAt)))
   return n + deDeseos.filter((d) => textoDeAviso(d.tipo, d.itemTitulo, d.sorpresa)).length
 }
 

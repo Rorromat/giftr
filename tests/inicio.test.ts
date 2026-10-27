@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 import Inicio from '@/app/(menu)/inicio/page'
 import Gente from '@/app/(menu)/gente/page'
 import Home from '@/app/page'
-import { noSugerirAction } from '@/app/actions'
+import { limpiarParaVosAction, noSugerirAction } from '@/app/actions'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { SectionHeader } from '@/components/ui'
 import { Portada } from '@/components/Portada'
@@ -48,7 +48,7 @@ import { CuentasPendientes } from '@/components/ResumenCuentas'
 
 type Props = {
   id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode; e?: EntradaBandeja; r?: MiRegalo
-  cuentas?: { debes: number }
+  cuentas?: { debes: number }; animar?: boolean; action?: unknown; name?: string; value?: string
 }
 
 /** Los elementos de la pantalla, en orden, sin renderizar (las partes async, como los carteles, no se renderizan acá). */
@@ -156,9 +156,20 @@ test('arriba lo que es para vos; abajo de lo nuevo de tus amigos, lo que tenés 
   ]
   expect(orden.every((i) => i > -1)).toBe(true)
   expect([...orden].sort((a, b) => a - b)).toEqual(orden)
-  expect(pantalla.filter((e) => e.type === FilaAviso).map((e) => e.props.e!.titulo)).toEqual(['Rodri compró "Bici"'])
+  expect(pantalla.filter((e) => e.type === FilaAviso).map((e) => [e.props.e!.titulo, e.props.e!.tipo, e.props.animar]))
+    .toEqual([['Rodri compró "Bici"', 'regalo_comprado', true]])
   expect(pantalla.filter((e) => e.type === FilaRegalo).map((e) => e.props.r!.titulo)).toEqual(['Termo'])
   expect(pantalla.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(25000)
+
+  // desde Inicio: ver todos (la campanita) o limpiarlos de acá
+  expect(pantalla.some((e) => e.props.href === '/avisos')).toBe(true)
+  const limpiar = pantalla.find((e) => e.type === 'form' && e.props.action === limpiarParaVosAction)
+  const hasta = elementos(limpiar?.props.children).find((e) => e.props.name === 'hasta')?.props.value
+  expect(hasta).toBeTruthy()
+  const fd = new FormData()
+  fd.set('hasta', hasta!)
+  await limpiarParaVosAction(fd)
+  expect((await inicio()).some((e) => e.props.id === 'para-vos')).toBe(false)
 })
 
 test('la portada: una carta por función, arriba la primera, con las flechas y un puntito por carta para pasar a mano', () => {

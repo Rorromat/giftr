@@ -44,7 +44,7 @@ test('una solicitud de amistad queda en su bandeja con la foto de quien la manda
   const { entradas } = await bandeja(db, { userId: sofi.id })
   expect(entradas).toEqual([{
     id: expect.any(String), emoji: '🤝', titulo: 'Euge quiere ser tu amigo en GiftR', cuerpo: 'Si aceptás, se ven las listas y los cumples.',
-    href: '/gente#solicitudes', de: { nombre: 'Euge', foto: null }, createdAt: expect.any(Date), nuevo: true,
+    href: '/gente#solicitudes', de: { nombre: 'Euge', foto: null }, tipo: 'amistad_pedida', createdAt: expect.any(Date), nuevo: true,
   }])
 
   // contesta: a Euge le llega que aceptó, con la foto de Sofi

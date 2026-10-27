@@ -366,6 +366,8 @@ export const avisos = pgTable('avisos', {
   titulo: text('titulo').notNull(),
   cuerpo: text('cuerpo').notNull(),
   url: text('url').notNull(),
+  // lo limpió de "Para vos", en Inicio: ya no es nuevo, aunque no haya abierto la campanita (ver limpiarParaVos)
+  vistoAt: timestamp('visto_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('avisos_user_id_created_at_idx').on(t.userId, t.createdAt)])
 

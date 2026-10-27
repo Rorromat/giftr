@@ -48,7 +48,7 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
       <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} volver="avisos" />
       <JuegosEnInicio invitaciones={juegosInvitado} pasados={[]} />
 
-      {nuevos.length > 0 && <ListaDeAvisos titulo="Nuevos" entradas={nuevos} />}
+      {nuevos.length > 0 && <ListaDeAvisos titulo="Nuevos" entradas={nuevos} animar />}
       {antes.length > 0 && <ListaDeAvisos titulo={nuevos.length ? 'Antes' : 'Lo último'} entradas={antes} />}
 
       {nada && (
@@ -69,13 +69,14 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
   )
 }
 
-function ListaDeAvisos({ titulo, entradas }: { titulo: string; entradas: EntradaBandeja[] }) {
+/** animar: los íconos de lo nuevo se mueven (ver IconoAviso). */
+function ListaDeAvisos({ titulo, entradas, animar = false }: { titulo: string; entradas: EntradaBandeja[]; animar?: boolean }) {
   const id = `avisos-${titulo.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2.5">
       <h2 id={id} className="gr-label">{titulo}</h2>
       <ul className="gr-card divide-y divide-gr-line">
-        {entradas.map((e) => <FilaAviso key={e.id} e={e} />)}
+        {entradas.map((e, i) => <FilaAviso key={e.id} e={e} animar={animar} i={i} />)}
       </ul>
     </section>
   )

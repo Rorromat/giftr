@@ -19,7 +19,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { marcarBandejaVista } from '@/lib/bandeja'
+import { limpiarParaVos, marcarBandejaVista } from '@/lib/bandeja'
 import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario } from '@/lib/users'
@@ -787,6 +787,16 @@ export async function vistaBandejaAction(hasta: string) {
   const viewer = await getViewer()
   if (!viewer.userId || typeof hasta !== 'string') return
   await marcarBandejaVista(db, { ...viewer, userId: viewer.userId }, new Date(hasta))
+}
+
+/** "Limpiar" en Para vos (Inicio): lo que había cuando se armó deja de ser nuevo (ver limpiarParaVos). */
+export async function limpiarParaVosAction(formData: FormData) {
+  const session = await auth()
+  const hasta = str(formData, 'hasta')
+  if (!session?.userId || !hasta) return
+  await limpiarParaVos(db, session.userId, new Date(hasta))
+  // también el número de la campanita, que está en el encabezado de cada sección
+  revalidatePath('/', 'layout')
 }
 
 export async function vistoCodazosAction() {

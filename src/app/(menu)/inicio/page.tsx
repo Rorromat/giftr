@@ -15,6 +15,8 @@ import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { avisosSinLeer, paraVos } from '@/lib/bandeja'
 import { FilaAviso } from '@/components/FilaAviso'
+import { BotonEnviar } from '@/components/BotonEnviar'
+import { limpiarParaVosAction } from '@/app/actions'
 import { porComprar } from '@/lib/mis-regalos'
 import { FilaRegalo } from '@/components/FilaRegalo'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
@@ -74,13 +76,27 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       <JuegosEnInicio invitaciones={juegos.filter((j) => j.miEstado === 'invitado' && j.dias >= 0)}
                       pasados={juegos.filter((j) => j.dias < 0 && j.miEstado === 'juega' && j.sorteado && !j.revelado)} />
 
-      {/* lo último de la campanita que te pide algo: te toca pagar, te pagaron, el amigo invisible (ver PARA_VOS) */}
-      {importantes.length > 0 && (
+      {/* lo último de la campanita que te pide algo: te toca pagar, te pagaron, el amigo invisible (ver PARA_VOS). Cada uno
+          con su ícono moviéndose; abajo, limpiarlos de acá o ir a verlos todos */}
+      {importantes.entradas.length > 0 && (
         <section aria-labelledby="para-vos" className="flex flex-col gap-3">
-          <SectionHeader id="para-vos" title="Para vos" href="/avisos" linkLabel="Ver avisos" />
-          <ul className="gr-card divide-y divide-gr-line">
-            {importantes.map((e) => <FilaAviso key={e.id} e={e} />)}
-          </ul>
+          <SectionHeader id="para-vos" title={<>Para vos<span className="text-gr-muted"> · {importantes.total}</span></>} />
+          <div className="gr-card">
+            <ul className="divide-y divide-gr-line">
+              {importantes.entradas.map((e, i) => <FilaAviso key={e.id} e={e} animar i={i} />)}
+            </ul>
+            <div className="flex divide-x divide-gr-line border-t border-gr-line text-sm font-semibold">
+              <form action={limpiarParaVosAction} className="flex flex-1">
+                <input type="hidden" name="hasta" value={importantes.hasta.toISOString()} />
+                <BotonEnviar pendiente="Limpiando…" className="flex min-h-12 flex-1 items-center justify-center gap-2">
+                  <Icon name="check" size={17} strokeWidth={2.6} className="flex-none" /> Limpiar
+                </BotonEnviar>
+              </form>
+              <Link href="/avisos" className="flex min-h-12 flex-1 items-center justify-center gap-2">
+                <Icon name="bell" size={17} className="flex-none" /> Ver todos
+              </Link>
+            </div>
+          </div>
         </section>
       )}
 

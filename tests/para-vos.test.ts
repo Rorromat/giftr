@@ -8,7 +8,9 @@ import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createItem } from '@/lib/items'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, saldarCon, sumarseARegalo } from '@/lib/regalos'
-import { bandeja, DIAS_PARA_VOS, EN_PARA_VOS, guardarAviso, marcarBandejaVista, paraVos, type TipoEnBandeja } from '@/lib/bandeja'
+import {
+  avisosSinLeer, bandeja, DIAS_PARA_VOS, EN_PARA_VOS, guardarAviso, limpiarParaVos, marcarBandejaVista, paraVos, type TipoEnBandeja,
+} from '@/lib/bandeja'
 import { guardarSuscripcion, mandarCodazo, type Aviso, type Enviar } from '@/lib/codazos'
 import { pedirAmistad, responderSolicitud } from '@/lib/amigos'
 
@@ -49,11 +51,11 @@ test('el que organiza lo compra: a cada uno que le debe le llega su parte, a Cue
   const [deSofi] = await entradas(db, sofi.id)
   expect(deSofi).toMatchObject({
     emoji: '🧾', titulo: 'Rodri compró "Bici"', cuerpo: 'Tu parte del regalo para Mamá: $30.000. Cuando le pagues, marcalo en Cuentas.',
-    href: '/cuentas', de: { nombre: 'Rodri' }, nuevo: true,
+    href: '/cuentas', de: { nombre: 'Rodri' }, tipo: 'regalo_comprado', nuevo: true,
   })
   // al celular va lo de siempre (ni de quién es ni qué tipo)
   expect(enviados.map((a) => Object.keys(a).sort())).toEqual([['body', 'title', 'url']])
-  expect(await paraVos(db, sofi.id)).toEqual([deSofi])
+  expect(await paraVos(db, sofi.id)).toEqual({ entradas: [deSofi], total: 1, hasta: expect.any(Date) })
   expect(await entradas(db, ana.id)).toEqual([])
   expect(await entradas(db, rodri.id)).toEqual([])
   // a Mamá, nunca: es su regalo
@@ -67,7 +69,7 @@ test('"Ya le pagué": al que lo compró le llega que le pagaron, una vez; "Me pa
   expect(await entradas(db, rodri.id)).toMatchObject([{
     emoji: '💸', titulo: 'Sofi te pagó $30.000', cuerpo: 'Su parte de "Bici", el regalo para Mamá.', href: '/cuentas', de: { nombre: 'Sofi' },
   }])
-  expect((await paraVos(db, rodri.id)).map((e) => e.titulo)).toEqual(['Sofi te pagó $30.000'])
+  expect((await paraVos(db, rodri.id)).entradas.map((e) => e.titulo)).toEqual(['Sofi te pagó $30.000'])
   // tocarlo de nuevo (otra pestaña) no lo repite
   expect(await marcarPagado(db, giftId, sofi.id, sofi.id)).toBe(true)
   // "Me pagó": Rodri marca la de Ana
@@ -115,13 +117,17 @@ test(`Para vos: lo nuevo que te pide algo, hasta ${EN_PARA_VOS} y de la última 
   // de hace más de una semana, tampoco
   await aviso('pago', '💸 Sofi te pagó $2', hace(DIAS_PARA_VOS * 24 * 60 + 1))
 
-  expect((await paraVos(db, yo.id)).map((e) => [e.emoji, e.titulo, e.de?.nombre])).toEqual([
-    ['🎁', 'Ya se sorteó "Navidad"', 'Sofi'], ['🧾', 'Sofi compró "Termo"', 'Sofi'], ['🤫', 'Tu amigo invisible te hizo una pregunta', 'Sofi'],
+  const { entradas: primeros, total } = await paraVos(db, yo.id)
+  expect(primeros.map((e) => [e.tipo, e.titulo, e.de?.nombre])).toEqual([
+    ['invisible_sorteo', 'Ya se sorteó "Navidad"', 'Sofi'], ['regalo_comprado', 'Sofi compró "Termo"', 'Sofi'],
+    ['invisible_pregunta', 'Tu amigo invisible te hizo una pregunta', 'Sofi'],
   ])
+  // el de $1 no entra, pero se cuenta
+  expect(total).toBe(4)
   await marcarBandejaVista(db, { userId: yo.id }, new Date())
-  expect(await paraVos(db, yo.id)).toEqual([])
+  expect((await paraVos(db, yo.id)).total).toBe(0)
   await guardarAviso(db, yo.id, { tipo: 'pago', title: '💸 Sofi te pagó $3', body: '', url: '/cuentas' })
-  expect((await paraVos(db, yo.id)).map((e) => e.titulo)).toEqual(['Sofi te pagó $3'])
+  expect((await paraVos(db, yo.id)).entradas.map((e) => e.titulo)).toEqual(['Sofi te pagó $3'])
 })
 
 test('cada aviso que se manda dice qué es', async () => {
@@ -136,6 +142,40 @@ test('cada aviso que se manda dice qué es', async () => {
   expect(await db.select().from(avisos).where(isNull(avisos.tipo))).toEqual([])
 })
 
-test('la migración le agrega el tipo a los avisos (los de antes quedan sin tipo)', () => {
-  expect(readFileSync('drizzle/0034_para_vos.sql', 'utf8').trim()).toBe('ALTER TABLE "avisos" ADD COLUMN "tipo" text;')
+test('"Limpiar" saca de Para vos lo que había (también lo que no entraba) y ya no es nuevo en la campanita; lo demás, sí', async () => {
+  const db = await createTestDb()
+  const [yo, sofi] = [await usuario(db, 'Yo'), await usuario(db, 'Sofi')]
+  const aviso = (tipo: TipoEnBandeja, titulo: string, min: number) =>
+    db.insert(avisos).values({ userId: yo.id, deUserId: sofi.id, tipo, titulo, cuerpo: '', url: '/', createdAt: new Date(Date.now() - min * 60_000) })
+  for (const n of [1, 2, 3, 4]) await aviso('pago', `💸 Sofi te pagó $${n}`, 10 - n)
+  await aviso('codazo', '👉 ¡Codazo de Sofi!', 1)
+  const { entradas: antes, hasta } = await paraVos(db, yo.id)
+  expect(antes).toHaveLength(EN_PARA_VOS)
+  expect(await avisosSinLeer(db, { userId: yo.id })).toBe(5)
+
+  // mientras miraba Inicio, llegó otro: ese queda
+  await guardarAviso(db, yo.id, { tipo: 'pago', title: '💸 Sofi te pagó $5', body: '', url: '/cuentas' })
+  await limpiarParaVos(db, yo.id, hasta)
+  expect((await paraVos(db, yo.id)).entradas.map((e) => e.titulo)).toEqual(['Sofi te pagó $5'])
+  // en la campanita siguen, ya vistos; el codazo y el nuevo, nuevos
+  expect(await avisosSinLeer(db, { userId: yo.id })).toBe(2)
+  expect((await bandeja(db, { userId: yo.id })).entradas.map((e) => [e.titulo, e.nuevo])).toEqual([
+    ['Sofi te pagó $5', true], ['¡Codazo de Sofi!', true],
+    ['Sofi te pagó $4', false], ['Sofi te pagó $3', false], ['Sofi te pagó $2', false], ['Sofi te pagó $1', false],
+  ])
+  // una fecha que no es fecha no limpia nada; una del futuro, hasta ahora
+  await limpiarParaVos(db, yo.id, new Date('cualquier cosa'))
+  expect((await paraVos(db, yo.id)).total).toBe(1)
+  await limpiarParaVos(db, yo.id, new Date(Date.now() + 3600_000))
+  expect((await paraVos(db, yo.id)).total).toBe(0)
+  // a otro no le toca nada
+  await db.insert(avisos).values({ userId: sofi.id, tipo: 'pago', titulo: '💸 Yo te pagó $1', cuerpo: '', url: '/' })
+  await limpiarParaVos(db, yo.id, new Date())
+  expect((await paraVos(db, sofi.id)).total).toBe(1)
+})
+
+test('la migración les agrega a los avisos el tipo y cuándo se limpiaron (los de antes quedan sin tipo)', () => {
+  expect(readFileSync('drizzle/0034_para_vos.sql', 'utf8').trim()).toBe(
+    'ALTER TABLE "avisos" ADD COLUMN "tipo" text;--> statement-breakpoint\nALTER TABLE "avisos" ADD COLUMN "visto_at" timestamp with time zone;',
+  )
 })

@@ -1,5 +1,5 @@
 {
-  "id": "56f19ce8-17c4-4802-841f-2c950019f765",
+  "id": "7bef7dec-c2f9-43db-9867-06dd27c59d4a",
   "prevId": "a3314edd-f097-4ddd-9ecb-08b39031027d",
   "version": "7",
   "dialect": "postgresql",
@@ -669,6 +669,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "visto_at": {
+          "name": "visto_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
