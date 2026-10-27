@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
+import { avisosSinLeer } from '@/lib/bandeja'
 import {
   comprasParaCorregir, misCuentas, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
 } from '@/lib/regalos'
@@ -164,12 +165,14 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
   const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, aCorregir, { nombre, foto }] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), yo(db, session.userId)])
+  const [c, aCorregir, { nombre, foto }, avisos] = await Promise.all([
+    misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), yo(db, session.userId), avisosSinLeer(db, { userId: session.userId }),
+  ])
   const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Cuentas</h1>
         <p className="text-[15px] text-gr-muted">Los regalos grupales: quién le debe a quién.</p>

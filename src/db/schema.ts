@@ -34,6 +34,8 @@ export const users = pgTable('users', {
   // Cuándo eligió su nombre en Perfil (vacío: usa el de Google, que se pone al día al entrar). Con uno elegido, entrar con
   // Google no se lo pisa (ver upsertUserFromGoogle).
   nombreElegidoAt: timestamp('nombre_elegido_at', { withTimezone: true }),
+  // Cuándo abrió Avisos por última vez: los de después son nuevos (la campanita los cuenta).
+  avisosVistosAt: timestamp('avisos_vistos_at', { withTimezone: true }),
 }, (t) => [
   // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
   index('users_email_lower_idx').on(sql`lower(${t.email})`),
@@ -343,6 +345,21 @@ export const codazos = pgTable('codazos', {
   // los topes del codazo: los de una lista en las últimas 24 horas
   index('codazos_list_id_created_at_idx').on(t.listId, t.createdAt),
 ])
+
+/**
+ * La bandeja de Avisos: cada aviso que le mandamos a alguien (codazos, solicitudes de amistad, propuestas de dividir, el
+ * amigo invisible), tal como le llegó al celular, haya activado los avisos o no. De quién es (para su foto), salvo que sea
+ * anónimo (las preguntas del amigo invisible) o de un invitado.
+ */
+export const avisos = pgTable('avisos', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deUserId: uuid('de_user_id').references(() => users.id, { onDelete: 'set null' }),
+  titulo: text('titulo').notNull(),
+  cuerpo: text('cuerpo').notNull(),
+  url: text('url').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('avisos_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
 // Amigo invisible: alguien arma el juego (con un nombre, una temática, presupuesto y la fecha en que se dan los regalos;
 // puede ser de una fecha especial, ver fechas-especiales.ts), invita amigos suyos y, cuando están, lo sortea. Cada uno ve

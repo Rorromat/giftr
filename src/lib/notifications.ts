@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { items, listasDeInvitado, listFollows, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -80,14 +80,19 @@ function tieneElLinkSql(db: Db, viewer: Viewer) {
 
 const A_CUENTAS = new Set<string>(['regalo_lo_tiene', 'compra_corregida'])
 
-export async function getUnreadNotifications(db: Db, viewer: Viewer) {
+/**
+ * Los avisos sobre deseos del que mira: los sin leer (los carteles) o, con desde, todos los de entonces para acá (la
+ * bandeja), los más nuevos primero.
+ */
+export async function avisosDeDeseos(db: Db, viewer: Viewer, { desde }: { desde?: Date } = {}) {
   if (!viewer.userId && !viewer.guestId) return []
   const filas = await db.select({
     id: notifications.id, tipo: notifications.tipo, itemTitulo: items.titulo, itemId: items.id, token: lists.shareToken,
+    leida: notifications.leida, createdAt: notifications.createdAt,
     activo: sql<boolean>`${items.estadoDueno} = 'activo'`, conLink: sql<boolean>`${tieneElLinkSql(db, viewer)}`, tipoLista: lists.tipo,
   }).from(notifications).innerJoin(items, eq(notifications.itemId, items.id)).innerJoin(lists, eq(items.listId, lists.id))
     // un aviso sobre un deseo propio le diría al dueño que alguien lo reservó
-    .where(and(eq(notifications.leida, false), notifDe(viewer), listasAjenasSql(db, viewer)))
+    .where(and(desde ? gte(notifications.createdAt, desde) : eq(notifications.leida, false), notifDe(viewer), listasAjenasSql(db, viewer)))
     .orderBy(desc(notifications.createdAt))
   return filas.map(({ itemId, token, activo, conLink, tipoLista, ...n }) => ({
     ...n,
@@ -101,11 +106,17 @@ export async function getUnreadNotifications(db: Db, viewer: Viewer) {
   }))
 }
 
-export async function markNotificationsRead(db: Db, viewer: Viewer) {
+export async function getUnreadNotifications(db: Db, viewer: Viewer) {
+  return (await avisosDeDeseos(db, viewer)).map((n) => ({ id: n.id, tipo: n.tipo, itemTitulo: n.itemTitulo, sorpresa: n.sorpresa, href: n.href }))
+}
+
+/** Marca leídos los avisos sobre deseos del que mira (con hasta, los de hasta ese momento: los que vio en la bandeja). */
+export async function markNotificationsRead(db: Db, viewer: Viewer, hasta?: Date) {
   if (!viewer.userId && !viewer.guestId) return
   // solo los que se mostraron: los que se esconden en este navegador (ver listasAjenasSql) quedan sin leer
   const ajenas = listasAjenasSql(db, viewer)
   const visibles = ajenas && inArray(notifications.itemId,
     db.select({ id: items.id }).from(items).innerJoin(lists, eq(items.listId, lists.id)).where(ajenas))
-  await db.update(notifications).set({ leida: true }).where(and(notifDe(viewer), visibles))
+  await db.update(notifications).set({ leida: true })
+    .where(and(notifDe(viewer), visibles, hasta && lte(notifications.createdAt, hasta)))
 }

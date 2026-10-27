@@ -157,18 +157,35 @@ export function LogoSticker({ className = '' }: { className?: string }) {
   )
 }
 
+/** La campanita de Avisos, con cuántos nuevos hay. */
+export function Campana({ nuevos }: { nuevos: number }) {
+  return (
+    <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'} className="gr-icon-btn relative">
+      <Icon name="bell" size={20} />
+      {nuevos > 0 && (
+        <span aria-hidden className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-gr-brand px-1.5 text-[11px] font-bold leading-none text-gr-accent ring-2 ring-gr-bg">
+          {nuevos > 9 ? '9+' : nuevos}
+        </span>
+      )}
+    </Link>
+  )
+}
+
 /**
- * Barra de arriba de las secciones del menú: algo a la izquierda, el logo al medio y tu foto a la derecha (lleva a tu
- * perfil). Mide 56 de alto.
+ * Barra de arriba de las secciones del menú: algo a la izquierda, el logo al medio y a la derecha la campanita de Avisos
+ * (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto.
  */
-export function AppHeader({ left, nombre, foto }: { left?: React.ReactNode; nombre: string; foto: string | null }) {
+export function AppHeader({ left, nombre, foto, avisos }: { left?: React.ReactNode; nombre: string; foto: string | null; avisos?: number }) {
   return (
     <header className="grid min-h-14 grid-cols-[1fr_auto_1fr] items-center">
       <div className="justify-self-start">{left}</div>
       <LogoSticker />
-      <Link href="/perfil" prefetch aria-label="Tu perfil" className="justify-self-end">
-        <AvatarSticker nombre={nombre} foto={foto} size={40} className="shadow-card" />
-      </Link>
+      <div className="flex items-center gap-2.5 justify-self-end">
+        {avisos !== undefined && <Campana nuevos={avisos} />}
+        <Link href="/perfil" prefetch aria-label="Tu perfil">
+          <AvatarSticker nombre={nombre} foto={foto} size={40} className="shadow-card" />
+        </Link>
+      </div>
     </header>
   )
 }

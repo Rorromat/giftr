@@ -5,6 +5,7 @@ import { codazos, config, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { duenosDeLista, esDuenoSql, esToken } from '@/lib/groups'
+import { guardarAviso } from '@/lib/bandeja'
 
 // Codazo: quien regala le pide al dueño que cargue su lista. Le llega como aviso push (si lo activó)
 // y como cartel en Mi lista. No dice nada de reservas: solo quién le dio el codazo.
@@ -151,11 +152,21 @@ const enviarConWebPush: Enviar = async (s, aviso, vapid) => {
 }
 
 /**
+ * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí) y le llega al celular (ver
+ * mandarPush). Devuelve a cuántos dispositivos llegó.
+ */
+export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null }, enviar: Enviar = enviarConWebPush): Promise<number> {
+  const { de = null, ...push } = aviso
+  await guardarAviso(db, userId, push, de)
+  return mandarPush(db, userId, push, enviar)
+}
+
+/**
  * Manda un aviso a todos los dispositivos del usuario, a la vez (un servicio lento no hace esperar a los demás). Borra los
  * que ya no existen (404/410) y los de antes de los controles de guardarSuscripcion que no los pasan (otro host, claves que
  * no sirven, más de 10), sin mandarles nada. Devuelve a cuántos llegó.
  */
-export async function avisar(db: Db, userId: string, aviso: Aviso, enviar: Enviar = enviarConWebPush): Promise<number> {
+async function mandarPush(db: Db, userId: string, aviso: Aviso, enviar: Enviar): Promise<number> {
   const subs = (await db.select().from(pushSubs).where(eq(pushSubs.userId, userId)).orderBy(desc(pushSubs.createdAt), desc(pushSubs.id)))
     .map((s) => ({ id: s.id, suscripcion: { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } } }))
   const sirven = subs.filter((s) => esSuscripcion(s.suscripcion)).slice(0, SUSCRIPCIONES_POR_USUARIO)
@@ -184,7 +195,8 @@ export async function probarAviso(db: Db, userId: string, enviar: Enviar = envia
     )))
     .returning({ id: users.id })
   if (!toca) return { ok: false, reason: 'espera' }
-  const llegaron = await avisar(db, userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' }, enviar)
+  // la prueba no queda en la bandeja
+  const llegaron = await mandarPush(db, userId, { title: '👉 Así llega un codazo', body: 'Cuando alguien quiera saber qué regalarte, te avisamos acá.', url: '/mi-lista' }, enviar)
   return { ok: true, llegaron }
 }
 
@@ -232,6 +244,7 @@ export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNomb
   let avisados = 0
   for (const d of duenos) {
     avisados += await avisar(db, d.id, {
+      de: viewer.userId ?? null,
       title: `👉 ¡Codazo de ${primer}!`,
       body: list.tipo === 'grupo'
         ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'el grupo'}".`

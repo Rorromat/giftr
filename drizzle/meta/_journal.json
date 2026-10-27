@@ -232,6 +232,13 @@
       "when": 1793068389790,
       "tag": "0032_talles_2xl",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793117982114,
+      "tag": "0033_bandeja_avisos",
+      "breakpoints": true
     }
   ]
 }

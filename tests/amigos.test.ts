@@ -89,7 +89,7 @@ describe('solicitudes', () => {
     await conAvisos(db, euge.id); await conAvisos(db, sofi.id)
     const push = pushFalso()
     expect(await pedirAmistad(db, euge.id, sofi.id, push.enviar)).toEqual({ ok: true, estado: 'enviada' })
-    expect(push.enviados).toEqual([{ para: sofi.id, aviso: expect.objectContaining({ title: '🤝 Euge quiere ser tu amigo en GiftR', url: '/gente' }) }])
+    expect(push.enviados).toEqual([{ para: sofi.id, aviso: expect.objectContaining({ title: '🤝 Euge quiere ser tu amigo en GiftR', url: '/gente#solicitudes' }) }])
     expect(await relacionCon(db, euge.id, sofi.id)).toBe('enviada')
     expect(await relacionCon(db, sofi.id, euge.id)).toBe('recibida')
     const [s] = await solicitudesRecibidas(db, sofi.id)

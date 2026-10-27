@@ -9,6 +9,7 @@ import { Banners } from '@/components/Banners'
 import { CargaTuCumple, CuentasPendientes, Proximos } from '@/components/Eventos'
 import { yo } from '@/lib/perfil'
 import { misAmigos } from '@/lib/amigos'
+import { avisosSinLeer } from '@/lib/bandeja'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
 import { InvitacionesRegalo } from '@/components/Dividir'
@@ -28,10 +29,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }] = await Promise.all([
+  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }, avisos] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
     yo(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
     invitacionesPendientes(db, session.userId), misAmigosInvisibles(db, session.userId, hoy, JUEGOS_PASADOS), searchParams,
+    avisosSinLeer(db, { userId: session.userId }),
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
@@ -39,7 +41,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto}
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos}
                  left={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={20} /></Link>} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Lo que viene</h1>

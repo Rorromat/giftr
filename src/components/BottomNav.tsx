@@ -17,12 +17,12 @@ const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; c
 const CON_AGREGAR = new Set(['/inicio', '/mi-lista', '/perfil'])
 
 /**
- * La sección del menú a la que pertenece una pantalla: todo el año, lo nuevo de tus amigos y las fechas especiales son de
- * Inicio; un grupo, un deseo y el perfil, de Vos; la lista de alguien y agregar un amigo, de Gente; Cuentas, una sorpresa y
+ * La sección del menú a la que pertenece una pantalla: todo el año, lo nuevo de tus amigos, las fechas especiales y Avisos
+ * son de Inicio; un grupo, un deseo y el perfil, de Vos; la lista de alguien y agregar un amigo, de Gente; Cuentas, una sorpresa y
  * un amigo invisible, de Regalos.
  */
 function seccionDe(path: string) {
-  if (path === '/eventos' || path === '/novedades' || path.startsWith('/fechas/')) return '/inicio'
+  if (path === '/eventos' || path === '/novedades' || path === '/avisos' || path.startsWith('/fechas/')) return '/inicio'
   if (path === '/cuentas' || path.startsWith('/sorpresa/') || path.startsWith('/invisible/')) return '/regalos'
   if (path.startsWith('/l/') || path.startsWith('/gente/')) return '/gente'
   if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil' || path.startsWith('/perfil/')) return '/mi-lista'
