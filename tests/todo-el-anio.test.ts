@@ -90,7 +90,7 @@ test('todo el año: cada mes lleva a su mes y dice cuántas fechas tiene; la lis
   expect(html).toContain(`href="/l/${deEuge.shareToken}"`)
 })
 
-test('un mes: la cara (o las iniciales) de quién cumple cada día, cuántos son, y cada día lleva a ese día', async () => {
+test('un mes: la cara (o las iniciales) de quién cumple cada día, apiladas si son más, y cada día lleva a ese día', async () => {
   const { db, sofi, deEuge, deMartin } = await setup()
   const { html, texto } = await calendario(db, sofi.id, 'mes=8')
   expect(titulo(html)).toBe('Agosto')
@@ -99,11 +99,12 @@ test('un mes: la cara (o las iniciales) de quién cumple cada día, cuántos son
   expect(html).toContain('href="/eventos?mes=9" aria-label="Ir a Septiembre"')
   // el 1 de agosto de 2026 es sábado: la grilla arranca con 5 lugares vacíos (de lunes a viernes)
   expect(html.match(/<li aria-hidden="true"><\/li>/g)).toHaveLength(5)
-  // el 22, los dos (primero Euge, sus iniciales, y cuántos son); el 16, el Día del Niño; hoy, marcado
-  const el22 = /<a href="\/eventos\?mes=8&amp;dia=22"[^>]*aria-label="Sábado 22 de agosto: Cumple de Euge, Cumple de Martín"[^>]*>.*?<\/a>/.exec(html)?.[0]
-  expect(el22).toBeDefined()
-  expect(el22).toContain('>EM<')
-  expect(el22).toMatch(/>2<\/span>/)
+  // el 22, los dos, con las caras apiladas (sus iniciales: primero Euge); el 16, el Día del Niño; hoy, marcado
+  const delDia22 = (html: string) => /<a href="\/eventos\?mes=8&amp;dia=22"[^>]*aria-label="Sábado 22 de agosto: ([^"]*)"[^>]*>.*?<\/a>/.exec(html)
+  const el22 = delDia22(html)
+  expect(el22?.[1]).toBe('Cumple de Euge, Cumple de Martín')
+  expect(el22?.[0].match(/>(EM|M)</g)).toEqual(['>EM<', '>M<'])
+  expect(el22?.[0]).not.toContain('+') // con dos se ven los dos: sin número
   expect(html).toContain('aria-label="Domingo 16 de agosto: Día del Niño"')
   expect(html).toMatch(/<li aria-current="date"[^>]*><span[^>]*>8<\/span><\/li>/)
   // abajo, lo del mes en orden y cada fila directo a su lista
@@ -111,6 +112,15 @@ test('un mes: la cara (o las iniciales) de quién cumple cada día, cuántos son
   expect(texto.indexOf('Cumple de Euge')).toBeLessThan(texto.indexOf('Cumple de Martín'))
   expect(html).toContain(`href="/l/${deEuge.shareToken}"`)
   expect(html).toContain(`href="/l/${deMartin.shareToken}"`)
+
+  // con tres, la primera cara y cuántos más son
+  const pablo = await usuario(db, 'Pablo')
+  await guardarCumple(db, pablo.id, 22, 8)
+  await seguir(db, sofi.id, (await listaDe(db, pablo.id)).id)
+  const conTres = delDia22((await calendario(db, sofi.id, 'mes=8')).html)
+  expect(conTres?.[1]).toBe('Cumple de Euge, Cumple de Martín, Cumple de Pablo')
+  expect(conTres?.[0].match(/>(EM|M|P)</g)).toEqual(['>EM<'])
+  expect(conTres?.[0]).toMatch(/>\+2<\/span>/)
 
   // un grupo, con su ícono (no la cara de quien lo armó)
   const octubre = await calendario(db, sofi.id, 'mes=10')

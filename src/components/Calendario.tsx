@@ -161,7 +161,7 @@ function VistaAnio({ meses, dias, cosas, orden, vacio }: Datos & { orden: string
   )
 }
 
-/** Un día de la grilla del mes: el número y, si cae algo, la cara de quién (con cuántos son, si son más) y lleva al día. */
+/** Un día de la grilla del mes: el número y, si cae algo, la cara de quién (apiladas, si son más) y lleva al día. */
 function Celda({ mes, dia, meses, dias, cosas }: Datos & { mes: number; dia: number }) {
   const delDia = dias[claveDelDia(mes, dia)]
   const caras = (delDia?.cosas ?? []).map((k) => cosas[k].cara)
@@ -185,14 +185,24 @@ function Celda({ mes, dia, meses, dias, cosas }: Datos & { mes: number; dia: num
          aria-label={`${delDia.semana} ${delDia.titulo}: ${delDia.cosas.map((k) => cosas[k].titulo).join(', ')}`}
          className={`${forma} bg-gr-soft transition-transform active:scale-95 ${pasado ? 'opacity-60' : ''}`}>
         {numero}
-        <span className="relative">
-          <CaraDe cara={gente[0] ?? especial!} size={30} />
-          {gente.length > 1 && (
-            <span aria-hidden className="absolute -right-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gr-brand px-1 text-[10px] leading-none font-bold text-gr-accent ring-2 ring-gr-soft">
-              {gente.length}
+        {gente.length > 1 ? (
+          // más de uno, apiladas (con un aro para separarlas; dos entran en la celda de un teléfono angosto): con dos, las
+          // dos caras, la primera arriba; con más, la primera y cuántos más son, arriba para que se lea
+          <span className="flex">
+            <span className={`flex rounded-full ring-2 ring-gr-soft ${gente.length === 2 ? 'z-10' : ''}`}>
+              <CaraDe cara={gente[0]} size={24} />
             </span>
-          )}
-        </span>
+            {gente.length === 2 ? (
+              <span className="-ml-2.5 flex rounded-full ring-2 ring-gr-soft">
+                <CaraDe cara={gente[1]} size={24} />
+              </span>
+            ) : (
+              <span aria-hidden className="-ml-2.5 flex size-6 items-center justify-center rounded-full bg-gr-brand text-[10px] leading-none font-bold text-gr-accent ring-2 ring-gr-soft">
+                +{gente.length - 1}
+              </span>
+            )}
+          </span>
+        ) : <CaraDe cara={gente[0] ?? especial!} size={30} />}
       </a>
     </li>
   )
