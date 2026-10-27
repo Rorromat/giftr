@@ -8,10 +8,11 @@ import {
 } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
-import { dividir, type Moneda } from '@/lib/pesos'
+import { dividir, plata, type Moneda } from '@/lib/pesos'
 import { notaDeCompra } from '@/lib/limites'
 import { accesoALista } from '@/lib/acceso'
 import { dejarAviso } from '@/lib/notifications'
+import { avisar, type Enviar } from '@/lib/codazos'
 
 export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
@@ -302,12 +303,12 @@ const encargadoPrimero = (filas: { userId: string }[], encargado: string) =>
 
 /**
  * El encargado lo compró: fija el total y la parte de cada uno (por defecto, partes iguales), entre los que vio en la
- * pantalla. Las partes tienen que sumar el total.
+ * pantalla. Las partes tienen que sumar el total. A cada uno que le debe su parte le llega cuánto le toca (ver avisarCompra).
  */
-export async function comprarRegalo(db: Db, giftId: string, userId: string, p: DatosCompra): Promise<CompraResult> {
+export async function comprarRegalo(db: Db, giftId: string, userId: string, p: DatosCompra, enviar?: Enviar): Promise<CompraResult> {
   if (!montoValido(p.total)) return { ok: false, reason: 'monto_invalido' }
   if (!esUuid(giftId)) return { ok: false, reason: 'no_permitido' }
-  return db.transaction(async (tx): Promise<CompraResult> => {
+  const r = await db.transaction(async (tx): Promise<CompraResult> => {
     const t = tx as unknown as Db
     // Lock del deseo y después del regalo, como sumarseARegalo. El del regalo: sumarse, bajarse o que lo saquen esperan a
     // la compra (y ya no está abierto), o la compra a ellos y divide entre los que quedaron. El del deseo: si a la vez lo
@@ -329,6 +330,8 @@ export async function comprarRegalo(db: Db, giftId: string, userId: string, p: D
     await t.update(claims).set({ estado: 'comprado', notaQueCompre: notaDeCompra(p.nota), updatedAt: ahora }).where(eq(claims.id, g.claimId))
     return { ok: true }
   })
+  if (r.ok) await avisarCompra(db, giftId, userId, enviar)
+  return r
 }
 
 /**
@@ -385,7 +388,9 @@ export async function corregirCompra(db: Db, giftId: string, userId: string, p: 
  * Si después se sumó al grupo de esa lista (aunque haya salido) ya no ve el regalo (ver enCuentasDe): tampoco lo marca
  * desde una pestaña vieja, como corregirCompra y saldarCon. El otro lo sigue viendo y lo marca desde su lado.
  */
-export async function marcarPagado(db: Db, giftId: string, deudorId: string, actorId: string, pagado = true, visto?: number): Promise<boolean> {
+export async function marcarPagado(
+  db: Db, giftId: string, deudorId: string, actorId: string, pagado = true, visto?: number, enviar?: Enviar,
+): Promise<boolean> {
   if (!esUuid(giftId) || !esUuid(deudorId)) return false
   // visto viene del formulario: una parte es un entero entre 0 y MONTO_MAXIMO, y otro número (fuera de lo que entra en la
   // columna) haría fallar la consulta
@@ -395,11 +400,17 @@ export async function marcarPagado(db: Db, giftId: string, deudorId: string, act
     .where(and(eq(groupGifts.id, giftId), eq(groupGifts.estado, 'comprado')))
   if (!g || deudorId === g.encargado || (actorId !== g.encargado && actorId !== deudorId)) return false
   if (await esOFueDuenoDeLista(db, g.listId, actorId)) return false
+  const deEse = and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, deudorId))
+  const [antes] = await db.select({ pagado: groupGiftMembers.pagado }).from(groupGiftMembers).where(deEse)
   const filas = await db.update(groupGiftMembers).set({ pagado, pagadoAt: pagado ? new Date() : null })
-    .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.userId, deudorId),
-      pagado && visto !== undefined ? eq(groupGiftMembers.monto, visto) : undefined))
-    .returning({ userId: groupGiftMembers.userId })
-  return filas.length > 0
+    .where(and(deEse, pagado && visto !== undefined ? eq(groupGiftMembers.monto, visto) : undefined))
+    .returning({ monto: groupGiftMembers.monto })
+  if (!filas.length) return false
+  // "Ya le pagué": al encargado le llega que le pagaron (el "Me pagó" lo marca él mismo)
+  if (pagado && actorId === deudorId && !antes?.pagado && (filas[0].monto ?? 0) > 0) {
+    await avisarPago(db, deudorId, g.encargado, filas[0].monto ?? 0, { giftId }, enviar)
+  }
+  return true
 }
 
 /**
@@ -416,9 +427,9 @@ const enCuentasDe = (db: Db, userId: string) => and(eq(groupGifts.estado, 'compr
  * visto: el neto del botón (positivo, te debe). Si cambió (justo corrigieron una compra), no salda nada: la pantalla
  * vuelve con el de ahora. Si es el mismo, saldar las partes nuevas da lo mismo que lo que se pagó.
  */
-export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number, moneda: Moneda = 'ARS'): Promise<number> {
+export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number, moneda: Moneda = 'ARS', enviar?: Enviar): Promise<number> {
   if (userId === otroId || !esUuid(otroId)) return 0
-  return db.transaction(async (tx) => {
+  const r = await db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const deEncargado = (encargado: string) => t.select({ id: groupGifts.id }).from(groupGifts)
       .innerJoin(items, eq(groupGifts.itemId, items.id))
@@ -435,12 +446,16 @@ export async function saldarCon(db: Db, userId: string, otroId: string, visto?: 
       .orderBy(asc(groupGiftMembers.giftId), asc(groupGiftMembers.userId))
       .for('update')
     const neto = filas.reduce((s, f) => s + (f.userId === otroId ? 1 : -1) * (f.monto ?? 0), 0)
-    if (!filas.length || (visto !== undefined && neto !== visto)) return 0
+    if (!filas.length || (visto !== undefined && neto !== visto)) return { saldadas: 0, neto }
     // estas filas y no las que cumplan el filtro ahora: una compra que se cerró recién no estaba en el botón
     await t.update(groupGiftMembers).set({ pagado: true, pagadoAt: new Date() })
       .where(or(...filas.map((f) => and(eq(groupGiftMembers.giftId, f.giftId), eq(groupGiftMembers.userId, f.userId)))))
-    return filas.length
+    return { saldadas: filas.length, neto }
   })
+  // "Ya le pagué todo": le debía (el neto es lo que el otro le debe), así que al otro le llega que le pagó. "Me pagó todo"
+  // o "Marcar todo como saldado" lo marca el que cobra: no hay a quién avisarle.
+  if (r.saldadas && r.neto < 0) await avisarPago(db, userId, otroId, -r.neto, { moneda }, enviar)
+  return r.saldadas
 }
 
 /** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño y a quien no ve la capa oculta (ver accesoALista) les devuelve []. */
@@ -558,19 +573,71 @@ type Destino = {
   activo: boolean; tieneElLink: boolean
 }
 
+const paraQuien = (r: Pick<Destino, 'tipo' | 'listaNombre' | 'duenoNombre'>) =>
+  r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? r.listaNombre ?? 'Alguien'
+
 /**
  * Para quién y adónde lleva. duenoNombre es el del dueño de la lista personal o el de quien recibe la sorpresa (ver
  * duenoOParaSql); una sorpresa para alguien sin GiftR lleva su nombre en el de la lista.
  */
 function destino(r: Destino, conLink = r.tieneElLink) {
   return {
-    para: r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? r.listaNombre ?? 'Alguien',
+    para: paraQuien(r),
     href: !conLink ? null : r.tipo === 'sorpresa' ? `/sorpresa/${r.shareToken}` : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`,
   }
 }
 
 /** Para el join con el dueño de una lista: el de la personal, o el que recibe una sorpresa (solo uno de los dos está). */
 export const duenoOParaSql = sql`coalesce(${lists.ownerId}, ${lists.paraUserId})`
+
+const primerNombreDe = async (db: Db, userId: string) =>
+  ((await db.select({ nombre: users.nombre }).from(users).where(eq(users.id, userId)))[0]?.nombre ?? 'Alguien').split(' ')[0]
+
+/** El deseo de un regalo, para quién es (como en Cuentas, ver destino) y en qué moneda se cuenta: lo que dicen sus avisos. */
+async function delRegalo(db: Db, giftId: string) {
+  const [r] = await db.select({
+    titulo: items.titulo, tipo: lists.tipo, listaNombre: lists.nombre, duenoNombre: duenosPersonales.nombre, moneda: groupGifts.moneda,
+  }).from(groupGifts)
+    .innerJoin(items, eq(groupGifts.itemId, items.id))
+    .innerJoin(lists, eq(items.listId, lists.id))
+    .leftJoin(duenosPersonales, eq(duenoOParaSql, duenosPersonales.id))
+    .where(eq(groupGifts.id, giftId))
+  return r ? { titulo: r.titulo, para: paraQuien(r), moneda: r.moneda } : null
+}
+
+/**
+ * El que organiza compró el regalo: a cada uno que le debe su parte le llega cuánto le toca (a Cuentas, donde la marca
+ * paga). Ya fuera de la transacción, como los codazos: el regalo no queda bloqueado mientras contestan los servicios de push.
+ * A los dueños de la lista nunca: no pueden estar en el regalo (ver sumarseARegalo y unirseAGrupo).
+ */
+async function avisarCompra(db: Db, giftId: string, encargadoId: string, enviar?: Enviar) {
+  const [r, deben, quien] = await Promise.all([
+    delRegalo(db, giftId),
+    db.select({ userId: groupGiftMembers.userId, monto: groupGiftMembers.monto }).from(groupGiftMembers)
+      .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.pagado, false), gt(groupGiftMembers.monto, 0))),
+    primerNombreDe(db, encargadoId),
+  ])
+  if (!r) return
+  await Promise.all(deben.map((d) => avisar(db, d.userId, {
+    tipo: 'regalo_comprado', de: encargadoId, url: '/cuentas',
+    title: `🧾 ${quien} compró "${r.titulo}"`,
+    body: `Tu parte del regalo para ${r.para}: ${plata(d.monto ?? 0, r.moneda)}. Cuando le pagues, marcalo en Cuentas.`,
+  }, enviar).catch(() => 0)))
+}
+
+/**
+ * Le pagaron: al que cobra le llega quién y cuánto, de un regalo ("Ya le pagué") o de todo lo que se debían en una moneda
+ * ("Ya le pagué todo", en saldarCon).
+ */
+async function avisarPago(db: Db, pagoId: string, cobraId: string, monto: number, de: { giftId: string } | { moneda: Moneda }, enviar?: Enviar) {
+  const [quien, regalo] = await Promise.all([primerNombreDe(db, pagoId), 'giftId' in de ? delRegalo(db, de.giftId) : null])
+  const moneda = regalo?.moneda ?? ('moneda' in de ? de.moneda : 'ARS')
+  await avisar(db, cobraId, {
+    tipo: 'pago', de: pagoId, url: '/cuentas',
+    title: `💸 ${quien} te pagó ${plata(monto, moneda)}`,
+    body: regalo ? `Su parte de "${regalo.titulo}", el regalo para ${regalo.para}.` : 'Todo lo que te debía de los regalos grupales: ya quedó saldado en Cuentas.',
+  }, enviar).catch(() => 0)
+}
 
 /**
  * Para qué deseo y lista es cada línea. Si cambiaron el link para regalar, el nuevo solo va en las líneas de quien sigue

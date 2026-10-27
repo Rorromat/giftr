@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, isNull, lt, or } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNull, lt, or } from 'drizzle-orm'
 import { avisos, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
@@ -6,8 +6,9 @@ import type { Aviso } from '@/lib/codazos'
 import { avisosDeDeseos, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { urlFoto } from '@/lib/users'
 
-// La bandeja de Avisos: lo que te llegó (codazos, solicitudes, propuestas, el amigo invisible) y los avisos sobre los
-// deseos que regalás, en un solo lugar. Lo de después de la última vez que la abriste es nuevo: la campanita lo cuenta.
+// La bandeja de Avisos: lo que te llegó (codazos, solicitudes, propuestas, el amigo invisible, las cuentas) y los avisos
+// sobre los deseos que regalás, en un solo lugar. Lo de después de la última vez que la abriste es nuevo: la campanita lo
+// cuenta, y lo nuevo que te pide algo va también arriba en Inicio ("Para vos").
 
 /** Cuántos días se guarda lo que llegó. */
 export const DIAS_EN_BANDEJA = 60
@@ -16,9 +17,22 @@ export const EN_BANDEJA = 60
 
 const desdeHace = (dias: number) => new Date(Date.now() - dias * 86_400_000)
 
+export type TipoEnBandeja = NonNullable<(typeof avisos.$inferInsert)['tipo']>
+
+/**
+ * Lo que va en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás, contestarle
+ * a tu amigo invisible) o que estabas esperando (te pagaron, te contestaron). Los codazos, las solicitudes de amistad, las
+ * propuestas para dividir y las invitaciones al amigo invisible no: mientras esperan que contestes ya tienen su cartel en
+ * Inicio, con sus botones. Que aceptaron tu solicitud o se sumaron a tu regalo, tampoco: no te piden nada.
+ */
+export const PARA_VOS: TipoEnBandeja[] = ['regalo_comprado', 'pago', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta']
+/** Cuántos van en "Para vos" como mucho (el resto, en la campanita), y de cuántos días para acá. */
+export const EN_PARA_VOS = 3
+export const DIAS_PARA_VOS = 7
+
 /** Lo guarda en la bandeja tal como se manda al celular (ver avisar). De paso, se van los de hace más de 60 días. */
-export async function guardarAviso(db: Db, userId: string, aviso: Aviso, de: string | null = null) {
-  await db.insert(avisos).values({ userId, deUserId: de, titulo: aviso.title, cuerpo: aviso.body, url: aviso.url })
+export async function guardarAviso(db: Db, userId: string, aviso: Aviso & { tipo?: TipoEnBandeja }, de: string | null = null) {
+  await db.insert(avisos).values({ userId, deUserId: de, tipo: aviso.tipo ?? null, titulo: aviso.title, cuerpo: aviso.body, url: aviso.url })
   await db.delete(avisos).where(and(eq(avisos.userId, userId), lt(avisos.createdAt, desdeHace(DIAS_EN_BANDEJA))))
 }
 
@@ -59,29 +73,38 @@ async function vistosAt(db: Db, userId: string): Promise<Date | null> {
   return u?.vistos ?? null
 }
 
+/** Los de la tabla avisos, con quién lo mandó (en una consulta con leftJoin a users por deUserId). */
+const columnasAviso = {
+  id: avisos.id, titulo: avisos.titulo, cuerpo: avisos.cuerpo, url: avisos.url, createdAt: avisos.createdAt,
+  de: { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl },
+}
+
+type FilaAviso = {
+  id: string; titulo: string; cuerpo: string; url: string; createdAt: Date
+  de: { id: string; nombre: string; fotoAt: Date | null; avatarUrl: string | null } | null
+}
+
+function entrada(a: FilaAviso, nuevo: boolean): EntradaBandeja {
+  const { emoji, texto } = separarEmoji(a.titulo)
+  return {
+    id: a.id, emoji: emoji ?? '🔔', titulo: texto, cuerpo: a.cuerpo || null, href: a.url, createdAt: a.createdAt,
+    de: a.de ? { nombre: a.de.nombre, foto: urlFoto(a.de) } : null, nuevo,
+  }
+}
+
 /** Lo de la bandeja, lo más nuevo primero, y cuándo se armó (lo que se marca visto al abrirla). */
 export async function bandeja(db: Db, viewer: Viewer & { userId: string }): Promise<{ entradas: EntradaBandeja[]; hasta: Date }> {
   const hasta = new Date()
   const desde = desdeHace(DIAS_EN_BANDEJA)
   const [vistos, propios, deDeseos] = await Promise.all([
     vistosAt(db, viewer.userId),
-    db.select({
-      id: avisos.id, titulo: avisos.titulo, cuerpo: avisos.cuerpo, url: avisos.url, createdAt: avisos.createdAt,
-      de: { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl },
-    }).from(avisos).leftJoin(users, eq(avisos.deUserId, users.id))
+    db.select(columnasAviso).from(avisos).leftJoin(users, eq(avisos.deUserId, users.id))
       .where(and(eq(avisos.userId, viewer.userId), gte(avisos.createdAt, desde)))
       .orderBy(desc(avisos.createdAt)).limit(EN_BANDEJA),
     avisosDeDeseos(db, viewer, { desde }),
   ])
   const entradas: EntradaBandeja[] = [
-    ...propios.map((a) => {
-      const { emoji, texto } = separarEmoji(a.titulo)
-      return {
-        id: a.id, emoji: emoji ?? '🔔', titulo: texto, cuerpo: a.cuerpo || null, href: a.url, createdAt: a.createdAt,
-        de: a.de ? { nombre: a.de.nombre, foto: urlFoto(a.de) } : null,
-        nuevo: !vistos || a.createdAt > vistos,
-      }
-    }),
+    ...propios.map((a) => entrada(a, !vistos || a.createdAt > vistos)),
     ...deDeseos.flatMap((n) => {
       const texto = textoDeAviso(n.tipo, n.itemTitulo, n.sorpresa)
       if (!texto) return []
@@ -90,6 +113,19 @@ export async function bandeja(db: Db, viewer: Viewer & { userId: string }): Prom
   ]
   entradas.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   return { entradas: entradas.slice(0, EN_BANDEJA), hasta }
+}
+
+/**
+ * "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más nuevo primero.
+ * Como el número de la campanita: al abrirla deja de ser nuevo y se va de Inicio (sigue en la bandeja).
+ */
+export async function paraVos(db: Db, userId: string): Promise<EntradaBandeja[]> {
+  const vistos = await vistosAt(db, userId)
+  const semana = desdeHace(DIAS_PARA_VOS)
+  const filas = await db.select(columnasAviso).from(avisos).leftJoin(users, eq(avisos.deUserId, users.id))
+    .where(and(eq(avisos.userId, userId), inArray(avisos.tipo, PARA_VOS), gt(avisos.createdAt, vistos && vistos > semana ? vistos : semana)))
+    .orderBy(desc(avisos.createdAt)).limit(EN_PARA_VOS)
+  return filas.map((a) => entrada(a, true))
 }
 
 /** Cuántos nuevos tiene (el número de la campanita). */

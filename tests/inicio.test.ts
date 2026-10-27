@@ -6,6 +6,12 @@ import type { Db } from '@/db/types'
 import { saltearBienvenida } from '@/lib/bienvenida'
 import { pedirAmistad } from '@/lib/amigos'
 import { upsertUserFromGoogle } from '@/lib/users'
+import { createItem } from '@/lib/items'
+import { reserveItem } from '@/lib/claims'
+import { guardarCumple } from '@/lib/events'
+import { comprarRegalo, iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
+import type { EntradaBandeja } from '@/lib/bandeja'
+import type { MiRegalo } from '@/lib/mis-regalos'
 
 // Inicio es lo primero al entrar: con la base en PGlite y la sesión, las cookies y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({
@@ -35,8 +41,15 @@ import { noSugerirAction } from '@/app/actions'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { SectionHeader } from '@/components/ui'
 import { Portada } from '@/components/Portada'
+import { Proximos } from '@/components/Eventos'
+import { FilaAviso } from '@/components/FilaAviso'
+import { FilaRegalo } from '@/components/FilaRegalo'
+import { CuentasPendientes } from '@/components/ResumenCuentas'
 
-type Props = { id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode }
+type Props = {
+  id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode; e?: EntradaBandeja; r?: MiRegalo
+  cuentas?: { debes: number }
+}
 
 /** Los elementos de la pantalla, en orden, sin renderizar (las partes async, como los carteles, no se renderizan acá). */
 function elementos(nodo: ReactNode): { type: unknown; props: Props }[] {
@@ -107,6 +120,45 @@ test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente,
   await saltearBienvenida(h.db, beto.id)
   h.session = { userId: beto.id }
   expect(sugeridos(await inicio())).toEqual(['Ana (Sofi)'])
+})
+
+test('arriba lo que es para vos; abajo de lo nuevo de tus amigos, lo que tenés por comprar y las cuentas pendientes', async () => {
+  h.db = await createTestDb()
+  h.cookies.clear()
+  const [yo, sofi, rodri] = await Promise.all(['Yo', 'Sofi', 'Rodri'].map(usuario))
+  await saltearBienvenida(h.db, yo.id)
+  await amigos(yo.id, sofi.id)
+  const pronto = new Date(Date.now() + 10 * 86_400_000)
+  await guardarCumple(h.db, sofi.id, pronto.getDate(), pronto.getMonth() + 1)
+  const [bici, termo] = [
+    (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Bici' }))!, (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Termo' }))!,
+  ]
+  h.session = { userId: yo.id }
+  const inicio = async () => elementos(await Inicio({ searchParams: Promise.resolve({}) }))
+
+  // sin nada pendiente, no están
+  const vacio = await inicio()
+  expect(vacio.some((e) => e.props.id === 'para-vos' || e.props.id === 'por-comprar')).toBe(false)
+  expect(vacio.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(0)
+
+  // Rodri arma el regalo de la bici, me sumo y lo compra: me toca la mitad. Y el termo lo reservé yo
+  const r = await iniciarRegaloGrupal(h.db, bici.id, rodri.id)
+  if (!r.ok) throw new Error(r.reason)
+  await sumarseARegalo(h.db, r.giftId, yo.id)
+  await comprarRegalo(h.db, r.giftId, rodri.id, { total: 50000 })
+  await reserveItem(h.db, termo.id, { userId: yo.id })
+
+  const pantalla = await inicio()
+  const donde = (que: (e: (typeof pantalla)[number]) => boolean) => pantalla.findIndex(que)
+  const orden = [
+    donde((e) => e.props.id === 'para-vos'), donde((e) => e.type === Proximos), donde((e) => e.props.id === 'novedades'),
+    donde((e) => e.props.id === 'por-comprar'), donde((e) => e.type === CuentasPendientes),
+  ]
+  expect(orden.every((i) => i > -1)).toBe(true)
+  expect([...orden].sort((a, b) => a - b)).toEqual(orden)
+  expect(pantalla.filter((e) => e.type === FilaAviso).map((e) => e.props.e!.titulo)).toEqual(['Rodri compró "Bici"'])
+  expect(pantalla.filter((e) => e.type === FilaRegalo).map((e) => e.props.r!.titulo)).toEqual(['Termo'])
+  expect(pantalla.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(25000)
 })
 
 test('la portada: cinco deseos de mentira en ronda, cada uno con su sello y quién se ocupa sin que el dueño se entere', () => {

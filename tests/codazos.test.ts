@@ -127,7 +127,7 @@ test('como mucho 10 dispositivos por persona: al activar otro se va el más viej
   ])
   const enviados: string[] = []
   const enviar: Enviar = async (s) => { enviados.push(s.endpoint); return 201 }
-  expect(await avisar(db, euge.id, { title: 't', body: 'b', url: '/' }, enviar)).toBe(SUSCRIPCIONES_POR_USUARIO)
+  expect(await avisar(db, euge.id, { tipo: 'codazo', title: 't', body: 'b', url: '/' }, enviar)).toBe(SUSCRIPCIONES_POR_USUARIO)
   expect(enviados.every((e) => e.startsWith('https://fcm.googleapis.com/'))).toBe(true)
   expect(enviados).not.toContain(sub('basura').endpoint)
   expect(await quedan()).toEqual(['3', '5', '6', '7', '8', '9', '10', '11', '12', '13'])
@@ -145,7 +145,7 @@ test('los avisos van a todos los dispositivos a la vez: uno lento no hace espera
     enVuelo--
     return 201
   }
-  expect(await avisar(db, euge.id, { title: 't', body: 'b', url: '/' }, enviar)).toBe(4)
+  expect(await avisar(db, euge.id, { tipo: 'codazo', title: 't', body: 'b', url: '/' }, enviar)).toBe(4)
   expect(maximo).toBe(4)
 })
 
@@ -274,7 +274,7 @@ test('EL TEST DE ORO, codazo: el aviso no dice nada de reservas ni de qué hay e
   const json = JSON.stringify([push.enviados, await codazosSinVer(db, euge.id)]).toLowerCase()
   for (const p of ['mate', 'comprado', 'reserv', 'claim']) expect(json).not.toContain(p)
   // y avisar a alguien sin dispositivos no manda nada
-  expect(await avisar(db, sofi.id, { title: 't', body: 'b', url: '/' }, push.enviar)).toBe(0)
+  expect(await avisar(db, sofi.id, { tipo: 'codazo', title: 't', body: 'b', url: '/' }, push.enviar)).toBe(0)
 })
 
 test('los topes del codazo valen también con pedidos a la vez', async () => {

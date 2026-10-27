@@ -239,6 +239,13 @@
       "when": 1793117982114,
       "tag": "0033_bandeja_avisos",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793141827102,
+      "tag": "0034_para_vos",
+      "breakpoints": true
     }
   ]
 }

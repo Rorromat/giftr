@@ -1,0 +1,1 @@
+ALTER TABLE "avisos" ADD COLUMN "tipo" text;

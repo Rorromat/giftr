@@ -5,7 +5,7 @@ import { codazos, config, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { duenosDeLista, esDuenoSql, esToken } from '@/lib/groups'
-import { guardarAviso } from '@/lib/bandeja'
+import { guardarAviso, type TipoEnBandeja } from '@/lib/bandeja'
 
 // Codazo: quien regala le pide al dueño que cargue su lista. Le llega como aviso push (si lo activó)
 // y como cartel en Mi lista. No dice nada de reservas: solo quién le dio el codazo.
@@ -152,12 +152,12 @@ const enviarConWebPush: Enviar = async (s, aviso, vapid) => {
 }
 
 /**
- * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí) y le llega al celular (ver
- * mandarPush). Devuelve a cuántos dispositivos llegó.
+ * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí; tipo: qué es, para "Para vos" en
+ * Inicio) y le llega al celular (ver mandarPush). Devuelve a cuántos dispositivos llegó.
  */
-export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null }, enviar: Enviar = enviarConWebPush): Promise<number> {
-  const { de = null, ...push } = aviso
-  await guardarAviso(db, userId, push, de)
+export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null; tipo: TipoEnBandeja }, enviar: Enviar = enviarConWebPush): Promise<number> {
+  const { de = null, tipo, ...push } = aviso
+  await guardarAviso(db, userId, { ...push, tipo }, de)
   return mandarPush(db, userId, push, enviar)
 }
 
@@ -245,6 +245,7 @@ export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNomb
   for (const d of duenos) {
     avisados += await avisar(db, d.id, {
       de: viewer.userId ?? null,
+      tipo: 'codazo',
       title: `👉 ¡Codazo de ${primer}!`,
       body: list.tipo === 'grupo'
         ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'el grupo'}".`
