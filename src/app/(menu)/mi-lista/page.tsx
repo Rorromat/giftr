@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
+import { avisosSinLeer } from '@/lib/bandeja'
 import { getOwnList } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
@@ -19,9 +20,9 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const { agregado, eliminado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple] = await Promise.all([
+  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple, avisos] = await Promise.all([
     getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), yo(db, session.userId),
-    miCumple(db, session.userId),
+    miCumple(db, session.userId), avisosSinLeer(db, { userId: session.userId }),
   ])
   if (!lista) redirect('/')
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
@@ -39,7 +40,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
       {/* Vos: tu lista y, tocando tu foto, tu perfil. La barra mide 56 y la tarjeta arranca a 84 de arriba: su estrella
           queda donde la busca la animación de inicio (ver ListaHero). */}
-      <AppHeader nombre={nombre} foto={foto} />
+      <AppHeader nombre={nombre} foto={foto} avisos={avisos} />
 
       <ListaHero
         destino

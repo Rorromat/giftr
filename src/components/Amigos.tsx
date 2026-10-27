@@ -20,7 +20,7 @@ export function PersonaFila({ p, size = 48, children }: { p: Persona; size?: num
 }
 
 /** Una solicitud que me llegó: aceptar o rechazar (rechazar no se le dice al otro). */
-export function SolicitudRecibida({ id, de }: { id: string; de: Persona }) {
+export function SolicitudRecibida({ id, de, volver }: { id: string; de: Persona; volver?: 'avisos' }) {
   return (
     <li className="gr-card flex flex-col gap-3 p-3.5">
       <PersonaFila p={de} />
@@ -29,11 +29,13 @@ export function SolicitudRecibida({ id, de }: { id: string; de: Persona }) {
         <form action={responderSolicitudAction}>
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="acepta" value="0" />
+          {volver && <input type="hidden" name="volver" value={volver} />}
           <BotonEnviar className="gr-btn gr-btn--sm w-full">Rechazar</BotonEnviar>
         </form>
         <form action={responderSolicitudAction}>
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="acepta" value="1" />
+          {volver && <input type="hidden" name="volver" value={volver} />}
           <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Aceptar</BotonEnviar>
         </form>
       </div>

@@ -62,6 +62,7 @@ async function sumarInvitados(db: Db, juego: { id: string; nombre: string }, org
     .onConflictDoNothing().returning({ id: amigoInvisibleGente.userId })
   const [org] = await personas(db, [organizadorId])
   await Promise.all(insertados.map((i) => avisar(db, i.id, {
+    de: organizadorId,
     title: `🎅 ${primerNombre(org?.nombre ?? 'Alguien')} te invita a un amigo invisible`,
     body: `"${juego.nombre}". ¿Jugás?`,
     url: url(juego.id),

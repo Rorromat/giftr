@@ -19,6 +19,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
+import { marcarBandejaVista } from '@/lib/bandeja'
 import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario } from '@/lib/users'
@@ -572,11 +573,13 @@ export async function responderInvitacionAction(formData: FormData) {
   const r = await responderInvitacion(db, userId, str(formData, 'id') ?? '', acepta)
   revalidatePath('/inicio')
   revalidatePath('/regalos')
+  revalidatePath('/avisos')
   if (r.ok && acepta) {
     revalidatePath(r.href)
     redirect(`${r.href}?regalo=sumado#regalo`)
   }
-  if (!r.ok && r.reason === 'no_se_pudo') redirect('/inicio?invitacion=no_se_pudo#invitaciones')
+  const desde = str(formData, 'volver') === 'avisos' ? '/avisos' : '/inicio'
+  if (!r.ok && r.reason === 'no_se_pudo') redirect(`${desde}?invitacion=no_se_pudo#invitaciones`)
 }
 
 /**
@@ -778,6 +781,13 @@ export async function codazoAction(formData: FormData) {
   redirect(`/l/${token}?codazo=${r.ok ? (r.avisados ? 'avisado' : 'cartel') : r.reason}#codazo`)
 }
 
+/** Abrió Avisos: lo que había cuando se armó la pantalla deja de ser nuevo (ver marcarBandejaVista). */
+export async function vistaBandejaAction(hasta: string) {
+  const viewer = await getViewer()
+  if (!viewer.userId || typeof hasta !== 'string') return
+  await marcarBandejaVista(db, { ...viewer, userId: viewer.userId }, new Date(hasta))
+}
+
 export async function vistoCodazosAction() {
   const session = await auth()
   if (!session?.userId) return
@@ -827,6 +837,8 @@ export async function responderSolicitudAction(formData: FormData) {
   const acepta = str(formData, 'acepta') === '1'
   const ok = await responderSolicitud(db, session.userId, str(formData, 'id') ?? '', acepta)
   revalidatePath('/', 'layout')
+  // desde Avisos, sigue ahí
+  if (str(formData, 'volver') === 'avisos') redirect('/avisos')
   redirect(ok && acepta ? '/gente?amigo=aceptada' : '/gente')
 }
 
@@ -922,6 +934,7 @@ function revalidarJuego(id: string) {
   revalidatePath(rutaJuego(id))
   revalidatePath('/regalos')
   revalidatePath('/inicio')
+  revalidatePath('/avisos')
   revalidatePath('/fechas', 'layout')
 }
 

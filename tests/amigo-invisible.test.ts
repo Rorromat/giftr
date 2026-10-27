@@ -1,6 +1,9 @@
 import { expect, test, vi } from 'vitest'
 import { createECDH, randomBytes } from 'node:crypto'
 import { createTestDb } from './helpers'
+import { eq } from 'drizzle-orm'
+import { avisos } from '@/db/schema'
+import { bandeja } from '@/lib/bandeja'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { pedirAmistad } from '@/lib/amigos'
@@ -204,6 +207,10 @@ test('preguntas anónimas: le llega de "tu amigo invisible" y la respuesta vuelv
   const { enviados, enviar } = pushFalso()
   expect(await preguntar(s.db, s.id, s.euge.id, '¿Qué talle usás?', enviar)).toBe(true)
   expect(enviados).toEqual([{ para: para.id, aviso: expect.objectContaining({ title: '🤫 Tu amigo invisible te hizo una pregunta' }) }])
+  // en su bandeja tampoco dice de quién es
+  const enBandeja = (await bandeja(s.db, { userId: para.id })).entradas.find((e) => e.emoji === '🤫')!
+  expect(enBandeja).toMatchObject({ titulo: 'Tu amigo invisible te hizo una pregunta', cuerpo: 'En "Navidad con los chicos": ¿Qué talle usás?', de: null })
+  expect((await s.db.select().from(avisos).where(eq(avisos.id, enBandeja.id)))[0].deUserId).toBeNull()
   // el que la recibe la ve sin saber de quién es
   const suya = (await amigoInvisibleParaViewer(s.db, s.id, para.id))!
   expect(suya.preguntasParaMi).toEqual([{ id: expect.any(String), texto: '¿Qué talle usás?', respuesta: null }])

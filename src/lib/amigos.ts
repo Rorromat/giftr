@@ -3,6 +3,7 @@ import { and, count, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-
 import { amistades, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { avisar, type Enviar } from '@/lib/codazos'
+import { guardarAviso } from '@/lib/bandeja'
 import { esToken, esUuid } from '@/lib/groups'
 import { urlFoto } from '@/lib/users'
 
@@ -160,6 +161,10 @@ export type ResultadoSolicitud =
   | { ok: true; estado: 'enviada' | 'amigos' }
   | { ok: false; reason: 'yo' | 'no_existe' | 'formato' | 'muchas' }
 
+const pidioAmistad = (primer: string, de: string) =>
+  ({ title: `🤝 ${primer} quiere ser tu amigo en GiftR`, body: 'Si aceptás, se ven las listas y los cumples.', url: '/gente#solicitudes', de })
+const acepto = (primer: string) => ({ title: `🤝 ${primer} aceptó`, body: 'Ya son amigos: se ven las listas y los cumples.', url: '/gente' })
+
 /**
  * Mandarle una solicitud a alguien. Si el otro ya me había mandado una (pendiente, o rechazada por mí), quedamos amigos:
  * los dos quieren. Si la mía ya estaba (pendiente o rechazada), no le llega de nuevo; la vuelvo a ver en enviadas.
@@ -193,9 +198,7 @@ export async function pedirAmistad(db: Db, de: string, para: string, enviar?: En
   if (!r.ok) return r
   if (r.avisar) {
     const primer = primerNombre(await nombreDe(db, de))
-    await avisar(db, para, r.avisar === 'pidio'
-      ? { title: `🤝 ${primer} quiere ser tu amigo en GiftR`, body: 'Si aceptás, se ven las listas y los cumples.', url: '/gente' }
-      : { title: `🤝 ${primer} aceptó`, body: 'Ya son amigos: se ven las listas y los cumples.', url: '/gente' }, enviar)
+    await avisar(db, para, r.avisar === 'pidio' ? pidioAmistad(primer, de) : { ...acepto(primer), de }, enviar)
       .catch(() => 0)
   }
   return { ok: true, estado: r.estado }
@@ -245,11 +248,17 @@ export async function reclamarSolicitudesPorMail(db: Db, userId: string, email: 
       await db.delete(amistades).where(eq(amistades.id, s.id))
       continue
     }
+    let reclamada = false
     try {
-      await db.update(amistades).set({ paraUserId: userId }).where(and(eq(amistades.id, s.id), isNull(amistades.paraUserId)))
+      reclamada = (await db.update(amistades).set({ paraUserId: userId }).where(and(eq(amistades.id, s.id), isNull(amistades.paraUserId)))
+        .returning({ id: amistades.id })).length > 0
     } catch {
       // justo se armó otra entre los dos
       await db.delete(amistades).where(eq(amistades.id, s.id))
+    }
+    // le llega a la bandeja (al celular no: recién entra)
+    if (reclamada && s.estado === 'pendiente') {
+      await guardarAviso(db, userId, pidioAmistad(primerNombre(await nombreDe(db, s.deUserId)), s.deUserId), s.deUserId)
     }
   }
 }
@@ -269,7 +278,7 @@ export async function responderSolicitud(db: Db, userId: string, id: string, ace
   if (!de) return false
   if (acepta) {
     const primer = primerNombre(await nombreDe(db, userId))
-    await avisar(db, de, { title: `🤝 ${primer} aceptó`, body: 'Ya son amigos: se ven las listas y los cumples.', url: '/gente' }, enviar)
+    await avisar(db, de, { ...acepto(primer), de: userId }, enviar)
       .catch(() => 0)
   }
   return true
@@ -427,7 +436,7 @@ export async function aceptarLinkDeAmigo(db: Db, userId: string, token: string, 
   })
   if (nuevo) {
     const primer = primerNombre(await nombreDe(db, userId))
-    await avisar(db, de.id, { title: `🤝 ${primer} se sumó como amigo`, body: 'Ya se ven las listas y los cumples.', url: '/gente' }, enviar)
+    await avisar(db, de.id, { title: `🤝 ${primer} se sumó como amigo`, body: 'Ya se ven las listas y los cumples.', url: '/gente', de: userId }, enviar)
       .catch(() => 0)
   }
   return { ok: true, de }

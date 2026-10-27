@@ -3,6 +3,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
+import { avisosSinLeer } from '@/lib/bandeja'
 import { yo as quienSoy } from '@/lib/perfil'
 import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
@@ -93,9 +94,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
   const yo = session.userId
-  const [gente, { nombre, foto }, amigos, recibidas, enviadas, usuario, token, sugerencias] = await Promise.all([
+  const [gente, { nombre, foto }, amigos, recibidas, enviadas, usuario, token, sugerencias, avisos] = await Promise.all([
     miGente(db, yo, hoy), quienSoy(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
-    asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo),
+    asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo), avisosSinLeer(db, { userId: yo }),
   ])
   // el @usuario de cada uno, para encontrarlo también así en el buscador
   const usuarios = new Map((await personas(db, gente.flatMap((c) => (c.tipo === 'personal' && c.duenos[0] ? [c.duenos[0].id] : []))))
@@ -105,7 +106,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="gr-title">Tu gente</h1>

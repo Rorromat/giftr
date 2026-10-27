@@ -106,7 +106,7 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
 }
 
 /** Las propuestas de dividir un regalo que te llegaron (Inicio): de quién, qué y para quién; te sumás o no. */
-export function InvitacionesRegalo({ invitaciones, noSePudo }: { invitaciones: Invitacion[]; noSePudo: boolean }) {
+export function InvitacionesRegalo({ invitaciones, noSePudo, volver }: { invitaciones: Invitacion[]; noSePudo: boolean; volver?: 'avisos' }) {
   if (!invitaciones.length && !noSePudo) return null
   return (
     <section id="invitaciones" aria-labelledby="invitaciones-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
@@ -137,11 +137,13 @@ export function InvitacionesRegalo({ invitaciones, noSePudo }: { invitaciones: I
             <form action={responderInvitacionAction}>
               <input type="hidden" name="id" value={i.id} />
               <input type="hidden" name="acepta" value="0" />
+              {volver && <input type="hidden" name="volver" value={volver} />}
               <BotonEnviar className="gr-btn gr-btn--sm w-full">No puedo</BotonEnviar>
             </form>
             <form action={responderInvitacionAction}>
               <input type="hidden" name="id" value={i.id} />
               <input type="hidden" name="acepta" value="1" />
+              {volver && <input type="hidden" name="volver" value={volver} />}
               <BotonEnviar pendiente="Sumándote…" className="gr-btn-primary gr-btn--sm w-full">Me sumo</BotonEnviar>
             </form>
           </div>

@@ -127,13 +127,13 @@ export default async function Perfil({ searchParams }: {
         </div>
       </section>
 
-      {/* Avisos push: así llegan los codazos */}
-      <section className="flex flex-col gap-2.5">
+      {/* Avisos push: así llegan al celular los codazos, las solicitudes y lo demás de la bandeja (desde ahí se llega con #avisos) */}
+      <section id="avisos" className="flex scroll-mt-6 flex-col gap-2.5">
         <h2 className="gr-heading">Avisos</h2>
         <div className="gr-card flex flex-col gap-3 p-4">
           <p className="flex items-start gap-3 text-[13px] leading-snug text-gr-muted">
             <span className="gr-row__icon text-gr-ink"><Icon name="bell" size={20} /></span>
-            <span className="pt-0.5">Cuando alguien te da un codazo para que cargues tu lista, te llega una notificación.</span>
+            <span className="pt-0.5">Los codazos, las solicitudes de amistad y lo demás que ves en la campanita, también como notificación en el celular.</span>
           </p>
           <ActivarAvisos vapidPublica={vapid.publica} />
         </div>

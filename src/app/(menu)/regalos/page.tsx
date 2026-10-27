@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
+import { avisosSinLeer } from '@/lib/bandeja'
 import { misRegalos, type MiRegalo } from '@/lib/mis-regalos'
 import { plata } from '@/lib/pesos'
 import { MESES } from '@/lib/events'
@@ -63,14 +64,15 @@ const JUEGOS_PASADOS = 15
 export default async function MisRegalos() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [{ porComprar, comprados, historial }, { nombre, foto }, juegos] = await Promise.all([
+  const [{ porComprar, comprados, historial }, { nombre, foto }, juegos, avisos] = await Promise.all([
     misRegalos(db, session.userId), yo(db, session.userId), misAmigosInvisibles(db, session.userId, undefined, JUEGOS_PASADOS),
+    avisosSinLeer(db, { userId: session.userId }),
   ])
   const tambien = tambienTeToco(juegos)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Tus regalos</h1>
         <p className="text-[15px] text-gr-muted">Lo que reservaste, los regalos grupales en los que estás y tus amigos invisibles.</p>
