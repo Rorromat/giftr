@@ -338,6 +338,24 @@ describe('con la API de MercadoLibre configurada', () => {
     expect(String(info.mock.calls[0][0])).toMatch(/^deseo\/link articulo\.mercadolibre\.com\.ar ok \d+ms api$/)
   })
 
+  test('un /up/ copiado con Compartir de la app (sin el nombre en el link): se le pregunta a la API por el item elegido', async () => {
+    vi.stubEnv('MELI_CLIENT_ID', '123')
+    vi.stubEnv('MELI_CLIENT_SECRET', 'secreto')
+    const urls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      urls.push(url)
+      if (url === `${API}/oauth/token`) return Response.json({ access_token: 'APP_USR-1', token_type: 'Bearer', expires_in: 60 })
+      if (url === `${API}/items/MLA876125421`) return Response.json({ ...ITEM, id: 'MLA876125421' })
+      throw new Error(`no esperaba ${url}`)
+    }))
+    const s = afuera({})
+    const compartido =
+      'https://www.mercadolibre.com.ar/up/MLAU152126940?matt_tool=12345678&pdp_filters=item_id:MLA876125421&ua=abc#origin=share&sid=share&wid=MLA876125421&action=copy'
+    expect(await (await leer({ url: compartido })).json()).toMatchObject({ estado: 'ok', titulo: ITEM.title, precio: '$88.990' })
+    expect(urls).toEqual([`${API}/oauth/token`, `${API}/items/MLA876125421`])
+    expect(s.urls()).toEqual([])
+  })
+
   test('cerrada: no-esta, con el nombre del link', async () => {
     api(() => Response.json({ ...ITEM, status: 'closed' }))
     expect(await (await leer({ url: ARTICULO })).json()).toEqual({

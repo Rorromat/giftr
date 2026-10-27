@@ -25,7 +25,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
         <h1 className="font-brand text-[40px] leading-[0.98] font-extrabold tracking-[-0.045em] [font-variation-settings:'opsz'_96]">
           Pedí lo que querés sin pedirlo.
         </h1>
-        <p className="text-base leading-snug text-gr-muted">Armá tu lista. Tu gente reserva en secreto y vos no te enterás de nada.</p>
+        <p className="text-base leading-snug text-gr-muted">Tu lista, la de tu gente y el amigo invisible. Sin arruinar ninguna sorpresa.</p>
         <form action={entrarConGoogleAction} className="mt-3 w-full">
           <input type="hidden" name="volver" value={volver ?? '/inicio'} />
           {volver && <p className="mb-3 text-[15px] font-semibold">Entrá y seguimos con lo que compartiste.</p>}

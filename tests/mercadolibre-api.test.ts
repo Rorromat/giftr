@@ -362,16 +362,52 @@ test('cualquier falla (red, status, JSON raro, tiempo): null, para seguir por la
   expect(llamadas.filter((l) => l.metodo === 'GET')).toEqual([])
 })
 
+test('lo que no se lee deja una línea en el log: el recurso, el status y el código de la API; nunca el id, el token ni la respuesta', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const casos: [() => Response | Promise<Response>, string][] = [
+    [
+      () => respuesta({ blocked_by: 'PolicyAgent', code: 'PA_UNAUTHORIZED_RESULT_FROM_POLICIES', message: 'At least one policy returned UNAUTHORIZED.', status: 403 }, 403),
+      'items dio 403 PA_UNAUTHORIZED_RESULT_FROM_POLICIES',
+    ],
+    [() => respuesta({ message: 'Item with id MLA1418506688 not found', error: 'not_found', status: 404, cause: [] }, 404), 'items dio 404 not_found'],
+    [() => respuesta('<html>Internal Server Error</html>', 500), 'items dio 500'],
+    [() => respuesta({ code: '<script>alert(1)</script>', status: 403 }, 403), 'items dio 403'],
+    [() => respuesta({ message: 'invalid access token', status: 401 }, 401), 'items dio 401'],
+    [() => Promise.reject(new TypeError('fetch failed')), 'items falló (TypeError)'],
+    [() => respuesta('{"title": "Mate', 200), 'items falló (SyntaxError)'],
+    [() => respuesta({ ...ITEM, title: '   ' }), 'items contestó sin el nombre'],
+  ]
+  for (const [contesta, linea] of casos) {
+    warn.mockClear()
+    conToken({ [`GET ${API}/items/MLA1418506688`]: [contesta] })
+    expect(await (await api()).leerDeLaApi(ARTICULO), linea).toBeNull()
+    expect(warn.mock.calls, linea).toEqual([[`API de MercadoLibre: ${linea}`]])
+  }
+  // un 401 que se arregla con otro token, o lo que sí se lee: nada
+  warn.mockClear()
+  conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta({ status: 401 }, 401), () => respuesta(ITEM)] })
+  expect(await (await api()).leerDeLaApi(ARTICULO)).toMatchObject({ estado: 'ok' })
+  expect(warn).not.toHaveBeenCalled()
+  // si el que pidió se fue, no es cosa de la API
+  conToken({ [`GET ${API}/items/MLA1418506688`]: [() => respuesta(ITEM)] })
+  const usuario = new AbortController()
+  usuario.abort()
+  expect(await (await api()).leerDeLaApi(ARTICULO, usuario.signal)).toBeNull()
+  expect(warn).not.toHaveBeenCalled()
+})
+
 test(`si la API no contesta, se corta a los ${API_ML_TIEMPO_MS / 1000} s: null`, async () => {
   // fetch que no contesta nunca pero respeta la señal, como el de verdad; los tiempos, cien veces más cortos
   const colgado = vi.fn((_url: string | URL, init: RequestInit = {}) => new Promise<Response>((_ok, mal) => {
     init.signal?.addEventListener('abort', () => mal(init.signal?.reason))
   }))
   vi.stubGlobal('fetch', colgado)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const ms = tiempos(100)
   const antes = Date.now()
   expect(await (await api()).leerDeLaApi(ARTICULO)).toBeNull()
   expect(Date.now() - antes).toBeLessThan(API_ML_TIEMPO_MS / 100 + 500)
   expect(ms).toEqual([API_ML_TIEMPO_MS])
   expect(colgado).toHaveBeenCalledTimes(1)
+  expect(warn.mock.calls).toEqual([['API de MercadoLibre: items falló (TimeoutError)']])
 })
