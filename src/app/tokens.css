@@ -129,15 +129,6 @@
     line-height: 1.4;
   }
 
-  /* Fotos sueltas (las de la portada) */
-  .gr-diecut {
-    display: block;
-    object-fit: cover;
-    border-radius: 22px;
-    box-shadow: var(--gr-shadow);
-    box-sizing: border-box;
-  }
-
   /* Etiquetas sobre fotos: chicas, blancas y con una sombrita, para que mande la foto */
   .gr-tag {
     display: inline-flex;
@@ -421,6 +412,37 @@
   to { transform: rotate(-10deg); }
 }
 
+/* La portada (<Portada>): cinco deseos en ronda, como un mazo, 4,2 s cada uno (21 s la vuelta: si cambia cuántos son,
+   cambian los porcentajes). El que sigue espera abajo, un poco más chico; el de arriba, al rato, recibe el sello y quién
+   se ocupa, y se va volando de costado mientras el de abajo sube. --i es su lugar en la ronda: arrancan todos ya
+   andando (una vuelta para atrás), así desde el principio cada uno está donde le toca y no apilados esperando. */
+.gr-portada__deseo {
+  opacity: 0;
+  animation: gr-portada-deseo 21s calc(var(--i) * 4.2s - 21.6s) infinite both;
+}
+.gr-portada__sello { animation: gr-portada-sello 21s calc(var(--i) * 4.2s - 21.6s) infinite both; }
+.gr-portada__quien { animation: gr-portada-quien 21s calc(var(--i) * 4.2s - 21.6s) infinite both; }
+@keyframes gr-portada-deseo {
+  from { opacity: 1; transform: translateY(12px) scale(0.94); z-index: 1; }
+  4% { opacity: 1; transform: none; z-index: 2; }
+  18% { opacity: 1; transform: none; z-index: 3; }
+  23% { opacity: 1; transform: translate(-125%, -12px) rotate(-16deg); z-index: 3; }
+  23.1%, 95% { opacity: 0; transform: translateY(12px) scale(0.94); z-index: 0; }
+  97%, to { opacity: 1; transform: translateY(12px) scale(0.94); z-index: 1; }
+}
+@keyframes gr-portada-sello {
+  from, 8% { opacity: 0; transform: scale(1.9) rotate(-38deg); }
+  10% { opacity: 1; transform: scale(0.9) rotate(-6deg); }
+  11.5% { transform: scale(1.05) rotate(-11deg); }
+  13%, 23% { opacity: 1; transform: rotate(-10deg); }
+  23.1%, to { opacity: 0; transform: scale(1.9) rotate(-38deg); }
+}
+@keyframes gr-portada-quien {
+  from, 10% { opacity: 0; transform: translateY(4px); }
+  13%, 23% { opacity: 1; transform: none; }
+  23.1%, to { opacity: 0; transform: translateY(4px); }
+}
+
 /* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y la estrella gira y
    crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
    girando mientras llega lo nuevo y se vuelve "Al día". Fija arriba, encima de todo; no mueve la página. */
@@ -625,6 +647,10 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-nav a.gr-fab { transition: none; animation: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja, .gr-sello--cae { animation: none; }
+  /* la portada, quieta en el primer deseo, ya con su sello */
+  .gr-portada__deseo, .gr-portada__sello, .gr-portada__quien { animation: none; }
+  .gr-portada__deseo:not(:first-of-type) { opacity: 0; }
+  .gr-portada__deseo:first-of-type { opacity: 1; }
   .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
   .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }
