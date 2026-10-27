@@ -23,6 +23,7 @@ import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
 import { Banners } from '@/components/Banners'
 import { SorpresasEnLista } from '@/components/Sorpresas'
+import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag, LogoSticker } from '@/components/ui'
 
@@ -57,6 +58,16 @@ function ConVideo({ className }: { className: string }) {
       <Icon name="play" size={14} strokeWidth={2.2} />Video
     </span>
   )
+}
+
+/**
+ * El sello chico de un deseo que te toca, el mismo que lleva grande en su página: lo reservaste, lo compraste o se compró
+ * el regalo grupal en el que estás.
+ */
+function selloDe(item: Tarjeta): TipoSello | null {
+  const mia = item.claims.find((c) => c.esMia && !c.grupal)
+  if (mia) return mia.estado === 'comprado' ? 'listo' : 'tuyo'
+  return item.claims.some((c) => c.grupal?.soyParte && c.estado === 'comprado') ? 'todos' : null
 }
 
 function YaLoReservaste({ item }: { item: Tarjeta }) {
@@ -148,6 +159,7 @@ export default async function ListaAjena({
     ? <YaLoReservaste item={hero} />
     : reservar(hero.id, 'primary'))
   const heroCupo = hero && cupo(hero)
+  const heroSello = hero && selloDe(hero)
 
   return (
     <main className="flex flex-col gap-4 pb-36 pt-2">
@@ -232,6 +244,7 @@ export default async function ListaAjena({
               </Link>
               <PriorityTag prioridad={hero.prioridad} className="pointer-events-none absolute left-3 top-3 h-[30px]" />
               {hero.videoUrl && <ConVideo className="absolute bottom-3 left-3" />}
+              {heroSello && <Sello chico tipo={heroSello} clave={hero.id} size={52} className="absolute bottom-2 right-2" />}
               {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
               {viewer.userId && <BotonRobar token={token} itemId={hero.id} variante="icono" className="absolute right-3 top-3 z-[2]" />}
             </div>
@@ -257,13 +270,15 @@ export default async function ListaAjena({
             {resto.map((item) => {
               const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
               const cuantas = cupo(item)
+              const sello = selloDe(item)
               return (
                 <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="gr-card relative flex flex-col">
                   <div className="relative">
                     <Link href={`/l/${token}/item/${item.id}`} aria-hidden tabIndex={-1} className="block">
                       <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
                     </Link>
-                    {item.videoUrl && <ConVideo className="absolute left-2 top-2" />}
+                    {sello && <Sello chico tipo={sello} clave={item.id} size={44} className="absolute left-1.5 top-1.5" />}
+                    {item.videoUrl && <ConVideo className={`absolute top-2 ${sello ? 'left-12' : 'left-2'}`} />}
                     {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
                     {!item.disponible && (
                       <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
