@@ -47,15 +47,19 @@ export const TODAS_LAS_MARCAS: readonly string[] = MARCAS.flatMap((g) => g.marca
 export const ESTILOS = ['Clásico', 'Deportivo', 'Urbano', 'Elegante', 'Relajado', 'Bohemio', 'Minimalista', 'Rockero', 'Colorido'] as const
 
 /**
- * Una foto de ejemplo de cada estilo (en public/estilos, 360×480): hechas con IA para GiftR, todas con el mismo encuadre y
- * la misma luz, cada una con el fondo de su color.
+ * Las fotos de ejemplo de cada estilo (en public/estilos, 360×480): hechas con IA para GiftR, todas con el mismo encuadre y
+ * la misma luz, cada una con el fondo de su color. Una de mujer y una de hombre, que se alternan en la bienvenida (la
+ * primera va en las demás pantallas). Arrancan mezcladas, así la grilla nunca es toda de unos ni toda de otros.
  */
-const FOTOS_ESTILOS: Record<(typeof ESTILOS)[number], string> = {
-  Clásico: 'clasico', Deportivo: 'deportivo', Urbano: 'urbano', Elegante: 'elegante', Relajado: 'relajado',
-  Bohemio: 'bohemio', Minimalista: 'minimalista', Rockero: 'rockero', Colorido: 'colorido',
+const FOTOS_ESTILOS: Record<(typeof ESTILOS)[number], string[]> = {
+  Clásico: ['clasico-mujer'], Deportivo: ['deportivo-hombre'], Urbano: ['urbano-mujer', 'urbano-hombre'],
+  Elegante: ['elegante-hombre'], Relajado: ['relajado-mujer'], Bohemio: ['bohemio-mujer', 'bohemio-hombre'],
+  Minimalista: ['minimalista-hombre', 'minimalista-mujer'], Rockero: ['rockero-mujer', 'rockero-hombre'],
+  Colorido: ['colorido-hombre', 'colorido-mujer'],
 }
-export const fotoDeEstilo = (estilo: string) =>
-  estilo in FOTOS_ESTILOS ? `/estilos/${FOTOS_ESTILOS[estilo as keyof typeof FOTOS_ESTILOS]}.webp` : null
+export const fotosDeEstilo = (estilo: string): string[] =>
+  estilo in FOTOS_ESTILOS ? FOTOS_ESTILOS[estilo as keyof typeof FOTOS_ESTILOS].map((f) => `/estilos/${f}.webp`) : []
+export const fotoDeEstilo = (estilo: string) => fotosDeEstilo(estilo)[0] ?? null
 
 /** Colores con su muestra. "Estampados" y "Pasteles" se dibujan aparte. */
 export const COLORES = [

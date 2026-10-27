@@ -469,6 +469,12 @@
 }
 /* con la estrella de agregar en la pantalla (ver .gr-fab), el cartel va arriba de ella */
 body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 170px); }
+/* Dos fotos que se alternan con un fundido (los estilos de la bienvenida): la de abajo queda y la de arriba aparece y se
+   va. Cada una con su animation-delay, así no cambian todas juntas. Sin animaciones, se queda la de abajo. */
+.gr-alternar { opacity: 0; animation: gr-alternar 8s ease-in-out infinite; }
+@keyframes gr-alternar { 0%, 42% { opacity: 0; } 50%, 92% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gr-alternar { animation: none; } }
+
 @keyframes gr-toast-quieto { 0%, 86% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 @keyframes gr-toast {
   0% { opacity: 0; transform: translate(-50%, 14px); }
