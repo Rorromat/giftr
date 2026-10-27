@@ -87,10 +87,11 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
             <div className="flex flex-col gap-1.5 px-1.5">
               <h3 className="line-clamp-2 text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{n.titulo}</h3>
               {n.precio && <p className="text-[15px] font-semibold leading-tight">{n.precio}</p>}
-              <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-gr-muted">
+              {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
+              <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-gr-muted">
                 <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={20} />
                 <span className="truncate">De {n.nombre}</span>
-              </p>
+              </div>
               <p className="flex items-center gap-1.5 text-[13px] text-gr-muted">
                 <Icon name="clock" size={15} className="flex-none" />Agregado {n.hace}
               </p>

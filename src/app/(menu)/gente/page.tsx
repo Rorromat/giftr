@@ -1,15 +1,19 @@
 import Link from 'next/link'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { avisosSinLeer } from '@/lib/bandeja'
 import { yo as quienSoy } from '@/lib/perfil'
 import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
+import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
 import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
-import { asegurarUsuario, miAmigoToken, misAmigos, personas, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos } from '@/lib/amigos'
+import {
+  amigosEnComun, asegurarUsuario, miAmigoToken, misAmigos, personas, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos,
+} from '@/lib/amigos'
 import { paraBuscar } from '@/lib/buscar'
 import { Buscador } from '@/components/Buscador'
 import { ArmarSorpresa } from '@/components/Sorpresas'
@@ -29,6 +33,9 @@ function cuando(c: Contacto, hoy: Date) {
   const dia = `${fecha.getUTCDate()} de ${MESES[fecha.getUTCMonth()]}${anio ? ` de ${anio}` : ''}`
   return [`${c.tipo === 'personal' ? 'Cumple el' : 'El'} ${dia}`, falta].filter(Boolean).join(' · ')
 }
+
+/** Cuántas de "Gente que quizás conocés" van arriba de tu gente (con "Ahora no" aparecen las que siguen). */
+const SUGERENCIAS = 3
 
 function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: boolean; usuario?: string | null }) {
   const dueno = c.tipo === 'personal' ? c.duenos[0] : undefined
@@ -94,9 +101,10 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
   const yo = session.userId
+  const sacada = noSugerir((await cookies()).get(NO_SUGERIR_COOKIE)?.value, yo)
   const [gente, { nombre, foto }, amigos, recibidas, enviadas, usuario, token, sugerencias, avisos] = await Promise.all([
     miGente(db, yo, hoy), quienSoy(db, yo), misAmigos(db, yo), solicitudesRecibidas(db, yo), solicitudesEnviadas(db, yo),
-    asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo), avisosSinLeer(db, { userId: yo }),
+    asegurarUsuario(db, yo), miAmigoToken(db, yo), sugerenciasDeAmigos(db, yo, SUGERENCIAS, sacada), avisosSinLeer(db, { userId: yo }),
   ])
   // el @usuario de cada uno, para encontrarlo también así en el buscador
   const usuarios = new Map((await personas(db, gente.flatMap((c) => (c.tipo === 'personal' && c.duenos[0] ? [c.duenos[0].id] : []))))
@@ -125,6 +133,16 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
           <h2 id="solicitudes-titulo" className="gr-label">Solicitudes de amistad</h2>
           <ul className="flex flex-col gap-3">
             {recibidas.map((r) => <SolicitudRecibida key={r.id} id={r.id} de={r.de} />)}
+          </ul>
+        </section>
+      )}
+
+      {/* arriba de tu gente, que se vea (en Inicio va la primera, con "Ver más" acá) */}
+      {sugerencias.length > 0 && (
+        <section id="sugerencias" aria-labelledby="sugerencias-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
+          <h2 id="sugerencias-titulo" className="gr-label">Gente que quizás conocés</h2>
+          <ul className="gr-card flex flex-col divide-y divide-gr-line px-3.5">
+            {sugerencias.map((s) => <SugerenciaAmigo key={s.p.id} p={s.p} enComun={amigosEnComun(s.enComun)} />)}
           </ul>
         </section>
       )}
@@ -163,18 +181,6 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
                   <BotonEnviar className="min-h-11 px-2 text-[13px] font-semibold text-gr-muted underline underline-offset-4">Cancelar</BotonEnviar>
                 </form>
               </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {sugerencias.length > 0 && (
-        <section aria-labelledby="sugerencias-titulo" className="flex flex-col gap-2.5">
-          <h2 id="sugerencias-titulo" className="gr-label">Gente que quizás conocés</h2>
-          <ul className="gr-card flex flex-col divide-y divide-gr-line px-3.5">
-            {sugerencias.map((s) => (
-              <SugerenciaAmigo key={s.p.id} p={s.p}
-                               enComun={juntarNombres(s.enComun.length > 2 ? [...s.enComun.slice(0, 2), `${s.enComun.length - 2} más`] : s.enComun)} />
             ))}
           </ul>
         </section>

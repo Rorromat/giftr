@@ -47,6 +47,7 @@ import {
 import { esMoneda, parsePesos, partePesos, plata } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
 import { LARGO, recortar } from '@/lib/limites'
+import { NO_SUGERIR_COOKIE, sumarNoSugerir } from '@/lib/no-sugerir'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
 export type EstadoForm = { error: string } | null
@@ -829,6 +830,16 @@ export async function sumarSugerenciaAction(_: EstadoSugerencia, formData: FormD
   // ya me la había mandado: somos amigos, y aparece en Tu gente
   if (r.estado === 'amigos') revalidatePath('/', 'layout')
   return { ok: true, amigos: r.estado === 'amigos' }
+}
+
+/** "Ahora no" en Gente que quizás conocés: a esa persona no se la sugiere más (en Inicio ni en Tu gente) en este navegador. */
+export async function noSugerirAction(formData: FormData) {
+  const session = await auth()
+  const otro = str(formData, 'para')
+  if (!session?.userId || !otro || !esUuid(otro)) return
+  const jar = await cookies()
+  jar.set(NO_SUGERIR_COOKIE, sumarNoSugerir(jar.get(NO_SUGERIR_COOKIE)?.value, session.userId, otro), OPCIONES_COOKIE_INVITADO)
+  revalidatePath('/', 'layout')
 }
 
 export async function responderSolicitudAction(formData: FormData) {

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { necesitaBienvenida } from '@/lib/bienvenida'
@@ -8,7 +9,9 @@ import { misCuentas } from '@/lib/regalos'
 import { Banners } from '@/components/Banners'
 import { CargaTuCumple, CuentasPendientes, Proximos } from '@/components/Eventos'
 import { yo } from '@/lib/perfil'
-import { misAmigos } from '@/lib/amigos'
+import { amigosEnComun, misAmigos, sugerenciasDeAmigos } from '@/lib/amigos'
+import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
+import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { avisosSinLeer } from '@/lib/bandeja'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
@@ -20,8 +23,8 @@ import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 // Inicio: lo que viene (los avisos, las cuentas, los próximos cumples y fechas de tu gente, con lo que ya hiciste para
-// cada uno, y las fechas especiales con tus amigos invisibles). Tu lista está en Vos: en ella, por la regla de la sorpresa,
-// nunca pasa nada que puedas ver.
+// cada uno, y las fechas especiales con tus amigos invisibles), lo nuevo de tus amigos y alguien que quizás conocés. Tu
+// lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
 
 /** Cuántos días después de su fecha sigue un amigo invisible en Inicio (para "¿Quién te regaló?"). */
 const JUEGOS_PASADOS = 15
@@ -29,11 +32,14 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
-  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }, avisos] = await Promise.all([
+  const sacada = noSugerir((await cookies()).get(NO_SUGERIR_COOKIE)?.value, session.userId)
+  const [bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }, avisos, sugerencias] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
     yo(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
     invitacionesPendientes(db, session.userId), misAmigosInvisibles(db, session.userId, hoy, JUEGOS_PASADOS), searchParams,
     avisosSinLeer(db, { userId: session.userId }),
+    // la primera, y si hay otra (para "Ver más")
+    sugerenciasDeAmigos(db, session.userId, 2, sacada),
   ])
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
@@ -91,6 +97,16 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           </span>
           <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
         </Link>
+      )}
+
+      {/* gente que quizás conocés (amigos de tus amigos): la primera; las demás, arriba en Tu gente */}
+      {sugerencias.length > 0 && (
+        <section aria-labelledby="quizas-conoces" className="flex flex-col gap-3">
+          <SectionHeader id="quizas-conoces" title="Gente que quizás conocés" href={sugerencias.length > 1 ? '/gente#sugerencias' : undefined} />
+          <ul className="gr-card flex flex-col px-3.5">
+            <SugerenciaAmigo key={sugerencias[0].p.id} p={sugerencias[0].p} enComun={amigosEnComun(sugerencias[0].enComun)} />
+          </ul>
+        </section>
       )}
 
       {!cumple && <CargaTuCumple />}

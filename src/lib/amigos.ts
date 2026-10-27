@@ -4,7 +4,7 @@ import { amistades, listFollows, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { avisar, type Enviar } from '@/lib/codazos'
 import { guardarAviso } from '@/lib/bandeja'
-import { esToken, esUuid } from '@/lib/groups'
+import { esToken, esUuid, juntarNombres } from '@/lib/groups'
 import { urlFoto } from '@/lib/users'
 
 // Amigos: uno le manda una solicitud al otro (por su @usuario, su mail, o desde su lista) y, si la acepta, se ven
@@ -361,12 +361,16 @@ export async function volverASeguirAmigos(db: Db, ownerId: string, listId: strin
 /** Alguien que quizás conocés, y los amigos tuyos que son amigos suyos (para "Amigos en común: Sofi y Juan"). */
 export type Sugerencia = { p: Persona; enComun: string[] }
 
+/** "Sofi", "Sofi y Juan", "Sofi, Juan y 2 más". */
+export const amigosEnComun = (nombres: string[]) =>
+  juntarNombres(nombres.length > 2 ? [...nombres.slice(0, 2), `${nombres.length - 2} más`] : nombres)
+
 /**
  * Gente que quizás conocés: amigos de tus amigos que no son tus amigos ni tienen una solicitud con vos, de quien sea y como
- * esté (las pendientes ya tienen su lugar; una rechazada no se vuelve a sugerir). Primero los que tienen más amigos en
- * común con vos.
+ * esté (las pendientes ya tienen su lugar; una rechazada no se vuelve a sugerir), ni los que sacaste con "Ahora no"
+ * (`sacada`, ver noSugerir). Primero los que tienen más amigos en común con vos.
  */
-export async function sugerenciasDeAmigos(db: Db, userId: string, limite = 6): Promise<Sugerencia[]> {
+export async function sugerenciasDeAmigos(db: Db, userId: string, limite = 6, sacada: (id: string) => boolean = () => false): Promise<Sugerencia[]> {
   const amigos = await misAmigos(db, userId)
   if (!amigos.size) return []
   const filas = await db.select({ de: amistades.deUserId, para: amistades.paraUserId }).from(amistades)
@@ -385,6 +389,7 @@ export async function sugerenciasDeAmigos(db: Db, userId: string, limite = 6): P
     and(eq(amistades.paraUserId, userId), inArray(amistades.deUserId, candidatos)),
   ))
   for (const f of conAlgo) via.delete(f.de === userId ? f.para! : f.de)
+  for (const id of via.keys()) if (sacada(id)) via.delete(id)
   if (!via.size) return []
 
   const ids = new Set([...via.keys(), ...[...via.values()].flatMap((s) => [...s])])
