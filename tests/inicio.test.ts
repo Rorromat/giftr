@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest'
-import { isValidElement, type ReactNode } from 'react'
+import { createElement, isValidElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { saltearBienvenida } from '@/lib/bienvenida'
@@ -33,6 +34,7 @@ import Home from '@/app/page'
 import { noSugerirAction } from '@/app/actions'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { SectionHeader } from '@/components/ui'
+import { Portada } from '@/components/Portada'
 
 type Props = { id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode }
 
@@ -105,4 +107,14 @@ test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente,
   await saltearBienvenida(h.db, beto.id)
   h.session = { userId: beto.id }
   expect(sugeridos(await inicio())).toEqual(['Ana (Sofi)'])
+})
+
+test('la portada: cinco deseos de mentira en ronda, cada uno con su sello y quién se ocupa sin que el dueño se entere', () => {
+  const html = renderToStaticMarkup(createElement(Portada))
+  // de muestra: los lectores de pantalla van al título y al texto de la página
+  expect(html.startsWith('<div aria-hidden="true"')).toBe(true)
+  expect(html.match(/class="gr-portada__deseo /g)).toHaveLength(5)
+  expect(html.match(/class="gr-sello gr-portada__sello /g)).toHaveLength(5)
+  expect(html.match(/no se entera\./g)).toHaveLength(5)
+  for (const i of [0, 1, 2, 3, 4]) expect(html).toContain(`--i:${i}`)
 })
