@@ -1,14 +1,15 @@
 'use client'
 
 import { useActionState } from 'react'
-import { sumarSugerenciaAction, type EstadoSugerencia } from '@/app/actions'
+import { noSugerirAction, sumarSugerenciaAction, type EstadoSugerencia } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { AvatarSticker, Icon } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 
 /**
- * Una persona de "Gente que quizás conocés" (amigos de tus amigos): quién es, los amigos en común, y Sumar. La solicitud
- * sale sin irse de la pantalla; la fila queda diciendo que se la mandaste.
+ * Una persona de "Gente que quizás conocés" (amigos de tus amigos): quién es, los amigos en común, Sumar y "Ahora no" (la
+ * saca de las sugerencias, ver noSugerirAction). La solicitud sale sin irse de la pantalla; la fila queda diciendo que se la
+ * mandaste.
  */
 export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string }) {
   const [estado, sumar] = useActionState<EstadoSugerencia, FormData>(sumarSugerenciaAction, null)
@@ -26,10 +27,19 @@ export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string })
           <Icon name="check" size={16} strokeWidth={2.6} className="text-gr-accent" />{estado.amigos ? '¡Amigos!' : 'Enviada'}
         </p>
       ) : (
-        <form action={sumar} className="flex-none">
-          <input type="hidden" name="para" value={p.id} />
-          <BotonEnviar pendiente="Sumando…" aria-label={`Sumar a ${p.nombre} como amigo`} className="gr-btn-primary gr-btn--sm">Sumar</BotonEnviar>
-        </form>
+        <div className="-mr-2 flex flex-none items-center">
+          <form action={sumar}>
+            <input type="hidden" name="para" value={p.id} />
+            <BotonEnviar pendiente="Sumando…" aria-label={`Sumar a ${p.nombre} como amigo`} className="gr-btn-primary gr-btn--sm">Sumar</BotonEnviar>
+          </form>
+          <form action={noSugerirAction}>
+            <input type="hidden" name="para" value={p.id} />
+            <BotonEnviar aria-label={`Ahora no: no sugerir a ${p.nombre}`} title="Ahora no"
+                         className="flex size-11 items-center justify-center rounded-xl text-gr-muted">
+              <Icon name="close" size={18} strokeWidth={2.4} />
+            </BotonEnviar>
+          </form>
+        </div>
       )}
     </li>
   )

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createECDH, randomBytes } from 'node:crypto'
+import { createECDH, randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { createTestDb, seguir } from './helpers'
@@ -9,6 +9,7 @@ import { upsertUserFromGoogle } from '@/lib/users'
 import { guardarSuscripcion, type Aviso, type Enviar } from '@/lib/codazos'
 import { miGente } from '@/lib/gente'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { noSugerir, sumarNoSugerir } from '@/lib/no-sugerir'
 import {
   aceptarLinkDeAmigo, asegurarUsuario, buscarPorUsuario, cambiarUsuario, cancelarSolicitud, cuantasRecibidas, dejarDeSerAmigos,
   miAmigoToken, misAmigos, normalizarUsuario, pedirAmistad, pedirAmistadPorMail, reclamarSolicitudesPorMail, relacionCon,
@@ -326,5 +327,35 @@ describe('gente que quizás conocés', () => {
     // y con Dani amigos: ya no es sugerencia
     await amigos(db, yo.id, dani.id)
     expect(await sugerenciasDeAmigos(db, yo.id)).toEqual([])
+  })
+
+  test('"Ahora no": no se la vuelve a sugerir a esa cuenta, y el límite cuenta después de sacarlas', async () => {
+    const db = await createTestDb()
+    const [yo, sofi, ana, beto, caro] = await Promise.all(['Yo', 'Sofi', 'Ana', 'Beto', 'Caro'].map((n) => usuario(db, n)))
+    await amigos(db, yo.id, sofi.id)
+    for (const o of [ana, beto, caro]) await amigos(db, sofi.id, o.id)
+    let cookie = sumarNoSugerir(undefined, yo.id, ana.id)
+    expect((await sugerenciasDeAmigos(db, yo.id, 1, noSugerir(cookie, yo.id))).map((s) => s.p.nombre)).toEqual(['Beto'])
+    cookie = sumarNoSugerir(cookie, yo.id, beto.id)
+    expect((await sugerenciasDeAmigos(db, yo.id, 6, noSugerir(cookie, yo.id))).map((s) => s.p.nombre)).toEqual(['Caro'])
+    // otra cuenta en el mismo navegador (Ana, amiga de Sofi) sí ve lo que sacó Yo: a Beto y a Caro, y a Yo
+    expect((await sugerenciasDeAmigos(db, ana.id, 6, noSugerir(cookie, ana.id))).map((s) => s.p.nombre)).toEqual(['Beto', 'Caro', 'Yo'])
+  })
+
+  test('la cookie de "Ahora no": sin repetir, las últimas, y una tocada o vacía no saca a nadie', () => {
+    const [yo, otro] = [randomUUID(), randomUUID()]
+    const una = sumarNoSugerir(undefined, yo, otro)
+    expect(sumarNoSugerir(una, yo, otro)).toBe(una)
+    expect(noSugerir(una, yo)(otro)).toBe(true)
+    expect(noSugerir(una, otro)(yo)).toBe(false)
+    expect(noSugerir(undefined, yo)(otro)).toBe(false)
+    expect(noSugerir('basura~', yo)(otro)).toBe(false)
+    // no se lee a quiénes
+    expect(una).not.toContain(otro)
+    let muchas = una
+    for (let i = 0; i < 60; i++) muchas = sumarNoSugerir(muchas, yo, randomUUID())
+    expect(muchas.split('~')).toHaveLength(50)
+    expect(noSugerir(muchas, yo)(otro)).toBe(false)
+    expect(muchas.length).toBeLessThan(1300)
   })
 })

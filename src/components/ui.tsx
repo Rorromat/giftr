@@ -12,7 +12,7 @@ export const PRIORIDADES = {
 
 export type Prioridad = keyof typeof PRIORIDADES
 
-const STAR_POINTS =
+export const STAR_POINTS =
   '50.0,2.0 59.8,13.3 74.0,8.4 76.9,23.1 91.6,26.0 86.7,40.2 98.0,50.0 86.7,59.8 91.6,74.0 76.9,76.9 74.0,91.6 59.8,86.7 50.0,98.0 40.2,86.7 26.0,91.6 23.1,76.9 8.4,74.0 13.3,59.8 2.0,50.0 13.3,40.2 8.4,26.0 23.1,23.1 26.0,8.4 40.2,13.3'
 
 /** Estrella de 12 puntas (contador). `label` la vuelve accesible; sin label es decorativa. */

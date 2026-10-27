@@ -18,6 +18,7 @@ import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
 import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
 import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
@@ -92,6 +93,9 @@ export default async function DetalleItem({ params, searchParams }: {
   const miCompra = mia?.estado === 'comprado' && mia.deshacer ? mia : undefined
   const vencida = giver?.miVencida ?? null
   const enUnRegalo = regalos.some((r) => r.soyParte)
+  // el sello sobre la foto, si te toca a vos: lo reservaste, lo compraste o se compró el regalo grupal en el que estás
+  const sello: TipoSello | null = mia ? (mia.estado === 'comprado' ? 'listo' : 'tuyo')
+    : regalos.some((r) => r.soyParte && r.estado === 'comprado') ? 'todos' : null
   // Una persona, una reserva por deseo (ver sumarseARegalo): en vez de "Me sumo", por qué no
   const ocupado = mia ? (mia.estado === 'comprado' ? 'Ya lo compraste vos: no hace falta que te sumes.'
     : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
@@ -112,11 +116,15 @@ export default async function DetalleItem({ params, searchParams }: {
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
       <article className="gr-card">
-        <FotoAmpliable src={item.fotoUrl} titulo={item.titulo}>
-          <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
-        </FotoAmpliable>
+        <div className="relative">
+          <FotoAmpliable src={item.fotoUrl} titulo={item.titulo} iconoArriba={!!sello}>
+            <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
+          </FotoAmpliable>
+          {/* pegado en la esquina, montado sobre el borde de la foto: el título le deja lugar */}
+          {sello && <Sello tipo={sello} clave={item.id} size={112} className="absolute right-3 top-[178px] z-[2]" />}
+        </div>
         <div className="flex flex-col gap-3 p-3.5">
-          <div className="flex flex-col gap-1.5">
+          <div className={`flex flex-col gap-1.5 ${sello ? 'pr-[112px]' : ''}`}>
             <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{item.titulo}</h1>
             <div className="flex items-center gap-2">
               {precio && <p className="text-lg font-semibold">{precio}</p>}
