@@ -47,10 +47,8 @@ export const TODAS_LAS_MARCAS: readonly string[] = MARCAS.flatMap((g) => g.marca
 export const ESTILOS = ['Clásico', 'Deportivo', 'Urbano', 'Elegante', 'Relajado', 'Bohemio', 'Minimalista', 'Rockero', 'Colorido'] as const
 
 /**
- * Una foto de ejemplo de cada estilo (en public/estilos, 360×480). Elegante, bohemio, minimalista, rockero y colorido son
- * hechas con IA para GiftR (todas con el mismo encuadre y la misma luz, cada una con el fondo de su color). Las demás, de
- * StockSnap, CC0 (dominio público: se pueden usar sin pedir permiso ni citar), van con su autor por cortesía:
- * Freestocks.org (clásico), The Lazy Artist Gallery (deportivo), Crown Labs Agency (urbano) y Matt Moloney (relajado).
+ * Una foto de ejemplo de cada estilo (en public/estilos, 360×480): hechas con IA para GiftR, todas con el mismo encuadre y
+ * la misma luz, cada una con el fondo de su color.
  */
 const FOTOS_ESTILOS: Record<(typeof ESTILOS)[number], string> = {
   Clásico: 'clasico', Deportivo: 'deportivo', Urbano: 'urbano', Elegante: 'elegante', Relajado: 'relajado',
