@@ -52,8 +52,8 @@ export const ESTILOS = ['Clásico', 'Deportivo', 'Urbano', 'Elegante', 'Relajado
  * primera va en las demás pantallas). Arrancan mezcladas, así la grilla nunca es toda de unos ni toda de otros.
  */
 const FOTOS_ESTILOS: Record<(typeof ESTILOS)[number], string[]> = {
-  Clásico: ['clasico-mujer'], Deportivo: ['deportivo-hombre'], Urbano: ['urbano-mujer', 'urbano-hombre'],
-  Elegante: ['elegante-hombre'], Relajado: ['relajado-mujer'], Bohemio: ['bohemio-mujer', 'bohemio-hombre'],
+  Clásico: ['clasico-mujer'], Deportivo: ['deportivo-hombre', 'deportivo-mujer'], Urbano: ['urbano-mujer', 'urbano-hombre'],
+  Elegante: ['elegante-hombre', 'elegante-mujer'], Relajado: ['relajado-mujer', 'relajado-hombre'], Bohemio: ['bohemio-mujer', 'bohemio-hombre'],
   Minimalista: ['minimalista-hombre', 'minimalista-mujer'], Rockero: ['rockero-mujer', 'rockero-hombre'],
   Colorido: ['colorido-hombre', 'colorido-mujer'],
 }
