@@ -224,6 +224,8 @@ export const notifications = pgTable('notifications', {
   guestId: uuid('guest_id').references(() => guestIdentities.id),
   // regalo_encargo: ahora organiza un regalo grupal. regalo_cancelado: el regalo grupal en el que estaba se canceló.
   // regalo_sacado: el encargado lo sacó del regalo grupal. compra_corregida: el encargado corrigió la compra y le cambió la parte.
+  // regalo_redividido: ya comprado, se sumó o se bajó alguien y le cambió la parte; regalo_a_mano: lo mismo en uno que el
+  // encargado dividió a mano (al que llega no le pone parte: la corrige él).
   // item_baja_comprado: ya lo había comprado y el dueño dijo "Ya no lo quiero". regalo_baja: estaba en un regalo grupal
   // abierto de un deseo que el dueño ya no quiere (el regalo se canceló); regalo_lo_tiene: el dueño dijo "Ya lo tengo" y el
   // regalo sigue abierto para dividirlo o cancelarlo desde Cuentas. Cuando el dueño lo vuelve a poner: item_vuelve, se le
@@ -231,7 +233,7 @@ export const notifications = pgTable('notifications', {
   tipo: text('tipo', {
     enum: [
       'item_baja', 'item_editado', 'regalo_encargo', 'regalo_cancelado', 'item_baja_comprado', 'regalo_baja', 'regalo_lo_tiene',
-      'item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'regalo_sacado', 'compra_corregida',
+      'item_vuelve', 'compra_vuelve', 'regalo_vuelve', 'regalo_sacado', 'compra_corregida', 'regalo_redividido', 'regalo_a_mano',
     ],
   }).notNull(),
   itemId: uuid('item_id').notNull().references(() => items.id),
@@ -269,6 +271,12 @@ export const groupGiftMembers = pgTable('group_gift_members', {
   giftId: uuid('gift_id').notNull().references(() => groupGifts.id),
   userId: uuid('user_id').notNull().references(() => users.id),
   monto: integer('monto'), // su parte en pesos; el encargado también tiene la suya
+  // Lo que ya le dio al encargado (el encargado, su parte: la puso él). saldo = monto - pagado_monto: positivo, le debe;
+  // negativo, el encargado le devuelve (pagó y después se volvió a dividir entre más, ver redividir).
+  pagadoMonto: integer('pagado_monto').notNull().default(0),
+  // lo que había puesto antes de quedar saldado: "Deshacer" vuelve a eso
+  pagadoAntes: integer('pagado_antes'),
+  // saldado: ni le debe ni le deben (monto = pagado_monto)
   pagado: boolean('pagado').notNull().default(false),
   pagadoAt: timestamp('pagado_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

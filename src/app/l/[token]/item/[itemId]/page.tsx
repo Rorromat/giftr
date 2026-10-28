@@ -102,10 +102,12 @@ export default async function DetalleItem({ params, searchParams }: {
     : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
   const tienda = item.linkTienda && sitioDeLaTienda(item.linkTienda)
   // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
+  // (también ya comprado: el que se suma después entra y se vuelve a dividir), con a quiénes se lo propuso y qué contestaron
   const amigos = viewer.userId && giver ? await amigosParaDividir(db, viewer.userId, item.id) : []
-  const organizo = regalos.find((r) => r.soyEncargado && r.estado === 'abierto')
-  const invitados = organizo ? await invitadosDeRegalo(db, organizo.id) : []
-  const yaEstan = new Set([...(organizo?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
+  const mio = regalos.find((r) => r.soyEncargado)
+  const organizo = mio?.estado === 'abierto' ? mio : undefined
+  const invitados = mio ? await invitadosDeRegalo(db, mio.id) : []
+  const yaEstan = new Set([...(mio?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
 
@@ -218,7 +220,10 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {deRegalo === 'sumado' && enUnRegalo && (
           <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-medium">
-            <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />¡Listo, te sumaste! Se divide en partes iguales entre los que estén.
+            <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
+            {regalos.some((r) => r.soyParte && r.estado === 'comprado')
+              ? '¡Listo, te sumaste! Ya estaba comprado: abajo ves cuánto te toca.'
+              : '¡Listo, te sumaste! Se divide en partes iguales entre los que estén.'}
           </p>
         )}
 
@@ -229,10 +234,11 @@ export default async function DetalleItem({ params, searchParams }: {
                             precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
                             logueado={logueado} ocupado={ocupado}
                             nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre}
-                            invitar={r.id === organizo?.id && (
+                            invitar={r.id === mio?.id && (
                               <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados}
                                                   paraInvitar={amigos.filter((a) => !yaEstan.has(a.id))} />
-                            )} />
+                            )}
+                            sinContestar={r.id === organizo?.id ? invitados.filter((i) => i.estado === 'esperando').map((i) => i.persona.nombre) : []} />
             ))}
           </div>
         )}

@@ -6,6 +6,7 @@ import type { Invitacion, Invitado } from '@/lib/invitaciones'
 import Link from 'next/link'
 import { Buscador } from '@/components/Buscador'
 import { paraBuscar } from '@/lib/buscar'
+import { plata } from '@/lib/pesos'
 
 // "Lo dividimos": elegir amigos para proponerles dividir un regalo, a quiénes se invitó (para el que lo organiza) y las
 // propuestas que te llegaron (Inicio). Siempre en partes iguales entre los que se sumen.
@@ -66,7 +67,10 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
 
 const ESTADOS: Record<Invitado['estado'], string> = { esperando: 'Esperando', se_sumo: 'Se sumó ✓', no_puede: 'No puede', se_bajo: 'Se bajó' }
 
-/** Para el que organiza: a quiénes les propuso dividirlo y qué contestaron; y proponérselo a más amigos. */
+/**
+ * Para el que organiza: a quiénes les propuso dividirlo y qué contestaron, y proponérselo a más amigos. También ya
+ * comprado: el que acepta después entra y se vuelve a dividir (ver redividir).
+ */
 export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvitar }: {
   token: string; itemId: string; giftId: string; invitados: Invitado[]; paraInvitar: Persona[]
 }) {
@@ -129,7 +133,9 @@ export function InvitacionesRegalo({ invitaciones, noSePudo, volver }: { invitac
               </p>
               <p className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{i.titulo}</p>
               <p className="text-[13px] leading-snug text-gr-muted">
-                Para {i.para}{i.sorpresa ? ' · no está en su lista' : ''} · en partes iguales{i.somos > 1 ? ` · ya son ${i.somos}` : ''}
+                Para {i.para}{i.sorpresa ? ' · no está en su lista' : ''} · {!i.comprado
+                  ? `en partes iguales${i.somos > 1 ? ` · ya son ${i.somos}` : ''}`
+                  : i.parte != null ? `ya lo compró: si te sumás, te tocan ${plata(i.parte, i.moneda)}` : 'ya lo compró y lo dividió a mano'}
               </p>
             </div>
           </Link>

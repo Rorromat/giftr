@@ -753,7 +753,7 @@ function compraDesdeForm(formData: FormData): DatosCompra {
 const ERRORES_COMPRA = {
   monto_invalido: 'Revisá los montos: tienen que ser números enteros. Si alguien no pone, dejá su parte vacía o en 0.',
   cambiaron: 'Se sumó o se bajó alguien, revisá la división.',
-  ya_pagaron: 'Alguien ya figura como que te pagó: para corregir, primero deshacé ese pago.',
+  moneda_pagada: 'Alguien ya te dio plata en la moneda de antes: para cambiarla, primero deshacé ese pago.',
   nada_que_corregir: 'Ya nadie te debe nada de este regalo: no hay nada que corregir.',
   no_permitido: 'No se pudo: puede que ya se haya comprado o cancelado. Recargá la página.',
 }
@@ -782,15 +782,15 @@ export async function buyGroupGiftAction(_: EstadoForm, formData: FormData): Pro
 }
 
 /**
- * "Corregir la compra": lo mismo, sobre un regalo ya comprado que nadie le pagó todavía al encargado. Si sale, o si ya no
- * se puede corregir (alguien pagó mientras tanto), el formulario se va al volver a armar la página y con él su mensaje:
- * cómo salió va en la página (?correccion=, ver CartelCorreccion), como el de una reserva que no sale.
+ * "Corregir la compra": lo mismo, sobre un regalo ya comprado (ver corregirCompra). Si sale, o si ya no se puede corregir
+ * (se saldó todo mientras tanto), el formulario se va al volver a armar la página y con él su mensaje: cómo salió va en la
+ * página (?correccion=, ver CartelCorreccion), como el de una reserva que no sale.
  */
 export async function fixGroupGiftAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const p = compraDesdeForm(formData)
   const r = await corregirCompra(db, str(formData, 'giftId') ?? '', await usuarioRegalador(), p)
   revalidarRegalo(formData)
-  if (r.ok || r.reason === 'ya_pagaron' || r.reason === 'nada_que_corregir') {
+  if (r.ok || r.reason === 'nada_que_corregir') {
     const token = str(formData, 'token')
     const itemId = str(formData, 'itemId')
     redirect(`${token && itemId && esUuid(itemId) ? `/l/${encodeURIComponent(token)}/item/${itemId}` : '/cuentas'}?correccion=${r.ok ? 'ok' : r.reason}`)

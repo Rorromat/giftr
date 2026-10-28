@@ -253,6 +253,13 @@
       "when": 1793154434381,
       "tag": "0035_lista_en_comun",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793155941483,
+      "tag": "0036_pagos_parciales",
+      "breakpoints": true
     }
   ]
 }

@@ -107,18 +107,20 @@ test('corregir la compra desde el formulario, y sacar a alguien: siempre como el
   expect((await misCuentas(db, sofi.id)).debes).toBe(45000)
 })
 
-// Rodri abre "Corregir la compra" y, mientras escribe, Sofi toca "Ya le pagué": al guardar, el formulario se va (ya no se
-// puede corregir), así que el porqué va en la página.
-test('si alguien pagó mientras corregía, la página dice que no se corrigió', async () => {
+// Rodri abre "Corregir la compra" y, mientras escribe, Sofi toca "Ya le pagué": se corrige igual, y lo que Sofi pagó de más
+// Rodri se lo devuelve. Lo que no sale (cambiar la moneda de lo que ya le pagaron) queda en el formulario.
+test('si alguien pagó mientras corregía, se corrige igual y lo que pagó queda', async () => {
   const { db, rodri, sofi, caro, lista, bici, giftId } = await preparar()
   const todos = [rodri.id, sofi.id, caro.id]
   await comprarRegalo(db, giftId, rodri.id, { total: 900000, miembros: todos })
   await marcarPagado(db, giftId, sofi.id, sofi.id)
   await expect(fixGroupGiftAction(null, compra({ giftId, token: lista.shareToken, itemId: bici.id, modo: 'iguales', total: '90.000' }, todos)))
-    .rejects.toMatchObject({ url: `/l/${lista.shareToken}/item/${bici.id}?correccion=ya_pagaron` })
-  expect((await misCuentas(db, caro.id)).debes).toBe(300000)
+    .rejects.toMatchObject({ url: `/l/${lista.shareToken}/item/${bici.id}?correccion=ok` })
+  expect((await misCuentas(db, caro.id)).debes).toBe(30000)
+  expect(await misCuentas(db, sofi.id)).toMatchObject({ debes: 0, teDeben: 270000 })
+  expect(await fixGroupGiftAction(null, compra({ giftId, modo: 'iguales', total: '90', moneda: 'USD' }, todos)))
+    .toEqual({ error: 'Alguien ya te dio plata en la moneda de antes: para cambiarla, primero deshacé ese pago.' })
   // lo que sigue con el formulario a la vista, en el formulario
-  await marcarPagado(db, giftId, sofi.id, rodri.id, false)
   expect(await fixGroupGiftAction(null, compra({ giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '10', [`parte:${sofi.id}`]: '', [`parte:${caro.id}`]: '' }, todos)))
     .toEqual({ error: 'Las partes suman $10: faltan $89.990 para llegar a $90.000.' })
 })

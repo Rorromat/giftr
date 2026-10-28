@@ -13,6 +13,9 @@ const TEXTOS = {
   // no promete que puede volver: con el deseo fuera de la lista no puede, y si está, el deseo se lo dice
   regalo_sacado: (t: string) => `Ya no estás en el regalo grupal de "${t}": te sacó quien lo organiza — si fue un error, hablalo con esa persona.`,
   compra_corregida: (t: string) => `Quien compró el regalo grupal de "${t}" corrigió la compra y te cambió la parte — fijate en Cuentas cuánto te toca.`,
+  regalo_redividido: (t: string) => `Se sumó o se bajó alguien del regalo grupal de "${t}" y se volvió a dividir — fijate en Cuentas cuánto te toca.`,
+  // al encargado: el que llegó entró sin parte, o la del que se fue quedó para él (ver redividir)
+  regalo_a_mano: (t: string) => `Cambió quién está en el regalo grupal de "${t}", que dividiste a mano — corregí la compra para acomodar las partes.`,
   item_baja_comprado: (t: string) => `"${t}" salió de la lista porque ya no lo quiere — si todavía podés, cambialo por otra cosa.`,
   regalo_baja: (t: string) => `"${t}" fue dado de baja por su dueño y se canceló el regalo grupal — si ya lo habían comprado, arréglenlo entre ustedes; si no, elijan otro regalo.`,
   regalo_lo_tiene: (t: string) => `"${t}" salió de la lista porque ya lo tiene — el regalo grupal sigue en Cuentas: si ya lo compraron, el que lo organiza divide lo que salió; si no, lo cancela.`,
@@ -78,7 +81,7 @@ function tieneElLinkSql(db: Db, viewer: Viewer) {
   return or(isNull(lists.shareTokenAt), despues)
 }
 
-const A_CUENTAS = new Set<string>(['regalo_lo_tiene', 'compra_corregida'])
+const A_CUENTAS = new Set<string>(['regalo_lo_tiene', 'compra_corregida', 'regalo_redividido'])
 
 /**
  * Los avisos sobre deseos del que mira: los sin leer (los carteles) o, con desde, todos los de entonces para acá (la
