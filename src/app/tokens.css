@@ -253,6 +253,19 @@
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-current="page"],
   .gr-segmented > :has(:checked) { background: var(--gr-brand); color: var(--gr-on-brand); font-weight: 600; }
+  /* Pestañas de dos con la pastilla que se desliza (ver PestanasRegalos): el fondo negro lo lleva ::before y se corre a la
+     marcada (data-columna) desde el toque, en vez de saltar de una a otra. */
+  .gr-segmented--desliza { position: relative; isolation: isolate; }
+  .gr-segmented--desliza::before {
+    content: ''; position: absolute; z-index: -1; inset: 4px auto 4px 4px; width: calc(50% - 6px);
+    border-radius: var(--gr-radius-pill); background: var(--gr-brand);
+    transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .gr-segmented--desliza[data-columna="1"]::before { transform: translateX(calc(100% + 4px)); }
+  .gr-segmented.gr-segmented--desliza > * { background: transparent; color: var(--gr-ink); font-weight: 500; transition: color 200ms ease; }
+  .gr-segmented.gr-segmented--desliza > [data-marcado] { color: var(--gr-on-brand); font-weight: 600; }
+  /* mientras llega la otra pestaña (si no estaba precargada), lo de abajo se apaga: el título ya es el de la otra */
+  main:has(> .gr-segmented--desliza[data-pendiente]) > .gr-fundido { opacity: 0.45; transition: opacity 150ms ease; }
 
   /* Foco visible en chips y segmentos hechos con radios ocultos */
   .gr-chip:has(:focus-visible) { outline: 2px solid var(--gr-ink); outline-offset: 2px; }
@@ -394,6 +407,9 @@
    opacidad: un transform haría que los botones fijos de la página (como "Mandala por WhatsApp") se corran. */
 .gr-seccion { animation: gr-aparece 180ms ease-out; }
 @keyframes gr-aparece { from { opacity: 0; } }
+/* Lo que cambia adentro de una sección sin salir de ella (las pestañas de Mis regalos y Cuentas): el mismo fundido, solo
+   en lo que cambió. */
+.gr-fundido { animation: gr-aparece 180ms ease-out; }
 /* Agregar sube como una hoja desde abajo, desde donde estaba el +, mientras la barra se esconde. */
 .gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
@@ -685,9 +701,10 @@ body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)
 @keyframes gr-foto-grande { from { opacity: 0; } }
 
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
-   un <main aria-busy>), la estrella del ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de
-   30° la deja igual, así que aguanta lo que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de
-   deseos (data-arranque-destino) mientras se ve la lista; en las demás se achica. Todo con CSS, así anda antes que el JS:
+   un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), la estrella del
+   ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de 30° la deja igual, así que aguanta lo
+   que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de deseos (data-arranque-destino) mientras se
+   ve la lista; en las demás se achica. Todo con CSS, así anda antes que el JS:
    las transiciones de la salida no corren si la pantalla ya llegó sin la de carga (ahí no se ve nada). */
 .gr-arranque {
   position: fixed; inset: 0; z-index: 50;
@@ -724,7 +741,7 @@ body:has([data-arranque-destino]) .gr-arranque__vuelo {
 .gr-arranque__letra { opacity: 0; transition: opacity 150ms ease-out; }
 
 /* Mientras carga. data-listo: ya llegó la primera pantalla (lo pone Arranque, así no vuelve en las de carga de después). */
-body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
+body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   visibility: visible; pointer-events: auto; transition: none;
   .gr-arranque__fondo { opacity: 1; transition: none; }
   .gr-arranque__vuelo { opacity: 1; transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(1); transition: none; }
@@ -749,7 +766,8 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a { transition: none; }
   .gr-nav a.gr-fab { transition: none; animation: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
-  .gr-seccion, .gr-hoja, .gr-sello--cae { animation: none; }
+  .gr-seccion, .gr-fundido, .gr-hoja, .gr-sello--cae { animation: none; }
+  .gr-segmented--desliza::before, .gr-segmented.gr-segmented--desliza > * { transition: none; }
   .gr-cal-entra, .gr-cal-sale, .gr-cal-siguiente, .gr-cal-anterior { animation: none; }
   /* la portada: no pasan solas (ver Portada) y cambian con un fundido, sin volar ni achicarse; el sello, ya puesto */
   .gr-portada__carta, .gr-portada__carta[data-lugar] { transform: none; transition: opacity 200ms ease; }

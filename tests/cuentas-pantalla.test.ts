@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
   notFound: () => { throw new Error('NEXT_NOT_FOUND') },
 }))
 
-import Cuentas from '@/app/(menu)/cuentas/page'
+import Cuentas from '@/app/(menu)/(regalos)/cuentas/page'
 
 const usuario = (nombre: string) => upsertUserFromGoogle(h.db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
 

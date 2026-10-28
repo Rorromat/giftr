@@ -28,3 +28,26 @@ export function SkeletonPage({ cards = 4 }: { cards?: number }) {
     </main>
   )
 }
+
+/**
+ * Lo de abajo de una sección con pestañas (Mis regalos y Cuentas) mientras llega: lo de arriba (el encabezado, el título
+ * y las pestañas) ya está en su layout y no se toca. totales: las dos tarjetas de arriba de Cuentas. Es .gr-cargando con
+ * aria-busy para que la animación de inicio la reconozca si la app abre acá (ver Arranque).
+ */
+export function SkeletonContenido({ filas = 3, totales = false }: { filas?: number; totales?: boolean }) {
+  return (
+    <div aria-busy="true" className="gr-cargando flex flex-col gap-5">
+      <span className="sr-only" role="status">Cargando…</span>
+      <div aria-hidden="true" className="flex flex-col gap-3 motion-safe:animate-pulse">
+        {totales && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-[96px] rounded-[26px] bg-gr-dot" />
+            <div className="h-[96px] rounded-[26px] bg-gr-dot" />
+          </div>
+        )}
+        <div className="mt-1 h-6 w-2/5 rounded-full bg-gr-dot" />
+        {Array.from({ length: filas }, (_, i) => <div key={i} className="h-[76px] rounded-[22px] bg-gr-dot" />)}
+      </div>
+    </div>
+  )
+}

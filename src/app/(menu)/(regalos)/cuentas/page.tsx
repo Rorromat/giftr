@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { avisosSinLeer } from '@/lib/bandeja'
 import {
   comprasParaCorregir, misCuentas, type AjusteCuenta, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type PagoPorVos,
   type RegaloEnCurso, type RondaCuenta,
@@ -13,9 +12,7 @@ import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { PagoParcial } from '@/components/PagoParcial'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { yo } from '@/lib/perfil'
-import { PestanasRegalos } from '@/components/PestanasRegalos'
-import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
+import { AvatarSticker, Icon, QuizasLink } from '@/components/ui'
 
 /** Qué es la línea: la parte que falta (o lo que falta de ella), o lo que el que compró devuelve. */
 function queEs(l: LineaCuenta) {
@@ -230,19 +227,12 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
   const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, aCorregir, { nombre, foto }, avisos] = await Promise.all([
-    misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), yo(db, session.userId), avisosSinLeer(db, { userId: session.userId }),
-  ])
+  const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
   const vacio = !c.personas.length && !c.rondas.length && !c.porVos.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
+  // lo de arriba (el encabezado, el título y las pestañas) está en el layout, compartido con Mis regalos
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
-      <div className="flex flex-col gap-1">
-        <h1 className="gr-title">Cuentas</h1>
-        <p className="text-[15px] text-gr-muted">Los regalos grupales: quién le debe a quién.</p>
-      </div>
-      <PestanasRegalos actual="cuentas" />
+    <div className="gr-fundido flex flex-col gap-5">
 
       <div className="grid grid-cols-2 gap-3">
         <div className="gr-hero flex flex-col gap-1.5 p-4">
@@ -331,6 +321,6 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           </ul>
         </section>
       )}
-    </Seccion>
+    </div>
   )
 }

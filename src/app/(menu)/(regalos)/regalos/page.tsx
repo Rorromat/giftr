@@ -2,15 +2,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { avisosSinLeer } from '@/lib/bandeja'
 import { misRegalos } from '@/lib/mis-regalos'
-import { yo } from '@/lib/perfil'
 import { FilaRegalo } from '@/components/FilaRegalo'
-import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { ArmarSorpresa } from '@/components/Sorpresas'
 import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
 import { misAmigosInvisibles, tambienTeToco } from '@/lib/amigo-invisible'
-import { AppHeader, Icon, Seccion } from '@/components/ui'
+import { Icon } from '@/components/ui'
 
 /**
  * Mis regalos: lo que reservé y los regalos grupales en los que estoy, de todas las listas, en un solo lugar. Arriba mis
@@ -24,20 +21,14 @@ const JUEGOS_PASADOS = 15
 export default async function MisRegalos() {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [{ porComprar, comprados, historial }, { nombre, foto }, juegos, avisos] = await Promise.all([
-    misRegalos(db, session.userId), yo(db, session.userId), misAmigosInvisibles(db, session.userId, undefined, JUEGOS_PASADOS),
-    avisosSinLeer(db, { userId: session.userId }),
+  const [{ porComprar, comprados, historial }, juegos] = await Promise.all([
+    misRegalos(db, session.userId), misAmigosInvisibles(db, session.userId, undefined, JUEGOS_PASADOS),
   ])
   const tambien = tambienTeToco(juegos)
 
+  // lo de arriba (el encabezado, el título y las pestañas) está en el layout, compartido con Cuentas
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
-      <div className="flex flex-col gap-1">
-        <h1 className="gr-title">Tus regalos</h1>
-        <p className="text-[15px] text-gr-muted">Lo que reservaste, los regalos grupales en los que estás y tus amigos invisibles.</p>
-      </div>
-      <PestanasRegalos actual="regalos" />
+    <div className="gr-fundido flex flex-col gap-5">
 
       {juegos.length > 0 && (
         <section aria-labelledby="invisibles" className="flex flex-col gap-2.5">
@@ -87,6 +78,6 @@ export default async function MisRegalos() {
 
       <ArmarSorpresa />
       {!juegos.length && <ArmarJuego />}
-    </Seccion>
+    </div>
   )
 }
