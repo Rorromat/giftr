@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { createECDH, randomBytes } from 'node:crypto'
 import { expect, test } from 'vitest'
-import { eq, isNull, sql } from 'drizzle-orm'
+import { eq, isNull } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { avisos, lists } from '@/db/schema'
+import { amistades, avisos, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createItem } from '@/lib/items'
@@ -135,7 +135,7 @@ test('cada aviso que se manda dice qué es', async () => {
   const db = await createTestDb()
   const [euge, sofi] = [await usuario(db, 'Euge'), await usuario(db, 'Sofi')]
   await pedirAmistad(db, euge.id, sofi.id)
-  const [solicitud] = (await db.execute<{ id: string }>(sql`select id from amistades`)).rows
+  const [solicitud] = await db.select({ id: amistades.id }).from(amistades)
   await responderSolicitud(db, sofi.id, solicitud.id, true)
   const [lista] = await db.select().from(lists).where(eq(lists.ownerId, euge.id))
   await mandarCodazo(db, lista.shareToken, { userId: sofi.id }, 'Sofi')
