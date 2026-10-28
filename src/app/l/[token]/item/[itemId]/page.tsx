@@ -101,10 +101,12 @@ export default async function DetalleItem({ params, searchParams }: {
     : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
     : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
   const cuantos = cantidad(item, giver?.item ?? null)
-  // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
+  // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza;
+  // y a quiénes se lo propuso y qué contestaron, también una vez comprado
   const amigos = viewer.userId && giver ? await amigosParaDividir(db, viewer.userId, item.id) : []
-  const organizo = regalos.find((r) => r.soyEncargado && r.estado === 'abierto')
-  const invitados = organizo ? await invitadosDeRegalo(db, organizo.id) : []
+  const mio = regalos.find((r) => r.soyEncargado)
+  const organizo = mio?.estado === 'abierto' ? mio : undefined
+  const invitados = mio ? await invitadosDeRegalo(db, mio.id) : []
   const yaEstan = new Set([...(organizo?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
@@ -225,10 +227,11 @@ export default async function DetalleItem({ params, searchParams }: {
                             precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
                             logueado={logueado} ocupado={ocupado}
                             nota={claims.find((c) => c.grupal?.giftId === r.id)?.notaQueCompre}
-                            invitar={r.id === organizo?.id && (
-                              <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados}
+                            invitar={r.id === mio?.id && (
+                              <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados} comprado={r.estado === 'comprado'}
                                                   paraInvitar={amigos.filter((a) => !yaEstan.has(a.id))} />
-                            )} />
+                            )}
+                            sinContestar={r.id === organizo?.id ? invitados.filter((i) => i.estado === 'esperando').map((i) => i.persona.nombre) : []} />
             ))}
           </div>
         )}

@@ -72,9 +72,11 @@ export default async function Sorpresa({ params, searchParams }: {
 
   const { item, regalos, comments } = s
   const yo = viewer.userId!
-  const organizo = regalos.find((r) => r.soyEncargado && r.estado === 'abierto')
-  const [amigos, invitados] = organizo
-    ? await Promise.all([amigosParaDividir(db, yo, item.id), invitadosDeRegalo(db, organizo.id)])
+  // a quiénes se lo propuso el que la organiza y qué contestaron, también una vez comprada; a más, solo mientras está abierta
+  const mio = regalos.find((r) => r.soyEncargado)
+  const organizo = mio?.estado === 'abierto' ? mio : undefined
+  const [amigos, invitados] = mio
+    ? await Promise.all([organizo ? amigosParaDividir(db, yo, item.id) : [], invitadosDeRegalo(db, mio.id)])
     : [[], []]
   const yaEstan = new Set([...(organizo?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const precio = item.precio ?? item.rangoPrecio
@@ -137,10 +139,11 @@ export default async function Sorpresa({ params, searchParams }: {
           <RegaloGrupal key={r.id} regalo={r} token={token} itemId={item.id} titulo={item.titulo} ownerNombre={quien} sorpresa
                         precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
                         logueado nota={s.nota}
-                        invitar={r.id === organizo?.id && (
-                          <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados}
+                        invitar={r.id === mio?.id && (
+                          <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados} comprado={r.estado === 'comprado'}
                                               paraInvitar={amigos.filter((a) => !yaEstan.has(a.id))} />
-                        )} />
+                        )}
+                        sinContestar={r.id === organizo?.id ? invitados.filter((i) => i.estado === 'esperando').map((i) => i.persona.nombre) : []} />
         ))}
       </div>
 

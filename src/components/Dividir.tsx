@@ -66,11 +66,16 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
 
 const ESTADOS: Record<Invitado['estado'], string> = { esperando: 'Esperando', se_sumo: 'Se sumó ✓', no_puede: 'No puede', se_bajo: 'Se bajó' }
 
-/** Para el que organiza: a quiénes les propuso dividirlo y qué contestaron; y proponérselo a más amigos. */
-export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvitar }: {
-  token: string; itemId: string; giftId: string; invitados: Invitado[]; paraInvitar: Persona[]
+/**
+ * Para el que organiza: a quiénes les propuso dividirlo y qué contestaron, también ya comprado (el que no llegó a contestar
+ * quedó afuera de la división); y, mientras está abierto, proponérselo a más amigos.
+ */
+export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvitar, comprado = false }: {
+  token: string; itemId: string; giftId: string; invitados: Invitado[]; paraInvitar: Persona[]; comprado?: boolean
 }) {
-  if (!invitados.length && !paraInvitar.length) return null
+  // a un regalo comprado ya no se suma nadie (ver invitarARegalo)
+  const masAmigos = comprado ? [] : paraInvitar
+  if (!invitados.length && !masAmigos.length) return null
   return (
     <div className="flex flex-col gap-2">
       {invitados.length > 0 && (
@@ -81,13 +86,15 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
               <li key={i.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
                 <AvatarSticker nombre={i.persona.nombre} foto={i.persona.foto} size={28} />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">{i.persona.nombre}</span>
-                <span className={`flex-none text-[13px] font-semibold ${i.estado === 'se_sumo' ? '' : 'text-gr-muted'}`}>{ESTADOS[i.estado]}</span>
+                <span className={`flex-none text-[13px] font-semibold ${i.estado === 'se_sumo' ? '' : 'text-gr-muted'}`}>
+                  {comprado && i.estado === 'esperando' ? 'No contestó' : ESTADOS[i.estado]}
+                </span>
               </li>
             ))}
           </ul>
         </>
       )}
-      {paraInvitar.length > 0 && (
+      {masAmigos.length > 0 && (
         <details className="group flex flex-col">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold underline underline-offset-4 [&::-webkit-details-marker]:hidden">
             <Icon name="users" size={17} />Proponérselo a más amigos
@@ -96,7 +103,7 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={itemId} />
             <input type="hidden" name="giftId" value={giftId} />
-            <ElegirAmigos amigos={paraInvitar} ambito="amigos-invitar" />
+            <ElegirAmigos amigos={masAmigos} ambito="amigos-invitar" />
             <BotonEnviar pendiente="Mandando…" className="gr-btn gr-btn--sm w-full">Mandarles la propuesta</BotonEnviar>
           </form>
         </details>

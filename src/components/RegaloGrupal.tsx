@@ -139,7 +139,9 @@ export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: 
   )
 }
 
-export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado, invitar, sorpresa = false }: Ctx & {
+export function RegaloGrupal({
+  regalo, token, itemId, titulo, ownerNombre, precio, monedaPrecio = 'ARS', nota, logueado, ocupado, invitar, sinContestar = [], sorpresa = false,
+}: Ctx & {
   regalo: RegaloView
   titulo: string
   ownerNombre: string
@@ -151,8 +153,10 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
   logueado: boolean
   /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
   ocupado?: string | null
-  /** Para el que lo organiza: a quiénes les propuso dividirlo y proponérselo a más (ver InvitadosDelRegalo). */
+  /** Para el que lo organiza: a quiénes les propuso dividirlo y qué contestaron, abierto o comprado (ver InvitadosDelRegalo). */
   invitar?: React.ReactNode
+  /** Para el que lo organiza, mientras está abierto: a los que se lo propuso y no contestaron (si lo compra ya, quedan afuera). */
+  sinContestar?: string[]
   /** El regalo de una sorpresa (ver sorpresas.ts): el link es el de la sorpresa, que no dice qué es, y cancelarlo la borra. */
   sorpresa?: boolean
 }) {
@@ -235,6 +239,12 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
                   Ya lo compré: dividir
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
+                  {sinContestar.length > 0 && (
+                    <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug">
+                      {juntarNombres(sinContestar)} todavía no {sinContestar.length === 1 ? 'contestó' : 'contestaron'}: se divide entre
+                      los que ya están, así que si lo dividís ahora {sinContestar.length === 1 ? 'queda' : 'quedan'} afuera.
+                    </p>
+                  )}
                   <CompraGrupalForm giftId={regalo.id} token={token} itemId={itemId} sugerido={precio} monedaSugerida={monedaPrecio}
                                     miembros={regalo.miembros.map(({ userId, nombre, esYo }) => ({ userId, nombre, esYo }))} />
                 </div>
@@ -291,6 +301,7 @@ export function RegaloGrupal({ regalo, token, itemId, titulo, ownerNombre, preci
               )
             })}
           </ul>
+          {regalo.soyEncargado && invitar}
           {/* un cero de más, o el precio de la lista que no era: mientras nadie le pagó, se arregla */}
           {regalo.corregible && (
             <details key={compra} className="group flex flex-col">
