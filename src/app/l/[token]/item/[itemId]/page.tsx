@@ -15,8 +15,10 @@ import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
-import { avisoDeCupo, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { Icon, ItemPhoto, PriorityTag, PageHeader } from '@/components/ui'
+import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
+import { sitioDeLaTienda } from '@/lib/links'
+import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PageHeader } from '@/components/ui'
+import { CategoriaDeseo, FichasDeseo, NotaDeseo } from '@/components/FichaDeseo'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
@@ -33,15 +35,13 @@ function ultimoDia(hasta: Date) {
 }
 
 /**
- * Cuántos pide de un deseo de varias unidades y, para quien ve la coordinación, cuántos quedan o cuántas reservas hay de
- * más (ver avisoDeCupo; al dueño no le llega nada).
+ * Para quien ve la coordinación de un deseo de varias unidades, en su ficha de cuántos pide: cuántos quedan o cuántas
+ * reservas hay de más (ver avisoDeCupo; al dueño no le llega nada).
  */
-function cantidad(item: OwnerItemView, giver: GiverItemView | null) {
-  if (item.repetible) return 'Se puede repetir: varios pueden regalar algo así.'
-  if (!giver) return item.cantidad > 1 ? `Pide ${item.cantidad}.` : null
-  const c = avisoDeCupo(giver, giver.claims.length)
+function cupo(giver: GiverItemView | null) {
+  const c = giver && avisoDeCupo(giver, giver.claims.length)
   if (!c) return null
-  return c.deMas ? `Pide ${item.cantidad} y hay ${c.reservas} reservas: arréglenlo en el hilo de abajo.` : `Pide ${item.cantidad} · quedan ${c.quedan}.`
+  return c.deMas ? { texto: `Hay ${c.reservas} reservas: arréglenlo en el hilo de abajo.`, alerta: true } : { texto: `Quedan ${c.quedan}`, alerta: false }
 }
 
 // La vista previa al compartir (WhatsApp): qué es, para quién y cuánto sale. La imagen sale de opengraph-image.
@@ -100,7 +100,7 @@ export default async function DetalleItem({ params, searchParams }: {
   const ocupado = mia ? (mia.estado === 'comprado' ? 'Ya lo compraste vos: no hace falta que te sumes.'
     : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
     : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
-  const cuantos = cantidad(item, giver?.item ?? null)
+  const tienda = item.linkTienda && sitioDeLaTienda(item.linkTienda)
   // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
   // (también ya comprado: el que se suma después entra y se vuelve a dividir), con a quiénes se lo propuso y qué contestaron
   const amigos = viewer.userId && giver ? await amigosParaDividir(db, viewer.userId, item.id) : []
@@ -113,7 +113,8 @@ export default async function DetalleItem({ params, searchParams }: {
 
   return (
     <main className="flex flex-col gap-4 pb-12 pt-2">
-      <PageHeader title="La lista" titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
+      {/* de quién es, para el que llega directo al deseo (un link por WhatsApp) */}
+      <PageHeader title={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
 
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
@@ -125,33 +126,36 @@ export default async function DetalleItem({ params, searchParams }: {
           {/* pegado en la esquina, montado sobre el borde de la foto: el título le deja lugar */}
           {sello && <Sello tipo={sello} clave={item.id} size={112} className="absolute right-3 top-[178px] z-[2]" />}
         </div>
-        <div className="flex flex-col gap-3 p-3.5">
-          <div className={`flex flex-col gap-1.5 ${sello ? 'pr-[112px]' : ''}`}>
+        <div className="flex flex-col gap-4 p-4">
+          {/* qué es y cuánto sale; el sello le deja lugar */}
+          <div className={`flex flex-col gap-2 ${sello ? 'pr-[112px]' : ''}`}>
+            {item.categoria && <CategoriaDeseo categoria={item.categoria} />}
             <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{item.titulo}</h1>
-            <div className="flex items-center gap-2">
-              {precio && <p className="text-lg font-semibold">{precio}</p>}
-              <PriorityTag prioridad={item.prioridad} className="h-6" />
-            </div>
+            {precio && <p className="text-xl font-semibold">{precio}</p>}
           </div>
-          {cuantos && <p className="text-sm font-semibold">{cuantos}</p>}
+          {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
+          <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />
           {item.notas && (
-            <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
-              <span className="font-semibold">{ownerNombre} {plural ? 'dicen' : 'dice'}:</span> {item.notas}
-            </p>
+            <NotaDeseo notas={item.notas} quien={`${ownerNombre} ${plural ? 'dicen' : 'dice'}`}
+                       avatar={plural
+                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} size={28} />
+                         : <AvatarSticker nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
           )}
           {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
-          <div className="flex flex-wrap gap-2">
+          {/* la tienda a lo ancho; abajo, de a dos con tu cuenta (con "Me lo robo" al lado, WhatsApp dice menos) */}
+          <div className="grid grid-cols-2 gap-2">
             {item.linkTienda && (
-              <a href={item.linkTienda} target="_blank" className="gr-btn text-sm">
-                Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
+              <a href={item.linkTienda} target="_blank" className="gr-btn gr-btn--sm col-span-2 min-w-0">
+                <span className="truncate">Ver en {tienda || 'la tienda'}</span>
+                <Icon name="external" size={16} strokeWidth={2} className="flex-none" />
               </a>
             )}
             {/* "Me lo robo": con tu cuenta, sumarlo a tu lista (querés lo mismo) */}
-            {logueado && <BotonRobar token={token} itemId={item.id} className="min-w-36" />}
+            {logueado && <BotonRobar token={token} itemId={item.id} />}
             {/* Mandárselo a alguien: WhatsApp arma la vista previa con la foto (opengraph-image) */}
-            <a target="_blank" className="gr-btn gap-2 text-sm"
+            <a target="_blank" aria-label="Mandarlo por WhatsApp" className={`gr-btn gr-btn--sm gap-2 ${logueado ? '' : 'col-span-2'}`}
                href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
-              <Icon name="chat" size={16} strokeWidth={2} />Mandarlo por WhatsApp
+              <Icon name="chat" size={16} strokeWidth={2} />{logueado ? 'WhatsApp' : 'Mandarlo por WhatsApp'}
             </a>
           </div>
         </div>

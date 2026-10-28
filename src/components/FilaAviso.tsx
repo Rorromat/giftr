@@ -42,6 +42,8 @@ const ICONOS: Record<TipoEnBandeja, { fondo: string; dibujo: ReactNode; mueve: M
   respuesta_propuesta: { fondo: GRIS, dibujo: DIBUJO.gente, mueve: 'late' },
   amistad_pedida: { fondo: LIMA, dibujo: DIBUJO.sumar, mueve: 'saluda' },
   amistad_aceptada: { fondo: GRIS, dibujo: DIBUJO.gente, mueve: 'late' },
+  // en el azul suave de las listas en común, como en Tu gente
+  lista_en_comun: { fondo: 'bg-gr-comun text-gr-comun-ink', dibujo: DIBUJO.gente, mueve: 'saluda' },
 }
 
 /**

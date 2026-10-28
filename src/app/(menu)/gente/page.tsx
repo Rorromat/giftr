@@ -10,7 +10,7 @@ import { miGente, type Contacto } from '@/lib/gente'
 import { juntarNombres } from '@/lib/groups'
 import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
 import { anioSiEstaLejos, hoyLocal, MESES } from '@/lib/events'
-import { cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
+import { agregarListaAction, cancelarSolicitudAction, dejarDeSerAmigosAction, pedirAmistadAction, unfollowAction } from '@/app/actions'
 import {
   amigosEnComun, asegurarUsuario, miAmigoToken, misAmigos, personas, solicitudesEnviadas, solicitudesRecibidas, sugerenciasDeAmigos,
 } from '@/lib/amigos'
@@ -19,11 +19,12 @@ import { Buscador } from '@/components/Buscador'
 import { ArmarSorpresa } from '@/components/Sorpresas'
 import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
-import { AvatarStack, AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
+import { AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
+import { AvatarDeLista } from '@/components/ListaEnComun'
 
 /**
- * "Cumple el 22 de agosto · en 14 días", "El 12 de octubre", "El 20 de noviembre de 2027" (a más de un año), "Sin cumple
- * cargado". La cuenta no se corta en dos renglones.
+ * "Cumple el 22 de agosto · en 14 días" (el de una persona o el de una lista en común que es un cumple), "El 12 de
+ * octubre", "El 20 de noviembre de 2027" (a más de un año), "Sin cumple cargado". La cuenta no se corta en dos renglones.
  */
 function cuando(c: Contacto, hoy: Date) {
   if (!c.proxima) return c.tipo === 'personal' ? 'Sin cumple cargado' : null
@@ -31,66 +32,128 @@ function cuando(c: Contacto, hoy: Date) {
   const falta = dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : dias <= 60 ? `en\u00a0${dias}\u00a0días` : null
   const anio = anioSiEstaLejos(fecha, hoy)
   const dia = `${fecha.getUTCDate()} de ${MESES[fecha.getUTCMonth()]}${anio ? ` de ${anio}` : ''}`
-  return [`${c.tipo === 'personal' ? 'Cumple el' : 'El'} ${dia}`, falta].filter(Boolean).join(' · ')
+  return [`${c.tipo === 'personal' || c.esCumple ? 'Cumple el' : 'El'} ${dia}`, falta].filter(Boolean).join(' · ')
 }
 
 /** Cuántas de "Gente que quizás conocés" van arriba de tu gente (con "Ahora no" aparecen las que siguen). */
 const SUGERENCIAS = 3
 
+/** Quitar de tu gente pide dos toques: sin el link, no hay otra forma de volver a su lista. */
+function Opciones({ nombre, children }: { nombre: string; children: React.ReactNode }) {
+  return (
+    <details className="relative flex-none">
+      <summary aria-label={`Opciones de ${nombre}`}
+               className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
+        <Icon name="more" size={22} strokeWidth={2.2} />
+      </summary>
+      <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
+        {children}
+      </div>
+    </details>
+  )
+}
+
+function Quitar({ listId, texto }: { listId: string; texto: string }) {
+  return (
+    <form action={unfollowAction} className="flex flex-col gap-2">
+      <input type="hidden" name="listId" value={listId} />
+      <p className="text-[13px] font-medium leading-snug">{texto}</p>
+      <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Quitar de tu gente</BotonEnviar>
+    </form>
+  )
+}
+
 function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: boolean; usuario?: string | null }) {
-  const dueno = c.tipo === 'personal' ? c.duenos[0] : undefined
-  const detalle = [
-    c.tipo === 'grupo' && `De ${juntarNombres(c.duenos.map((d) => d.nombre.split(' ')[0]))}`,
-    `${c.deseos} ${c.deseos === 1 ? 'deseo' : 'deseos'}`,
-  ].filter(Boolean).join(' · ')
+  const dueno = c.duenos[0]
   const fecha = cuando(c, hoy)
   return (
-    <li data-buscar={paraBuscar([c.nombre, ...c.duenos.map((d) => d.nombre), ...(usuario ? [usuario] : [])].join(' '))}
+    <li data-buscar={paraBuscar([c.nombre, ...(usuario ? [usuario] : [])].join(' '))}
         className="gr-card flex items-center gap-1 overflow-visible py-3 pl-3.5 pr-1.5">
       <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">
-        {c.tipo === 'personal'
-          ? <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={48} />
-          : <AvatarStack nombres={c.duenos.map((d) => d.nombre).slice(0, 3)} fotos={c.duenos.map((d) => d.foto).slice(0, 3)} />}
+        <AvatarSticker nombre={c.nombre} foto={dueno?.foto} size={48} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex flex-wrap items-center gap-x-2 text-base leading-tight font-semibold [overflow-wrap:anywhere]">
             {c.nombre}
             {amigo && <span className="rounded-full bg-gr-accent px-2 py-0.5 text-[11px] font-semibold">Amigos</span>}
           </p>
           {fecha && <p className="flex items-center gap-1.5 text-[13px] font-medium leading-snug"><Icon name="cake" size={14} className="flex-none" />{fecha}</p>}
-          <p className="text-[13px] font-medium leading-snug text-gr-muted [overflow-wrap:anywhere]">{detalle}</p>
+          <p className="text-[13px] font-medium leading-snug text-gr-muted">{c.deseos} {c.deseos === 1 ? 'deseo' : 'deseos'}</p>
         </div>
       </Link>
-      {/* Quitar pide dos toques: sin el link, no hay otra forma de volver a su lista */}
-      <details className="relative flex-none">
-        <summary aria-label={`Opciones de ${c.nombre}`}
-                 className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
-          <Icon name="more" size={22} strokeWidth={2.2} />
-        </summary>
-        <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
-          {amigo && dueno ? (
-            <form action={dejarDeSerAmigosAction} className="flex flex-col gap-2">
-              <input type="hidden" name="userId" value={dueno.id} />
-              <p className="text-[13px] font-medium leading-snug">Ninguno de los dos va a ver más al otro acá ni en Eventos.</p>
-              <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Dejar de ser amigos</BotonEnviar>
-            </form>
-          ) : (
-            <>
-              {dueno && (
-                <form action={pedirAmistadAction} className="flex flex-col gap-2">
-                  <input type="hidden" name="para" value={dueno.id} />
-                  <p className="text-[13px] font-medium leading-snug">Le llega una solicitud: si acepta, también ve tu lista.</p>
-                  <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-11 text-sm">Sumar como amigo</BotonEnviar>
-                </form>
-              )}
-              <form action={unfollowAction} className="flex flex-col gap-2">
-                <input type="hidden" name="listId" value={c.listId} />
-                <p className="text-[13px] font-medium leading-snug">Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.</p>
-                <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Quitar de tu gente</BotonEnviar>
+      <Opciones nombre={c.nombre}>
+        {amigo && dueno ? (
+          <form action={dejarDeSerAmigosAction} className="flex flex-col gap-2">
+            <input type="hidden" name="userId" value={dueno.id} />
+            <p className="text-[13px] font-medium leading-snug">Ninguno de los dos va a ver más al otro acá ni en Eventos.</p>
+            <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Dejar de ser amigos</BotonEnviar>
+          </form>
+        ) : (
+          <>
+            {dueno && (
+              <form action={pedirAmistadAction} className="flex flex-col gap-2">
+                <input type="hidden" name="para" value={dueno.id} />
+                <p className="text-[13px] font-medium leading-snug">Le llega una solicitud: si acepta, también ve tu lista.</p>
+                <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-11 text-sm">Sumar como amigo</BotonEnviar>
               </form>
-            </>
-          )}
-        </div>
-      </details>
+            )}
+            <Quitar listId={c.listId} texto="Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve." />
+          </>
+        )}
+      </Opciones>
+    </li>
+  )
+}
+
+/**
+ * Una lista en común (la de Juancito, la de la abuela), como una persona más pero en azul: su foto con la de sus dueños,
+ * su cumple o fecha y qué es para ellos. La de un amigo que no agregaste va punteada y sin link, con "Agregar": recién
+ * agregada entra su fecha en tus Eventos.
+ */
+function EnComun({ c, hoy, deAmigo }: { c: Contacto; hoy: Date; deAmigo: boolean }) {
+  const fecha = cuando(c, hoy)
+  const relacion = c.relacion ?? `De ${juntarNombres(c.duenos.map((d) => d.nombre.split(' ')[0]))}`
+  const contenido = (
+    <>
+      <AvatarDeLista nombre={c.nombre} foto={c.foto} duenos={c.duenos} size={48} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="flex flex-wrap items-center gap-x-2 text-base leading-tight font-semibold [overflow-wrap:anywhere]">
+          {c.nombre}
+          {c.agregada && <span className="rounded-full bg-gr-blue px-2 py-0.5 text-[11px] font-semibold text-gr-on-blue">En común</span>}
+        </p>
+        {fecha && (
+          <p className="flex items-center gap-1.5 text-[13px] font-medium leading-snug">
+            <Icon name={c.esCumple ? 'cake' : 'calendar'} size={14} className="flex-none" />{fecha}
+          </p>
+        )}
+        <p className="text-[13px] font-medium leading-snug text-gr-muted [overflow-wrap:anywhere]">
+          <span className="font-semibold text-gr-comun-ink">{relacion}</span> · {c.deseos} {c.deseos === 1 ? 'deseo' : 'deseos'}
+        </p>
+      </div>
+    </>
+  )
+  const buscar = paraBuscar([c.nombre, relacion, ...c.duenos.map((d) => d.nombre)].join(' '))
+  if (!c.agregada) {
+    return (
+      <li data-buscar={buscar} className="flex items-center gap-2 rounded-[22px] border-[1.5px] border-dashed border-gr-comun-line py-3 pl-3.5 pr-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">{contenido}</div>
+        <form action={agregarListaAction} className="flex-none">
+          <input type="hidden" name="listId" value={c.listId} />
+          <BotonEnviar aria-label={`Agregar ${c.nombre} a tu gente`} pendiente="…"
+                       className="inline-flex min-h-10 items-center gap-1 rounded-full bg-gr-blue px-3.5 text-[13px] font-semibold text-gr-on-blue">
+            <Icon name="plus" size={15} strokeWidth={2.6} />Agregar
+          </BotonEnviar>
+        </form>
+      </li>
+    )
+  }
+  return (
+    <li data-buscar={buscar} className="gr-card flex items-center gap-1 overflow-visible border-gr-comun-line bg-gr-comun py-3 pl-3.5 pr-1.5">
+      <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">{contenido}</Link>
+      <Opciones nombre={c.nombre}>
+        <Quitar listId={c.listId} texto={deAmigo
+          ? 'Su fecha sale de tus Eventos. La lista sigue acá por si la querés agregar de nuevo.'
+          : 'Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.'} />
+      </Opciones>
     </li>
   )
 }
@@ -118,7 +181,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="gr-title">Tu gente</h1>
-          <p className="text-[15px] text-gr-muted">Tus amigos y las listas que abriste.</p>
+          <p className="text-[15px] text-gr-muted">Tus amigos, sus listas en común y las que abriste.</p>
         </div>
         <Link href="/gente/agregar" className="gr-btn gr-btn--sm flex-none gap-1.5"><Icon name="plus" size={18} strokeWidth={2.4} />Agregar</Link>
       </div>
@@ -161,9 +224,9 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
                       masAlla={{ href: '/gente/agregar?q=', texto: 'Buscarlo para sumarlo como amigo' }} />
           )}
           <ul id="mi-gente" className="flex flex-col gap-3">
-            {gente.map((c) => (
-              <Persona key={c.listId} c={c} hoy={hoy} amigo={esAmigo(c)} usuario={c.tipo === 'personal' ? usuarios.get(c.duenos[0]?.id ?? '') : null} />
-            ))}
+            {gente.map((c) => (c.tipo === 'grupo'
+              ? <EnComun key={c.listId} c={c} hoy={hoy} deAmigo={c.duenos.some((d) => amigos.has(d.id))} />
+              : <Persona key={c.listId} c={c} hoy={hoy} amigo={esAmigo(c)} usuario={usuarios.get(c.duenos[0]?.id ?? '')} />))}
           </ul>
         </>
       )}

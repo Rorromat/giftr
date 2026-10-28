@@ -22,6 +22,10 @@
   --gr-line-strong: #8D8C85;
   --gr-blue: #2F5BEA;       /* tarjetas de aviso y festejo (codazos) */
   --gr-on-blue: #FFFFFF;
+  /* Las listas en común en Tu gente (la de Juancito, la de la abuela): el azul en su versión suave, con el texto en azul */
+  --gr-comun: #EAF0FF;
+  --gr-comun-line: #C5D3FF;
+  --gr-comun-ink: #1F45C4;
   /* La tarjeta destacada (.gr-hero) tiene sus propios colores, para poder ser oscura o clara: el fondo, el texto, los
      detalles chicos (íconos, el número de Cuentas) y su botón. */
   --gr-hero: #141414;

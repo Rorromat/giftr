@@ -1,5 +1,5 @@
 {
-  "id": "a77bf2e4-15c1-44c7-ba71-677be091c7c2",
+  "id": "77b74cbb-08d2-4688-82d0-099c7c4502fc",
   "prevId": "7bef7dec-c2f9-43db-9867-06dd27c59d4a",
   "version": "7",
   "dialect": "postgresql",
@@ -1355,19 +1355,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pagado_monto": {
-          "name": "pagado_monto",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "pagado_antes": {
-          "name": "pagado_antes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "pagado": {
           "name": "pagado",
           "type": "boolean",
@@ -2154,6 +2141,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "parentesco": {
+          "name": "parentesco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2373,6 +2366,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "es_cumple": {
+          "name": "es_cumple",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "foto_url": {
+          "name": "foto_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2388,6 +2394,22 @@
           ],
           "isUnique": false,
           "where": "\"lists\".\"para_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "lists_foto_deseo_idx": {
+          "name": "lists_foto_deseo_idx",
+          "columns": [
+            {
+              "expression": "lower(substring(\"foto_url\" from '/foto/deseo/([0-9A-Fa-f-]{36})'))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"lists\".\"foto_url\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

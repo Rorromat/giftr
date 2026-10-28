@@ -20,7 +20,12 @@ import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewer
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
 import { limpiarParaVos, marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
-import { crearGrupo, esToken, esUuid, fechaDeGrupoValida, nuevaInvitacion, sacarDelGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
+import {
+  crearGrupo, esToken, esUuid, fechaDeCumple, fechaDeGrupoValida, guardarFotoGrupo, guardarParentesco, nuevaInvitacion, parentescoDelForm,
+  sacarDelGrupo, salirDeGrupo, unirseAGrupo,
+} from '@/lib/groups'
+import { invitarAGrupo } from '@/lib/invitar-a-grupo'
+import { agregarListaDeAmigo } from '@/lib/gente'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario } from '@/lib/users'
 import { cambiarNombre } from '@/lib/perfil'
@@ -170,21 +175,40 @@ export async function updatePriorityAction(formData: FormData) {
   revalidatePath('/grupos', 'layout')
 }
 
+/**
+ * La fecha del formulario de un grupo: la del cumple (cumple=1: día y mes, ver fechaDeCumple) o la elegida en el
+ * calendario. invalida: escribió algo que no es una fecha que exista (el 31 de abril, o el día sin el mes).
+ */
+function fechaDelForm(fd: FormData): { esCumple: boolean; fecha: string | null; invalida: boolean } {
+  if (fd.get('cumple') === '1') {
+    const fecha = fechaDeCumple(numero(fd, 'dia'), numero(fd, 'mes'))
+    return { esCumple: true, fecha, invalida: !fecha && !!(str(fd, 'dia') || str(fd, 'mes')) }
+  }
+  const fecha = str(fd, 'fecha') ?? null
+  return { esCumple: false, fecha, invalida: !!fecha && !fechaDeGrupoValida(fecha) }
+}
+
+/** Los amigos tildados en "¿Con quién la armás?". */
+const amigosElegidos = (fd: FormData) => fd.getAll('amigo').filter((v): v is string => typeof v === 'string' && esUuid(v))
+
 export async function createGroupAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const nombre = recortar(str(formData, 'nombre') ?? '', LARGO.nombreGrupo)
   if (!nombre) redirect('/grupos/nuevo')
-  const fecha = str(formData, 'fecha')
+  const { esCumple, fecha, invalida } = fechaDelForm(formData)
   // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
   // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
   const id = await crearGrupo(db, session.userId, {
     nombre, descripcion: recortar(str(formData, 'descripcion') ?? '', LARGO.descripcionGrupo) || undefined,
-    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on',
+    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on', esCumple, fotoUrl: str(formData, 'foto'),
+    parentesco: parentescoDelForm(str(formData, 'parentesco'), str(formData, 'parentescoOtro')),
   })
+  // a los amigos elegidos les llega el aviso; con la lista ya creada, que no llegue uno no la frena
+  const invitados = await invitarAGrupo(db, id, session.userId, amigosElegidos(formData)).catch(() => [])
   revalidatePath('/mi-lista')
   revalidatePath('/eventos')
-  redirect(fecha && !fechaDeGrupoValida(fecha) ? `/grupos/${id}?fecha=invalida` : `/grupos/${id}`)
+  redirect(invalida ? `/grupos/${id}?fecha=invalida` : invitados.length ? `/grupos/${id}?nuevo=invitados` : `/grupos/${id}`)
 }
 
 export async function setGroupDateAction(formData: FormData) {
@@ -192,13 +216,59 @@ export async function setGroupDateAction(formData: FormData) {
   if (!session?.userId) redirect('/')
   const id = str(formData, 'grupoId') ?? ''
   if (!esUuid(id)) return
-  const fecha = formData.get('quitar') ? null : str(formData, 'fecha') ?? null
-  if (fecha !== null && !fechaDeGrupoValida(fecha)) redirect(`/grupos/${id}?fecha=invalida`)
-  await guardarFechaGrupo(db, id, session.userId, fecha, formData.get('anual') === 'on')
+  const quitar = !!formData.get('quitar')
+  const { esCumple, fecha, invalida } = fechaDelForm(formData)
+  if (!quitar && (invalida || (esCumple && !fecha))) redirect(`/grupos/${id}?fecha=invalida`)
+  await guardarFechaGrupo(db, id, session.userId, quitar ? null : fecha, formData.get('anual') === 'on', undefined, esCumple)
   revalidatePath(`/grupos/${id}`)
   revalidatePath('/eventos')
   // sin el aviso de una fecha inválida anterior, si quedó en la dirección
   redirect(`/grupos/${id}`)
+}
+
+/** La foto del grupo, ya subida (ver FotoDeLista); sin foto, la quita. Se queda en la pantalla. */
+export async function setGroupPhotoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  await guardarFotoGrupo(db, id, session.userId, str(formData, 'foto') ?? null)
+  revalidatePath(`/grupos/${id}`)
+  revalidatePath('/gente')
+  revalidatePath('/eventos')
+  revalidatePath('/l', 'layout')
+}
+
+/** "¿Qué es para vos?" en un grupo: cada dueño el suyo. */
+export async function setParentescoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  await guardarParentesco(db, id, session.userId, parentescoDelForm(str(formData, 'parentesco'), str(formData, 'parentescoOtro')))
+  revalidatePath(`/grupos/${id}`)
+  revalidatePath('/gente')
+  revalidatePath('/eventos')
+  revalidatePath('/l', 'layout')
+  if (esUuid(id)) redirect(`/grupos/${id}`)
+}
+
+/** Desde el grupo: avisarles a más amigos que los sumaron (ver invitarAGrupo). */
+export async function invitarAlGrupoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  const invitados = await invitarAGrupo(db, id, session.userId, amigosElegidos(formData))
+  revalidatePath(`/grupos/${id}`)
+  if (invitados.length) redirect(`/grupos/${id}?nuevo=invitados`)
+}
+
+/** "Agregar" la lista en común de un amigo a tu gente (y su cumple a tus Eventos). */
+export async function agregarListaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await agregarListaDeAmigo(db, session.userId, str(formData, 'listId') ?? '')
+  revalidatePath('/gente')
+  revalidatePath('/eventos')
+  revalidatePath('/inicio')
 }
 
 const numero = (fd: FormData, k: string) => { const v = Number(str(fd, k)); return Number.isInteger(v) && v > 0 ? v : null }
@@ -263,6 +333,9 @@ export async function joinGroupAction(formData: FormData) {
   if (!session?.userId) redirect(`/grupos/unirme/${invite}`)
   const id = await unirseAGrupo(db, invite, session.userId)
   if (!id) redirect('/mi-lista')
+  // qué es la lista para él, si lo dijo al sumarse
+  const parentesco = parentescoDelForm(str(formData, 'parentesco'), str(formData, 'parentescoOtro'))
+  if (parentesco) await guardarParentesco(db, id, session.userId, parentesco)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   redirect(`/grupos/${id}`)

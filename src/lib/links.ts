@@ -197,3 +197,14 @@ export const esUrlFotoDeseo = (v: string) => RUTA_FOTO_DESEO.test(v)
 
 /** El id (en minúsculas) de la foto subida de esa URL; null si es un link cualquiera. */
 export const idDeUrlFotoDeseo = (v: string) => RUTA_FOTO_DESEO.exec(v)?.[1].toLowerCase() ?? null
+
+/**
+ * De dónde es el link de la tienda, para decirlo en el botón: "zara.com", "tiendamia.com". MercadoLibre, de cualquier
+ * país y con el subdominio que sea (articulo., listado., meli.la), como "Mercado Libre". Null si no se puede leer.
+ */
+export function sitioDeLaTienda(link: string): string | null {
+  let host: string
+  try { host = hostSinPunto(new URL(link).hostname) } catch { return null }
+  if (/(^|\.)mercadoli(bre|vre)\.[a-z.]+$|(^|\.)meli\.la$/.test(host)) return 'Mercado Libre'
+  return host.replace(/^(www|m)\./, '') || null
+}
