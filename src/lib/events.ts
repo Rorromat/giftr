@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql } from '@/lib/groups'
+import { esDuenoSql, esUuid, fechaDeGrupoValida, noEsNiFueDuenoSql, relacionDeLista, tituloDelGrupo, tuParentesco } from '@/lib/groups'
 import { expireStaleClaims, ocupaSql } from '@/lib/claims'
 import { ultimosRegalos } from '@/lib/regalos'
 import { cupoDe } from '@/lib/serialize'
@@ -130,16 +130,18 @@ export function proximaDeGrupo(eventoFecha: string | null, anual: boolean, hoy: 
 }
 
 /**
- * La fecha en la pantalla del grupo: la próxima ("Sábado 22 de agosto · en 10 días"), una única que ya pasó (sigue
- * guardada: "Fue el 1 de marzo de 2026 · cambiar") o ninguna ("Agregar una fecha").
+ * La fecha en la pantalla del grupo: la próxima ("Sábado 22 de agosto · en 10 días"; la de un cumple, "Cumple el sábado
+ * 22 de agosto · en 10 días"), una única que ya pasó (sigue guardada: "Fue el 1 de marzo de 2026 · cambiar") o ninguna
+ * ("Agregar una fecha", "Agregar su cumple").
  */
-export function rotuloFechaGrupo(eventoFecha: string | null, anual: boolean, hoy: Date): string {
+export function rotuloFechaGrupo(eventoFecha: string | null, anual: boolean, hoy: Date, esCumple = false): string {
   const fecha = proximaDeGrupo(eventoFecha, anual, hoy)
   if (fecha) {
     const dias = diasEntre(hoy, fecha)
-    return `${fechaLarga(fecha, hoy)} · ${dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : `en ${dias} días`}`
+    const larga = fechaLarga(fecha, hoy)
+    return `${esCumple ? `Cumple el ${larga.charAt(0).toLowerCase()}${larga.slice(1)}` : larga} · ${dias === 0 ? '¡hoy!' : dias === 1 ? 'mañana' : `en ${dias} días`}`
   }
-  if (!eventoFecha) return 'Agregar una fecha'
+  if (!eventoFecha) return esCumple ? 'Agregar su cumple' : 'Agregar una fecha'
   const [y, m, d] = eventoFecha.split('-').map(Number)
   return `Fue el ${d} de ${MESES[m - 1]} de ${y} · cambiar`
 }
@@ -219,7 +221,10 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
   const [owners, miembros] = await Promise.all([
     ownerIds.length ? db.select().from(users).where(inArray(users.id, ownerIds)) : [],
     grupoIds.length
-      ? db.select({ listId: listMembers.listId, nombre: users.nombre, id: users.id, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl })
+      ? db.select({
+        listId: listMembers.listId, nombre: users.nombre, id: users.id, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl,
+        parentesco: listMembers.parentesco,
+      })
         .from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
         .where(and(inArray(listMembers.listId, grupoIds), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
       : [],
@@ -247,13 +252,18 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       if (!fecha) continue
       const sorpresa = list.tipo === 'sorpresa'
       const delGrupo = miembros.filter((m) => m.listId === list.id)
+      // qué es para él (si es uno de los dueños) o para los dueños ("Hijo de Rodri y Euge")
+      const suyo = delGrupo.find((m) => m.id === userId)?.parentesco
+      const relacion = propio ? suyo && tuParentesco(suyo) : relacionDeLista(delGrupo)
+      // con foto, la del grupo (la cara de Juancito); si no, la de cada dueño
+      const conFoto = !sorpresa && list.fotoUrl
       conFecha.push({
         listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
-        titulo: sorpresa ? `Sorpresa para ${list.nombre ?? 'alguien'}` : list.nombre ?? 'Grupo',
+        titulo: sorpresa ? `Sorpresa para ${list.nombre ?? 'alguien'}` : tituloDelGrupo(list.nombre ?? 'Grupo', list.esCumple),
         href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
-        personas: sorpresa ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
-        caras: sorpresa ? [null] : delGrupo.map(urlFoto),
-        contexto: sorpresa ? 'No usa GiftR' : propio ? 'Tu grupo' : 'Grupo',
+        personas: sorpresa || conFoto ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
+        caras: sorpresa ? [null] : conFoto ? [list.fotoUrl] : delGrupo.map(urlFoto),
+        contexto: sorpresa ? 'No usa GiftR' : relacion || (propio ? 'Tu grupo' : 'Grupo'),
       })
     }
   }
@@ -356,7 +366,7 @@ async function fechaDeLista(db: Db, listId: string): Promise<{ f: (FechaEvento &
   if (row.list.tipo === 'personal' || row.list.paraUserId) {
     return { corte, f: row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null }
   }
-  return { corte, f: row.list.eventoFecha ? { esCumple: false, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) } : null }
+  return { corte, f: row.list.eventoFecha ? { esCumple: row.list.esCumple, ...fechaDeGrupo(row.list.eventoFecha, row.list.eventoAnual) } : null }
 }
 
 /** El próximo evento de una lista (cumple del dueño o fecha del grupo), para la cuenta regresiva. */
@@ -411,6 +421,8 @@ export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy:
 
 /**
  * Fecha del grupo: 'YYYY-MM-DD' o null para quitarla. Solo un dueño del grupo puede cambiarla. Una que no existe, no.
+ * esCumple: el grupo es el cumple de alguien (la fecha viene de fechaDeCumple y se repite todos los años); si no, deja de
+ * serlo. El cumple que ya tenía, guardado de nuevo, queda como estaba.
  * Se guarda como la cargaron: en una anual, el año es el de la primera vez (un casamiento a más de un año no es este
  * noviembre). Lo del evento que ya pasó no vuelve a ser de este: en corteEvento queda desde cuándo lo comprado era para
  * el que venía con la fecha de antes (ver desdeElUltimoEvento), aunque la nueva no lo encuentre (una única que ya fue y
@@ -419,8 +431,9 @@ export function fechaParaEditar(eventoFecha: string | null, anual: boolean, hoy:
  * tocar la fecha no corre la primera vez. Y si esa próxima es del año que viene, cambiarle solo el día no la manda a ese.
  */
 export async function guardarFechaGrupo(
-  db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, ahora = new Date(),
+  db: Db, listId: string, userId: string, fecha: string | null, anual: boolean, ahora = new Date(), esCumple = false,
 ): Promise<boolean> {
+  if (esCumple) anual = true
   if (!esUuid(listId)) return false
   if (fecha !== null && !fechaDeGrupoValida(fecha)) return false
   const hoy = hoyLocal(ahora)
@@ -431,7 +444,8 @@ export async function guardarFechaGrupo(
     if (!antes) return false
     const hoyIso = hoy.toISOString().slice(0, 10)
     const mostrada = antes.eventoFecha && antes.eventoAnual ? fechaParaEditar(antes.eventoFecha, true, hoy) : null
-    const sigueIgual = anual && !!mostrada && fecha === mostrada
+    // el cumple se edita con el día y el mes de siempre (ver fechaDeCumple), no con la próxima vez
+    const sigueIgual = esCumple ? fecha === antes.eventoFecha && antes.eventoAnual : anual && !!mostrada && fecha === mostrada
     // En una anual que ya cayó, el formulario muestra la próxima, que puede ser del año que viene: si dejan ese año y
     // cambian el día por uno que todavía no llegó en este, es en este (el 21/10, corregir el 12/10 por el 25 es en 4 días,
     // no en 2027). El servidor no lo distingue de quien quería ese año, y se ve en el rótulo: volver a guardar con el año
@@ -441,13 +455,14 @@ export async function guardarFechaGrupo(
     // El 29/2 de un año que no es bisiesto no existe: se guarda el de cuatro años antes, que este año cae el 28/2 (enAnio).
     const anio = fecha ? Number(fecha.slice(0, 4)) : 0
     const unAnioAntes = fecha ? `${anio - 1}${fecha.slice(4)}` : null // '2027-02-29' no existe, pero se compara bien con hoy
-    const esDeEsteAnio = anual && !!mostrada && !!fecha && !!unAnioAntes && antes.eventoFecha! < hoyIso
+    const esDeEsteAnio = !esCumple && anual && !!mostrada && !!fecha && !!unAnioAntes && antes.eventoFecha! < hoyIso
       && fecha.slice(0, 4) === mostrada.slice(0, 4) && unAnioAntes >= hoyIso
     const deEsteAnio = unAnioAntes && fechaDeGrupoValida(unAnioAntes) ? unAnioAntes : `${anio - 4}${fecha?.slice(4)}`
     const corte = desdeDe(antes.eventoFecha ? fechaDeGrupo(antes.eventoFecha, antes.eventoAnual) : null, antes.corte, hoy, ahora)
     await t.update(lists).set({
-      eventoFecha: sigueIgual ? antes.eventoFecha : esDeEsteAnio ? deEsteAnio : fecha, eventoAnual: anual,
-      corteEvento: corte.getTime() > 0 ? corte : null, // la de antes todavía no había caído nunca: no hay corte
+      eventoFecha: sigueIgual ? antes.eventoFecha : esDeEsteAnio ? deEsteAnio : fecha, eventoAnual: anual, esCumple,
+      // la de antes todavía no había caído nunca: no hay corte. La misma de antes, el que tenía.
+      corteEvento: sigueIgual && esCumple ? antes.corte : corte.getTime() > 0 ? corte : null,
     }).where(eq(lists.id, listId))
     return true
   })

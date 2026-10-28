@@ -7,11 +7,14 @@ import { newShareToken, urlFoto } from '@/lib/users'
 import { pickItemFields } from '@/lib/serialize'
 import { recienHecho } from '@/lib/repetido'
 import { desdeQueOcupa, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
+import { esUrlFotoDeseo } from '@/lib/links'
+import { LARGO, recortar } from '@/lib/limites'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
 
-export type Dueno = { id: string; nombre: string; foto: string | null }
+/** parentesco: qué es la lista para él, en un grupo (ver PARENTESCOS); en una lista personal no hay. */
+export type Dueno = { id: string; nombre: string; foto: string | null; parentesco?: string | null }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const esUuid = (s: string) => UUID.test(s)
@@ -31,6 +34,64 @@ export function newInviteToken(): string {
 export function juntarNombres(nombres: string[]): string {
   if (nombres.length <= 1) return nombres[0] ?? ''
   return `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}`
+}
+
+// ---------------------------------------------------------------- lo que es la lista para cada dueño
+
+/** Lo que se elige en "¿Qué es para vos?"; con "Otro" se escribe lo que sea (ver parentescoDelForm). */
+export const PARENTESCOS = [
+  'Hijo', 'Hija', 'Padre', 'Madre', 'Hermano', 'Hermana', 'Abuelo', 'Abuela', 'Nieto', 'Nieta', 'Tío', 'Tía', 'Tío abuelo',
+  'Tía abuela', 'Sobrino', 'Sobrina', 'Primo', 'Prima', 'Pareja', 'Amigo', 'Amiga',
+] as const
+/** El valor de "Otro" en el formulario: el parentesco va escrito en otro campo. */
+export const OTRO_PARENTESCO = 'otro'
+
+const primeraMayuscula = (t: string) => t.charAt(0).toLocaleUpperCase('es') + t.slice(1)
+const primeraMinuscula = (t: string) => t.charAt(0).toLocaleLowerCase('es') + t.slice(1)
+
+/**
+ * Lo que eligió en "¿Qué es para vos?": uno de PARENTESCOS o, con "Otro", lo que escribió (con mayúscula y sin espacios de
+ * más). Null si no eligió nada, si eligió algo que no es de la lista (un formulario armado a mano) o si con "Otro" no
+ * escribió nada.
+ */
+export function parentescoDelForm(elegido: unknown, escrito: unknown): string | null {
+  if (elegido === OTRO_PARENTESCO) {
+    const t = typeof escrito === 'string' ? recortar(escrito.replace(/\s+/g, ' '), LARGO.parentesco) : ''
+    return t ? primeraMayuscula(t) : null
+  }
+  return typeof elegido === 'string' && (PARENTESCOS as readonly string[]).includes(elegido) ? elegido : null
+}
+
+const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0]
+
+/**
+ * Qué es la lista para sus dueños, como lo leen los demás: "Hijo de Rodri y Euge", "Abuela de Sofi · madre de Ana". Los
+ * que no dijeron qué es no van. Null si no lo dijo nadie.
+ */
+export function relacionDeLista(duenos: Pick<Dueno, 'nombre' | 'parentesco'>[]): string | null {
+  const grupos = new Map<string, { parentesco: string; nombres: string[] }>()
+  for (const d of duenos) {
+    if (!d.parentesco) continue
+    const clave = d.parentesco.toLocaleLowerCase('es')
+    const g = grupos.get(clave) ?? { parentesco: d.parentesco, nombres: [] }
+    g.nombres.push(primerNombre(d.nombre))
+    grupos.set(clave, g)
+  }
+  if (!grupos.size) return null
+  return [...grupos.values()]
+    .map((g, i) => `${i ? primeraMinuscula(g.parentesco) : g.parentesco} de ${juntarNombres(g.nombres)}`).join(' · ')
+}
+
+/** Para uno de sus dueños: "Tu hijo", "Tu tío abuelo". */
+export const tuParentesco = (parentesco: string) => `Tu ${primeraMinuscula(parentesco)}`
+
+/**
+ * El nombre de un grupo donde se lo nombra como evento: el de un cumple, "Cumple de Juancito" (sin repetirlo si ya lo
+ * dice, ni el "Lista de" del principio); el de cualquier otro, tal cual.
+ */
+export function tituloDelGrupo(nombre: string, esCumple: boolean): string {
+  if (!esCumple || /^cumple\b/i.test(nombre)) return nombre
+  return `Cumple de ${nombre.replace(/^lista de\s+/i, '')}`
 }
 
 // Ser dueño de una lista son dos preguntas distintas:
@@ -63,14 +124,18 @@ export function noEsNiFueDuenoSql(db: Db, userId: string) {
   )!
 }
 
-/** Dueños de una lista en orden: el de la lista personal, o los co-dueños activos del grupo por antigüedad. */
+/**
+ * Dueños de una lista en orden: el de la lista personal, o los co-dueños activos del grupo por antigüedad (con lo que es
+ * la lista para cada uno).
+ */
 export async function duenosDeLista(db: Db, list: { id: string; ownerId: string | null }): Promise<Dueno[]> {
   const campos = { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }
-  const filas = list.ownerId
-    ? await db.select(campos).from(users).where(eq(users.id, list.ownerId))
-    : await db.select(campos).from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
-      .where(and(eq(listMembers.listId, list.id), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
-  return filas.map((u) => ({ id: u.id, nombre: u.nombre, foto: urlFoto(u) }))
+  if (list.ownerId) {
+    return (await db.select(campos).from(users).where(eq(users.id, list.ownerId))).map((u) => ({ id: u.id, nombre: u.nombre, foto: urlFoto(u) }))
+  }
+  const filas = await db.select({ ...campos, parentesco: listMembers.parentesco }).from(listMembers).innerJoin(users, eq(listMembers.userId, users.id))
+    .where(and(eq(listMembers.listId, list.id), isNull(listMembers.salioAt))).orderBy(asc(listMembers.createdAt))
+  return filas.map((u) => ({ id: u.id, nombre: u.nombre, foto: urlFoto(u), parentesco: u.parentesco }))
 }
 
 /**
@@ -103,10 +168,39 @@ export function fechaDeGrupoValida(fecha: string): boolean {
   return y >= ANIO_MINIMO && y <= ANIO_MAXIMO && f.getUTCFullYear() === y && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia
 }
 
-/** Crea el grupo con el usuario de dueño. La fecha va en el mismo alta (una que no existe no se guarda). */
+/**
+ * El cumple de un grupo (solo día y mes, como el de Perfil) se guarda como su fecha, que se repite todos los años desde
+ * este: así cae siempre (ver proximaVez) sin saber en qué año nació. Es bisiesto, para que entre el 29/2.
+ */
+export const ANIO_DE_CUMPLE = 2000
+
+/** El día y mes de un cumple como fecha de grupo ('2000-MM-DD'); null si falta uno o no existe (el 31/4). */
+export function fechaDeCumple(dia: number | null, mes: number | null): string | null {
+  if (!dia || !mes || !Number.isInteger(dia) || !Number.isInteger(mes)) return null
+  const f = `${ANIO_DE_CUMPLE}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+  return fechaDeGrupoValida(f) ? f : null
+}
+
+/** El día y mes guardados en la fecha de un grupo, para el formulario del cumple. */
+export function diaYMes(eventoFecha: string | null): { dia: number; mes: number } | null {
+  if (!eventoFecha) return null
+  const [, mes, dia] = eventoFecha.split('-').map(Number)
+  return { dia, mes }
+}
+
+/** Solo una foto subida (/foto/deseo/:id): un link de afuera puede dejar de andar o cambiar de foto. */
+const fotoDeGrupo = (fotoUrl: string | null | undefined) => (fotoUrl && esUrlFotoDeseo(fotoUrl) ? fotoUrl : null)
+
+/**
+ * Crea el grupo con el usuario de dueño. La fecha, la foto, si es un cumple (todos los años) y qué es para él van en el
+ * mismo alta (una fecha que no existe o una foto que no es una subida no se guardan).
+ */
 export async function crearGrupo(
   db: Db, userId: string,
-  p: { nombre: string; descripcion?: string; eventoFecha?: string | null; eventoAnual?: boolean },
+  p: {
+    nombre: string; descripcion?: string; eventoFecha?: string | null; eventoAnual?: boolean
+    esCumple?: boolean; fotoUrl?: string | null; parentesco?: string | null
+  },
 ): Promise<string> {
   return db.transaction(async (tx) => {
     // Un doble toque en "Crear grupo" no arma dos: el mismo grupo recién creado es ese (lock del usuario, por dos a la vez).
@@ -118,9 +212,10 @@ export async function crearGrupo(
       tipo: 'grupo', nombre: p.nombre, descripcion: p.descripcion ?? null,
       shareToken: newShareToken(), inviteToken: newInviteToken(),
       eventoFecha: p.eventoFecha && fechaDeGrupoValida(p.eventoFecha) ? p.eventoFecha : null,
-      eventoAnual: p.eventoAnual ?? true,
+      eventoAnual: p.esCumple || (p.eventoAnual ?? true),
+      esCumple: p.esCumple ?? false, fotoUrl: fotoDeGrupo(p.fotoUrl),
     }).returning({ id: lists.id })
-    await tx.insert(listMembers).values({ listId: list.id, userId })
+    await tx.insert(listMembers).values({ listId: list.id, userId, parentesco: p.parentesco ?? null })
     return list.id
   })
 }
@@ -141,7 +236,7 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
     .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId)))
   if (!list) return null
   const otros = alias(listMembers, 'otros')
-  const [duenos, rows, despues] = await Promise.all([
+  const [duenos, rows, despues, [yo]] = await Promise.all([
     duenosDeLista(db, list),
     // sin los que eliminaron (ver borrarDeseo)
     db.select().from(items).where(and(eq(items.listId, list.id), isNull(items.borradoAt))).orderBy(asc(items.createdAt)),
@@ -151,6 +246,8 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
       .innerJoin(users, eq(otros.userId, users.id))
       .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId)))
       .orderBy(asc(otros.createdAt)),
+    db.select({ parentesco: listMembers.parentesco }).from(listMembers)
+      .where(and(eq(listMembers.listId, list.id), eq(listMembers.userId, userId))),
   ])
   return {
     id: list.id,
@@ -158,6 +255,10 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
     descripcion: list.descripcion,
     eventoFecha: list.eventoFecha,
     eventoAnual: list.eventoAnual,
+    esCumple: list.esCumple,
+    fotoUrl: list.fotoUrl,
+    /** Qué es para el que mira (ver guardarParentesco). */
+    miParentesco: yo?.parentesco ?? null,
     shareToken: list.shareToken,
     inviteToken: list.inviteToken!,
     duenos,
@@ -172,7 +273,10 @@ export async function grupoPorInvitacion(db: Db, inviteToken: string) {
   const [list] = await db.select().from(lists)
     .where(and(eq(lists.inviteToken, inviteToken), eq(lists.tipo, 'grupo')))
   if (!list) return null
-  return { id: list.id, nombre: list.nombre ?? 'Grupo', descripcion: list.descripcion, duenos: await duenosDeLista(db, list) }
+  return {
+    id: list.id, nombre: list.nombre ?? 'Grupo', descripcion: list.descripcion, esCumple: list.esCumple, fotoUrl: list.fotoUrl,
+    duenos: await duenosDeLista(db, list),
+  }
 }
 
 /**
@@ -307,6 +411,23 @@ export async function sacarDelGrupo(db: Db, listId: string, actorId: string, use
     await t.update(lists).set({ inviteToken: newInviteToken() }).where(eq(lists.id, listId))
     return true
   })
+}
+
+/** La foto del grupo (una subida, ver fotoDeGrupo), o null para quitarla. Solo un dueño. */
+export async function guardarFotoGrupo(db: Db, listId: string, userId: string, fotoUrl: string | null): Promise<boolean> {
+  if (!esUuid(listId) || (fotoUrl !== null && !fotoDeGrupo(fotoUrl))) return false
+  const r = await db.update(lists).set({ fotoUrl })
+    .where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId))).returning({ id: lists.id })
+  return r.length > 0
+}
+
+/** Qué es la lista para él (null: no dice). Cada dueño el suyo, solo mientras está en el grupo. */
+export async function guardarParentesco(db: Db, listId: string, userId: string, parentesco: string | null): Promise<boolean> {
+  if (!esUuid(listId)) return false
+  const r = await db.update(listMembers).set({ parentesco })
+    .where(and(eq(listMembers.listId, listId), eq(listMembers.userId, userId), isNull(listMembers.salioAt)))
+    .returning({ id: listMembers.userId })
+  return r.length > 0
 }
 
 /** Un link de invitación nuevo: el anterior deja de servir. Solo un dueño del grupo. Devuelve el token nuevo, o null. */

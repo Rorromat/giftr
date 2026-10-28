@@ -3,8 +3,8 @@ import { auth, signIn } from '@/auth'
 import { db } from '@/db'
 import { grupoPorInvitacion, juntarNombres } from '@/lib/groups'
 import { joinGroupAction } from '@/app/actions'
-import { AvatarStack } from '@/components/ui'
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { AvatarDeLista, CampoParentesco } from '@/components/ListaEnComun'
 
 // Unirse pide un toque (POST): WhatsApp abre los links solo para armar la vista previa,
 // y eso no tiene que sumar a nadie como dueño.
@@ -20,7 +20,7 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 pb-12 text-center">
-      <AvatarStack nombres={nombres} fotos={grupo.duenos.map((d) => d.foto)} size={64} />
+      <AvatarDeLista nombre={grupo.nombre} foto={grupo.fotoUrl} duenos={grupo.duenos} size={88} />
       <p className="text-[15px] font-medium">{invitan} a armar juntos</p>
       <h1 className="text-[32px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
@@ -35,8 +35,9 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
         otro de los que se sumaron y, si no queda nadie, se cancela (les avisamos). Lo que ya compraste queda como está.
       </p>
       {session?.userId ? (
-        <form action={joinGroupAction} className="mt-2 w-full">
+        <form action={joinGroupAction} className="mt-2 flex w-full flex-col gap-4 text-left">
           <input type="hidden" name="invite" value={token} />
+          <CampoParentesco etiqueta={`¿Qué es ${grupo.nombre} para vos? (opcional)`} />
           <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-14 w-full">Unirme al grupo</BotonEnviar>
         </form>
       ) : (

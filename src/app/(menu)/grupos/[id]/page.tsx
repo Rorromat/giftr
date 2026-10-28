@@ -2,9 +2,15 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { ANIO_MAXIMO, ANIO_MINIMO, grupoParaDueno, juntarNombres } from '@/lib/groups'
-import { leaveGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction } from '@/app/actions'
+import { grupoParaDueno, juntarNombres, relacionDeLista } from '@/lib/groups'
+import {
+  invitarAlGrupoAction, leaveGroupAction, newInviteAction, newShareLinkAction, removeMemberAction, setGroupDateAction, setParentescoAction,
+} from '@/app/actions'
 import { fechaParaEditar, hoyLocal, rotuloFechaGrupo } from '@/lib/events'
+import { amigosParaInvitar } from '@/lib/invitar-a-grupo'
+import { ElegirAmigos } from '@/components/Dividir'
+import { FotoDeLista } from '@/components/FotoDeLista'
+import { CampoParentesco, CamposFecha } from '@/components/ListaEnComun'
 import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
@@ -21,6 +27,7 @@ const AVISOS: Record<string, string> = {
   invitacion: 'Listo: el link de invitación es nuevo. El de antes ya no sirve para sumarse.',
   regalar: 'Listo: el link para regalar es nuevo. El de antes ya no anda: volvé a mandarlo por WhatsApp.',
   sacado: 'Listo: ya no es parte del grupo. El link de invitación cambió para que no vuelva a sumarse: si falta alguien, mandale el nuevo.',
+  invitados: 'Listo: les avisamos. Cuando se sumen, van a aparecer acá.',
 }
 
 export default async function Grupo({ params, searchParams }: {
@@ -32,11 +39,14 @@ export default async function Grupo({ params, searchParams }: {
   if (!session?.userId) redirect('/')
   const grupo = await grupoParaDueno(db, id, session.userId)
   if (!grupo) notFound()
+  const paraInvitar = await amigosParaInvitar(db, grupo.id, session.userId)
 
   const activos = grupo.items.filter((i) => i.estadoDueno === 'activo')
   const fechaInvalida = errorFecha === 'invalida'
   const aviso = nuevo && Object.hasOwn(AVISOS, nuevo) ? AVISOS[nuevo] : null
   const otros = grupo.duenos.filter((d) => d.id !== session.userId).map((d) => d.nombre)
+  const relacion = relacionDeLista(grupo.duenos)
+  const hoy = hoyLocal()
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? ''
   const shareUrl = `${base}/l/${grupo.shareToken}`
   const inviteUrl = `${base}/grupos/unirme/${grupo.inviteToken}`
@@ -49,22 +59,20 @@ export default async function Grupo({ params, searchParams }: {
                   action={<Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn bg-gr-accent"><Icon name="plus" size={20} strokeWidth={2.4} /></Link>} />
 
       <ListaHero etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
-                 waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}>
-        {/* Fecha del grupo: aparece en Eventos de los dueños y de quienes siguen la lista */}
+                 waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}
+                 foto={<FotoDeLista key={grupo.fotoUrl ?? ''} foto={grupo.fotoUrl} grupoId={grupo.id} size={56} enHero />}>
+        {/* Fecha del grupo (o su cumple): aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
-        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
+        <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${grupo.esCumple}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full bg-gr-on-hero/10 py-1.5 pl-2.5 pr-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
-            <Icon name="calendar" size={16} className="flex-none text-gr-accent" />
-            {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())}
+            <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none text-gr-accent" />
+            {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy, grupo.esCumple)}
           </summary>
-          <form action={setGroupDateAction} className="mt-2 flex flex-col gap-2 rounded-2xl bg-gr-surface p-3 text-gr-ink">
+          <form action={setGroupDateAction} className="mt-2 flex flex-col gap-3 rounded-2xl bg-gr-surface p-3 text-gr-ink">
             <input type="hidden" name="grupoId" value={grupo.id} />
             {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
-            <input name="fecha" type="date" required min={`${ANIO_MINIMO}-01-01`} max={`${ANIO_MAXIMO}-12-31`}
-                   defaultValue={fechaParaEditar(grupo.eventoFecha, grupo.eventoAnual, hoyLocal())} aria-label="Fecha del grupo" className="gr-input" />
-            <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
-              <input type="checkbox" name="anual" defaultChecked={grupo.eventoAnual} className="size-[22px] accent-gr-ink" /> Se repite todos los años
-            </label>
+            <CamposFecha esCumple={grupo.esCumple} eventoFecha={grupo.eventoFecha} anual={grupo.eventoAnual} opcional={false}
+                         fechaEnCalendario={grupo.esCumple ? '' : fechaParaEditar(grupo.eventoFecha, grupo.eventoAnual, hoy)} />
             <div className="flex gap-2">
               <BotonEnviar className="gr-btn-primary gr-btn--sm flex-1">Guardar</BotonEnviar>
               {grupo.eventoFecha && (
@@ -89,9 +97,36 @@ export default async function Grupo({ params, searchParams }: {
             <p className="text-base leading-tight font-semibold">
               {otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora'}
             </p>
-            <p className="text-[13px] leading-snug text-gr-muted">Invitá a quien arma la lista con vos: va a poder agregar y editar.</p>
+            <p className="text-[13px] leading-snug text-gr-muted">{relacion ?? 'Invitá a quien arma la lista con vos: va a poder agregar y editar.'}</p>
           </div>
         </div>
+        {/* qué es la lista para cada uno: cada dueño el suyo (la abuela de uno es la madre del otro) */}
+        <details key={grupo.miParentesco ?? ''} className="group flex flex-col">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-2xl bg-gr-comun px-3.5 text-sm [&::-webkit-details-marker]:hidden">
+            <span className="font-medium">Para vos {grupo.nombre} es: <b className="font-semibold text-gr-comun-ink">{grupo.miParentesco ?? 'sin decir'}</b></span>
+            <span className="text-[13px] font-semibold underline underline-offset-4">Cambiar</span>
+          </summary>
+          <form action={setParentescoAction} className="mt-2 flex flex-col gap-2">
+            <input type="hidden" name="grupoId" value={grupo.id} />
+            <CampoParentesco actual={grupo.miParentesco} etiqueta="¿Qué es para vos?" />
+            <p className="text-xs leading-snug text-gr-muted">Lo ven tus amigos en su gente, y los que regalan en la lista: “hijo de Rodri y Euge”.</p>
+            <BotonEnviar className="gr-btn-primary gr-btn--sm">Guardar</BotonEnviar>
+          </form>
+        </details>
+        {/* sumar a amigos de GiftR: les llega el aviso y se suman con un toque (ver invitarAGrupo) */}
+        {paraInvitar.length > 0 && (
+          <details className="group flex flex-col">
+            <summary className="gr-btn-primary gr-btn--sm cursor-pointer list-none gap-2 [&::-webkit-details-marker]:hidden">
+              <Icon name="users" size={18} />Sumar amigos de GiftR
+            </summary>
+            <form action={invitarAlGrupoAction} className="mt-2 flex flex-col gap-2.5">
+              <input type="hidden" name="grupoId" value={grupo.id} />
+              <ElegirAmigos amigos={paraInvitar} ambito="amigos-grupo" />
+              <p className="text-xs leading-snug text-gr-muted">A cada uno le llega un aviso con el nombre de la lista y se suma con un toque.</p>
+              <BotonEnviar pendiente="Avisando…" className="gr-btn gr-btn--sm w-full">Avisarles</BotonEnviar>
+            </form>
+          </details>
+        )}
         <div className="flex items-center gap-2 rounded-full bg-gr-soft py-1.5 pl-4 pr-1.5">
           <p className="min-w-0 flex-1 truncate text-[13px] font-medium">{inviteUrl.replace(/^https?:\/\//, '')}</p>
           <CopyLinkButton url={inviteUrl} />

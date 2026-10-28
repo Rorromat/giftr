@@ -206,9 +206,9 @@ test('toca solo users (el lock), pedidos_afuera y fotos_deseo: nada de deseos, r
   const s = servidor({ [ML_GRANDE]: { headers: { 'content-type': 'image/webp' }, cuerpo: png } })
   expect(await importarFotoDeseo(db, ownerId, ML, { pedir: s.pedir })).toMatchObject({ url: expect.stringMatching(/^\/foto\/deseo\//) })
   const tablas = new Set(consultas.flatMap((q) => [...q.matchAll(/(?:from|into|update|join)\s+"(\w+)"/gi)].map((m) => m[1])))
-  // items aparece solo en la limpieza de fotos que nadie usa (guardarFotoDeseo, como en cualquier subida): se mira si un
-  // deseo usa la foto, no qué deseo ni si está reservado
-  expect([...tablas].sort()).toEqual(['fotos_deseo', 'items', 'pedidos_afuera', 'users'])
+  // items y lists aparecen solo en la limpieza de fotos que nadie usa (guardarFotoDeseo, como en cualquier subida): se mira
+  // si un deseo o un grupo usa la foto, no qué deseo ni si está reservado
+  expect([...tablas].sort()).toEqual(['fotos_deseo', 'items', 'lists', 'pedidos_afuera', 'users'])
   expect(consultas.filter((q) => /"(claims|comments|group_gifts|group_gift_members|notifications)"/.test(q))).toEqual([])
 })
 

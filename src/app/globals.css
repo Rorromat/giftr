@@ -15,6 +15,9 @@
   --color-gr-on-brand: var(--gr-on-brand);
   --color-gr-blue: var(--gr-blue);
   --color-gr-on-blue: var(--gr-on-blue);
+  --color-gr-comun: var(--gr-comun);
+  --color-gr-comun-line: var(--gr-comun-line);
+  --color-gr-comun-ink: var(--gr-comun-ink);
   --color-gr-hero: var(--gr-hero);
   --color-gr-on-hero: var(--gr-on-hero);
   --color-gr-hero-detail: var(--gr-hero-detail);

@@ -26,6 +26,7 @@ import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag, LogoSticker } from '@/components/ui'
+import { AvatarDeLista } from '@/components/ListaEnComun'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
@@ -169,16 +170,18 @@ export default async function ListaAjena({
         <div className="flex items-center gap-3.5">
           {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
           <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
-            {vista.grupoNombre
-              ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={52} />
-              : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-gr-on-hero/20" />}
+            {vista.grupoFoto
+              ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={64} />
+              : vista.grupoNombre
+                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={52} />
+                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-gr-on-hero/20" />}
           </Link>
           <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
               {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
             </h1>
             <p className="text-sm text-gr-on-hero/70">
-              {vista.grupoNombre && `De ${vista.ownerNombre}. `}Elegí, reservá y no te duplicás con nadie.
+              {vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.
             </p>
           </div>
         </div>
