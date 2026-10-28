@@ -1,6 +1,4 @@
 import Link from 'next/link'
-import type { Cuentas } from '@/lib/regalos'
-import { plata } from '@/lib/pesos'
 import { calendarioDelAnio, diaEnElAnio, diasEntre, fechaCorta, fechaLarga, MESES, repartirProximos, SEMANA, type Evento } from '@/lib/events'
 import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
 import { AvatarStack, Icon, Starburst } from '@/components/ui'
@@ -165,26 +163,6 @@ export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[
     }
   }
   return <Calendario meses={calendarioDelAnio(eventos, hoy)} dias={dias} cosas={cosas} orden={todas.map((t) => t.clave)} vacio={!eventos.length} />
-}
-
-/** El cartel de las cuentas de regalos grupales (los totales son netos: con alguien pueden estar a mano y tener partes sin marcar). */
-export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
-  if (!cuentas.personas.length) return null
-  return (
-    <Link href="/cuentas" className="flex min-h-14 items-center gap-3 rounded-[22px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
-      <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-gr-on-brand/10 text-gr-accent"><Icon name="wallet" size={18} /></span>
-      <span className="min-w-0 flex-1">
-        Cuentas pendientes:{' '}
-        {cuentas.debes || cuentas.teDeben || cuentas.dolares?.debes || cuentas.dolares?.teDeben
-          ? [
-            cuentas.debes && `debés ${plata(cuentas.debes)}`, cuentas.dolares?.debes && `debés ${plata(cuentas.dolares.debes, 'USD')}`,
-            cuentas.teDeben && `te deben ${plata(cuentas.teDeben)}`, cuentas.dolares?.teDeben && `te deben ${plata(cuentas.dolares.teDeben, 'USD')}`,
-          ].filter(Boolean).join(' · ')
-          : 'están a mano, falta marcarlo'}
-      </span>
-      <Icon name="chevron" size={18} className="flex-none text-gr-accent" />
-    </Link>
-  )
 }
 
 /** Si no cargó su cumple: para que su gente lo tenga con tiempo. */

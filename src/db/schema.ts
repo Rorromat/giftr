@@ -348,16 +348,26 @@ export const codazos = pgTable('codazos', {
 
 /**
  * La bandeja de Avisos: cada aviso que le mandamos a alguien (codazos, solicitudes de amistad, propuestas de dividir, el
- * amigo invisible), tal como le llegó al celular, haya activado los avisos o no. De quién es (para su foto), salvo que sea
- * anónimo (las preguntas del amigo invisible) o de un invitado.
+ * amigo invisible, las cuentas de los regalos grupales), tal como le llegó al celular, haya activado los avisos o no. De
+ * quién es (para su foto), salvo que sea anónimo (las preguntas del amigo invisible) o de un invitado.
  */
 export const avisos = pgTable('avisos', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   deUserId: uuid('de_user_id').references(() => users.id, { onDelete: 'set null' }),
+  // qué es: de esto sale si va en "Para vos", en Inicio (ver PARA_VOS). Los de antes de la migración 0034 no lo tienen.
+  // regalo_comprado: el que organiza un regalo grupal lo compró y te toca tu parte. pago: te pagaron tu parte de uno.
+  tipo: text('tipo', {
+    enum: [
+      'codazo', 'amistad_pedida', 'amistad_aceptada', 'propuesta_regalo', 'respuesta_propuesta', 'regalo_comprado', 'pago',
+      'invisible_invitacion', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta',
+    ],
+  }),
   titulo: text('titulo').notNull(),
   cuerpo: text('cuerpo').notNull(),
   url: text('url').notNull(),
+  // lo limpió de "Para vos", en Inicio: ya no es nuevo, aunque no haya abierto la campanita (ver limpiarParaVos)
+  vistoAt: timestamp('visto_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('avisos_user_id_created_at_idx').on(t.userId, t.createdAt)])
 

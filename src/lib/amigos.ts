@@ -161,9 +161,11 @@ export type ResultadoSolicitud =
   | { ok: true; estado: 'enviada' | 'amigos' }
   | { ok: false; reason: 'yo' | 'no_existe' | 'formato' | 'muchas' }
 
-const pidioAmistad = (primer: string, de: string) =>
-  ({ title: `🤝 ${primer} quiere ser tu amigo en GiftR`, body: 'Si aceptás, se ven las listas y los cumples.', url: '/gente#solicitudes', de })
-const acepto = (primer: string) => ({ title: `🤝 ${primer} aceptó`, body: 'Ya son amigos: se ven las listas y los cumples.', url: '/gente' })
+const pidioAmistad = (primer: string, de: string) => ({
+  tipo: 'amistad_pedida' as const, title: `🤝 ${primer} quiere ser tu amigo en GiftR`, body: 'Si aceptás, se ven las listas y los cumples.',
+  url: '/gente#solicitudes', de,
+})
+const acepto = (primer: string) => ({ tipo: 'amistad_aceptada' as const, title: `🤝 ${primer} aceptó`, body: 'Ya son amigos: se ven las listas y los cumples.', url: '/gente' })
 
 /**
  * Mandarle una solicitud a alguien. Si el otro ya me había mandado una (pendiente, o rechazada por mí), quedamos amigos:
@@ -441,7 +443,7 @@ export async function aceptarLinkDeAmigo(db: Db, userId: string, token: string, 
   })
   if (nuevo) {
     const primer = primerNombre(await nombreDe(db, userId))
-    await avisar(db, de.id, { title: `🤝 ${primer} se sumó como amigo`, body: 'Ya se ven las listas y los cumples.', url: '/gente', de: userId }, enviar)
+    await avisar(db, de.id, { tipo: 'amistad_aceptada', title: `🤝 ${primer} se sumó como amigo`, body: 'Ya se ven las listas y los cumples.', url: '/gente', de: userId }, enviar)
       .catch(() => 0)
   }
   return { ok: true, de }
