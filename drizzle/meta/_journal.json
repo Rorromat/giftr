@@ -243,8 +243,15 @@
     {
       "idx": 34,
       "version": "7",
-      "when": 1793151470641,
-      "tag": "0034_pagos_parciales",
+      "when": 1793144146747,
+      "tag": "0034_para_vos",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793154474069,
+      "tag": "0035_pagos_parciales",
       "breakpoints": true
     }
   ]

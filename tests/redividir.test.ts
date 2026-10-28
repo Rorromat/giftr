@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { groupGiftMembers, items, lists, notifications } from '@/db/schema'
+import { avisos as avisosPush, groupGiftMembers, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { pedirAmistad } from '@/lib/amigos'
@@ -90,8 +90,8 @@ test('pagó y después se sumó alguien: el encargado le devuelve la diferencia,
   await sumarseARegalo(db, giftId, sofi.id)
   await comprarRegalo(db, giftId, rodri.id, { total: 90000 })
   expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)).toBe(true)
-  // un doble toque no la vuelve a marcar
-  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)).toBe(false)
+  // un doble toque no cambia nada (ni le vuelve a avisar a Rodri, ver abajo)
+  expect(await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)).toBe(true)
 
   expect(await sumarseARegalo(db, giftId, caro.id)).toBe(true)
   expect(await division(db, bici.id, sofi.id)).toEqual([['Rodri', 30000, 0], ['Sofi', 30000, -15000], ['Caro', 30000, 30000]])
@@ -132,6 +132,11 @@ test('pagó y después se sumó alguien: el encargado le devuelve la diferencia,
   expect((await regalosDeItem(db, bici.id, { userId: sofi.id }))[0].miembros[1]).toMatchObject({ puso: true, pagado: false })
   const falta = (await misCuentas(db, sofi.id)).personas[0].lineas[0]
   expect(falta).toMatchObject({ tipo: 'debes', devolucion: false, monto: 15000, parte: 45000 })
+  // a Rodri le llega lo que Sofi le pagó cada vez: ahora, solo lo que le faltaba (y el doble toque de antes, nada)
+  await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)
+  const pagos = await db.select({ titulo: avisosPush.titulo }).from(avisosPush)
+    .where(and(eq(avisosPush.userId, rodri.id), eq(avisosPush.tipo, 'pago'))).orderBy(avisosPush.createdAt)
+  expect(pagos.map((a) => a.titulo)).toEqual(['💸 Sofi te pagó $45.000', '💸 Sofi te pagó $30.000', '💸 Sofi te pagó $15.000'])
 })
 
 test('dividido a mano: el que llega entra en 0 y el encargado se entera; la parte del que se va queda para él', async () => {

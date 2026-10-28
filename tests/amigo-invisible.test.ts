@@ -13,9 +13,11 @@ import {
   estadoDeJuegos, marcarYaLoTengo, misAmigosInvisibles, preguntar, tambienTeToco, responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo,
 } from '@/lib/amigo-invisible'
 import { diaEn, especialesQueVienen, fechasQueVienen, proximaEspecial } from '@/lib/fechas-especiales'
+import { hoyLocal } from '@/lib/events'
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
-const enDias = (n: number) => iso(new Date(Date.now() + n * 86400_000))
+// desde hoy en Argentina, como cuenta la app (ver hoyLocal): con la fecha UTC, de 21 a 24 daba un día de más
+const enDias = (n: number) => iso(new Date(hoyLocal().getTime() + n * 86400_000))
 
 test('las fechas especiales de Argentina: fijas y los terceros domingos', () => {
   expect(iso(diaEn('navidad', 2026))).toBe('2026-12-25')

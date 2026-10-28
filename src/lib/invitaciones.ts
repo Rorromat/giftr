@@ -82,12 +82,14 @@ export async function invitarARegalo(db: Db, giftId: string, deUserId: string, p
   await Promise.all(insertados.map((i) => avisar(db, i.para, r.sorpresa
     ? {
       de: deUserId,
+      tipo: 'propuesta_regalo',
       title: `🤫 ${quien} te propone una sorpresa`,
       body: `"${r.titulo}" para ${r.para}: no está en su lista y no se entera. ${comprado ? 'Ya la compró: en' : 'En'} partes iguales, ¿te sumás?`,
       url: '/inicio#invitaciones',
     }
     : {
       de: deUserId,
+      tipo: 'propuesta_regalo',
       title: `🎁 ${quien} te propone dividir un regalo`,
       body: `"${r.titulo}" para ${r.para}, en partes iguales.${comprado ? ' Ya lo compró.' : ''} ¿Te sumás?`,
       url: '/inicio#invitaciones',
@@ -175,11 +177,12 @@ export async function responderInvitacion(db: Db, userId: string, id: string, ac
   const quien = primerNombre(yo?.nombre ?? 'Alguien')
   await avisar(db, inv.deUserId, sumado
     ? {
+      tipo: 'respuesta_propuesta',
       title: `🤝 ${quien} se suma a "${r.titulo}"`,
       body: r.estado === 'comprado' ? 'Ya lo habías comprado: se volvió a dividir con su parte.' : `Lo dividen en partes iguales para ${r.para}.`,
       url: r.href, de: userId,
     }
-    : { title: `${quien} no se suma a "${r.titulo}"`, body: 'Podés invitar a alguien más desde el regalo.', url: r.href, de: userId },
+    : { tipo: 'respuesta_propuesta', title: `${quien} no se suma a "${r.titulo}"`, body: 'Podés invitar a alguien más desde el regalo.', url: r.href, de: userId },
   enviar).catch(() => 0)
   return { ok: true, token: r.token, itemId: r.itemId, href: r.href }
 }

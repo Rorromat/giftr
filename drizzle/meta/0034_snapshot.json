@@ -1,5 +1,5 @@
 {
-  "id": "8095a314-8752-478f-a6d2-7fba5b884cd6",
+  "id": "7bef7dec-c2f9-43db-9867-06dd27c59d4a",
   "prevId": "a3314edd-f097-4ddd-9ecb-08b39031027d",
   "version": "7",
   "dialect": "postgresql",
@@ -646,6 +646,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "titulo": {
           "name": "titulo",
           "type": "text",
@@ -663,6 +669,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "visto_at": {
+          "name": "visto_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -1339,19 +1351,6 @@
         },
         "monto": {
           "name": "monto",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pagado_monto": {
-          "name": "pagado_monto",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "pagado_antes": {
-          "name": "pagado_antes",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
