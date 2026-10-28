@@ -5,7 +5,9 @@ import { db } from '@/db'
 import { deseoParaEditar } from '@/lib/items'
 import { textoDueno } from '@/lib/compartir'
 import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
-import { Icon, ItemPhoto, PriorityTag, Seccion, PageHeader } from '@/components/ui'
+import { Icon, ItemPhoto, Seccion, PageHeader } from '@/components/ui'
+import { CategoriaDeseo, FichasDeseo, NotaDeseo } from '@/components/FichaDeseo'
+import { sitioDeLaTienda } from '@/lib/links'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { VideoDeseo } from '@/components/VideoDeseo'
 
@@ -20,8 +22,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
   const { deseo, grupo, shareToken } = editable
   const lista = grupo ? `/grupos/${grupo.id}` : '/mi-lista'
   const precio = deseo.precio ?? deseo.rangoPrecio
-  const cuantos = deseo.repetible ? 'Se puede repetir: varios pueden regalar algo así.'
-    : deseo.cantidad > 1 ? `Cantidad: ${deseo.cantidad}.` : null
+  const tienda = deseo.linkTienda && sitioDeLaTienda(deseo.linkTienda)
 
   return (
     <Seccion className="flex flex-col gap-4 pb-36 pt-2">
@@ -31,30 +32,25 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
         <FotoAmpliable src={deseo.fotoUrl} titulo={deseo.titulo}>
           <ItemPhoto src={deseo.fotoUrl} titulo={deseo.titulo} height={260} />
         </FotoAmpliable>
-        <div className="flex flex-col gap-3 p-4">
-          {deseo.categoria && <p className="gr-label">{deseo.categoria}</p>}
-          <div className="flex flex-col gap-1.5">
+        {/* como lo ve quien regala (ver /l/[token]/item), con sus palabras: "Lo quiero mucho", "Tu nota" */}
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-col gap-2">
+            {deseo.categoria && <CategoriaDeseo categoria={deseo.categoria} />}
             <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{deseo.titulo}</h1>
-            <div className="flex items-center gap-2">
-              {precio && <p className="text-lg font-semibold">{precio}</p>}
-              <PriorityTag prioridad={deseo.prioridad} className="h-6" />
-            </div>
+            {precio && <p className="text-xl font-semibold">{precio}</p>}
           </div>
-          {cuantos && <p className="text-sm text-gr-muted">{cuantos}</p>}
-          {deseo.notas && (
-            <p className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm leading-snug [overflow-wrap:anywhere]">
-              <span className="font-semibold">Nota:</span> {deseo.notas}
-            </p>
-          )}
+          <FichasDeseo deseo={deseo} voz="propia" />
+          {deseo.notas && <NotaDeseo notas={deseo.notas} quien={grupo ? 'La nota' : 'Tu nota'} />}
           {deseo.videoUrl && <VideoDeseo url={deseo.videoUrl} titulo={deseo.titulo} />}
           <div className="flex flex-wrap gap-2">
             {deseo.linkTienda && (
-              <a href={deseo.linkTienda} target="_blank" className="gr-btn gr-btn--sm">
-                Ver en la tienda <Icon name="external" size={16} strokeWidth={2} />
+              <a href={deseo.linkTienda} target="_blank" className="gr-btn gr-btn--sm w-full min-w-0">
+                <span className="truncate">Ver en {tienda || 'la tienda'}</span>
+                <Icon name="external" size={16} strokeWidth={2} className="flex-none" />
               </a>
             )}
             {/* El link del deseo es el de quien regala: WhatsApp muestra la foto y el precio */}
-            <a target="_blank" className="gr-btn gr-btn--sm gap-2"
+            <a target="_blank" className="gr-btn gr-btn--sm flex-1 gap-2"
                href={`https://wa.me/?text=${encodeURIComponent(textoDueno(deseo, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/item/${deseo.id}`))}`}>
               <Icon name="chat" size={16} strokeWidth={2} />Mandarlo por WhatsApp
             </a>
