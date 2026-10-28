@@ -20,16 +20,27 @@ const nivel = (v: Vista) => (v.dia ? 2 : v.mes ? 1 : 0)
 const ADENTRO = 'adentro'
 
 /**
+ * El último cambio de vista que pidió un toque (ver ir), y si lleva arriba de todo. Uno que llega sin esto es un atrás o
+ * adelante del navegador (ver Calendario). Se anota antes de cambiar la dirección: Next dibuja la vista nueva adentro de su
+ * popstate, antes que cualquier otro que lo escuche.
+ */
+let pedido: { url: string; arriba: boolean } | null = null
+
+/**
  * Ir a otra vista sin pedirle nada al servidor. Entrar apila (atrás vuelve); al de al lado, reemplaza (atrás sigue volviendo
  * a la de arriba, que es la misma: los meses son del año y los días, de su mes). Salir, si se había entrado desde la de
  * arriba, es volver atrás (si no, atrás volvería a entrar); si se llegó directo (un link, recargar), la reemplaza.
  * Sin __NA en el estado: así Next se entera y useSearchParams cambia (ver window.history.pushState en su app-router).
  */
 function ir(v: Vista, como: 'entrar' | 'al lado' | 'salir') {
-  if (como === 'entrar') history.pushState({ calendario: ADENTRO }, '', urlDe(v))
-  else if (como === 'al lado') history.replaceState({ calendario: history.state?.calendario }, '', urlDe(v))
-  else if (history.state?.calendario === ADENTRO) history.back()
-  else history.replaceState(null, '', urlDe(v))
+  const url = urlDe(v)
+  const atras = como === 'salir' && history.state?.calendario === ADENTRO
+  // volver con la flecha es un atrás: el navegador deja donde se estaba
+  pedido = { url, arriba: !atras }
+  if (como === 'entrar') history.pushState({ calendario: ADENTRO }, '', url)
+  else if (como === 'al lado') history.replaceState({ calendario: history.state?.calendario }, '', url)
+  else if (atras) history.back()
+  else history.replaceState(null, '', url)
 }
 
 /** Un link a otra vista: un link común (otra pestaña, sin JavaScript), y con un toque, sin recargar. */
@@ -282,8 +293,10 @@ function VistaDia({ mes, dia, meses, dias, cosas }: Datos & { mes: number; dia: 
 }
 
 /**
- * Todo el año, para recorrerlo (ver arriba). Cambiar de vista agranda la nueva desde donde estaba en la de arriba, la
- * achica al salir o la desliza al pasar a la de al lado; lleva arriba de todo y el foco al título (para que un lector de
+ * Todo el año, para recorrerlo (ver arriba). Cambiar de vista con un toque agranda la nueva desde donde estaba en la de
+ * arriba, la achica al salir o la desliza al pasar a la de al lado, y lleva arriba de todo (salvo la flecha de volver, que
+ * es un atrás: el navegador deja donde se estaba). Con atrás o adelante del navegador (deslizar, en el celu), nada: el
+ * gesto ya trae su animación y la nuestra encima era un zoom de más. Siempre, el foco al título (para que un lector de
  * pantalla diga dónde está).
  */
 export function Calendario({ orden, vacio, ...datos }: Datos & {
@@ -295,17 +308,20 @@ export function Calendario({ orden, vacio, ...datos }: Datos & {
   const vista = vistaDe(useSearchParams(), datos.dias)
   const clave = urlDe(vista)
   const [antes, setAntes] = useState(vista)
-  const [animacion, setAnimacion] = useState<Animacion | null>(null)
+  const [cambio, setCambio] = useState<{ animacion: Animacion | null; arriba: boolean } | null>(null)
   if (urlDe(antes) !== clave) {
+    const porToque = pedido?.url === clave ? pedido : null
     setAntes(vista)
-    setAnimacion(animacionEntre(antes, vista, datos.meses))
+    setCambio({ animacion: porToque && animacionEntre(antes, vista, datos.meses), arriba: !!porToque?.arriba })
   }
   const titulo = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
-    if (!animacion) return
-    window.scrollTo({ top: 0 })
+    if (!cambio) return
+    pedido = null
+    if (cambio.arriba) window.scrollTo({ top: 0 })
     titulo.current?.focus({ preventScroll: true })
-  }, [animacion])
+  }, [cambio])
+  const animacion = cambio?.animacion
 
   const { mes, dia } = vista
   const m = mes ? datos.meses[mes - 1] : null
