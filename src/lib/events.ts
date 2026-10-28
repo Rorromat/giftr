@@ -45,7 +45,7 @@ export function proximaFecha(dia: number, mes: number, hoy: Date): Date {
 const DIA = 86400_000
 export const diasEntre = (desde: Date, hasta: Date) => Math.round((hasta.getTime() - desde.getTime()) / DIA)
 
-const SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+export const SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 /** A más de esto, una fecha del año que viene es una que este año pasó hace poco (ver anioSiEstaLejos). */
@@ -148,6 +148,8 @@ const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0]
 
 export type Evento = {
   listId: string
+  /** El cumple de alguien (o el tuyo), la fecha de un grupo o una sorpresa para alguien que no usa GiftR. */
+  tipo: 'cumple' | 'grupo' | 'sorpresa'
   titulo: string
   /** La próxima vez que cae. */
   fecha: Date
@@ -233,7 +235,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       const cae: FechaEvento = { dia: owner.cumpleDia, mes: owner.cumpleMes, anio: null, anual: true }
       const fecha = proximaFecha(cae.dia, cae.mes, hoy)
       conFecha.push({
-        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: true, cae, propio,
+        listId: list.id, tipo: 'cumple', fecha, dias: diasEntre(hoy, fecha), anual: true, cae, propio,
         titulo: propio ? 'Tu cumple' : `Cumple de ${primerNombre(owner.nombre)}`,
         href: propio ? '/mi-lista' : `/l/${list.shareToken}`,
         personas: [owner.nombre],
@@ -248,7 +250,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       const sorpresa = list.tipo === 'sorpresa'
       const delGrupo = miembros.filter((m) => m.listId === list.id)
       conFecha.push({
-        listId: list.id, fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
+        listId: list.id, tipo: sorpresa ? 'sorpresa' : 'grupo', fecha, dias: diasEntre(hoy, fecha), anual: list.eventoAnual, cae, propio,
         titulo: sorpresa ? `Sorpresa para ${list.nombre ?? 'alguien'}` : list.nombre ?? 'Grupo',
         href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
         personas: sorpresa ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
@@ -453,23 +455,39 @@ export async function guardarFechaGrupo(
   })
 }
 
-export type MesCalendario = { nombre: string; dias: number; eventos: number[]; hoy: number | null; actual: boolean }
+export type MesCalendario = {
+  /** "Oct" */
+  nombre: string
+  /** "Octubre" */
+  largo: string
+  dias: number
+  /** El día de la semana del 1, con la semana de lunes a domingo (0 lunes … 6 domingo): dónde arranca la grilla del mes. */
+  empiezaEn: number
+  eventos: number[]
+  hoy: number | null
+  actual: boolean
+}
 
 /**
- * Los 12 meses del año de hoy con los días que tienen eventos: los anuales en el día en que caen este año (el 29/2, el
- * 28 si este no es bisiesto, como en proximaFecha), si ya había sido la primera vez; los únicos, solo si son de este año.
+ * El día en que cae en un año, o null si ese año no cae: los anuales, en el día de ese año (el 29/2, el 28 si no es
+ * bisiesto, como en proximaFecha) si ya había sido la primera vez; los únicos, solo si son de ese año.
  */
+export function diaEnElAnio(f: FechaEvento, anio: number): Date | null {
+  if (!f.anual) return f.anio === anio ? new Date(Date.UTC(anio, f.mes - 1, f.dia)) : null
+  const dia = enAnio(f.dia, f.mes, anio)
+  const primera = primeraVez(f)
+  return primera && dia < primera ? null : dia
+}
+
+/** Los 12 meses del año de hoy con los días que tienen eventos (ver diaEnElAnio). */
 export function calendarioDelAnio(eventos: Pick<Evento, 'cae'>[], hoy: Date): MesCalendario[] {
   const anio = hoy.getUTCFullYear()
-  const enEsteAnio = eventos.flatMap(({ cae: f }) => {
-    if (!f.anual) return f.anio === anio ? [new Date(Date.UTC(anio, f.mes - 1, f.dia))] : []
-    const dia = enAnio(f.dia, f.mes, anio)
-    const primera = primeraVez(f)
-    return primera && dia < primera ? [] : [dia]
-  })
+  const enEsteAnio = eventos.flatMap(({ cae }) => diaEnElAnio(cae, anio) ?? [])
   return MESES.map((nombre, m) => ({
     nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1, 3),
+    largo: nombre.charAt(0).toUpperCase() + nombre.slice(1),
     dias: new Date(Date.UTC(anio, m + 1, 0)).getUTCDate(),
+    empiezaEn: (new Date(Date.UTC(anio, m, 1)).getUTCDay() + 6) % 7,
     eventos: [...new Set(enEsteAnio.filter((f) => f.getUTCMonth() === m).map((f) => f.getUTCDate()))],
     hoy: hoy.getUTCMonth() === m ? hoy.getUTCDate() : null,
     actual: hoy.getUTCMonth() === m,

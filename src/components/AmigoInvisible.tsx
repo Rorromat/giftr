@@ -42,15 +42,15 @@ function TileJuego({ f }: { f: FechaEspecial | null }) {
 
 /**
  * La tarjeta del carrusel de Próximos: una fecha especial con sus colores (con tus amigos invisibles de esa fecha) o un
- * amigo invisible aparte en negro, con su nombre.
+ * amigo invisible aparte en negro, con su nombre. También la de un día de Todo el año, a lo ancho.
  */
-export function CardEspecial({ t, hoy }: { t: TarjetaEspecial; hoy: Date }) {
+export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-start' }: { t: TarjetaEspecial; hoy: Date; className?: string }) {
   const fecha = t.tipo === 'fecha' ? t.fecha : null
   const juegos = t.tipo === 'fecha' ? t.juegos : [t.juego]
   const estado = estadoDeJuegos(juegos)
   const p = paletaDe(fecha?.id ?? null)
   return (
-    <li className="w-[252px] flex-none snap-start">
+    <li className={className}>
       <Link href={fecha ? `/fechas/${fecha.id}` : `/invisible/${juegos[0].id}`} style={{ background: p.fondo }}
             className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
         <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
