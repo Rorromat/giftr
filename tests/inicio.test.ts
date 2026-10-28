@@ -6,6 +6,12 @@ import type { Db } from '@/db/types'
 import { saltearBienvenida } from '@/lib/bienvenida'
 import { pedirAmistad } from '@/lib/amigos'
 import { upsertUserFromGoogle } from '@/lib/users'
+import { createItem } from '@/lib/items'
+import { reserveItem } from '@/lib/claims'
+import { guardarCumple } from '@/lib/events'
+import { comprarRegalo, iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
+import { guardarAviso, paraVos, type EntradaBandeja } from '@/lib/bandeja'
+import type { MiRegalo } from '@/lib/mis-regalos'
 
 // Inicio es lo primero al entrar: con la base en PGlite y la sesión, las cookies y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({
@@ -31,12 +37,20 @@ vi.mock('next/navigation', () => ({
 import Inicio from '@/app/(menu)/inicio/page'
 import Gente from '@/app/(menu)/gente/page'
 import Home from '@/app/page'
-import { noSugerirAction } from '@/app/actions'
+import { abrirAvisoAction, archivarAvisoAction, limpiarParaVosAction, noSugerirAction } from '@/app/actions'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { SectionHeader } from '@/components/ui'
 import { Portada } from '@/components/Portada'
+import { Proximos } from '@/components/Eventos'
+import { ContenidoAviso } from '@/components/FilaAviso'
+import { AvisoDeslizable } from '@/components/AvisoDeslizable'
+import { FilaRegalo } from '@/components/FilaRegalo'
+import { CuentasPendientes } from '@/components/ResumenCuentas'
 
-type Props = { id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode }
+type Props = {
+  id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode; e?: EntradaBandeja; r?: MiRegalo
+  cuentas?: { debes: number }; animar?: boolean; action?: unknown; name?: string; value?: string; titulo?: string
+}
 
 /** Los elementos de la pantalla, en orden, sin renderizar (las partes async, como los carteles, no se renderizan acá). */
 function elementos(nodo: ReactNode): { type: unknown; props: Props }[] {
@@ -107,6 +121,80 @@ test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente,
   await saltearBienvenida(h.db, beto.id)
   h.session = { userId: beto.id }
   expect(sugeridos(await inicio())).toEqual(['Ana (Sofi)'])
+})
+
+test('arriba lo que es para vos; abajo de lo nuevo de tus amigos, lo que tenés por comprar y las cuentas pendientes', async () => {
+  h.db = await createTestDb()
+  h.cookies.clear()
+  const [yo, sofi, rodri] = await Promise.all(['Yo', 'Sofi', 'Rodri'].map(usuario))
+  await saltearBienvenida(h.db, yo.id)
+  await amigos(yo.id, sofi.id)
+  const pronto = new Date(Date.now() + 10 * 86_400_000)
+  await guardarCumple(h.db, sofi.id, pronto.getDate(), pronto.getMonth() + 1)
+  const [bici, termo] = [
+    (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Bici' }))!, (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Termo' }))!,
+  ]
+  h.session = { userId: yo.id }
+  const inicio = async () => elementos(await Inicio({ searchParams: Promise.resolve({}) }))
+
+  // sin nada pendiente, no están
+  const vacio = await inicio()
+  expect(vacio.some((e) => e.props.id === 'para-vos' || e.props.id === 'por-comprar')).toBe(false)
+  expect(vacio.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(0)
+
+  // Rodri arma el regalo de la bici, me sumo y lo compra: me toca la mitad. Y el termo lo reservé yo
+  const r = await iniciarRegaloGrupal(h.db, bici.id, rodri.id)
+  if (!r.ok) throw new Error(r.reason)
+  await sumarseARegalo(h.db, r.giftId, yo.id)
+  await comprarRegalo(h.db, r.giftId, rodri.id, { total: 50000 })
+  await reserveItem(h.db, termo.id, { userId: yo.id })
+
+  const pantalla = await inicio()
+  const donde = (que: (e: (typeof pantalla)[number]) => boolean) => pantalla.findIndex(que)
+  const orden = [
+    donde((e) => e.props.id === 'para-vos'), donde((e) => e.type === Proximos), donde((e) => e.props.id === 'novedades'),
+    donde((e) => e.props.id === 'por-comprar'), donde((e) => e.type === CuentasPendientes),
+  ]
+  expect(orden.every((i) => i > -1)).toBe(true)
+  expect([...orden].sort((a, b) => a - b)).toEqual(orden)
+  expect(pantalla.filter((e) => e.type === ContenidoAviso).map((e) => [e.props.e!.titulo, e.props.e!.tipo, e.props.animar]))
+    .toEqual([['Rodri compró "Bici"', 'regalo_comprado', true]])
+  // cada uno se desliza para verlo o archivarlo
+  expect(pantalla.filter((e) => e.type === AvisoDeslizable).map((e) => e.props.titulo)).toEqual(['Rodri compró "Bici"'])
+  expect(pantalla.filter((e) => e.type === FilaRegalo).map((e) => e.props.r!.titulo)).toEqual(['Termo'])
+  expect(pantalla.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(25000)
+
+  // desde Inicio: ver todos (la campanita) o limpiarlos de acá
+  expect(pantalla.some((e) => e.props.href === '/avisos')).toBe(true)
+  const limpiar = pantalla.find((e) => e.type === 'form' && e.props.action === limpiarParaVosAction)
+  const hasta = elementos(limpiar?.props.children).find((e) => e.props.name === 'hasta')?.props.value
+  expect(hasta).toBeTruthy()
+  const fd = new FormData()
+  fd.set('hasta', hasta!)
+  await limpiarParaVosAction(fd)
+  expect((await inicio()).some((e) => e.props.id === 'para-vos')).toBe(false)
+})
+
+test('en Para vos, tocar un aviso (o "Ver") lleva adonde dice y "Archivar" lo saca; uno ajeno, a la campanita', async () => {
+  h.db = await createTestDb()
+  const [yo, sofi] = await Promise.all(['Yo', 'Sofi'].map(usuario))
+  await guardarAviso(h.db, yo.id, { tipo: 'pago', title: '💸 Sofi te pagó $1', body: '', url: '/cuentas' })
+  await guardarAviso(h.db, yo.id, { tipo: 'invisible_pregunta', title: '🤫 Tu amigo invisible te hizo una pregunta', body: '', url: '/invisible/x#preguntas' })
+  const [pregunta, pago] = (await paraVos(h.db, yo.id)).entradas
+  const conId = (id: string) => { const fd = new FormData(); fd.set('id', id); return fd }
+
+  h.session = { userId: sofi.id }
+  expect(await redirige(abrirAvisoAction(conId(pago.id)))).toBe('/avisos')
+  await archivarAvisoAction(conId(pago.id))
+  expect((await paraVos(h.db, yo.id)).total).toBe(2)
+
+  h.session = { userId: yo.id }
+  expect(await redirige(abrirAvisoAction(conId(pregunta.id)))).toBe('/invisible/x#preguntas')
+  await archivarAvisoAction(conId(pago.id))
+  expect((await paraVos(h.db, yo.id)).total).toBe(0)
+  // sin sesión, a la campanita (que lo manda a entrar)
+  h.session = null
+  expect(await redirige(abrirAvisoAction(conId(pago.id)))).toBe('/avisos')
 })
 
 test('la portada: una carta por función, arriba la primera, con las flechas y un puntito por carta para pasar a mano', () => {
