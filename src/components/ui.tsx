@@ -287,6 +287,14 @@ const ICONS = {
   antifaz: <><path d="M2.5 11c0-3.2 4.6-4.4 9.5-1.9 4.9-2.5 9.5-1.3 9.5 1.9 0 3.9-4.6 5.2-7.3 2.7-1.2-1.1-3.2-1.1-4.4 0C7.1 16.2 2.5 14.9 2.5 11z" /><ellipse cx="7.6" cy="11.3" rx="1.9" ry="1.3" /><ellipse cx="16.4" cy="11.3" rx="1.9" ry="1.3" /></>,
   // "Me lo robo": copiarlo a tu lista
   copiar: <><rect x="8.5" y="8.5" width="12" height="12" rx="3" /><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" /></>,
+  // La ficha del deseo: tiene que ser este mismo (una mira), sirve algo parecido (≈), se puede repetir
+  mira: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.6" /></>,
+  parecido: <><path d="M5 9.5c2.3-2 4.5-2 7 0s4.7 2 7 0" /><path d="M5 15.5c2.3-2 4.5-2 7 0s4.7 2 7 0" /></>,
+  repetir: <><path d="M4.5 11.5A7 7 0 0 1 17 7.5l1.5 1.5" /><path d="M18.5 4.5V9H14" /><path d="M19.5 12.5A7 7 0 0 1 7 16.5L5.5 15" /><path d="M5.5 19.5V15H10" /></>,
+  // Las categorías (Casa, Ropa y Hobbies usan home, shirt y palette)
+  celu: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18h3" /></>,
+  libro: <><path d="M5 19V5.5A2.5 2.5 0 0 1 7.5 3H19v13.5H7.5A2.5 2.5 0 0 0 5 19a2.5 2.5 0 0 0 2.5 2.5H19" /><path d="M9 7.5h6" /></>,
+  entrada: <><path d="M3.5 9V7a1 1 0 0 1 1-1h15a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6z" /><path d="M14.5 6v2.5M14.5 10.75v2.5M14.5 15.5V18" /></>,
 } as const
 
 export type IconName = keyof typeof ICONS
