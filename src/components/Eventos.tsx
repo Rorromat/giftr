@@ -1,16 +1,16 @@
 import Link from 'next/link'
 import type { Cuentas } from '@/lib/regalos'
 import { plata } from '@/lib/pesos'
-import { calendarioDelAnio, fechaCorta, fechaLarga, repartirProximos, type Evento } from '@/lib/events'
+import { calendarioDelAnio, diaEnElAnio, diasEntre, fechaCorta, fechaLarga, MESES, repartirProximos, SEMANA, type Evento } from '@/lib/events'
 import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
 import { AvatarStack, Icon, Starburst } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { CardEspecial } from '@/components/AmigoInvisible'
-import { IconoFecha } from '@/components/IconoFecha'
-import { paletaDe } from '@/lib/colores-fechas'
+import { Calendario } from '@/components/Calendario'
+import { claveDelDia, type Cara, type CosaDelCalendario, type DiaDelCalendario } from '@/lib/calendario'
 
-// Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos). Las fechas especiales (Navidad,
-// Día del Amigo…) y los amigos invisibles van entre ellos, en azul.
+// Los cumples y fechas de tu gente: los próximos (en Inicio) y todo el año (en Eventos, para recorrer mes por mes y día por
+// día). Las fechas especiales (Navidad, Día del Amigo…) y los amigos invisibles van entre ellos, cada una con su color.
 
 /**
  * Las fotos de lo que más quiere, una al lado de la otra. La fila mide los 170 px (minmax(0,1fr)): con la fila en auto,
@@ -61,10 +61,13 @@ function Estado({ e }: { e: Evento }) {
   )
 }
 
-/** Tarjeta alta del carrusel: las fotos de lo que más quiere, la cuenta regresiva en la estrella y quién es. */
-function CardProximo({ e, hoy }: { e: Evento; hoy: Date }) {
+/**
+ * Tarjeta alta del carrusel: las fotos de lo que más quiere, la cuenta regresiva en la estrella y quién es. También la de un
+ * día de Todo el año, a lo ancho.
+ */
+function CardProximo({ e, hoy, className = 'w-[252px] flex-none snap-start' }: { e: Evento; hoy: Date; className?: string }) {
   return (
-    <li className="w-[252px] flex-none snap-start">
+    <li className={className}>
       <Link href={e.href} className="gr-card relative flex h-full flex-col">
         <div className="relative">
           <Fotos e={e} />
@@ -123,67 +126,45 @@ export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[];
   )
 }
 
-/** Todo el año: la grilla de los meses (las fechas especiales, cada una con su color) y la lista, con todo por cercanía. */
+const caraDe = (e: Evento): Cara => (e.tipo === 'grupo' ? { tipo: 'grupo' } : { tipo: 'persona', nombre: e.personas[0], foto: e.caras[0] })
+
+/**
+ * Todo el año, para recorrerlo (ver Calendario): lo que cae cada día de este año (los eventos, ver diaEnElAnio, y las fechas
+ * especiales), con su fila y la tarjeta del día (la de Próximos, a lo ancho), y todo por cercanía para la lista.
+ */
 export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: FechaEspecialVista[] }) {
-  const meses = calendarioDelAnio(eventos, hoy)
-  // en la grilla, el día de este año (la próxima vez puede ser el año que viene)
-  const esteAnio = especiales.map((f) => ({ dia: diaEn(f.id, hoy.getUTCFullYear()), color: paletaDe(f.id).fondo }))
-  const colorDeEspecial = (m: number, d: number) => esteAnio.find((e) => e.dia.getUTCMonth() === m && e.dia.getUTCDate() === d)?.color
-  const lista = [
-    ...eventos.map((e) => ({ dias: e.dias, fila: (
-      <li key={e.listId}>
-        <Link href={e.href} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
-          <span className="flex-none rounded-full bg-gr-soft px-2.5 py-1 text-[13px] font-semibold">{fechaCorta(e.fecha, hoy)}</span>
-          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{e.titulo}</span>
-          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
-        </Link>
-      </li>
-    ) })),
-    ...especiales.map((f) => ({ dias: f.dias, fila: (
-      <li key={f.id}>
-        <Link href={`/fechas/${f.id}`} className="gr-card flex min-h-14 items-center gap-3 px-3 py-2">
-          <span className="flex-none rounded-full px-2.5 py-1 text-[13px] font-semibold text-white" style={{ background: paletaDe(f.id).fondo }}>
-            {fechaCorta(f.fecha, hoy)}
-          </span>
-          <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{f.nombre}</span>
-          <span style={{ color: paletaDe(f.id).fondo }}><IconoFecha fecha={f.id} size={22} acento="currentColor" className="flex-none" /></span>
-          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
-        </Link>
-      </li>
-    ) })),
-  ].sort((a, b) => a.dias - b.dias)
-  return (
-    <>
-      <div className="gr-card flex flex-col gap-3 p-3.5">
-        <ul className="grid grid-cols-3 gap-x-3 gap-y-4">
-          {meses.map((m, i) => (
-            <li key={m.nombre} className="flex flex-col gap-1.5">
-              <span className={`self-start text-[13px] font-semibold ${m.actual ? 'rounded-full bg-gr-brand px-2 text-gr-on-brand' : ''}`}>{m.nombre}</span>
-              <div aria-hidden className="grid grid-cols-7 gap-[3px]">
-                {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => {
-                  const especial = colorDeEspecial(i, d)
-                  return (
-                    <span key={d} style={especial ? { background: especial } : undefined} className={`aspect-square rounded-full ${
-                      especial ? '' : m.eventos.includes(d) ? 'bg-gr-accent ring-1 ring-gr-ink/30' : m.hoy === d ? 'bg-gr-ink' : 'bg-gr-dot'}`} />
-                  )
-                })}
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-gr-line pt-3 text-xs text-gr-muted">
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-accent ring-1 ring-gr-ink/30" />Evento o cumple</span>
-          {especiales.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="size-3 rounded-full" style={{ background: `conic-gradient(${esteAnio.map((e) => e.color).join(', ')})` }} />Fecha especial
-            </span>
-          )}
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-ink" />Hoy</span>
-        </p>
-      </div>
-      <ul className="flex flex-col gap-2.5">{lista.map((l) => l.fila)}</ul>
-    </>
-  )
+  const anio = hoy.getUTCFullYear()
+  const todas = [
+    ...eventos.map((e) => ({
+      clave: e.listId, proxima: e.dias, cae: diaEnElAnio(e.cae, anio),
+      cosa: { href: e.href, titulo: e.titulo, cuando: fechaCorta(e.fecha, hoy), cara: caraDe(e), tarjeta: <CardProximo e={e} hoy={hoy} className="w-full" /> },
+    })),
+    ...especiales.map((f) => ({
+      clave: f.id, proxima: f.dias, cae: diaEn(f.id, anio),
+      cosa: {
+        href: `/fechas/${f.id}`, titulo: f.nombre, cuando: fechaCorta(f.fecha, hoy), cara: { tipo: 'especial', fecha: f.id } as const,
+        tarjeta: <CardEspecial t={{ tipo: 'fecha', fecha: f, juegos: [], dias: f.dias }} hoy={hoy} className="w-full" />,
+      },
+    })),
+  ].sort((a, b) => a.proxima - b.proxima)
+  const cosas: Record<string, CosaDelCalendario> = {}
+  const dias: Record<string, DiaDelCalendario> = {}
+  for (const { clave, proxima, cae, cosa } of todas) {
+    cosas[clave] = cosa
+    if (!cae) continue
+    const delDia = claveDelDia(cae.getUTCMonth() + 1, cae.getUTCDate())
+    if (dias[delDia]) {
+      dias[delDia].cosas.push(clave)
+      continue
+    }
+    // la primera es la más cercana: si este año ya pasó, cuándo es la próxima
+    const faltan = diasEntre(hoy, cae)
+    dias[delDia] = {
+      titulo: `${cae.getUTCDate()} de ${MESES[cae.getUTCMonth()]}`, semana: SEMANA[cae.getUTCDay()], cosas: [clave],
+      cuando: faltan === 0 ? '¡es hoy!' : faltan === 1 ? 'mañana' : faltan > 1 ? `en ${faltan} días` : `este año ya pasó (el próximo, en ${proxima} días)`,
+    }
+  }
+  return <Calendario meses={calendarioDelAnio(eventos, hoy)} dias={dias} cosas={cosas} orden={todas.map((t) => t.clave)} vacio={!eventos.length} />
 }
 
 /** El cartel de las cuentas de regalos grupales (los totales son netos: con alguien pueden estar a mano y tener partes sin marcar). */
