@@ -107,9 +107,16 @@ export const lists = pgTable('lists', {
   paraUserId: uuid('para_user_id').references(() => users.id),
   creadaPor: uuid('creada_por').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Un grupo que es el cumple de alguien (la lista de Juancito): su fecha es la del cumple, todos los años (ver
+  // ANIO_DE_CUMPLE), y en Eventos y en el link dice "Cumple de…".
+  esCumple: boolean('es_cumple').notNull().default(false),
+  // La foto de un grupo (la cara de Juancito), subida como la de un deseo: /foto/deseo/:id (ver guardarFotoDeseo).
+  fotoUrl: text('foto_url'),
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
+  // la limpieza de fotos subidas que nadie usa (ver guardarFotoDeseo) también mira las de los grupos
+  index('lists_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)).where(sql`${t.fotoUrl} is not null`),
 ])
 
 // Listas que un usuario abrió como regalador: su gente. Sus cumples y fechas aparecen en Eventos.
@@ -129,6 +136,9 @@ export const listMembers = pgTable('list_members', {
   // La última vez que se sumó (o volvió) al grupo. created_at no cambia al volver (y da la antigüedad, ver sacarDelGrupo).
   // Lo que un invitado dijo de esta lista antes de esa fecha ya no vale: puede ser este mismo, ahora dueño (ver accesoALista).
   unidoAt: timestamp('unido_at', { withTimezone: true }).notNull().defaultNow(),
+  // Qué es la lista para este dueño ("Hijo", "Abuela", "Tío abuelo" o lo que escribió): cada uno el suyo, porque la abuela
+  // de uno es la madre de otro (ver PARENTESCOS). Vacío: no lo dijo, o la lista no es de una persona ("Nuestra casa").
+  parentesco: text('parentesco'),
 },(t) => [primaryKey({ columns: [t.listId, t.userId] }), index('list_members_user_id_idx').on(t.userId)])
 
 export const items = pgTable('items', {
@@ -357,10 +367,11 @@ export const avisos = pgTable('avisos', {
   deUserId: uuid('de_user_id').references(() => users.id, { onDelete: 'set null' }),
   // qué es: de esto sale si va en "Para vos", en Inicio (ver PARA_VOS). Los de antes de la migración 0034 no lo tienen.
   // regalo_comprado: el que organiza un regalo grupal lo compró y te toca tu parte. pago: te pagaron tu parte de uno.
+  // lista_en_comun: te sumaron a una lista en común (ver invitarAGrupo).
   tipo: text('tipo', {
     enum: [
       'codazo', 'amistad_pedida', 'amistad_aceptada', 'propuesta_regalo', 'respuesta_propuesta', 'regalo_comprado', 'pago',
-      'invisible_invitacion', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta',
+      'invisible_invitacion', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun',
     ],
   }),
   titulo: text('titulo').notNull(),

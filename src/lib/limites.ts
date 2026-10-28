@@ -3,7 +3,7 @@
 
 export const LARGO = {
   titulo: 120, notas: 500, precio: 40, rangoPrecio: 40, categoria: 40, link: 2000, comentario: 500, notaCompra: 200,
-  nombreGrupo: 60, descripcionGrupo: 120, paraSorpresa: 60, temaInvisible: 300,
+  nombreGrupo: 60, descripcionGrupo: 120, parentesco: 30, paraSorpresa: 60, temaInvisible: 300,
 } as const
 
 /** Cuántas unidades puede pedir un deseo (más que eso no es un regalo, y la columna tiene su tope). */

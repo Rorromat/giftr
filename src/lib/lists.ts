@@ -5,7 +5,7 @@ import type { Viewer } from '@/lib/types'
 import { expireStaleClaims, miReservaVencida, ocupaSql } from '@/lib/claims'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { cupoDe, esRepetible, pickItemFields, type ClaimView, type GiverItemView, type OwnerItemView } from '@/lib/serialize'
-import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, type Dueno } from '@/lib/groups'
+import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, relacionDeLista, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
 import { volverASeguirAmigos } from '@/lib/amigos'
@@ -13,8 +13,12 @@ import { accesoALista, type MotivoAnonimo } from '@/lib/acceso'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
 // Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
-// perfiles: para la foto y el link al perfil de cada dueño (sin nada de reservas).
-type ListaRegalador = { listId: string; ownerNombre: string; duenos: string[]; perfiles: Dueno[]; grupoNombre: string | null }
+// perfiles: para la foto y el link al perfil de cada dueño (sin nada de reservas). De un grupo, también su foto y qué es
+// para sus dueños ("Hijo de Rodri y Euge").
+type ListaRegalador = {
+  listId: string; ownerNombre: string; duenos: string[]; perfiles: Dueno[]; grupoNombre: string | null
+  grupoFoto: string | null; relacion: string | null
+}
 
 // anonimo: no sabemos si el que mira es el dueño sin su sesión (ver Acceso en src/lib/acceso.ts), así que ve los deseos
 // como los ve el dueño: sin nada de la capa oculta. motivo: qué le falta para verla.
@@ -94,7 +98,11 @@ export function toGiverView(row: ReturnType<typeof pickItemFields>, itemClaims: 
 
 function paraRegalador(list: typeof lists.$inferSelect, duenos: Dueno[]): ListaRegalador {
   const nombres = duenos.map((d) => d.nombre)
-  return { listId: list.id, ownerNombre: juntarNombres(nombres), duenos: nombres, perfiles: duenos, grupoNombre: list.tipo === 'grupo' ? list.nombre ?? 'Grupo' : null }
+  const grupo = list.tipo === 'grupo'
+  return {
+    listId: list.id, ownerNombre: juntarNombres(nombres), duenos: nombres, perfiles: duenos, grupoNombre: grupo ? list.nombre ?? 'Grupo' : null,
+    grupoFoto: grupo ? list.fotoUrl : null, relacion: grupo ? relacionDeLista(duenos) : null,
+  }
 }
 
 export async function getListForViewer(db: Db, shareToken: string, viewer: Viewer): Promise<ListView | null> {

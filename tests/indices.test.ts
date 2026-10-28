@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest'
-import { and, asc, desc, eq, gt, lt, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNotNull, lt, lte, sql } from 'drizzle-orm'
 import type { PGlite } from '@electric-sql/pglite'
 import { createTestDb } from './helpers'
-import { claims, codazos, comments, groupGifts, items, listFollows, notifications, pedidosAfuera } from '@/db/schema'
+import { claims, codazos, comments, groupGifts, idDeFotoDeseo, items, listFollows, lists, notifications, pedidosAfuera } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { noEsDeRegaloGrupal } from '@/lib/claims'
 import { contarPedidosAfuera } from '@/lib/pedidos-afuera'
@@ -56,6 +56,9 @@ test('cada consulta frecuente usa su índice', async () => {
     ['pedidos_afuera_user_id_created_at_idx', contarPedidosAfuera(db, UNO)],
     ['pedidos_afuera_user_id_created_at_idx', db.delete(pedidosAfuera)
       .where(and(eq(pedidosAfuera.userId, UNO), lte(pedidosAfuera.createdAt, sql`now() - interval '24 hours'`)))],
+    // la limpieza de fotos subidas: si algún grupo la usa (ver guardarFotoDeseo)
+    ['lists_foto_deseo_idx', db.select({ id: lists.id }).from(lists)
+      .where(and(isNotNull(lists.fotoUrl), sql`${idDeFotoDeseo(lists.fotoUrl)} = ${UNO}`))],
   ]
   for (const [indice, q] of casos) expect(await plan(db, q), indice).toContain(indice)
 })

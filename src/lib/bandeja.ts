@@ -22,11 +22,14 @@ export type TipoEnBandeja = NonNullable<(typeof avisos.$inferInsert)['tipo']>
 
 /**
  * Lo que va en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás, contestarle
- * a tu amigo invisible) o que estabas esperando (te pagaron, te contestaron). Los codazos, las solicitudes de amistad, las
- * propuestas para dividir y las invitaciones al amigo invisible no: mientras esperan que contestes ya tienen su cartel en
- * Inicio, con sus botones. Que aceptaron tu solicitud o se sumaron a tu regalo, tampoco: no te piden nada.
+ * a tu amigo invisible, sumarte a la lista en común a la que te sumaron) o que estabas esperando (te pagaron, te
+ * contestaron). Los codazos, las solicitudes de amistad, las propuestas para dividir y las invitaciones al amigo invisible
+ * no: mientras esperan que contestes ya tienen su cartel en Inicio, con sus botones. Que aceptaron tu solicitud o se
+ * sumaron a tu regalo, tampoco: no te piden nada.
  */
-export const PARA_VOS: TipoEnBandeja[] = ['regalo_comprado', 'pago', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta']
+export const PARA_VOS: TipoEnBandeja[] = [
+  'regalo_comprado', 'pago', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun',
+]
 /** Cuántos van en "Para vos" como mucho (el resto, en la campanita), y de cuántos días para acá. */
 export const EN_PARA_VOS = 3
 export const DIAS_PARA_VOS = 7
