@@ -63,6 +63,7 @@ async function sumarInvitados(db: Db, juego: { id: string; nombre: string }, org
   const [org] = await personas(db, [organizadorId])
   await Promise.all(insertados.map((i) => avisar(db, i.id, {
     de: organizadorId,
+    tipo: 'invisible_invitacion',
     title: `🎅 ${primerNombre(org?.nombre ?? 'Alguien')} te invita a un amigo invisible`,
     body: `"${juego.nombre}". ¿Jugás?`,
     url: url(juego.id),
@@ -219,7 +220,7 @@ export async function sortear(db: Db, id: string, organizadorId: string, enviar?
   })
   if (!r.ok) return r
   await Promise.all(r.juegan!.map((u) => avisar(db, u, {
-    title: `🎁 Ya se sorteó "${r.nombre}"`, body: 'Entrá a ver a quién le regalás (solo lo sabés vos).', url: url(id),
+    tipo: 'invisible_sorteo', title: `🎁 Ya se sorteó "${r.nombre}"`, body: 'Entrá a ver a quién le regalás (solo lo sabés vos).', url: url(id),
   }, enviar).catch(() => 0)))
   return { ok: true }
 }
@@ -356,7 +357,7 @@ export async function preguntar(db: Db, id: string, userId: string, escrito: str
   await db.insert(amigoInvisiblePreguntas).values({ amigoInvisibleId: id, deUserId: userId, paraUserId: mia.regalaA, texto })
   const [j] = await db.select({ nombre: amigosInvisibles.nombre }).from(amigosInvisibles).where(eq(amigosInvisibles.id, id))
   await avisar(db, mia.regalaA, {
-    title: '🤫 Tu amigo invisible te hizo una pregunta', body: `En "${j?.nombre ?? 'el amigo invisible'}": ${texto}`, url: `${url(id)}#preguntas`,
+    tipo: 'invisible_pregunta', title: '🤫 Tu amigo invisible te hizo una pregunta', body: `En "${j?.nombre ?? 'el amigo invisible'}": ${texto}`, url: `${url(id)}#preguntas`,
   }, enviar).catch(() => 0)
   return true
 }
@@ -371,7 +372,7 @@ export async function responderPregunta(db: Db, preguntaId: string, userId: stri
   if (!p) return null
   const [j] = await db.select({ nombre: amigosInvisibles.nombre }).from(amigosInvisibles).where(eq(amigosInvisibles.id, p.amigoInvisibleId))
   await avisar(db, p.deUserId, {
-    title: '💬 Te contestaron', body: `En "${j?.nombre ?? 'el amigo invisible'}": ${respuesta}`, url: `${url(p.amigoInvisibleId)}#preguntas`,
+    tipo: 'invisible_respuesta', title: '💬 Te contestaron', body: `En "${j?.nombre ?? 'el amigo invisible'}": ${respuesta}`, url: `${url(p.amigoInvisibleId)}#preguntas`,
   }, enviar).catch(() => 0)
   return p.amigoInvisibleId
 }

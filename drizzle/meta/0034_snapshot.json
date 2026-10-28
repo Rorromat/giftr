@@ -1,5 +1,5 @@
 {
-  "id": "4fd34970-8c8a-425e-bda3-bd00c70a28a7",
+  "id": "7bef7dec-c2f9-43db-9867-06dd27c59d4a",
   "prevId": "a3314edd-f097-4ddd-9ecb-08b39031027d",
   "version": "7",
   "dialect": "postgresql",
@@ -646,6 +646,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "titulo": {
           "name": "titulo",
           "type": "text",
@@ -663,6 +669,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "visto_at": {
+          "name": "visto_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2129,12 +2141,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "parentesco": {
-          "name": "parentesco",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -2354,19 +2360,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "es_cumple": {
-          "name": "es_cumple",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "foto_url": {
-          "name": "foto_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -2382,22 +2375,6 @@
           ],
           "isUnique": false,
           "where": "\"lists\".\"para_user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "lists_foto_deseo_idx": {
-          "name": "lists_foto_deseo_idx",
-          "columns": [
-            {
-              "expression": "lower(substring(\"foto_url\" from '/foto/deseo/([0-9A-Fa-f-]{36})'))",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"lists\".\"foto_url\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

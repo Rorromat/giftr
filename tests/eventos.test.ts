@@ -11,7 +11,7 @@ import { getListForViewer } from '@/lib/lists'
 import { cancelarRegalo, comprarRegalo, iniciarRegaloGrupal, salirDeRegalo, sumarseARegalo } from '@/lib/regalos'
 import { miGente } from '@/lib/gente'
 import {
-  calendarioDelAnio, desdeElUltimoEvento, diasEntre, eventoDeLista, fechaCorta, fechaDeGrupo, fechaLarga, fechaParaEditar, repartirProximos,
+  calendarioDelAnio, desdeElUltimoEvento, diaEnElAnio, diasEntre, eventoDeLista, fechaCorta, fechaDeGrupo, fechaLarga, fechaParaEditar, repartirProximos,
   guardarCumple, guardarFechaGrupo, hoyLocal, inicioDelDia, misEventos, proximaDeGrupo, proximaFecha, rotuloFechaGrupo,
 } from '@/lib/events'
 
@@ -65,13 +65,13 @@ test('el regalador ve el cumple de su gente con los 3 que más quiere sin reserv
   const { db, sofi, rodri } = await setup()
   const [cumple, grupo] = await misEventos(db, sofi.id, HOY)
   expect(cumple).toMatchObject({
-    titulo: 'Cumple de Euge', dias: 14, propio: false, personas: ['Euge Mateus'],
+    tipo: 'cumple', titulo: 'Cumple de Euge', dias: 14, propio: false, personas: ['Euge Mateus'],
     fotos: ['mate.jpg', 'copas.jpg', 'libro.jpg'], // sin las zapatillas reservadas ni las velas archivadas
     misReservas: 0,
   })
   expect(cumple.fecha).toEqual(dia('2026-08-22'))
   expect(cumple.href).toMatch(/^\/l\//)
-  expect(grupo).toMatchObject({ titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Grupo', fotos: [] })
+  expect(grupo).toMatchObject({ tipo: 'grupo', titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Grupo', fotos: [] })
   // quien reservó se ve a sí mismo
   const [deRodri] = await misEventos(db, rodri.id, HOY)
   expect(deRodri.misReservas).toBe(1)
@@ -175,10 +175,25 @@ test('calendario del año: días por mes, eventos y hoy', () => {
     { cae: fechaDeGrupo('2027-01-15', false) }, // única del año que viene: no se marca en este calendario
   ], HOY)
   expect(meses).toHaveLength(12)
-  expect(meses[1]).toMatchObject({ nombre: 'Feb', dias: 28 })
-  expect(meses[7]).toMatchObject({ nombre: 'Ago', dias: 31, eventos: [22], hoy: 8, actual: true })
+  // con el día de la semana en que empieza, de lunes (0) a domingo (6): el 1/1/2026 es jueves, el 1/2 domingo, el 1/8 sábado
+  expect(meses[0]).toMatchObject({ nombre: 'Ene', largo: 'Enero', empiezaEn: 3 })
+  expect(meses[1]).toMatchObject({ nombre: 'Feb', largo: 'Febrero', dias: 28, empiezaEn: 6 })
+  expect(meses[7]).toMatchObject({ nombre: 'Ago', largo: 'Agosto', dias: 31, empiezaEn: 5, eventos: [22], hoy: 8, actual: true })
+  expect(meses[5]).toMatchObject({ largo: 'Junio', empiezaEn: 0 }) // el 1/6/2026 es lunes
   expect(meses[2].eventos).toEqual([1])
   expect(meses[0].eventos).toEqual([])
+})
+
+test('el día en que cae en un año: los anuales desde la primera vez (el 29/2, el 28 si no es bisiesto); los únicos, en el suyo', () => {
+  const anual = (s: string) => fechaDeGrupo(s, true)
+  expect(diaEnElAnio({ dia: 22, mes: 8, anio: null, anual: true }, 2026)).toEqual(dia('2026-08-22'))
+  expect(diaEnElAnio({ dia: 29, mes: 2, anio: null, anual: true }, 2027)).toEqual(dia('2027-02-28'))
+  expect(diaEnElAnio({ dia: 29, mes: 2, anio: null, anual: true }, 2028)).toEqual(dia('2028-02-29'))
+  expect(diaEnElAnio(anual('2024-03-10'), 2026)).toEqual(dia('2026-03-10'))
+  expect(diaEnElAnio(anual('2027-11-20'), 2026)).toBeNull() // el casamiento que es el año que viene
+  expect(diaEnElAnio(anual('2027-11-20'), 2027)).toEqual(dia('2027-11-20'))
+  expect(diaEnElAnio(fechaDeGrupo('2027-01-15', false), 2026)).toBeNull()
+  expect(diaEnElAnio(fechaDeGrupo('2027-01-15', false), 2027)).toEqual(dia('2027-01-15'))
 })
 
 const deseoDe = async (db: Db, listId: string, titulo: string) =>

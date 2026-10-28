@@ -72,7 +72,8 @@ export type MisRegalos = {
   historial: MiRegalo[]
 }
 
-export async function misRegalos(db: Db, userId: string, ahora = new Date()): Promise<MisRegalos> {
+/** Lo mío de las listas de los demás, lo más nuevo primero. soloPorComprar: lo reservado y los grupales abiertos (Inicio). */
+async function deLasListasDeOtros(db: Db, userId: string, ahora: Date, soloPorComprar: boolean) {
   await expireStaleClaims(db)
   const deGrupales = db.select({ id: groupGifts.claimId }).from(groupGifts)
 
@@ -88,7 +89,7 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
         eq(claims.claimerUserId, userId),
         // la reserva de un regalo grupal (la del encargado) va con el grupal
         notInArray(claims.id, deGrupales),
-        or(and(eq(claims.estado, 'reservado'), eq(items.estadoDueno, 'activo')), eq(claims.estado, 'comprado')),
+        or(and(eq(claims.estado, 'reservado'), eq(items.estadoDueno, 'activo')), soloPorComprar ? undefined : eq(claims.estado, 'comprado')),
         noEsNiFueDuenoSql(db, userId),
       ))
       .orderBy(desc(claims.updatedAt)).limit(COMPRADOS_MAX),
@@ -105,7 +106,7 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
       .leftJoin(duenos, eq(duenoOParaSql, duenos.id))
       .where(and(
         eq(groupGiftMembers.userId, userId),
-        ne(groupGifts.estado, 'cancelado'),
+        soloPorComprar ? eq(groupGifts.estado, 'abierto') : ne(groupGifts.estado, 'cancelado'),
         noEsNiFueDuenoSql(db, userId),
       ))
       .orderBy(desc(groupGifts.createdAt)).limit(COMPRADOS_MAX),
@@ -125,14 +126,23 @@ export async function misRegalos(db: Db, userId: string, ahora = new Date()): Pr
       listId: r.listId,
     })),
   ]
+  return todos.sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
+}
+
+export async function misRegalos(db: Db, userId: string, ahora = new Date()): Promise<MisRegalos> {
+  const todos = await deLasListasDeOtros(db, userId, ahora, false)
   // desde cuándo lo comprado es para el evento que viene, lista por lista
-  const listas = [...new Set([...sueltos, ...grupales].map((r) => r.listId))]
+  const listas = [...new Set(todos.map((r) => r.listId))]
   const desde = new Map(await Promise.all(listas.map(async (id) => [id, await desdeElUltimoEvento(db, id, ahora)] as const)))
   const yaPaso = (r: MiRegalo) => r.estado === 'comprado' && r.fecha < desde.get(r.listId)!
-  const porFecha = (a: MiRegalo, b: MiRegalo) => b.fecha.getTime() - a.fecha.getTime()
   return {
-    porComprar: todos.filter((r) => r.estado === 'reservado').sort(porFecha),
-    comprados: todos.filter((r) => r.estado === 'comprado' && !yaPaso(r)).sort(porFecha),
-    historial: todos.filter(yaPaso).sort(porFecha),
+    porComprar: todos.filter((r) => r.estado === 'reservado'),
+    comprados: todos.filter((r) => r.estado === 'comprado' && !yaPaso(r)),
+    historial: todos.filter(yaPaso),
   }
+}
+
+/** Lo que falta comprar (lo de "Por comprar" en Mis regalos), sin lo comprado: para el resumen de Inicio. */
+export async function porComprar(db: Db, userId: string, ahora = new Date()): Promise<MiRegalo[]> {
+  return deLasListasDeOtros(db, userId, ahora, true)
 }

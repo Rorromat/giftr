@@ -19,7 +19,7 @@ import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { marcarBandejaVista } from '@/lib/bandeja'
+import { limpiarParaVos, marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
 import {
   crearGrupo, esToken, esUuid, fechaDeCumple, fechaDeGrupoValida, guardarFotoGrupo, guardarParentesco, nuevaInvitacion, parentescoDelForm,
   sacarDelGrupo, salirDeGrupo, unirseAGrupo,
@@ -860,6 +860,34 @@ export async function vistaBandejaAction(hasta: string) {
   const viewer = await getViewer()
   if (!viewer.userId || typeof hasta !== 'string') return
   await marcarBandejaVista(db, { ...viewer, userId: viewer.userId }, new Date(hasta))
+}
+
+/** "Limpiar" en Para vos (Inicio): lo que había cuando se armó deja de ser nuevo (ver limpiarParaVos). */
+export async function limpiarParaVosAction(formData: FormData) {
+  const session = await auth()
+  const hasta = str(formData, 'hasta')
+  if (!session?.userId || !hasta) return
+  await limpiarParaVos(db, session.userId, new Date(hasta))
+  // también el número de la campanita, que está en el encabezado de cada sección
+  revalidatePath('/', 'layout')
+}
+
+/** Para vos: deslizar un aviso y "Archivar" (o deslizarlo hasta el final) lo saca de ahí (ver marcarAvisoVisto). */
+export async function archivarAvisoAction(formData: FormData) {
+  const session = await auth()
+  const id = str(formData, 'id')
+  if (!session?.userId || !id) return
+  await marcarAvisoVisto(db, session.userId, id)
+  revalidatePath('/', 'layout')
+}
+
+/** Para vos: tocar un aviso (o "Ver" al deslizarlo) lleva adonde dice y lo saca de ahí. Si no es suyo, a la campanita. */
+export async function abrirAvisoAction(formData: FormData) {
+  const session = await auth()
+  const id = str(formData, 'id')
+  const url = session?.userId && id ? await marcarAvisoVisto(db, session.userId, id) : null
+  if (url) revalidatePath('/', 'layout')
+  redirect(url ? rutaPropia(url) : '/avisos')
 }
 
 export async function vistoCodazosAction() {

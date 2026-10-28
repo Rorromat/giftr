@@ -243,8 +243,15 @@
     {
       "idx": 34,
       "version": "7",
-      "when": 1793150985221,
-      "tag": "0034_lista_en_comun",
+      "when": 1793144146747,
+      "tag": "0034_para_vos",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793154434381,
+      "tag": "0035_lista_en_comun",
       "breakpoints": true
     }
   ]

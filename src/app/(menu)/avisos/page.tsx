@@ -8,12 +8,12 @@ import { invitacionesPendientes } from '@/lib/invitaciones'
 import { misAmigosInvisibles } from '@/lib/amigo-invisible'
 import { tieneAvisos } from '@/lib/codazos'
 import { hoyLocal } from '@/lib/events'
-import { hace } from '@/lib/novedades'
 import { SolicitudRecibida } from '@/components/Amigos'
 import { InvitacionesRegalo } from '@/components/Dividir'
 import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { MarcarBandejaVista } from '@/components/MarcarBandejaVista'
-import { AvatarSticker, Icon, PageHeader, QuizasLink, Seccion } from '@/components/ui'
+import { FilaAviso } from '@/components/FilaAviso'
+import { Icon, PageHeader, Seccion } from '@/components/ui'
 
 /**
  * Avisos (la campanita): arriba lo que espera que contestes (solicitudes de amistad, propuestas de dividir, invitaciones al
@@ -48,13 +48,13 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
       <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} volver="avisos" />
       <JuegosEnInicio invitaciones={juegosInvitado} pasados={[]} />
 
-      {nuevos.length > 0 && <ListaDeAvisos titulo="Nuevos" entradas={nuevos} />}
+      {nuevos.length > 0 && <ListaDeAvisos titulo="Nuevos" entradas={nuevos} animar />}
       {antes.length > 0 && <ListaDeAvisos titulo={nuevos.length ? 'Antes' : 'Lo último'} entradas={antes} />}
 
       {nada && (
         <div className="gr-empty flex flex-col items-center gap-2 py-8 text-center">
           <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="bell" size={26} /></span>
-          <p>Todavía no te llegó nada. Acá vas a ver los codazos, las solicitudes de amistad, las propuestas para dividir un regalo y los cambios en lo que regalás.</p>
+          <p>Todavía no te llegó nada. Acá vas a ver los codazos, las solicitudes de amistad, las propuestas para dividir un regalo, las cuentas de los regalos grupales y los cambios en lo que regalás.</p>
         </div>
       )}
 
@@ -69,34 +69,14 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
   )
 }
 
-function ListaDeAvisos({ titulo, entradas }: { titulo: string; entradas: EntradaBandeja[] }) {
+/** animar: los íconos de lo nuevo se mueven (ver IconoAviso). */
+function ListaDeAvisos({ titulo, entradas, animar = false }: { titulo: string; entradas: EntradaBandeja[]; animar?: boolean }) {
   const id = `avisos-${titulo.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2.5">
       <h2 id={id} className="gr-label">{titulo}</h2>
       <ul className="gr-card divide-y divide-gr-line">
-        {entradas.map((e) => (
-          <li key={e.id}>
-            <QuizasLink href={e.href} className="flex items-start gap-3 px-4 py-3.5">
-              <span className="relative flex-none">
-                {e.de
-                  ? <AvatarSticker nombre={e.de.nombre} foto={e.de.foto} size={44} />
-                  : <span aria-hidden className="flex size-11 items-center justify-center rounded-full bg-gr-soft text-xl">{e.emoji}</span>}
-                {e.de && (
-                  <span aria-hidden className="absolute -bottom-1 -right-1.5 flex size-6 items-center justify-center rounded-full bg-gr-surface text-[13px] shadow-card">
-                    {e.emoji}
-                  </span>
-                )}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className={`text-[15px] leading-snug [overflow-wrap:anywhere] ${e.nuevo ? 'font-semibold' : 'font-medium'}`}>{e.titulo}</span>
-                {e.cuerpo && <span className="line-clamp-2 text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">{e.cuerpo}</span>}
-                <span className="text-xs font-medium text-gr-muted">{hace(e.createdAt)}</span>
-              </span>
-              {e.nuevo && <span className="mt-2 size-2.5 flex-none rounded-full bg-gr-blue"><span className="sr-only">Nuevo</span></span>}
-            </QuizasLink>
-          </li>
-        ))}
+        {entradas.map((e, i) => <FilaAviso key={e.id} e={e} animar={animar} i={i} />)}
       </ul>
     </section>
   )

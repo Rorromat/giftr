@@ -45,6 +45,7 @@ export async function invitarAGrupo(db: Db, listId: string, deUserId: string, el
     .map((a) => a.userId))
   const [yo] = await db.select({ nombre: users.nombre }).from(users).where(eq(users.id, deUserId))
   const aviso = {
+    tipo: 'lista_en_comun' as const,
     title: `👥 ${primerNombre(yo?.nombre ?? 'Alguien')} te sumó a la lista en común "${list.nombre ?? 'Grupo'}"`,
     body: 'Tocá para entrar: van a poder agregar y editar juntos.',
     url, de: deUserId,

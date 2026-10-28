@@ -397,6 +397,16 @@
 /* Agregar sube como una hoja desde abajo, desde donde estaba el +, mientras la barra se esconde. */
 .gr-hoja { animation: gr-sube 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes gr-sube { from { opacity: 0; transform: translateY(56px); } }
+/* Todo el año (<Calendario>): entrar a un mes o a un día lo agranda desde donde estaba en la grilla de arriba (--desde),
+   salir lo achica hacia ahí y pasar al de al lado lo desliza. Adentro no hay nada fijo, así que el transform no corre nada. */
+.gr-cal-entra { animation: gr-cal-entra 280ms cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: var(--desde); }
+.gr-cal-sale { animation: gr-cal-sale 220ms ease-out; transform-origin: var(--desde); }
+.gr-cal-siguiente { animation: gr-cal-siguiente 220ms ease-out; }
+.gr-cal-anterior { animation: gr-cal-anterior 220ms ease-out; }
+@keyframes gr-cal-entra { from { opacity: 0; transform: scale(0.25); } }
+@keyframes gr-cal-sale { from { opacity: 0; transform: scale(1.25); } }
+@keyframes gr-cal-siguiente { from { opacity: 0; transform: translateX(32px); } }
+@keyframes gr-cal-anterior { from { opacity: 0; transform: translateX(-32px); } }
 /* la estrella de agregar aparece girando, con un rebote (ver .gr-fab) */
 @keyframes gr-fab-entra { from { transform: scale(0.4) rotate(-60deg); opacity: 0; } }
 
@@ -527,6 +537,92 @@ body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)
   100% { opacity: 0; transform: translate(-50%, 6px); visibility: hidden; }
 }
 
+/* El ícono de cada aviso (<IconoAviso> en FilaAviso): mientras es nuevo, el dibujo se mueve como lo que pasó y después
+   descansa, cada 4 segundos. --i corre cada fila medio segundo, así no se mueven todas a la vez, y hasta que le toca ya
+   está en su primer cuadro (backwards): la moneda y el ticket entran desde afuera del cuadradito, que los recorta. */
+.gr-aviso-icono { overflow: hidden; }
+.gr-aviso-icono[data-mueve] > svg { animation: 4s ease-in-out calc(var(--i, 0) * 0.5s) infinite backwards; }
+/* te pagaron: cae una moneda girando, rebota y después se va por abajo, como en una alcancía */
+.gr-aviso-icono[data-mueve="cae"] > svg { animation-name: gr-aviso-cae; }
+@keyframes gr-aviso-cae {
+  0% { transform: translateY(-140%) rotateY(0deg); }
+  14% { transform: translateY(0) rotateY(360deg); }
+  19% { transform: translateY(-16%) rotateY(360deg); }
+  24% { transform: translateY(0) rotateY(360deg); }
+  27% { transform: translateY(-5%) rotateY(360deg); }
+  30%, 90% { transform: translateY(0) rotateY(360deg); }
+  100% { transform: translateY(140%) rotateY(360deg); }
+}
+/* te toca pagar: el ticket sale de a tirones, como de una impresora, y se corta por arriba */
+.gr-aviso-icono[data-mueve="imprime"] > svg { animation-name: gr-aviso-imprime; }
+@keyframes gr-aviso-imprime {
+  0% { transform: translateY(120%); }
+  6%, 10% { transform: translateY(80%); }
+  16%, 20% { transform: translateY(40%); }
+  28%, 88% { transform: translateY(0); }
+  100% { transform: translateY(-130%); }
+}
+/* ya se sorteó / te proponen dividir: el regalo se sacude y se infla */
+.gr-aviso-icono[data-mueve="sacude"] > svg { animation-name: gr-aviso-sacude; transform-origin: 50% 85%; }
+@keyframes gr-aviso-sacude {
+  0%, 30%, 100% { transform: rotate(0deg) scale(1); }
+  4% { transform: rotate(-14deg); }
+  8% { transform: rotate(12deg); }
+  12% { transform: rotate(-10deg); }
+  16% { transform: rotate(7deg); }
+  20% { transform: rotate(0deg) scale(1); }
+  24% { transform: rotate(0deg) scale(1.18); }
+}
+/* una pregunta: el signo se ladea, dudando */
+.gr-aviso-icono[data-mueve="duda"] > svg { animation-name: gr-aviso-duda; }
+@keyframes gr-aviso-duda {
+  0%, 30%, 100% { transform: rotate(0deg) translateY(0); }
+  7% { transform: rotate(-18deg) translateY(-6%); }
+  15% { transform: rotate(14deg) translateY(-6%); }
+  22% { transform: rotate(-6deg) translateY(0); }
+}
+/* te contestaron: los puntitos de "escribiendo…", de a uno y sin descanso */
+.gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto {
+  animation: gr-aviso-punto 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center;
+}
+.gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto:nth-of-type(2) { animation-delay: 0.15s; }
+.gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto:nth-of-type(3) { animation-delay: 0.3s; }
+@keyframes gr-aviso-punto { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-1.6px); } }
+/* te invitan al amigo invisible: el antifaz mira para los dos lados y guiña */
+.gr-aviso-icono[data-mueve="parpadea"] > svg { animation-name: gr-aviso-parpadea; }
+@keyframes gr-aviso-parpadea {
+  0%, 20%, 100% { transform: translateX(0) scaleY(1); }
+  5% { transform: translateX(-10%); }
+  10% { transform: translateX(10%); }
+  14% { transform: translateX(0) scaleY(1); }
+  17% { transform: translateX(0) scaleY(0.15); }
+}
+/* un codazo: dos empujones */
+.gr-aviso-icono[data-mueve="empuja"] > svg { animation-name: gr-aviso-empuja; }
+@keyframes gr-aviso-empuja {
+  0%, 13%, 25%, 100% { transform: translateX(0); }
+  5% { transform: translateX(-22%); }
+  9% { transform: translateX(16%); }
+  17% { transform: translateX(-14%); }
+  21% { transform: translateX(10%); }
+}
+/* quiere ser tu amigo: saluda */
+.gr-aviso-icono[data-mueve="saluda"] > svg { animation-name: gr-aviso-saluda; transform-origin: 50% 90%; }
+@keyframes gr-aviso-saluda {
+  0%, 25%, 100% { transform: rotate(0deg); }
+  5% { transform: rotate(14deg); }
+  10% { transform: rotate(-8deg); }
+  15% { transform: rotate(12deg); }
+  20% { transform: rotate(-4deg); }
+}
+/* aceptó, se suma: late dos veces */
+.gr-aviso-icono[data-mueve="late"] > svg { animation-name: gr-aviso-late; }
+@keyframes gr-aviso-late {
+  0%, 12%, 24%, 100% { transform: scale(1); }
+  6% { transform: scale(1.18); }
+  18% { transform: scale(1.12); }
+}
+
 /* Girá el teléfono: GiftR va en vertical. Solo en un teléfono de costado (pantalla táctil y baja): una tablet o la compu
    apaisadas, no. */
 .gr-girar { display: none; }
@@ -654,6 +750,7 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-nav a.gr-fab { transition: none; animation: none; }
   .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
   .gr-seccion, .gr-hoja, .gr-sello--cae { animation: none; }
+  .gr-cal-entra, .gr-cal-sale, .gr-cal-siguiente, .gr-cal-anterior { animation: none; }
   /* la portada: no pasan solas (ver Portada) y cambian con un fundido, sin volar ni achicarse; el sello, ya puesto */
   .gr-portada__carta, .gr-portada__carta[data-lugar] { transform: none; transition: opacity 200ms ease; }
   .gr-portada__carta[data-lugar="abajo"] { opacity: 0; }
@@ -663,6 +760,8 @@ body:has(main[aria-busy="true"]) .gr-arranque:not([data-listo]) {
   .gr-toast { animation-name: gr-toast-quieto; }
   .gr-foto-grande[open] { animation: none; }
   .gr-girar__tel { animation: none; }
+  /* los íconos de los avisos, quietos (en su lugar, con los tres puntitos prendidos) */
+  .gr-aviso-icono[data-mueve] > svg, .gr-aviso-icono[data-mueve] .gr-aviso__punto { animation: none; }
   /* la estrella quieta mientras carga, y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }
