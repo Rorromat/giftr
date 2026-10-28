@@ -43,7 +43,7 @@ export function separarEmoji(titulo: string): { emoji: string | null; texto: str
 }
 
 const EMOJI_DESEO: Record<string, string> = {
-  item_editado: '✏️', compra_corregida: '💸', item_vuelve: '↩️', compra_vuelve: '↩️', regalo_vuelve: '↩️',
+  item_editado: '✏️', compra_corregida: '💸', regalo_redividido: '💸', regalo_a_mano: '💸', item_vuelve: '↩️', compra_vuelve: '↩️', regalo_vuelve: '↩️',
   item_baja: '📦', item_baja_comprado: '📦', regalo_baja: '📦', regalo_lo_tiene: '📦',
 }
 

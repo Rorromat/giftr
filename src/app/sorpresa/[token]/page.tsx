@@ -72,13 +72,14 @@ export default async function Sorpresa({ params, searchParams }: {
 
   const { item, regalos, comments } = s
   const yo = viewer.userId!
-  // a quiénes se lo propuso el que la organiza y qué contestaron, también una vez comprada; a más, solo mientras está abierta
+  // a quiénes se lo propuso el que la organiza y qué contestaron, y proponérsela a más (también ya comprada: el que se suma
+  // después entra y se vuelve a dividir)
   const mio = regalos.find((r) => r.soyEncargado)
   const organizo = mio?.estado === 'abierto' ? mio : undefined
   const [amigos, invitados] = mio
-    ? await Promise.all([organizo ? amigosParaDividir(db, yo, item.id) : [], invitadosDeRegalo(db, mio.id)])
+    ? await Promise.all([amigosParaDividir(db, yo, item.id), invitadosDeRegalo(db, mio.id)])
     : [[], []]
-  const yaEstan = new Set([...(organizo?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
+  const yaEstan = new Set([...(mio?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const precio = item.precio ?? item.rangoPrecio
   const enUnRegalo = regalos.some((r) => r.soyParte)
   const cuando = s.fecha && `${s.para.userId ? 'Su cumple' : 'Es'} ${s.fecha.dias === 0 ? 'hoy' : s.fecha.dias === 1 ? 'mañana' : `en ${s.fecha.dias} días`} · ${fechaLarga(s.fecha.fecha)}`
@@ -130,7 +131,10 @@ export default async function Sorpresa({ params, searchParams }: {
 
       {deRegalo === 'sumado' && enUnRegalo && (
         <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-medium">
-          <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />¡Listo, te sumaste! Se divide en partes iguales entre los que estén.
+          <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
+          {regalos.some((r) => r.soyParte && r.estado === 'comprado')
+            ? '¡Listo, te sumaste! Ya estaba comprada: abajo ves cuánto te toca.'
+            : '¡Listo, te sumaste! Se divide en partes iguales entre los que estén.'}
         </p>
       )}
 
@@ -140,7 +144,7 @@ export default async function Sorpresa({ params, searchParams }: {
                         precio={enDolares(precio) ? parseDolares(precio) : parsePesos(precio)} monedaPrecio={enDolares(precio) ? 'USD' : 'ARS'}
                         logueado nota={s.nota}
                         invitar={r.id === mio?.id && (
-                          <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados} comprado={r.estado === 'comprado'}
+                          <InvitadosDelRegalo token={token} itemId={item.id} giftId={r.id} invitados={invitados}
                                               paraInvitar={amigos.filter((a) => !yaEstan.has(a.id))} />
                         )}
                         sinContestar={r.id === organizo?.id ? invitados.filter((i) => i.estado === 'esperando').map((i) => i.persona.nombre) : []} />

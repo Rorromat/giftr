@@ -10,7 +10,8 @@ import { comprarRegalo, iniciarRegaloGrupal } from '@/lib/regalos'
 import { invitacionesPendientes, invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import { crearSorpresa } from '@/lib/sorpresas'
 
-// "Lo dividimos", en el regalo: el que lo organiza ve a quiénes se lo propuso y qué contestaron, también una vez comprado.
+// "Lo dividimos", en el regalo: el que lo organiza ve a quiénes se lo propuso y qué contestaron, también una vez comprado,
+// y el que contesta tarde ("sumame, después te pago") entra y se vuelve a dividir.
 // Con las páginas tal cual, la base en PGlite y la sesión y las redirecciones de Next simuladas.
 const h = vi.hoisted(() => ({
   db: undefined as unknown as Db,
@@ -49,7 +50,7 @@ async function setup() {
   return { euge, rodri, sofi, juan, caro }
 }
 
-test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contestaron, antes y después de comprarlo', async () => {
+test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contestaron, y el que contesta tarde se suma', async () => {
   const { euge, rodri, sofi, juan, caro } = await setup()
   const [lista] = await h.db.select().from(lists).where(eq(lists.ownerId, euge.id))
   const [bici] = await h.db.insert(items).values({ listId: lista.id, tipo: 'exacto', titulo: 'Bici' }).returning()
@@ -63,8 +64,8 @@ test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contest
   h.session = { userId: rodri.id }
   const abierto = await deseo()
   expect(abierto).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
-  // al dividirlo, que sepa que Caro queda afuera si no espera
-  expect(abierto).toContain('Caro todavía no contestó: se divide entre los que ya están, así que si lo dividís ahora queda afuera.')
+  // al dividirlo, que sepa que Caro todavía puede entrar
+  expect(abierto).toContain('Caro todavía no contestó: se divide entre los que ya están, y si después se suma, se vuelve a dividir.')
   // los que se sumaron no ven a quiénes les llegó la propuesta
   h.session = { userId: sofi.id }
   expect(await deseo()).not.toContain('Les propusiste')
@@ -72,10 +73,24 @@ test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contest
   expect(await comprarRegalo(h.db, r.giftId, rodri.id, { total: 90000 })).toMatchObject({ ok: true })
   h.session = { userId: rodri.id }
   const comprado = await deseo()
-  // la división, y a quiénes se lo propuso: Caro ya no puede contestar
+  // la división, y a quiénes se lo propuso: Caro todavía puede contestar
   expect(comprado).toContain('Vos compraste el regalo $45.000 Puso Sofi $45.000 Debe')
-  expect(comprado).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro No contestó')
-  for (const no of ['Esperando', 'Proponérselo a más amigos', 'todavía no contestó']) expect(comprado).not.toContain(no)
+  expect(comprado).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
+  expect(comprado).toContain('Invitar por WhatsApp')
+  // Caro, antes de contestar, ve cuánto le tocaría
+  h.session = { userId: caro.id }
+  expect(await deseo()).toContain('Ya lo compraron Rodri y Sofi. Si te sumás, se vuelve a dividir entre 3: te tocan $30.000. Me sumo')
+  // "sumame, después te pago": acepta tarde y se vuelve a dividir
+  const [deCaro] = await invitacionesPendientes(h.db, caro.id)
+  expect(deCaro).toMatchObject({ comprado: true, parte: 30000 })
+  await responderInvitacion(h.db, caro.id, deCaro.id, true, sinAvisos)
+  h.session = { userId: rodri.id }
+  const redividido = await deseo()
+  expect(redividido).toContain('Vos compraste el regalo $30.000 Puso Sofi $30.000 Debe Me pagó Caro $30.000 Debe Me pagó')
+  expect(redividido).toContain('C Caro Se sumó ✓')
+  // Sofi, que no pagó nada, se puede bajar
+  h.session = { userId: sofi.id }
+  expect(await deseo()).toContain('Me bajo')
 })
 
 test('en una sorpresa ya comprada, también', async () => {
@@ -90,5 +105,5 @@ test('en una sorpresa ya comprada, también', async () => {
 
   h.session = { userId: rodri.id }
   const pagina = delRegalo(renderToStaticMarkup(await Sorpresa({ params: Promise.resolve({ token: s.token }), searchParams: Promise.resolve({}) })))
-  expect(pagina).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro No contestó')
+  expect(pagina).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
 })

@@ -14,12 +14,19 @@ import { yo } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
 
+/** Qué es la línea: la parte que falta (o lo que falta de ella), o lo que el que compró devuelve. */
+function queEs(l: LineaCuenta) {
+  if (l.devolucion) return l.tipo === 'debes' ? 'le devolvés' : 'te devuelve'
+  const resto = l.monto < l.parte ? 'lo que falta de ' : ''
+  return `${resto}${l.tipo === 'debes' ? 'tu parte' : 'su parte'}`
+}
+
 function Linea({ l }: { l: LineaCuenta }) {
   return (
     <li className="flex items-center gap-2 py-2">
       <QuizasLink href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
         <span className={`font-semibold [overflow-wrap:anywhere] ${l.href ? 'underline underline-offset-2' : ''}`}>{l.itemTitulo}</span>
-        <span className="block text-xs font-medium text-gr-muted">para {l.para} · {l.tipo === 'debes' ? 'tu parte' : 'su parte'}</span>
+        <span className="block text-xs font-medium text-gr-muted">para {l.para} · {queEs(l)}</span>
       </QuizasLink>
       <span className="text-base font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
       <form action={markPaidAction}>
@@ -27,8 +34,10 @@ function Linea({ l }: { l: LineaCuenta }) {
         <input type="hidden" name="deudorId" value={l.deudorId} />
         <input type="hidden" name="pagado" value="1" />
         {/* la parte que ve: si justo la corrigieron, no queda paga una que no vio */}
-        <input type="hidden" name="monto" value={l.monto} />
-        <BotonEnviar className="gr-btn min-h-11 px-2.5 text-[13px]">{l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}</BotonEnviar>
+        <input type="hidden" name="monto" value={l.parte} />
+        <BotonEnviar className="gr-btn min-h-11 px-2.5 text-[13px]">
+          {l.devolucion ? (l.tipo === 'debes' ? 'Ya le devolví' : 'Me devolvió') : l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}
+        </BotonEnviar>
       </form>
     </li>
   )
@@ -135,17 +144,17 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
 
 /**
  * Lo que compró en un regalo y no puede corregir en el deseo (lo sacaron de la lista, o cambiaron el link): desde acá,
- * mientras nadie le pagó (o el primer mes, si los demás quedaron en 0: ver sePuedeCorregir). Cambia con cada corrección:
- * el formulario vuelve a arrancar cerrado y con lo nuevo.
+ * mientras quede algo por saldar (o el primer mes: ver sePuedeCorregir). Cambia con cada corrección: el formulario vuelve
+ * a arrancar cerrado y con lo nuevo.
  */
 function Corregir({ c }: { c: CompraParaCorregir }) {
-  const alguienDebe = c.miembros.some((m) => !m.esYo && m.monto > 0)
+  const alguienPone = c.miembros.some((m) => !m.esYo && m.monto > 0)
   return (
     <li className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
       <p className="text-sm leading-snug">
         <span className="font-semibold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
         <span className="block text-xs font-medium text-gr-muted">
-          Lo compraste por {plata(c.total, c.moneda)} · {alguienDebe ? 'nadie te pagó todavía' : `los demás quedaron en ${plata(0, c.moneda)}`}
+          Lo compraste por {plata(c.total, c.moneda)}{alguienPone ? '' : ` · los demás quedaron en ${plata(0, c.moneda)}`}
         </span>
       </p>
       <details key={`${c.total}:${c.moneda}:${c.miembros.map((m) => m.monto).join(',')}`} className="group mt-1 flex flex-col">
@@ -233,7 +242,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
       {aCorregir.length > 0 && (
         <section className="flex flex-col gap-2.5">
           <h2 className="gr-heading">Lo que compraste</h2>
-          <p className="text-[13px] leading-snug text-gr-muted">Mientras nadie te pague, podés cambiar el total o cómo se dividió.</p>
+          <p className="text-[13px] leading-snug text-gr-muted">Podés cambiar el total o cómo se dividió: lo que ya te pagaron queda, y la diferencia se ve acá.</p>
           <ul className="flex flex-col gap-2.5">{aCorregir.map((x) => <Corregir key={x.giftId} c={x} />)}</ul>
         </section>
       )}
