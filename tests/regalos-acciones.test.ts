@@ -23,8 +23,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 import {
-  buyGroupGiftAction, fixGroupGiftAction, joinGroupGiftAction, letBackGroupGiftMemberAction, markPaidAction, postponeGroupGiftReminderAction,
-  removeGroupGiftMemberAction, settleUpAction,
+  buyGroupGiftAction, fixGroupGiftAction, joinGroupGiftAction, letBackGroupGiftMemberAction, markPaidAction, payPartAction,
+  postponeGroupGiftReminderAction, removeGroupGiftMemberAction, settleRoundAction, settleUpAction,
 } from '@/app/actions'
 import { SacarDelRegalo } from '@/components/RegaloGrupal'
 
@@ -222,4 +222,45 @@ test('sacar a alguien desde Cuentas con el deseo fuera de la lista: no le promet
   const html = renderToStaticMarkup(createElement(SacarDelRegalo, { giftId, otros: r.dividirCon!.filter((m) => !m.esYo), sacados: r.sacados }))
   expect(html).toContain('no se puede volver a sumar por su cuenta')
   expect(html).not.toContain('salvo que lo dejes')
+})
+
+test('"Le pagué una parte": lo que escribió, con puntos; si no cierra, el formulario dice por qué', async () => {
+  const { db, rodri, sofi, caro, giftId } = await preparar()
+  await comprarRegalo(db, giftId, rodri.id, { total: 90000, miembros: [rodri.id, sofi.id, caro.id] })
+  h.session = { userId: sofi.id }
+  const parte = (monto: string, neto = '-30000') => compra({ otroId: rodri.id, moneda: 'ARS', neto, monto }, [])
+  expect(await payPartAction(null, parte(''))).toEqual({ error: 'Poné cuánto fue.' })
+  expect(await payPartAction(null, parte('40.000'))).toEqual({ error: 'Es más de lo que le debés ($30.000).' })
+  expect(await payPartAction(null, parte('5.000', '-25000'))).toEqual({ error: 'Las cuentas cambiaron mientras tanto: fijate cuánto es ahora y anotalo de nuevo.' })
+  expect(await payPartAction(null, parte('12.500'))).toBeNull()
+  expect((await misCuentas(db, sofi.id)).debes).toBe(17500)
+  // el que cobra: "Me pagó una parte"
+  h.session = { userId: rodri.id }
+  expect(await payPartAction(null, compra({ otroId: caro.id, moneda: 'ARS', neto: '30000', monto: '50.000' }, [])))
+    .toEqual({ error: 'Es más de lo que te debe ($30.000).' })
+  expect(await payPartAction(null, compra({ otroId: sofi.id, moneda: 'ARS', neto: '17500', monto: '7.500' }, []))).toBeNull()
+  expect((await misCuentas(db, sofi.id)).debes).toBe(10000)
+})
+
+test('"Marcar como saldado" una ronda: con lo que mostraba la pantalla', async () => {
+  const { db, mama } = await preparar()
+  // Ana le debe a Bruno, Bruno a Carla y Carla a Ana: una ronda de $10.000
+  const usuario =(nombre: string) => upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre}@test.com`, nombre })
+  const [ana, bruno, carla] = [await usuario('Ana'), await usuario('Bruno'), await usuario('Carla')]
+  const regalo = async (titulo: string, encargado: string, otro: string) => {
+    const item = (await createItem(db, mama.id, { tipo: 'exacto', titulo }))!
+    const g = await iniciarRegaloGrupal(db, item.id, encargado)
+    if (!g.ok) throw new Error(g.reason)
+    await sumarseARegalo(db, g.giftId, otro)
+    await comprarRegalo(db, g.giftId, encargado, { total: 20000 })
+  }
+  await regalo('Libro', bruno.id, ana.id)
+  await regalo('Taza', carla.id, bruno.id)
+  await regalo('Vela', ana.id, carla.id)
+  const [ronda] = (await misCuentas(db, ana.id)).rondas
+  h.session = { userId: ana.id }
+  await settleRoundAction(compra({ clave: ronda.clave, monto: '5000', moneda: 'ARS' }, []))
+  expect((await misCuentas(db, ana.id)).rondas).toHaveLength(1)
+  await settleRoundAction(compra({ clave: ronda.clave, monto: '10000', moneda: 'ARS' }, []))
+  for (const u of [ana, bruno, carla]) expect(await misCuentas(db, u.id)).toMatchObject({ personas: [], rondas: [] })
 })

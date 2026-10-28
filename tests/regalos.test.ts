@@ -515,7 +515,7 @@ test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni hist
   expect(await regalosParaCerrar(db, mama.id)).toEqual([])
   expect((await ultimosRegalos(db, mama.id, [lista.id])).size).toBe(0)
   const cuentas = await misCuentas(db, mama.id)
-  expect(cuentas).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(cuentas).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   const eventos = await misEventos(db, mama.id)
   expect(eventos[0]).toMatchObject({ propio: true })
   expect(eventos[0].ultimo).toBeUndefined()
@@ -559,7 +559,7 @@ test('EL TEST DE ORO, co-dueños: si te sumás a un grupo después de entrar al 
 
   // ...y después Delfina lo invita al grupo
   await unirseAGrupo(db, grupo.inviteToken!, martin.id)
-  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   expect(await regalosDeItem(db, cafetera.id, { userId: martin.id })).toEqual([])
   expect(await historialDeLista(db, grupoId, { userId: martin.id })).toBeNull()
   // para Rodri sigue todo igual
@@ -623,7 +623,7 @@ test('si te unís como co-dueño, lo que tenías como regalador en esa lista no 
   expect(deRodri.miembros.map((m) => m.nombre)).toEqual(['Rodri'])
   // y a él no le queda nada de eso a la vista
   expect(await getMyClaimWarnings(db, { userId: martin.id })).toEqual([])
-  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   // ya como dueño no se vuelve a sumar ni a armar nada
   expect(await sumarseARegalo(db, deHeladera.giftId, martin.id)).toBe(false)
   expect(await iniciarRegaloGrupal(db, (await deseo('Mantel')).id, martin.id)).toEqual({ ok: false, reason: 'propio' })
@@ -944,7 +944,7 @@ test('si nadie le debe nada al encargado, la compra se corrige solo el primer me
   await archiveItem(db, bici.id, mama.id, 'lo_tengo')
   await archiveItem(db, perfume.id, mama.id, 'lo_tengo')
   expect(await comprasParaCorregir(db, rodri.id)).toEqual([])
-  expect(await misCuentas(db, rodri.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(await misCuentas(db, rodri.id)).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   expect((await misCuentas(db, sofi.id)).personas).toEqual([])
 })
 

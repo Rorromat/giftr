@@ -92,7 +92,7 @@ test('EL TEST DE ORO, grupos: el que sale del grupo sigue sin ver nada de lo que
   expect((await ultimosRegalos(db, martin.id, [grupo.id])).size).toBe(0)
   expect(await misEventos(db, martin.id)).toEqual([])
   expect(await miGente(db, martin.id)).toEqual([])
-  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   // tampoco reserva, comenta ni arma un regalo
   expect(await reserveItem(db, libre.id, yo)).toEqual({ ok: false, reason: 'propio' })
   expect(await addComment(db, item.id, yo, 'yo lo compro')).toBe(false)
