@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { createECDH, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
-import { avisos, lists } from '@/db/schema'
+import { amistades, avisos, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { guardarSuscripcion, mandarCodazo, probarAviso, type Aviso, type Enviar } from '@/lib/codazos'
@@ -49,7 +49,7 @@ test('una solicitud de amistad queda en su bandeja con la foto de quien la manda
 
   // contesta: a Euge le llega que aceptó, con la foto de Sofi
   await guardarSuscripcion(db, euge.id, { endpoint: `https://fcm.googleapis.com/fcm/send/${euge.id}`, keys: CLAVES })
-  expect(await responderSolicitud(db, sofi.id, (await db.execute<{ id: string }>(sql`select id from amistades`)).rows[0].id, true, push.enviar)).toBe(true)
+  expect(await responderSolicitud(db, sofi.id, (await db.select({ id: amistades.id }).from(amistades))[0].id, true, push.enviar)).toBe(true)
   expect(push.enviados.map((e) => e.aviso.title)).toEqual(['🤝 Sofi aceptó'])
   // al celular va lo de siempre (sin de quién es)
   expect(Object.keys(push.enviados[0].aviso).sort()).toEqual(['body', 'title', 'url'])
