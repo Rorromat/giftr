@@ -14,7 +14,8 @@ import { amigosEnComun, misAmigos, sugerenciasDeAmigos } from '@/lib/amigos'
 import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { avisosSinLeer, paraVos } from '@/lib/bandeja'
-import { FilaAviso } from '@/components/FilaAviso'
+import { ContenidoAviso } from '@/components/FilaAviso'
+import { AvisoDeslizable } from '@/components/AvisoDeslizable'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { limpiarParaVosAction } from '@/app/actions'
 import { porComprar } from '@/lib/mis-regalos'
@@ -77,13 +78,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       pasados={juegos.filter((j) => j.dias < 0 && j.miEstado === 'juega' && j.sorteado && !j.revelado)} />
 
       {/* lo último de la campanita que te pide algo: te toca pagar, te pagaron, el amigo invisible (ver PARA_VOS). Cada uno
-          con su ícono moviéndose; abajo, limpiarlos de acá o ir a verlos todos */}
+          con su ícono moviéndose; se desliza para verlo o archivarlo, y abajo, limpiarlos todos de acá o ir a la campanita */}
       {importantes.entradas.length > 0 && (
         <section aria-labelledby="para-vos" className="flex flex-col gap-3">
           <SectionHeader id="para-vos" title={<>Para vos<span className="text-gr-muted"> · {importantes.total}</span></>} />
           <div className="gr-card">
             <ul className="divide-y divide-gr-line">
-              {importantes.entradas.map((e, i) => <FilaAviso key={e.id} e={e} animar i={i} />)}
+              {importantes.entradas.map((e, i) => (
+                <AvisoDeslizable key={e.id} id={e.id} titulo={e.titulo}><ContenidoAviso e={e} animar i={i} /></AvisoDeslizable>
+              ))}
             </ul>
             <div className="flex divide-x divide-gr-line border-t border-gr-line text-sm font-semibold">
               <form action={limpiarParaVosAction} className="flex flex-1">

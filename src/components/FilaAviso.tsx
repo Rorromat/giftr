@@ -77,21 +77,30 @@ export function IconoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; an
   )
 }
 
+/** Lo de adentro de la fila de un aviso: su ícono, qué pasó, el detalle y cuándo; lo nuevo, con un punto. */
+export function ContenidoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; animar?: boolean; i?: number }) {
+  return (
+    <>
+      <IconoAviso e={e} animar={animar && e.nuevo} i={i} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className={`text-[15px] leading-snug [overflow-wrap:anywhere] ${e.nuevo ? 'font-semibold' : 'font-medium'}`}>{e.titulo}</span>
+        {e.cuerpo && <span className="line-clamp-2 text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">{e.cuerpo}</span>}
+        <span className="text-xs font-medium text-gr-muted">{hace(e.createdAt)}</span>
+      </span>
+      {e.nuevo && <span className="mt-2 size-2.5 flex-none rounded-full bg-gr-blue"><span className="sr-only">Nuevo</span></span>}
+    </>
+  )
+}
+
 /**
- * Un aviso de la bandeja en una fila (va dentro de una lista `gr-card`): su ícono, qué pasó, el detalle y cuándo; lo nuevo,
- * con un punto. En Avisos y en "Para vos" de Inicio. animar e i: ver IconoAviso.
+ * Un aviso de la bandeja en una fila que lleva adonde dice (va dentro de una lista `gr-card`), en Avisos. En "Para vos" de
+ * Inicio va en una que se desliza (ver AvisoDeslizable). animar e i: ver IconoAviso.
  */
 export function FilaAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; animar?: boolean; i?: number }) {
   return (
     <li>
       <QuizasLink href={e.href} className="flex items-start gap-3 px-4 py-3.5">
-        <IconoAviso e={e} animar={animar && e.nuevo} i={i} />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className={`text-[15px] leading-snug [overflow-wrap:anywhere] ${e.nuevo ? 'font-semibold' : 'font-medium'}`}>{e.titulo}</span>
-          {e.cuerpo && <span className="line-clamp-2 text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">{e.cuerpo}</span>}
-          <span className="text-xs font-medium text-gr-muted">{hace(e.createdAt)}</span>
-        </span>
-        {e.nuevo && <span className="mt-2 size-2.5 flex-none rounded-full bg-gr-blue"><span className="sr-only">Nuevo</span></span>}
+        <ContenidoAviso e={e} animar={animar} i={i} />
       </QuizasLink>
     </li>
   )

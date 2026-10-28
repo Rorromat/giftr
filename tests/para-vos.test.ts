@@ -9,7 +9,8 @@ import { upsertUserFromGoogle } from '@/lib/users'
 import { createItem } from '@/lib/items'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, saldarCon, sumarseARegalo } from '@/lib/regalos'
 import {
-  avisosSinLeer, bandeja, DIAS_PARA_VOS, EN_PARA_VOS, guardarAviso, limpiarParaVos, marcarBandejaVista, paraVos, type TipoEnBandeja,
+  avisosSinLeer, bandeja, DIAS_PARA_VOS, EN_PARA_VOS, guardarAviso, limpiarParaVos, marcarAvisoVisto, marcarBandejaVista, paraVos,
+  type TipoEnBandeja,
 } from '@/lib/bandeja'
 import { guardarSuscripcion, mandarCodazo, type Aviso, type Enviar } from '@/lib/codazos'
 import { pedirAmistad, responderSolicitud } from '@/lib/amigos'
@@ -172,6 +173,31 @@ test('"Limpiar" saca de Para vos lo que había (también lo que no entraba) y ya
   await db.insert(avisos).values({ userId: sofi.id, tipo: 'pago', titulo: '💸 Yo te pagó $1', cuerpo: '', url: '/' })
   await limpiarParaVos(db, yo.id, new Date())
   expect((await paraVos(db, sofi.id)).total).toBe(1)
+})
+
+test('abrir o archivar uno (deslizándolo) lo saca de Para vos y ya no es nuevo; los demás siguen. Solo los propios', async () => {
+  const db = await createTestDb()
+  const [yo, sofi] = [await usuario(db, 'Yo'), await usuario(db, 'Sofi')]
+  await guardarAviso(db, yo.id, { tipo: 'pago', title: '💸 Sofi te pagó $1', body: '', url: '/cuentas' })
+  await guardarAviso(db, yo.id, { tipo: 'invisible_pregunta', title: '🤫 Tu amigo invisible te hizo una pregunta', body: '', url: '/invisible/x#preguntas' })
+  const [pregunta, pago] = (await paraVos(db, yo.id)).entradas
+  expect(await avisosSinLeer(db, { userId: yo.id })).toBe(2)
+
+  // a otro no le marca nada, y lo que no es un id no rompe
+  expect(await marcarAvisoVisto(db, sofi.id, pago.id)).toBeNull()
+  expect(await marcarAvisoVisto(db, yo.id, 'cualquier-cosa')).toBeNull()
+  expect((await paraVos(db, yo.id)).total).toBe(2)
+
+  expect(await marcarAvisoVisto(db, yo.id, pago.id)).toBe('/cuentas')
+  expect((await paraVos(db, yo.id)).entradas.map((e) => e.id)).toEqual([pregunta.id])
+  expect(await avisosSinLeer(db, { userId: yo.id })).toBe(1)
+  const [{ vistoAt }] = await db.select({ vistoAt: avisos.vistoAt }).from(avisos).where(eq(avisos.id, pago.id))
+  // abrirlo de nuevo (desde la campanita) lleva igual, sin cambiar cuándo se vio
+  expect(await marcarAvisoVisto(db, yo.id, pago.id)).toBe('/cuentas')
+  expect((await db.select({ vistoAt: avisos.vistoAt }).from(avisos).where(eq(avisos.id, pago.id)))[0].vistoAt).toEqual(vistoAt)
+  expect((await bandeja(db, { userId: yo.id })).entradas.map((e) => [e.titulo, e.nuevo])).toEqual([
+    ['Tu amigo invisible te hizo una pregunta', true], ['Sofi te pagó $1', false],
+  ])
 })
 
 test('la migración les agrega a los avisos el tipo y cuándo se limpiaron (los de antes quedan sin tipo)', () => {

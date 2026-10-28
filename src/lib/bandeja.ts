@@ -1,10 +1,11 @@
-import { and, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or } from 'drizzle-orm'
+import { and, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { avisos, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import type { Aviso } from '@/lib/codazos'
 import { avisosDeDeseos, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
 import { urlFoto } from '@/lib/users'
+import { esUuid } from '@/lib/groups'
 
 // La bandeja de Avisos: lo que te llegó (codazos, solicitudes, propuestas, el amigo invisible, las cuentas) y los avisos
 // sobre los deseos que regalás, en un solo lugar. Lo de después de la última vez que la abriste es nuevo: la campanita lo
@@ -153,6 +154,18 @@ export async function limpiarParaVos(db: Db, userId: string, hasta: Date) {
   if (Number.isNaN(h.getTime())) return
   await db.update(avisos).set({ vistoAt: new Date() })
     .where(and(eq(avisos.userId, userId), inArray(avisos.tipo, PARA_VOS), isNull(avisos.vistoAt), lte(avisos.createdAt, h)))
+}
+
+/**
+ * Uno de "Para vos" que abrió (tocándolo, o "Ver" al deslizarlo) o que deslizó para archivarlo: se va de ahí y ya no es
+ * nuevo en la campanita. Devuelve adónde lleva; null si no es suyo.
+ */
+export async function marcarAvisoVisto(db: Db, userId: string, id: string): Promise<string | null> {
+  if (!esUuid(id)) return null
+  const [a] = await db.update(avisos).set({ vistoAt: sql`coalesce(${avisos.vistoAt}, now())` })
+    .where(and(eq(avisos.id, id), eq(avisos.userId, userId)))
+    .returning({ url: avisos.url })
+  return a?.url ?? null
 }
 
 /** Cuántos nuevos tiene (el número de la campanita). */
