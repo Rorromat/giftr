@@ -14,6 +14,7 @@ import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { MarcarBandejaVista } from '@/components/MarcarBandejaVista'
 import { FilaAviso } from '@/components/FilaAviso'
 import { Icon, PageHeader, Seccion } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 
 /**
  * Avisos (la campanita): arriba lo que espera que contestes (solicitudes de amistad, propuestas de dividir, invitaciones al
@@ -53,7 +54,7 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
 
       {nada && (
         <div className="gr-empty flex flex-col items-center gap-2 py-8 text-center">
-          <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="bell" size={26} /></span>
+          <DibujoVacio icon="bell" sticker="campana" className="mb-1" />
           <p>Todavía no te llegó nada. Acá vas a ver los codazos, las solicitudes de amistad, las propuestas para dividir un regalo, las cuentas de los regalos grupales y los cambios en lo que regalás.</p>
         </div>
       )}

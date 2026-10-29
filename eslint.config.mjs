@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Backend AWS: proyecto aparte con su propio tooling.
     "aws-backend/**",
+    // Skills de Claude Code (el kit de fun-isometric tiene su propio estilo; el que usa la app está en src/stickers).
+    ".claude/**",
   ]),
 ]);
 

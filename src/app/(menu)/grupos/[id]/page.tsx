@@ -19,6 +19,7 @@ import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AvatarStack, Icon, PageHeader, Seccion, SectionHeader } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
@@ -163,7 +164,7 @@ export default async function Grupo({ params, searchParams }: {
 
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
+          <DibujoVacio icon="gift" sticker="lista" />
           <p>Todavía no hay nada en “{grupo.nombre}”.<br />Agreguen lo primero que necesiten.</p>
           <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm">Agregar un deseo</Link>
         </div>

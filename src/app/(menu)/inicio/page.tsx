@@ -28,6 +28,7 @@ import { misAmigosInvisibles } from '@/lib/amigo-invisible'
 import { especialesQueVienen } from '@/lib/fechas-especiales'
 import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 
 // Inicio: lo que viene. Arriba lo que te espera (los carteles, las propuestas, y "Para vos": lo último de la campanita que
 // te pide algo), los próximos cumples y fechas de tu gente (con lo que ya hiciste para cada uno, y las fechas especiales con
@@ -111,7 +112,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       )}
       {eventos.length === 0 && (
         <div className="gr-empty flex flex-col items-center gap-3 py-7 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="calendar" size={26} /></span>
+          <DibujoVacio icon="calendar" sticker="calendario" />
           <p>Acá van a aparecer los cumples de tu gente, con tiempo para elegir. Para eso, abrí con tu cuenta el link de su lista.</p>
           <div className="flex w-full flex-col gap-2">
             <Link href="/gente" className="gr-btn">Pedile su lista a tu gente</Link>

@@ -13,6 +13,7 @@
   --gr-brand: #141414;      /* tarjeta destacada, pestaña activa, botón principal */
   --gr-on-brand: #FFFFFF;
   --gr-accent: #C8F31D;     /* lima: detalles sobre lo oscuro, insignias, el + */
+  --gr-on-accent: var(--gr-ink); /* lo que va encima de la lima (las propuestas de temas.css lo cambian) */
   --gr-muted: #66655F;
   --gr-dot: #E2E1DB;
   /* La superficie suave (botones secundarios, notas, vacíos) y las líneas: la fina separa, la marcada es el borde de lo que

@@ -1,14 +1,23 @@
 import type { Metadata, Viewport } from 'next'
-import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
+import { Bricolage_Grotesque, Fraunces, Gabarito, Instrument_Sans, Instrument_Serif, Manrope, Rubik, Unbounded } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
 import { Refrescar } from '@/components/Refrescar'
 import { RegistrarSW } from '@/components/RegistrarSW'
 import { ATRAPAR_PEDIDO_INSTALAR, SIN_ZOOM } from '@/lib/app-instalable'
+import { APLICAR_TEMA } from '@/lib/tema'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
 const instrument = Instrument_Sans({ subsets: ['latin'], variable: '--font-instrument' })
+// Las letras de las propuestas de diseño (ver lib/tema.ts): sin precarga, el navegador baja solo las de la que esté puesta.
+const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz', 'SOFT'], variable: '--font-fraunces', preload: false })
+const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], variable: '--font-instrument-serif', preload: false })
+const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded', preload: false })
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', preload: false })
+const gabarito = Gabarito({ subsets: ['latin'], variable: '--font-gabarito', preload: false })
+const rubik = Rubik({ subsets: ['latin'], variable: '--font-rubik', preload: false })
+const letras = [bricolage, instrument, fraunces, instrumentSerif, unbounded, manrope, gabarito, rubik].map((f) => f.variable).join(' ')
 
 export const metadata: Metadata = {
   // Base de las URLs absolutas de la vista previa al compartir (og:image, og:url).
@@ -35,8 +44,11 @@ export const viewport: Viewport = { themeColor: '#F4F4F0', width: 'device-width'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${bricolage.variable} ${instrument.variable}`}>
+    // suppressHydrationWarning: APLICAR_TEMA le pone data-tema antes de que hidrate
+    <html lang="es" className={letras} suppressHydrationWarning>
       <head>
+        {/* la propuesta de diseño elegida, antes de pintar (texto fijo) */}
+        <script dangerouslySetInnerHTML={{ __html: APLICAR_TEMA }} />
         {/* el pedido de instalar de Chrome, si llega antes de que hidrate (texto fijo, no viene del pedido) */}
         <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />
         <script dangerouslySetInnerHTML={{ __html: SIN_ZOOM }} />

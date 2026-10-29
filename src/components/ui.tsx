@@ -29,18 +29,18 @@ export function Starburst({ children, sub, label, size = 62, fontSize = 40, clas
   return (
     <svg
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
-      width={size} height={size} viewBox="0 0 100 100" className={className} style={style}
+      width={size} height={size} viewBox="0 0 100 100" className={`gr-estrella ${className}`} style={style}
     >
       <polygon points={STAR_POINTS} fill="var(--gr-accent)" />
       {children != null && (
         <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
-              fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {children}
         </text>
       )}
       {sub && (
         <text x="50" y="70" dy="0.35em" textAnchor="middle" fontSize={17} fontWeight={800}
-              fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {sub}
         </text>
       )}
@@ -150,7 +150,7 @@ export function BackLink({ href, label }: { href: string; label: string }) {
 /** El logo: "GiftR" con la estrella lima. */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 font-brand text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
+    <span className={`gr-logo inline-flex items-center gap-1 font-brand text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
       GiftR
       <Starburst size={18} className="-mt-3" />
     </span>

@@ -13,6 +13,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { yo } from '@/lib/perfil'
 import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 
 /** Qué es la línea: la parte que falta (o lo que falta de ella), o lo que el que compró devuelve. */
 function queEs(l: LineaCuenta) {
@@ -203,7 +204,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
 
       {vacio && (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
-          <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="wallet" size={26} /></span>
+          <DibujoVacio icon="wallet" sticker="alcancia" className="mb-1" />
           <p>Cuando arman un regalo entre varios, acá ves cuánto puso cada uno y a quién le falta pagar.</p>
           <p className="text-gr-muted">Abrí un deseo de la lista de alguien y tocá “Armar regalo grupal”.</p>
         </div>

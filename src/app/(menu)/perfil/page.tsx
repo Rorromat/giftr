@@ -127,6 +127,14 @@ export default async function Perfil({ searchParams }: {
         </div>
       </section>
 
+      {/* Las propuestas de diseño: probar GiftR con otros colores, letras y dibujos (ver lib/tema.ts) */}
+      <section className="flex flex-col gap-2.5">
+        <h2 className="gr-heading">Diseño</h2>
+        <div className="gr-card gr-rows">
+          <Row href="/propuestas" icon="palette" title="Propuestas de diseño" sub="Probá GiftR con otros colores, letras y dibujos" />
+        </div>
+      </section>
+
       {/* Avisos push: así llegan al celular los codazos, las solicitudes y lo demás de la bandeja (desde ahí se llega con #avisos) */}
       <section id="avisos" className="flex scroll-mt-6 flex-col gap-2.5">
         <h2 className="gr-heading">Avisos</h2>

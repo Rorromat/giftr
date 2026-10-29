@@ -10,7 +10,8 @@ import { PestanasRegalos } from '@/components/PestanasRegalos'
 import { ArmarSorpresa } from '@/components/Sorpresas'
 import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
 import { misAmigosInvisibles, tambienTeToco } from '@/lib/amigo-invisible'
-import { AppHeader, Icon, Seccion } from '@/components/ui'
+import { AppHeader, Seccion } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 
 /**
  * Mis regalos: lo que reservé y los regalos grupales en los que estoy, de todas las listas, en un solo lugar. Arriba mis
@@ -51,7 +52,7 @@ export default async function MisRegalos() {
 
       {!porComprar.length && !comprados.length && !historial.length ? (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
-          <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
+          <DibujoVacio icon="gift" sticker="regalo" className="mb-1" />
           <p>Todavía no reservaste nada.</p>
           <p className="text-gr-muted">Cuando reserves algo de la lista de alguien, o te sumes a un regalo grupal, aparece acá.</p>
           <Link href="/gente" className="gr-btn gr-btn--sm mt-2">Ver tu gente</Link>

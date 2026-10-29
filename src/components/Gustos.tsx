@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { fotoDeEstilo, muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { paletaGusto } from '@/lib/colores-gustos'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
+import { Ilustrado, STICKER_GUSTO } from '@/components/Ilustrado'
 import { AvatarSticker, Icon } from '@/components/ui'
 
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
@@ -127,7 +128,7 @@ const PISTAS: Record<BloqueGustos['paso'], string> = {
 function MiniIlustracion({ paso }: { paso: BloqueGustos['paso'] }) {
   return (
     <span aria-hidden className="flex size-12 flex-none items-center justify-center overflow-hidden rounded-2xl" style={{ background: paletaGusto(paso).fondo }}>
-      <IlustracionGusto paso={paso} size={58} />
+      <Ilustrado sticker={STICKER_GUSTO[paso]} className="size-[60px] flex-none"><IlustracionGusto paso={paso} size={58} /></Ilustrado>
     </span>
   )
 }

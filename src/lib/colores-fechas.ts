@@ -26,4 +26,9 @@ const PALETAS: Record<FechaEspecial | 'aparte', PaletaFecha> = {
   aparte: { fondo: '#141414', marco: '#2A2A27', piso: '#000000', acento: '#C8F31D' },
 }
 
-export const paletaDe = (f: FechaEspecial | null): PaletaFecha => PALETAS[f ?? 'aparte']
+/** Con una propuesta de diseño puesta (temas.css), el fondo y el círculo son los suyos: --gr-fecha-<fecha> y su -marco. */
+export function paletaDe(f: FechaEspecial | null): PaletaFecha {
+  const k = f ?? 'aparte'
+  const p = PALETAS[k]
+  return { ...p, fondo: `var(--gr-fecha-${k}, ${p.fondo})`, marco: `var(--gr-fecha-${k}-marco, ${p.marco})` }
+}

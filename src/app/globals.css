@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./temas.css";
 
 @theme inline {
   --color-gr-bg: var(--gr-bg);

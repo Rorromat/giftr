@@ -7,6 +7,7 @@ import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
+import { Ilustrado, STICKER_GUSTO } from '@/components/Ilustrado'
 import { Icon, PageHeader } from '@/components/ui'
 import { paletaGusto } from '@/lib/colores-gustos'
 import {
@@ -174,7 +175,9 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
       {/* el cartel del paso, con su color y su ilustración */}
       <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-[26px] py-5 pl-5 pr-[124px] text-white shadow-card"
            style={{ background: paletaGusto(PASOS_GUSTOS[paso]).fondo }}>
-        <IlustracionGusto paso={PASOS_GUSTOS[paso]} size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
+        <Ilustrado sticker={STICKER_GUSTO[PASOS_GUSTOS[paso]]} className="absolute -right-4 top-1/2 size-[150px] -translate-y-1/2">
+          <IlustracionGusto paso={PASOS_GUSTOS[paso]} size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
+        </Ilustrado>
         <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em]">
           {paso === 0 ? (solo ? 'Tu foto y tu cumple' : `¡Hola, ${nombre}!`) : PASOS[paso].titulo}
         </h1>

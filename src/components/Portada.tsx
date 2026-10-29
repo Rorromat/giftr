@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { SelloDibujo } from '@/components/SelloDibujo'
+import { Ilustrado } from '@/components/Ilustrado'
+import type { NombreSticker } from '@/stickers/giftr'
 import { Icon, PriorityTag, STAR_POINTS } from '@/components/ui'
 
 // La portada: lo que hace la app, una carta por función, como un mazo. Pasan solas y despacio (la de arriba se va
 // volando de costado y sube la de abajo) o a mano: arrastrándola, con las flechas o con los puntitos. Cada carta con su
-// dibujo, para qué sirve y un ejemplo de verdad abajo. Los dibujos van con los colores de la app; cómo se mueven, en
-// gr-portada (tokens.css).
+// dibujo, para qué sirve y un ejemplo de verdad abajo. Los dibujos van con los colores de la app (con una propuesta de
+// diseño puesta, son stickers con los suyos, y el fondo de cada carta también); cómo se mueven, en gr-portada (tokens.css).
 
 const TINTA = 'var(--gr-ink)'
 const linea = { stroke: TINTA, strokeWidth: 4, strokeLinejoin: 'round', strokeLinecap: 'round' } as const
@@ -106,7 +108,8 @@ function Cuenta() {
 
 /** Caritas en fila, para los que regalan juntos. */
 function Caras({ letras }: { letras: string[] }) {
-  const fondos = ['bg-gr-accent', 'bg-[#FFD43B]', 'bg-[#FF7FA8]', 'bg-[#DCE8FF]']
+  // con una propuesta de diseño, los colores son los suyos (--gr-cara-*, en temas.css)
+  const fondos = ['bg-gr-accent', 'bg-[var(--gr-cara-2,#FFD43B)]', 'bg-[var(--gr-cara-3,#FF7FA8)]', 'bg-[var(--gr-cara-4,#DCE8FF)]']
   return (
     <span aria-hidden className="flex pl-2">
       {letras.map((l, i) => (
@@ -116,22 +119,22 @@ function Caras({ letras }: { letras: string[] }) {
   )
 }
 
-type Funcion = { Dibujo: () => ReactNode; fondo: string; nombre: string; titulo: string; texto: string; ejemplo: ReactNode }
+type Funcion = { Dibujo: () => ReactNode; sticker: NombreSticker; fondo: string; nombre: string; titulo: string; texto: string; ejemplo: ReactNode }
 
 const FUNCIONES: Funcion[] = [
-  { Dibujo: Pato, fondo: '#DCE8FF', nombre: 'Tu lista', titulo: 'Armá tu lista',
+  { Dibujo: Pato, sticker: 'lista', fondo: 'var(--gr-portada-1, #DCE8FF)', nombre: 'Tu lista', titulo: 'Armá tu lista',
     texto: 'Con foto o link. Marcá lo que más querés y mandala por WhatsApp.',
     ejemplo: <><PriorityTag prioridad="mucho" className="h-6 px-2" />Pato de goma gigante · $38.000</> },
-  { Dibujo: Regalo, fondo: '#EAF7C4', nombre: 'En secreto', titulo: 'Te lo regalan en secreto',
+  { Dibujo: Regalo, sticker: 'regalo', fondo: 'var(--gr-portada-2, #EAF7C4)', nombre: 'En secreto', titulo: 'Te lo regalan en secreto',
     texto: 'Tu gente reserva y vos no ves nada: ni quién, ni qué.',
     ejemplo: <><Icon name="lock" size={15} strokeWidth={2.2} className="flex-none" />Lo reservaste vos. Euge no se entera.</> },
-  { Dibujo: EntreTodos, fondo: '#FFE1D6', nombre: 'Entre todos', titulo: 'Lo pagan entre todos',
+  { Dibujo: EntreTodos, sticker: 'alcancia', fondo: 'var(--gr-portada-3, #FFE1D6)', nombre: 'Entre todos', titulo: 'Lo pagan entre todos',
     texto: 'Uno lo compra y la app le hace las cuentas a cada uno.',
     ejemplo: <><Caras letras={['C', 'M', 'E', 'R']} />$12.000 cada uno</> },
-  { Dibujo: Papelitos, fondo: '#E7E2FF', nombre: 'Amigo invisible', titulo: 'Amigo invisible sin papelitos',
+  { Dibujo: Papelitos, sticker: 'antifaz', fondo: 'var(--gr-portada-4, #E7E2FF)', nombre: 'Amigo invisible', titulo: 'Amigo invisible sin papelitos',
     texto: 'La app sortea y cada uno ve solo a quién le regala. Ni el que organiza se entera.',
     ejemplo: <><Caras letras={['C', 'M', 'E', 'R']} />Navidad · hasta $20.000</> },
-  { Dibujo: Cuenta, fondo: '#FFF0C2', nombre: 'Cumples', titulo: 'Cumples con tiempo',
+  { Dibujo: Cuenta, sticker: 'calendario', fondo: 'var(--gr-portada-5, #FFF0C2)', nombre: 'Cumples', titulo: 'Cumples con tiempo',
     texto: 'Te avisamos antes del cumple de tu gente, con su lista a mano.',
     ejemplo: <><Icon name="calendar" size={15} strokeWidth={2.2} className="flex-none" />Mati cumple el sábado</> },
 ]
@@ -232,7 +235,9 @@ export function Portada() {
                 className="gr-portada__carta gr-card absolute inset-x-0 top-0 flex h-[336px] flex-col"
                 style={arrastrada ? { transform: `translateX(${arrastre}px) rotate(${arrastre / 18}deg)` } : undefined}>
               <div className="relative h-[196px]" style={{ background: f.fondo }}>
-                <svg aria-hidden viewBox="0 0 240 200" className="absolute inset-0 m-auto h-[176px] w-[212px]"><f.Dibujo /></svg>
+                <Ilustrado sticker={f.sticker} className="absolute inset-0 m-auto size-[196px]">
+                  <svg aria-hidden viewBox="0 0 240 200" className="absolute inset-0 m-auto h-[176px] w-[212px]"><f.Dibujo /></svg>
+                </Ilustrado>
                 <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-gr-surface py-1 pl-1 pr-2.5 text-xs font-semibold">
                   <span aria-hidden className="flex size-5 items-center justify-center rounded-full bg-gr-brand text-[10px] font-bold text-gr-accent">{i + 1}</span>
                   {f.nombre}

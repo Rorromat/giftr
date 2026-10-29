@@ -1,0 +1,451 @@
+/* Las propuestas de diseño (ver lib/tema.ts): cada una es un data-tema en <html> que cambia los colores, las letras y las
+   formas de las mismas pantallas. Sin data-tema, GiftR se ve como siempre (tokens.css).
+   - Sobremesa: lino, petróleo, rosa viejo y ocre. Cálida, con títulos en Fraunces, curvas grandes y la barra oscura.
+   - Revista: papel, oliva, café y topo. Editorial, con títulos en Instrument Serif, esquinas rectas y filetes finos.
+   - Brasa: grafito y brasa. De noche, con títulos en Unbounded, vidrio en la barra y degradés naranja en lo principal.
+   - Cielo: cielo, carbón, rojo y pizarra. Pop, con títulos en Gabarito y el borde grueso y la sombra dura de los stickers.
+   Cada una define los mismos tokens (--gr-*), los radios de Tailwind que cambian, y los colores de las tarjetas de la portada,
+   de los gustos y de las fechas especiales (con texto blanco encima: todos pasan 4.5:1). Lo que no alcanza con tokens va en
+   @layer components; lo poco que tiene que pisar utilidades de Tailwind, al final y sin capa. */
+
+/* ───────────── Sobremesa ───────────── */
+:root[data-tema="sobremesa"] {
+  color-scheme: light;
+  --gr-bg: #EAE4DC;
+  --gr-ink: #0C3D4F;
+  --gr-surface: #F8F4EF;
+  --gr-brand: #0C3D4F;
+  --gr-on-brand: #F8F4EF;
+  --gr-accent: #DB9957;
+  --gr-on-accent: #0C3D4F;
+  --gr-muted: #4D5F63;
+  --gr-dot: #D6CDC1;
+  --gr-soft: #E1D9CE;
+  --gr-line: #DCD3C7;
+  --gr-line-strong: #857C70;
+  --gr-blue: #B4505A;
+  --gr-on-blue: #FFFFFF;
+  --gr-comun: #F4E2DE;
+  --gr-comun-line: #E3BFB9;
+  --gr-comun-ink: #8E3A43;
+  --gr-hero: #0C3D4F;
+  --gr-on-hero: #F8F4EF;
+  --gr-hero-detail: #DB9957;
+  --gr-hero-btn: #DB9957;
+  --gr-on-hero-btn: #0C3D4F;
+  --gr-font-display: var(--font-fraunces), Georgia, serif;
+  --gr-font-body: var(--font-instrument), sans-serif;
+  --gr-radius-lg: 28px;
+  --gr-radius-md: 18px;
+  --gr-shadow: 0 1px 2px rgb(12 61 79 / 0.05), 0 10px 26px rgb(12 61 79 / 0.08);
+  --gr-shadow-float: 0 4px 10px rgb(12 61 79 / 0.14), 0 18px 40px rgb(12 61 79 / 0.24);
+  --gr-cara-2: #E8C9A4;
+  --gr-cara-3: #E9B8BC;
+  --gr-cara-4: #C9DADC;
+  --gr-portada-1: #DCE5E4;
+  --gr-portada-2: #F4DCD3;
+  --gr-portada-3: #F1DFC8;
+  --gr-portada-4: #E6DAD7;
+  --gr-portada-5: #EFE4D2;
+  --gr-gusto-cumple: #B4505A;
+  --gr-gusto-deportes: #0C3D4F;
+  --gr-gusto-futbol: #2F6670;
+  --gr-gusto-hobbies: #7B4A5A;
+  --gr-gusto-ropa: #8E5A28;
+  --gr-gusto-colores: #3B6168;
+  --gr-gusto-bebidas: #8A3F46;
+  --gr-gusto-no-regalar: #082D3B;
+  --gr-fecha-navidad: #A9434D;
+  --gr-fecha-amigo: #0C3D4F;
+  --gr-fecha-padre: #2F5763;
+  --gr-fecha-madre: #B4505A;
+  --gr-fecha-ninos: #8E5A28;
+  --gr-fecha-aparte: #082D3B;
+}
+
+/* ───────────── Revista ───────────── */
+:root[data-tema="revista"] {
+  color-scheme: light;
+  --gr-bg: #E4DFD1;
+  --gr-ink: #29201E;
+  --gr-surface: #EFEBE1;
+  --gr-brand: #29201E;
+  --gr-on-brand: #EFEBE1;
+  --gr-accent: #B7B86D;
+  --gr-on-accent: #29201E;
+  --gr-muted: #65554F;
+  --gr-dot: #CFC8B7;
+  --gr-soft: #DAD4C5;
+  --gr-line: rgb(41 32 30 / 0.16);
+  --gr-line-strong: #7A6E66;
+  --gr-blue: #65554F;
+  --gr-on-blue: #FFFFFF;
+  --gr-comun: #E5E3C8;
+  --gr-comun-line: #B7B86D;
+  --gr-comun-ink: #4E4F1F;
+  --gr-hero: #B7B86D;
+  --gr-on-hero: #29201E;
+  --gr-hero-detail: #29201E;
+  --gr-hero-btn: #29201E;
+  --gr-on-hero-btn: #EFEBE1;
+  --gr-font-display: var(--font-instrument-serif), Georgia, serif;
+  --gr-font-body: var(--font-instrument), sans-serif;
+  --gr-radius-lg: 6px;
+  --gr-radius-md: 4px;
+  --gr-radius-pill: 4px;
+  --gr-shadow: none;
+  --gr-shadow-float: 0 1px 0 rgb(41 32 30 / 0.2), 0 10px 24px rgb(41 32 30 / 0.12);
+  --radius-lg: 4px;
+  --radius-xl: 5px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
+  --gr-cara-2: #D9CFA8;
+  --gr-cara-3: #CDB9AE;
+  --gr-cara-4: #DCDDB4;
+  --gr-portada-1: #E8E4CC;
+  --gr-portada-2: #DDD5C4;
+  --gr-portada-3: #EAE2CF;
+  --gr-portada-4: #D8D1C6;
+  --gr-portada-5: #E3E0C2;
+  --gr-gusto-cumple: #8A5543;
+  --gr-gusto-deportes: #5B5C2A;
+  --gr-gusto-futbol: #6A5A3C;
+  --gr-gusto-hobbies: #65554F;
+  --gr-gusto-ropa: #7A5638;
+  --gr-gusto-colores: #4C5634;
+  --gr-gusto-bebidas: #5A3A31;
+  --gr-gusto-no-regalar: #29201E;
+  --gr-fecha-navidad: #7D3E2E;
+  --gr-fecha-amigo: #4B4C26;
+  --gr-fecha-padre: #3E3430;
+  --gr-fecha-madre: #8A5543;
+  --gr-fecha-ninos: #5B5C2A;
+  --gr-fecha-aparte: #29201E;
+}
+
+/* ───────────── Brasa ───────────── */
+:root[data-tema="brasa"] {
+  color-scheme: dark;
+  --gr-bg: #1E1E20;
+  --gr-ink: #F6F1EC;
+  --gr-surface: #29292C;
+  --gr-brand: #0F0F11;
+  --gr-on-brand: #F6F1EC;
+  --gr-accent: #FB3C20;
+  --gr-on-accent: #1E1E20;
+  --gr-muted: #ABA49F;
+  --gr-dot: #3A3A3F;
+  --gr-soft: #323236;
+  --gr-line: #38383D;
+  --gr-line-strong: #77726E;
+  --gr-blue: #FB3C20;
+  --gr-on-blue: #1E1E20;
+  --gr-comun: #2C2220;
+  --gr-comun-line: #5A2C22;
+  --gr-comun-ink: #FF8A70;
+  --gr-hero: #141416;
+  --gr-on-hero: #F6F1EC;
+  --gr-hero-detail: #FF7A5C;
+  --gr-hero-btn: #FB3C20;
+  --gr-on-hero-btn: #1E1E20;
+  --gr-font-display: var(--font-unbounded), sans-serif;
+  --gr-font-body: var(--font-manrope), sans-serif;
+  --gr-radius-lg: 22px;
+  --gr-radius-md: 16px;
+  --gr-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 10px 30px rgb(0 0 0 / 0.32);
+  --gr-shadow-float: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 16px 40px rgb(0 0 0 / 0.55);
+  --gr-brasa: linear-gradient(135deg, #FF6A3D 0%, #FB3C20 55%, #DE3214 100%);
+  --gr-cara-2: #4A4A52;
+  --gr-cara-3: #6A3027;
+  --gr-cara-4: #3A3A40;
+  --gr-portada-1: #2D2523;
+  --gr-portada-2: #33231F;
+  --gr-portada-3: #2A2A2E;
+  --gr-portada-4: #3A2620;
+  --gr-portada-5: #2F2724;
+  --gr-gusto-cumple: #C42E15;
+  --gr-gusto-deportes: #3A3A40;
+  --gr-gusto-futbol: #A3240F;
+  --gr-gusto-hobbies: #4A2C27;
+  --gr-gusto-ropa: #B4321A;
+  --gr-gusto-colores: #34343A;
+  --gr-gusto-bebidas: #7A1E10;
+  --gr-gusto-no-regalar: #0F0F11;
+  --gr-fecha-navidad: #C42E15;
+  --gr-fecha-amigo: #3A3A40;
+  --gr-fecha-padre: #2A2A2E;
+  --gr-fecha-madre: #A3240F;
+  --gr-fecha-ninos: #8A2A18;
+  --gr-fecha-aparte: #0F0F11;
+}
+
+/* ───────────── Cielo ───────────── */
+:root[data-tema="cielo"] {
+  color-scheme: light;
+  --gr-bg: #D3E7F6;
+  --gr-ink: #332C2D;
+  --gr-surface: #FFFFFF;
+  --gr-brand: #332C2D;
+  --gr-on-brand: #FFFFFF;
+  --gr-accent: #E3213A;
+  --gr-on-accent: #FFFFFF;
+  --gr-muted: #4E5A60;
+  --gr-dot: #A9C6DC;
+  --gr-soft: #E9F3FB;
+  --gr-line: #332C2D;
+  --gr-line-strong: #332C2D;
+  --gr-blue: #44636D;
+  --gr-on-blue: #FFFFFF;
+  --gr-comun: #EAF3FB;
+  --gr-comun-line: #332C2D;
+  --gr-comun-ink: #2F4A52;
+  --gr-hero: #44636D;
+  --gr-on-hero: #FFFFFF;
+  --gr-hero-detail: #D3E7F6;
+  --gr-hero-btn: #FFFFFF;
+  --gr-on-hero-btn: #332C2D;
+  --gr-font-display: var(--font-gabarito), sans-serif;
+  --gr-font-body: var(--font-rubik), sans-serif;
+  --gr-border: 2px solid #332C2D;
+  --gr-radius-lg: 20px;
+  --gr-radius-md: 14px;
+  --gr-shadow: 4px 4px 0 #332C2D;
+  --gr-shadow-float: 4px 4px 0 #332C2D;
+  --gr-rojo: #D41C31;
+  --gr-cara-2: #FFFFFF;
+  --gr-cara-3: #FFB3BC;
+  --gr-cara-4: #A9C6DC;
+  --gr-portada-1: #FFFFFF;
+  --gr-portada-2: #FDE2E5;
+  --gr-portada-3: #EAF3FB;
+  --gr-portada-4: #DCE6E9;
+  --gr-portada-5: #FFFFFF;
+  --gr-gusto-cumple: #D41C31;
+  --gr-gusto-deportes: #44636D;
+  --gr-gusto-futbol: #2F4A52;
+  --gr-gusto-hobbies: #5C3E42;
+  --gr-gusto-ropa: #B81B2D;
+  --gr-gusto-colores: #3A5862;
+  --gr-gusto-bebidas: #332C2D;
+  --gr-gusto-no-regalar: #332C2D;
+  --gr-fecha-navidad: #D41C31;
+  --gr-fecha-amigo: #44636D;
+  --gr-fecha-padre: #2F4A52;
+  --gr-fecha-madre: #B81B2D;
+  --gr-fecha-ninos: #3A5862;
+  --gr-fecha-aparte: #332C2D;
+}
+
+@layer components {
+  /* ── Sobremesa: títulos en Fraunces suave, tarjetas sin borde, la barra de abajo en petróleo con la sección en ocre ── */
+  :root[data-tema="sobremesa"] {
+    .gr-title {
+      font-family: var(--gr-font-display);
+      font-weight: 600;
+      font-size: 32px;
+      letter-spacing: -0.015em;
+      font-variation-settings: 'opsz' 72, 'SOFT' 100;
+    }
+    .gr-heading {
+      font-family: var(--gr-font-display);
+      font-weight: 600;
+      font-size: 21px;
+      font-variation-settings: 'opsz' 36, 'SOFT' 100;
+    }
+    .gr-number { font-weight: 700; letter-spacing: -0.03em; font-variation-settings: 'opsz' 96, 'SOFT' 100; }
+    .gr-sticker, .gr-card { border-color: transparent; }
+    .gr-chip { border-color: transparent; }
+    .gr-btn { border-color: transparent; }
+    .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-variation-settings: 'opsz' 48, 'SOFT' 100; }
+    .gr-nav { background: var(--gr-brand); border-color: var(--gr-brand); }
+    .gr-nav a { color: var(--gr-on-brand); }
+    .gr-nav a[data-marcado] { background: var(--gr-accent); color: var(--gr-brand); }
+    .gr-nav a[data-marcado] svg { color: var(--gr-brand); }
+    .gr-nav a.gr-fab { color: var(--gr-on-accent); }
+  }
+
+  /* ── Revista: títulos de revista, versalitas en los botones, filetes finos en vez de sombras, esquinas rectas ── */
+  :root[data-tema="revista"] {
+    .gr-title {
+      font-family: var(--gr-font-display);
+      font-weight: 400;
+      font-size: 42px;
+      line-height: 1;
+      letter-spacing: -0.015em;
+    }
+    .gr-heading {
+      font-family: var(--gr-font-display);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 26px;
+      letter-spacing: -0.005em;
+    }
+    .gr-label { letter-spacing: 0.16em; font-size: 11px; color: var(--gr-ink); }
+    .gr-number { font-weight: 400; font-style: italic; letter-spacing: -0.02em; }
+    .gr-sticker, .gr-card { border: 1px solid rgb(41 32 30 / 0.22); box-shadow: none; }
+    .gr-hero { border-radius: 6px; box-shadow: none; }
+    .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-weight: 400; letter-spacing: -0.01em; }
+    .gr-hero h1 { font-size: 34px; }
+    .gr-empty { border: 1px dashed rgb(41 32 30 / 0.3); background: transparent; }
+    .gr-btn, .gr-btn-primary {
+      border-radius: 3px;
+      border-color: var(--gr-ink);
+      background: transparent;
+      box-shadow: none;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 12.5px;
+    }
+    .gr-btn-primary, .gr-btn--dark { background: var(--gr-brand); color: var(--gr-on-brand); font-size: 13px; }
+    .gr-btn--accent { background: var(--gr-accent); border-color: var(--gr-ink); }
+    .gr-btn--hero { background: var(--gr-hero-btn); border-color: var(--gr-hero-btn); }
+    .gr-chip { border-radius: 3px; border-color: rgb(41 32 30 / 0.35); background: transparent; }
+    .gr-segmented { border-radius: 4px; background: transparent; border: 1px solid rgb(41 32 30 / 0.35); }
+    .gr-segmented > * { border-radius: 2px; }
+    .gr-input { border-radius: 3px; border: 1px solid rgb(41 32 30 / 0.5); background: #F4F1E9; }
+    .gr-tag { border-radius: 3px; }
+    .gr-icon-btn { background: transparent; box-shadow: none; border: 1px solid rgb(41 32 30 / 0.35); }
+    .gr-row__icon { background: transparent; border: 1px solid rgb(41 32 30 / 0.25); }
+    .gr-nav { border-radius: 6px; border: 1px solid var(--gr-ink); background: var(--gr-surface); }
+    .gr-nav a { border-radius: 3px; }
+    .gr-nav a[data-marcado] svg { color: var(--gr-accent); }
+    .gr-floatbar, .gr-toast { border-radius: 6px; }
+    .gr-refrescar { border-radius: 6px; }
+  }
+
+  /* ── Brasa: modo oscuro; lo principal se prende con el degradé de brasa y la barra es de vidrio ── */
+  :root[data-tema="brasa"] {
+    .gr-title { font-family: var(--gr-font-display); font-weight: 600; font-size: 25px; line-height: 1.15; letter-spacing: -0.03em; }
+    .gr-heading { font-family: var(--gr-font-display); font-weight: 500; font-size: 17px; letter-spacing: -0.02em; }
+    .gr-number { font-weight: 700; letter-spacing: -0.05em; }
+    .gr-sticker, .gr-card { border-color: rgb(255 255 255 / 0.06); }
+    .gr-hero {
+      background:
+        radial-gradient(120% 95% at 100% 0%, rgb(251 60 32 / 0.95) 0%, rgb(251 60 32 / 0.45) 26%, rgb(251 60 32 / 0) 62%),
+        var(--gr-hero);
+      border: 1px solid rgb(255 255 255 / 0.06);
+    }
+    .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-weight: 600; letter-spacing: -0.03em; }
+    .gr-btn { background: var(--gr-soft); border-color: rgb(255 255 255 / 0.08); box-shadow: none; }
+    .gr-btn-primary, .gr-btn--hero, .gr-btn--accent {
+      border: 0;
+      background: var(--gr-brasa);
+      color: #1E1E20;
+      box-shadow: 0 10px 28px -10px rgb(251 60 32 / 0.85);
+    }
+    .gr-btn--dark { background: var(--gr-brand); border-color: rgb(255 255 255 / 0.1); }
+    .gr-icon-btn { background: var(--gr-surface); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07), var(--gr-shadow); }
+    .gr-chip { background: var(--gr-surface); border-color: rgb(255 255 255 / 0.08); }
+    .gr-chip[aria-pressed="true"], .gr-chip[aria-current="page"], .gr-chip:has(:checked),
+    .gr-segmented > [aria-pressed="true"], .gr-segmented > [aria-current="page"], .gr-segmented > :has(:checked) {
+      background: var(--gr-brasa);
+      border-color: transparent;
+      color: #1E1E20;
+    }
+    .gr-segmented { background: var(--gr-surface); }
+    .gr-input { background: #161618; border-color: #4A4A50; }
+    .gr-input:focus { outline-color: var(--gr-accent); }
+    .gr-tag { background: rgb(20 20 22 / 0.88); color: var(--gr-ink); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08); }
+    .gr-avatar { border-color: var(--gr-bg); }
+    .gr-nav {
+      background: rgb(41 41 44 / 0.78);
+      border-color: rgb(255 255 255 / 0.08);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      backdrop-filter: blur(18px) saturate(150%);
+    }
+    .gr-nav a[data-marcado] { background: var(--gr-brasa); color: #1E1E20; }
+    .gr-nav a[data-marcado] svg { color: #1E1E20; }
+    .gr-nav a.gr-fab { color: var(--gr-on-accent); filter: drop-shadow(0 8px 18px rgb(251 60 32 / 0.5)); }
+    .gr-floatbar { border: 1px solid rgb(255 255 255 / 0.08); }
+    .gr-toast { border: 1px solid rgb(255 255 255 / 0.08); }
+    .gr-refrescar[data-fase="listo"], .gr-refrescar[data-fase="sin-red"] { border: 1px solid rgb(255 255 255 / 0.08); }
+  }
+
+  /* ── Cielo: el borde grueso y la sombra dura de los stickers; los botones se hunden al tocarlos ── */
+  :root[data-tema="cielo"] {
+    .gr-title { font-family: var(--gr-font-display); font-weight: 800; font-size: 32px; letter-spacing: -0.025em; }
+    .gr-heading { font-family: var(--gr-font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.015em; }
+    .gr-number { font-weight: 900; letter-spacing: -0.04em; }
+    .gr-sticker, .gr-card { border: var(--gr-border); }
+    .gr-hero { border: var(--gr-border); box-shadow: 5px 5px 0 var(--gr-ink); }
+    .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-weight: 800; letter-spacing: -0.02em; }
+    .gr-empty { border: 2px dashed var(--gr-ink); background: var(--gr-soft); }
+    .gr-btn, .gr-btn-primary {
+      border: var(--gr-border);
+      box-shadow: 3px 3px 0 var(--gr-ink);
+      font-weight: 700;
+      transition: transform 80ms ease, box-shadow 80ms ease;
+    }
+    .gr-btn:active, .gr-btn-primary:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--gr-ink); }
+    .gr-btn-primary { background: var(--gr-rojo); color: #FFFFFF; }
+    .gr-btn--dark { background: var(--gr-brand); color: var(--gr-on-brand); }
+    .gr-btn--accent { background: var(--gr-rojo); color: #FFFFFF; }
+    .gr-btn--hero { background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
+    .gr-icon-btn { border: var(--gr-border); box-shadow: 2px 2px 0 var(--gr-ink); }
+    .gr-chip { border: var(--gr-border); font-weight: 600; }
+    .gr-chip[aria-pressed="true"], .gr-chip[aria-current="page"], .gr-chip:has(:checked) {
+      background: var(--gr-rojo);
+      border-color: var(--gr-ink);
+      color: #FFFFFF;
+      box-shadow: 2px 2px 0 var(--gr-ink);
+    }
+    .gr-segmented { background: var(--gr-surface); border: var(--gr-border); }
+    .gr-segmented > [aria-pressed="true"], .gr-segmented > [aria-current="page"], .gr-segmented > :has(:checked) { background: var(--gr-rojo); color: #FFFFFF; }
+    .gr-input:focus { outline: 3px solid var(--gr-accent); outline-offset: 1px; }
+    .gr-tag { border: 2px solid var(--gr-ink); box-shadow: none; }
+    .gr-avatar { border-color: var(--gr-ink); }
+    .gr-row__icon { background: var(--gr-bg); border: var(--gr-border); }
+    .gr-rows > * + * { border-top-width: 2px; }
+    .gr-nav { border: var(--gr-border); box-shadow: var(--gr-shadow-float); }
+    .gr-nav a[data-marcado] { background: var(--gr-rojo); color: #FFFFFF; }
+    .gr-nav a[data-marcado] svg { color: #FFFFFF; }
+    .gr-nav a.gr-fab { color: var(--gr-on-accent); filter: none; }
+    .gr-estrella polygon { stroke: var(--gr-ink); stroke-width: 5px; stroke-linejoin: round; paint-order: stroke; }
+    .gr-floatbar, .gr-toast { border: var(--gr-border); box-shadow: var(--gr-shadow-float); }
+  }
+}
+
+/* Con una propuesta puesta, las ilustraciones son stickers (ver Ilustrado.tsx); sin ella, las de siempre. */
+:root[data-tema] .gr-solo-actual { display: none !important; }
+:root:not([data-tema]) .gr-solo-tema { display: none !important; }
+
+/* Lo que va sobre el color de detalle (las pastillas, los avatares sin foto) lleva el texto que le corresponde: el de siempre
+   es la tinta, pero en Brasa la tinta es clara y en Cielo el detalle es rojo. */
+:root[data-tema] .bg-gr-accent { color: var(--gr-on-accent); }
+/* En Brasa la tinta es clara: lo blanco de arriba de las fotos lleva texto oscuro. */
+:root[data-tema="brasa"] :is(.bg-white, .bg-white\/95) { color: #1E1E20; }
+/* En Cielo el detalle es rojo: sobre lo oscuro (el carbón, la tarjeta pizarra) va en rosa, para que se lea. */
+:root[data-tema="cielo"] :is(.bg-gr-brand, .gr-toast, .gr-hero, .gr-floatbar, .gr-sticker--dark) :is(.text-gr-accent),
+:root[data-tema="cielo"] .bg-gr-brand.text-gr-accent {
+  color: #FF9AA6;
+}
+/* y lo que confirma algo ("Listo, …") no va en rojo, que parece un error: va en blanco con el borde de carbón */
+[data-tema="cielo"] [role="status"].bg-gr-accent {
+  background: var(--gr-surface);
+  color: var(--gr-ink);
+  border: 2px solid var(--gr-ink);
+  box-shadow: 3px 3px 0 var(--gr-ink);
+}
+
+/* El círculo de las ilustraciones de las fechas (el brillo de su tarjeta en Próximos): su color, un poco más claro. */
+:root[data-tema] {
+  --gr-fecha-navidad-marco: color-mix(in oklab, var(--gr-fecha-navidad) 78%, white);
+  --gr-fecha-amigo-marco: color-mix(in oklab, var(--gr-fecha-amigo) 78%, white);
+  --gr-fecha-padre-marco: color-mix(in oklab, var(--gr-fecha-padre) 78%, white);
+  --gr-fecha-madre-marco: color-mix(in oklab, var(--gr-fecha-madre) 78%, white);
+  --gr-fecha-ninos-marco: color-mix(in oklab, var(--gr-fecha-ninos) 78%, white);
+  --gr-fecha-aparte-marco: color-mix(in oklab, var(--gr-fecha-aparte) 78%, white);
+}
+
+/* Las letras grandes (el logo, el lema de la portada, los números): cada propuesta con su peso y su espacio entre letras,
+   que pisan los de las utilidades. Instrument Serif tiene un solo peso: en Revista nunca se engorda de mentira. */
+[data-tema="sobremesa"] :is(.font-brand, .font-display) { font-weight: 700; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96, 'SOFT' 100; }
+[data-tema="revista"] { font-synthesis-weight: none; }
+[data-tema="revista"] :is(.font-brand, .font-display) { letter-spacing: -0.01em; }
+[data-tema="revista"] .gr-logo { font-size: 31px; font-style: italic; }
+[data-tema="revista"] .gr-lema { font-size: 50px; line-height: 0.95; }
+[data-tema="brasa"] :is(.font-brand, .font-display) { letter-spacing: -0.05em; }
+[data-tema="brasa"] .gr-logo { font-size: 23px; }
+[data-tema="brasa"] .gr-lema { font-size: 33px; line-height: 1.05; }
+[data-tema="cielo"] :is(.font-brand, .font-display) { letter-spacing: -0.03em; }
+[data-tema="cielo"] .gr-lema { font-size: 44px; line-height: 0.95; }

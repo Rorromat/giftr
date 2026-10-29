@@ -9,6 +9,7 @@ import { datosDe, esFechaEspecial, vistaDe } from '@/lib/fechas-especiales'
 import { miGente } from '@/lib/gente'
 import { ArmarJuego, FilaJuego } from '@/components/AmigoInvisible'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
+import { Ilustrado, stickerDeFecha } from '@/components/Ilustrado'
 import { paletaDe } from '@/lib/colores-fechas'
 import { AvatarSticker, Icon, PageHeader, Seccion } from '@/components/ui'
 
@@ -41,7 +42,9 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
 
       <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-[26px] p-[18px] pr-[132px] text-white shadow-card"
            style={{ background: paletaDe(slug).fondo }}>
-        <IlustracionFecha fecha={slug} size={150} className="absolute -right-3 -bottom-3" />
+        <Ilustrado sticker={stickerDeFecha(slug)} className="absolute -right-4 -bottom-3 size-[156px]">
+          <IlustracionFecha fecha={slug} size={150} className="absolute -right-3 -bottom-3" />
+        </Ilustrado>
         <span className="self-start whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold" style={{ color: paletaDe(slug).fondo }}>
           Fecha especial · {v.dias === 0 ? 'es hoy' : v.dias === 1 ? 'mañana' : `en ${v.dias} días`}
         </span>

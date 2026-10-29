@@ -17,4 +17,5 @@ const PALETAS: Record<PasoGustos, PaletaGusto> = {
   'no-regalar': { fondo: '#141414', marco: '#2A2A27', piso: '#000000', acento: '#C8F31D' },
 }
 
-export const paletaGusto = (paso: PasoGustos) => PALETAS[paso]
+/** Con una propuesta de diseño puesta (temas.css), el fondo es el suyo: --gr-gusto-<paso>. */
+export const paletaGusto = (paso: PasoGustos): PaletaGusto => ({ ...PALETAS[paso], fondo: `var(--gr-gusto-${paso}, ${PALETAS[paso].fondo})` })

@@ -22,7 +22,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
       <Portada />
 
       <div className="flex flex-col items-center gap-3 px-2.5 text-center">
-        <h1 className="font-brand text-[40px] leading-[0.98] font-extrabold tracking-[-0.045em] [font-variation-settings:'opsz'_96]">
+        <h1 className="gr-lema font-brand text-[40px] leading-[0.98] font-extrabold tracking-[-0.045em] [font-variation-settings:'opsz'_96]">
           Pedí lo que querés sin pedirlo.
         </h1>
         <p className="text-base leading-snug text-gr-muted">Tu lista, la de tu gente y el amigo invisible. Sin arruinar ninguna sorpresa.</p>

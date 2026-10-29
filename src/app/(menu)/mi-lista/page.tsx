@@ -14,7 +14,8 @@ import { ListaHero } from '@/components/ListaHero'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
-import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
+import { AppHeader, Seccion, SectionHeader } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 
 export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string; eliminado?: string }> }) {
   const { agregado, eliminado } = await searchParams
@@ -64,7 +65,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
 
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
+          <DibujoVacio icon="gift" sticker="lista" />
           <p>Agregá lo primero que se te venga a la cabeza.<br />¿Un link? Pegalo en “Agregar”.</p>
           <Link href="/agregar" className="gr-btn-primary gr-btn--sm">Agregar un deseo</Link>
         </div>

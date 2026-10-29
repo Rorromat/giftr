@@ -20,6 +20,7 @@ import { ArmarSorpresa } from '@/components/Sorpresas'
 import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigos'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
+import { DibujoVacio } from '@/components/Ilustrado'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 
 /**
@@ -212,7 +213,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
 
       {gente.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
-          <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="users" size={26} /></span>
+          <DibujoVacio icon="users" sticker="amigos" className="mb-1" />
           <p>Acá aparecen tus amigos y las listas que abrís con tu cuenta.</p>
           <p className="text-gr-muted">Tocá “Agregar” y buscalos por su @usuario o su mail.</p>
         </div>

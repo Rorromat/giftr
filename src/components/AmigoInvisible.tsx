@@ -11,6 +11,7 @@ import { ElegirAmigos } from '@/components/Dividir'
 import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
+import { Ilustrado, stickerDeFecha } from '@/components/Ilustrado'
 import { paletaDe } from '@/lib/colores-fechas'
 import { AvatarSticker, Icon, Starburst } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
@@ -58,7 +59,9 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
                 className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-ink'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
-          <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
+          <Ilustrado sticker={stickerDeFecha(fecha?.id ?? null)} className="mt-4 size-[150px]">
+            <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
+          </Ilustrado>
           <Starburst size={64} fontSize={t.dias > 99 ? 26 : 32} sub={t.dias === 0 ? undefined : t.dias === 1 ? 'día' : 'días'}
                      label={t.dias === 0 ? 'Es hoy' : `Faltan ${t.dias} ${t.dias === 1 ? 'día' : 'días'}`}
                      className="absolute right-2 top-2 drop-shadow-sm">
@@ -514,7 +517,7 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   if (!v.meToca) {
     return (
       <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-3 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
-        <IlustracionFecha fecha={v.fechaEspecial} size={120} />
+        <Ilustrado sticker={stickerDeFecha(v.fechaEspecial)} className="size-[128px]"><IlustracionFecha fecha={v.fechaEspecial} size={120} /></Ilustrado>
         <p className="text-xl font-semibold">Ya se sorteó</p>
         <p className="text-sm opacity-80">Fijate que nadie esté mirando tu pantalla.</p>
         <form action={verAQuienLeRegaloAction} className="w-full">
