@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { CuentaPersona, Cuentas } from '@/lib/regalos'
 import { plata } from '@/lib/pesos'
+import { juntarNombres } from '@/lib/groups'
 import { AvatarSticker, Icon, SectionHeader } from '@/components/ui'
 
 // Las cuentas pendientes en Inicio, abajo de lo nuevo de tus amigos: cuánto debés y cuánto te deben (como arriba en
@@ -21,7 +22,8 @@ function Total({ pesos, dolares, className = '' }: { pesos: number; dolares: num
 }
 
 function Persona({ p }: { p: CuentaPersona }) {
-  const regalos = [...new Set(p.lineas.map((l) => l.itemTitulo))]
+  // de qué regalos, y lo que cambió al simplificar ("En vez de pagarle a Bruno")
+  const regalos = [...new Set([...p.lineas.map((l) => l.itemTitulo), ...p.ajustes.map((a) => a.texto)])]
   return (
     <li className="flex items-center gap-3 px-4 py-3">
       <AvatarSticker nombre={p.nombre} size={40} />
@@ -36,7 +38,7 @@ function Persona({ p }: { p: CuentaPersona }) {
 }
 
 export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
-  if (!cuentas.personas.length) return null
+  if (!cuentas.personas.length && !cuentas.rondas.length) return null
   const mas = cuentas.personas.length - PERSONAS_EN_INICIO
   return (
     <section aria-labelledby="cuentas-pendientes" className="flex flex-col gap-3">
@@ -54,6 +56,16 @@ export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
         </span>
         <ul className="flex flex-col divide-y divide-gr-line">
           {cuentas.personas.slice(0, PERSONAS_EN_INICIO).map((p) => <Persona key={`${p.id}-${p.moneda}`} p={p} />)}
+          {/* lo que se debían en ronda: nadie paga, pero alguno lo tiene que marcar */}
+          {cuentas.rondas.map((r) => (
+            <li key={`${r.clave}-${r.moneda}`} className="flex items-center gap-3 px-4 py-3">
+              <AvatarSticker nombre={r.con[0]} size={40} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">Con {juntarNombres(r.con)} quedan a mano</span>
+                <span className="truncate text-[13px] text-gr-muted">Se cancela en ronda: falta marcarlo como saldado</span>
+              </span>
+            </li>
+          ))}
         </ul>
         <span className="flex items-center gap-2 border-t border-gr-line px-4 py-3 text-sm font-semibold">
           <Icon name="wallet" size={18} className="flex-none" />

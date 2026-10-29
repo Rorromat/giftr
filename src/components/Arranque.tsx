@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Starburst } from '@/components/ui'
 
-const cargando = () => !!document.querySelector('main[aria-busy="true"]')
+// la pantalla de carga entera, o solo lo de abajo de una sección con pestañas (ver SkeletonContenido)
+const cargando = () => !!document.querySelector('main[aria-busy="true"], .gr-cargando[aria-busy="true"]')
 
 /**
  * La animación de inicio: mientras la primera pantalla de la app está cargando, la estrella del ícono se pega en el

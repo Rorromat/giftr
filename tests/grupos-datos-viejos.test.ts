@@ -87,7 +87,7 @@ test('la migración destraba lo que dejó un regalador que se unió como co-due�
   expect(await reserveItem(db, tostadora.id, { userId: sofi.id })).toMatchObject({ ok: true })
   // de la vela de Ana se baja
   expect((await regalosDeItem(db, vela.id, { userId: ana.id }))[0].miembros.map((m) => m.nombre)).toEqual(['Ana'])
-  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], enCurso: [], saldadas: [] })
+  expect(await misCuentas(db, martin.id)).toEqual({ debes: 0, teDeben: 0, personas: [], rondas: [], porVos: [], enCurso: [], saldadas: [] })
   // Rodri queda como ex co-dueño: sin capa oculta y sin reservar, y lo que reservó se libera
   expect(await getListForViewer(db, grupo.shareToken, { userId: rodri.id })).toMatchObject({ role: 'anonimo', motivo: 'ex_dueno' })
   expect(await reserveItem(db, plantas.id, { userId: rodri.id })).toEqual({ ok: false, reason: 'propio' })

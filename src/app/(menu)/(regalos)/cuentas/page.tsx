@@ -1,18 +1,18 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { avisosSinLeer } from '@/lib/bandeja'
 import {
-  comprasParaCorregir, misCuentas, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type RegaloEnCurso,
+  comprasParaCorregir, misCuentas, type AjusteCuenta, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type PagoPorVos,
+  type RegaloEnCurso, type RondaCuenta,
 } from '@/lib/regalos'
-import { plata } from '@/lib/pesos'
-import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleUpAction } from '@/app/actions'
+import { plata, type Moneda } from '@/lib/pesos'
+import { juntarNombres } from '@/lib/groups'
+import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleRoundAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
+import { PagoParcial } from '@/components/PagoParcial'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
-import { yo } from '@/lib/perfil'
-import { PestanasRegalos } from '@/components/PestanasRegalos'
-import { AppHeader, AvatarSticker, Icon, QuizasLink, Seccion } from '@/components/ui'
+import { AvatarSticker, Icon, QuizasLink } from '@/components/ui'
 
 /** Qué es la línea: la parte que falta (o lo que falta de ella), o lo que el que compró devuelve. */
 function queEs(l: LineaCuenta) {
@@ -21,7 +21,8 @@ function queEs(l: LineaCuenta) {
   return `${resto}${l.tipo === 'debes' ? 'tu parte' : 'su parte'}`
 }
 
-function Linea({ l }: { l: LineaCuenta }) {
+/** Una parte. conBoton: se salda sola (en una tarjeta simplificada, no: se salda con el botón de la tarjeta). */
+function Linea({ l, conBoton }: { l: LineaCuenta; conBoton: boolean }) {
   return (
     <li className="flex items-center gap-2 py-2">
       <QuizasLink href={l.href} className="min-w-0 flex-1 text-sm leading-snug">
@@ -29,7 +30,7 @@ function Linea({ l }: { l: LineaCuenta }) {
         <span className="block text-xs font-medium text-gr-muted">para {l.para} · {queEs(l)}</span>
       </QuizasLink>
       <span className="text-base font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
-      <form action={markPaidAction}>
+      {conBoton && <form action={markPaidAction}>
         <input type="hidden" name="giftId" value={l.giftId} />
         <input type="hidden" name="deudorId" value={l.deudorId} />
         <input type="hidden" name="pagado" value="1" />
@@ -38,7 +39,21 @@ function Linea({ l }: { l: LineaCuenta }) {
         <BotonEnviar className="gr-btn min-h-11 px-2.5 text-[13px]">
           {l.devolucion ? (l.tipo === 'debes' ? 'Ya le devolví' : 'Me devolvió') : l.tipo === 'debes' ? 'Ya le pagué' : 'Me pagó'}
         </BotonEnviar>
-      </form>
+      </form>}
+    </li>
+  )
+}
+
+/** Lo que cambió al simplificar (ver AjusteCuenta): en el sentido de la tarjeta suma, al revés resta. */
+function Ajuste({ a, neto, moneda }: { a: AjusteCuenta; neto: number; moneda?: Moneda }) {
+  const resta = a.monto * (neto < 0 ? -1 : 1) < 0
+  return (
+    <li className="flex items-center gap-2 py-2">
+      <span className="min-w-0 flex-1 text-sm leading-snug">
+        <span className="font-semibold [overflow-wrap:anywhere]">{a.texto}</span>
+        <span className="block text-xs font-medium text-gr-muted">simplificado</span>
+      </span>
+      <span className="text-base font-semibold tabular-nums">{resta ? '−' : ''}{plata(Math.abs(a.monto), moneda)}</span>
     </li>
   )
 }
@@ -46,6 +61,8 @@ function Linea({ l }: { l: LineaCuenta }) {
 function Persona({ p }: { p: CuentaPersona }) {
   const leDebo = p.neto < 0
   const ambas = new Set(p.lineas.map((l) => l.tipo)).size > 1
+  // simplificada: las partes no suman lo que dice arriba, así que se salda todo junto
+  const simplificada = p.ajustes.length > 0
   return (
     <li className="gr-card flex flex-col gap-1 p-4">
       <div className="flex items-center gap-3">
@@ -55,10 +72,14 @@ function Persona({ p }: { p: CuentaPersona }) {
         </p>
       </div>
       {ambas && <p className="text-xs font-semibold text-gr-muted">Ya está descontado lo que se deben entre los dos.</p>}
+      {simplificada && (
+        <p className="text-xs font-semibold text-gr-muted">Simplificado, como en Splitwise: menos transferencias y todos quedan igual.</p>
+      )}
       <ul className="flex flex-col divide-y divide-gr-line">
-        {p.lineas.map((l) => <Linea key={`${l.giftId}-${l.deudorId}`} l={l} />)}
+        {p.lineas.map((l) => <Linea key={`${l.giftId}-${l.deudorId}`} l={l} conBoton={!simplificada} />)}
+        {p.ajustes.map((a) => <Ajuste key={a.texto} a={a} neto={p.neto} moneda={p.moneda} />)}
       </ul>
-      {p.lineas.length > 1 && (
+      {(p.lineas.length > 1 || simplificada) && (
         <form action={settleUpAction}>
           <input type="hidden" name="otroId" value={p.id} />
           <input type="hidden" name="moneda" value={p.moneda ?? 'ARS'} />
@@ -69,6 +90,38 @@ function Persona({ p }: { p: CuentaPersona }) {
           </BotonEnviar>
         </form>
       )}
+      {p.neto !== 0 && <PagoParcial key={p.neto} otroId={p.id} neto={p.neto} moneda={p.moneda} />}
+    </li>
+  )
+}
+
+/** Se deben lo mismo en círculo: nadie paga nada, alguno lo marca (ver saldarRonda). */
+function Ronda({ r }: { r: RondaCuenta }) {
+  const pasos = [`vos le debés a ${r.con[0]}`, ...r.con.slice(0, -1).map((n, i) => `${n} a ${r.con[i + 1]}`), `${r.con.at(-1)} a vos`]
+  return (
+    <li className="gr-card flex flex-col gap-2 p-4">
+      <p className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">Con {juntarNombres(r.con)} quedan a mano</p>
+      <p className="text-sm leading-snug">
+        Se deben {plata(r.monto, r.moneda)} en ronda: {juntarNombres(pasos)}. Se cancela sin que nadie pague nada.
+      </p>
+      <form action={settleRoundAction}>
+        <input type="hidden" name="clave" value={r.clave} />
+        <input type="hidden" name="monto" value={r.monto} />
+        <input type="hidden" name="moneda" value={r.moneda ?? 'ARS'} />
+        <BotonEnviar className="gr-btn gr-btn--sm w-full">Marcar como saldado</BotonEnviar>
+      </form>
+    </li>
+  )
+}
+
+/** Un pago del plan que pasa por vos (ver PagoPorVos): no tenés que hacer nada. */
+function PorVos({ x }: { x: PagoPorVos }) {
+  return (
+    <li className="flex flex-col gap-0.5 py-2 text-sm leading-snug">
+      <span className="font-semibold [overflow-wrap:anywhere]">
+        {x.de} le paga {plata(x.monto, x.moneda)} a {x.a} por vos
+      </span>
+      <span className="text-xs font-medium text-gr-muted">Así vos no le pagás eso a {x.despues} y {x.antes} no te lo paga a vos.</span>
     </li>
   )
 }
@@ -174,19 +227,12 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
   const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, aCorregir, { nombre, foto }, avisos] = await Promise.all([
-    misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), yo(db, session.userId), avisosSinLeer(db, { userId: session.userId }),
-  ])
-  const vacio = !c.personas.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
+  const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
+  const vacio = !c.personas.length && !c.rondas.length && !c.porVos.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
+  // lo de arriba (el encabezado, el título y las pestañas) está en el layout, compartido con Mis regalos
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
-      <div className="flex flex-col gap-1">
-        <h1 className="gr-title">Cuentas</h1>
-        <p className="text-[15px] text-gr-muted">Los regalos grupales: quién le debe a quién.</p>
-      </div>
-      <PestanasRegalos actual="cuentas" />
+    <div className="gr-fundido flex flex-col gap-5">
 
       <div className="grid grid-cols-2 gap-3">
         <div className="gr-hero flex flex-col gap-1.5 p-4">
@@ -209,13 +255,25 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
         </div>
       )}
 
-      {c.personas.length === 0 && !vacio && (
+      {c.personas.length === 0 && !c.rondas.length && !c.porVos.length && !vacio && (
         <p className="gr-card flex items-center gap-2 px-4 py-3.5 text-base font-semibold">
           <Icon name="check" size={20} strokeWidth={3} /> Están todos a mano
         </p>
       )}
 
       {c.personas.length > 0 && <ul className="flex flex-col gap-4">{c.personas.map((p) => <Persona key={`${p.id}-${p.moneda}`} p={p} />)}</ul>}
+
+      {c.rondas.length > 0 && <ul className="flex flex-col gap-4">{c.rondas.map((r) => <Ronda key={`${r.clave}-${r.moneda}`} r={r} />)}</ul>}
+
+      {c.porVos.length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <h2 className="gr-heading">Lo pagan por vos</h2>
+          <p className="text-[13px] leading-snug text-gr-muted">Se simplificó para hacer menos transferencias: cuando lo marquen, quedás a mano.</p>
+          <ul className="flex flex-col divide-y divide-gr-line">
+            {c.porVos.map((x) => <PorVos key={`${x.de}-${x.a}-${x.antes}-${x.despues}-${x.moneda}`} x={x} />)}
+          </ul>
+        </section>
+      )}
 
       {c.enCurso.length > 0 && (
         <section className="flex flex-col gap-2.5">
@@ -263,6 +321,6 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           </ul>
         </section>
       )}
-    </Seccion>
+    </div>
   )
 }

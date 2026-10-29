@@ -95,16 +95,19 @@ test('pagó y después se sumó alguien: el encargado le devuelve la diferencia,
 
   expect(await sumarseARegalo(db, giftId, caro.id)).toBe(true)
   expect(await division(db, bici.id, sofi.id)).toEqual([['Rodri', 30000, 0], ['Sofi', 30000, -15000], ['Caro', 30000, 30000]])
-  // en Cuentas: Rodri le devuelve a Sofi; Caro le debe a Rodri
+  // Rodri le devuelve a Sofi y Caro le debe a Rodri: en Cuentas se simplifica (ver simplificar.ts), Caro le paga directo a
+  // Sofi lo que Rodri le devolvía y el resto a Rodri
   const deRodri = await misCuentas(db, rodri.id)
-  expect(deRodri).toMatchObject({ debes: 15000, teDeben: 30000 })
-  expect(deRodri.personas.map((p) => [p.nombre, p.neto, p.lineas.map((l) => [l.tipo, l.devolucion, l.monto, l.parte])])).toEqual([
-    ['Sofi', -15000, [['debes', true, 15000, 30000]]],
-    ['Caro', 30000, [['te_deben', false, 30000, 30000]]],
+  expect(deRodri).toMatchObject({ debes: 0, teDeben: 15000 })
+  expect(deRodri.personas.map((p) => [p.nombre, p.neto, p.lineas.map((l) => [l.tipo, l.devolucion, l.monto, l.parte]), p.ajustes])).toEqual([
+    ['Caro', 15000, [['te_deben', false, 30000, 30000]], [{ monto: -15000, texto: 'Caro le paga a Sofi por vos' }]],
   ])
+  expect(deRodri.porVos).toEqual([{ de: 'Caro', a: 'Sofi', antes: 'Caro', despues: 'Sofi', monto: 15000 }])
   const deSofi = await misCuentas(db, sofi.id)
   expect(deSofi).toMatchObject({ debes: 0, teDeben: 15000 })
-  expect(deSofi.personas[0].lineas[0]).toMatchObject({ tipo: 'te_deben', devolucion: true, monto: 15000 })
+  expect(deSofi.personas).toEqual([expect.objectContaining({
+    nombre: 'Caro', neto: 15000, lineas: [], ajustes: [{ monto: 15000, texto: 'En vez de que te pague Rodri' }],
+  })])
   // con plata puesta no se baja ni la sacan: primero se la devuelven
   expect(await salirDeRegalo(db, giftId, sofi.id)).toBe(false)
   expect(await sacarDeRegalo(db, giftId, sofi.id, rodri.id)).toBe(false)
@@ -114,10 +117,13 @@ test('pagó y después se sumó alguien: el encargado le devuelve la diferencia,
   expect(await division(db, bici.id, sofi.id)).toContainEqual(['Sofi', 30000, 0])
   expect(await marcarPagado(db, giftId, sofi.id, rodri.id, false)).toBe(true)
   expect(await division(db, bici.id, sofi.id)).toContainEqual(['Sofi', 30000, -15000])
-  // "Saldar todo" desde Rodri también lo devuelve (el neto con Sofi es negativo: él le debe)
-  expect(await saldarCon(db, rodri.id, sofi.id, 15000)).toBe(0)
-  expect(await saldarCon(db, rodri.id, sofi.id, -15000)).toBe(1)
-  expect(await division(db, bici.id, sofi.id)).toContainEqual(['Sofi', 30000, 0])
+  // Rodri no tiene nada que saldar con Sofi: se lo paga Caro, y con eso queda devuelto (y Caro le debe la mitad a Rodri)
+  expect(await saldarCon(db, rodri.id, sofi.id, -15000)).toBe(0)
+  expect(await saldarCon(db, caro.id, sofi.id, -15000)).toBe(2)
+  expect(await division(db, bici.id, sofi.id)).toEqual([['Rodri', 30000, 0], ['Sofi', 30000, 0], ['Caro', 30000, 15000]])
+  // cada parte se deshace por su lado: lo de Caro, entero (todavía no había puesto nada)
+  expect(await marcarPagado(db, giftId, caro.id, caro.id, false)).toBe(true)
+  expect(await division(db, bici.id, sofi.id)).toContainEqual(['Caro', 30000, 30000])
   // y si en realidad nunca había pagado: dos "Deshacer" y debe su parte entera
   await marcarPagado(db, giftId, sofi.id, sofi.id, false)
   expect(await division(db, bici.id, sofi.id)).toContainEqual(['Sofi', 30000, -15000])
@@ -136,7 +142,8 @@ test('pagó y después se sumó alguien: el encargado le devuelve la diferencia,
   await marcarPagado(db, giftId, sofi.id, sofi.id, true, 45000)
   const pagos = await db.select({ titulo: avisosPush.titulo }).from(avisosPush)
     .where(and(eq(avisosPush.userId, rodri.id), eq(avisosPush.tipo, 'pago'))).orderBy(avisosPush.createdAt)
-  expect(pagos.map((a) => a.titulo)).toEqual(['💸 Sofi te pagó $45.000', '💸 Sofi te pagó $30.000', '💸 Sofi te pagó $15.000'])
+  expect(pagos.map((a) => a.titulo))
+    .toEqual(['💸 Sofi te pagó $45.000', '💸 Caro le pagó $15.000 a Sofi por vos', '💸 Sofi te pagó $30.000', '💸 Sofi te pagó $15.000'])
 })
 
 test('dividido a mano: el que llega entra en 0 y el encargado se entera; la parte del que se va queda para él', async () => {

@@ -1,14 +1,17 @@
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
+import {
+  amistades, claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, listMembers, lists, notifications, users,
+} from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import {
   desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult,
 } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
-import { esOFueDuenoDeLista, esUuid, noEsNiFueDuenoSql } from '@/lib/groups'
+import { esOFueDuenoDeLista, esUuid, juntarNombres, noEsNiFueDuenoSql } from '@/lib/groups'
 import { dividir, plata, type Moneda } from '@/lib/pesos'
+import { simplificar, type Tramo } from '@/lib/simplificar'
 import { notaDeCompra } from '@/lib/limites'
 import { accesoALista } from '@/lib/acceso'
 import { dejarAviso } from '@/lib/notifications'
@@ -17,7 +20,9 @@ import { avisar, type Enviar } from '@/lib/codazos'
 export { dividir, parsePesos, pesos } from '@/lib/pesos'
 
 // Regalo grupal, a lo Splitwise: un encargado reserva el deseo y los demás se suman.
-// El encargado lo compra, pone cuánto salió y lo reparte; cada uno le debe su parte hasta que le paga.
+// El encargado lo compra, pone cuánto salió y lo reparte; cada uno le debe su parte hasta que le paga (toda junta o de a
+// partes). En Cuentas las deudas se simplifican: si Ana le debe a Bruno y Bruno a Carla, Ana le paga directo a Carla (ver
+// simplificar.ts y saldarTarjetaCon).
 // Ya comprado se puede seguir sumando (o bajando) gente: se vuelve a dividir (ver redividir), y lo que cada uno ya puso
 // queda anotado, así que al que ahora le toca menos el encargado le devuelve la diferencia.
 // Regla de la sorpresa: los dueños de la lista (también uno que salió del grupo) no pueden armarlo ni sumarse, y nada de
@@ -559,46 +564,451 @@ export async function marcarPagado(
  */
 const enCuentasDe = (db: Db, userId: string) => and(eq(groupGifts.estado, 'comprado'), noEsNiFueDuenoSql(db, userId))
 
+// ---------- Simplificar y saldar: el ovillo de deudas alrededor de cada uno ----------
+
+/** Una parte sin saldar de un regalo comprado: el que se sumó (deudor) y el que lo compró (encargado). */
+type Abierta = {
+  giftId: string; deudorId: string; encargadoId: string; listId: string; moneda: Moneda; compradoAt: Date | null; monto: number; pagadoMonto: number
+}
+
 /**
- * Saldar todo con alguien, en una moneda: salda lo pendiente entre los dos, en las dos direcciones (deudas y lo que el
- * encargado devuelve; las de la otra moneda, no: son otra tarjeta en Cuentas). Solo las que Cuentas
- * le muestra al que toca el botón (el monto del botón): nunca una que no ve, como la de un regalo de un grupo al que se
- * sumó después. Esa la sigue viendo el otro, que la puede saldar desde su lado.
- * visto: el neto del botón (positivo, te debe). Si cambió (justo corrigieron una compra), no salda nada: la pantalla
- * vuelve con el de ahora. Si es el mismo, saldar las partes nuevas da lo mismo que lo que se pagó.
+ * Lo que está sin saldar alrededor de alguien: sus partes, y las de todos los que se conectan con él por deudas que ven los
+ * dos (el plan para simplificar sale de todo eso junto, ver simplificar.ts; así es el mismo para cada uno de ellos).
  */
-export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number, moneda: Moneda = 'ARS', enviar?: Enviar): Promise<number> {
-  if (userId === otroId || !esUuid(otroId)) return 0
-  const r = await db.transaction(async (tx) => {
-    const t = tx as unknown as Db
-    const deEncargado = (encargado: string) => t.select({ id: groupGifts.id }).from(groupGifts)
+type Ovillo = {
+  abiertas: Abierta[]
+  /** Para quiénes es cada lista (ver esOFueDuenoSql): sus dueños, también los que salieron, y el de una sorpresa. */
+  receptores: Map<string, Set<string>>
+  nombres: Map<string, string>
+  /** El plan de cada moneda (no se mezclan). */
+  planes: Map<Moneda, Tramo[]>
+}
+
+/** Con cuánta gente como mucho se arma el plan: con más, cada uno ve lo suyo sin simplificar. */
+const GENTE_PARA_SIMPLIFICAR = 200
+
+/** La ve en Cuentas (ver enCuentasDe): no es ni fue dueño de la lista. */
+const laVe = (ov: Ovillo, f: Abierta, userId: string) => !ov.receptores.get(f.listId)?.has(userId)
+/** La ven los dos: solo esas se simplifican (la que ve uno solo la salda él, desde su lado). */
+const deLosDos = (ov: Ovillo, f: Abierta) => laVe(ov, f, f.deudorId) && laVe(ov, f, f.encargadoId)
+
+/** Los receptores de las listas que faltan (ver Ovillo): el dueño o el de la sorpresa vienen con la lista; los del grupo, de acá. */
+async function cargarReceptores(db: Db, receptores: Map<string, Set<string>>, ls: { listId: string; ownerId: string | null; paraUserId: string | null }[]) {
+  const faltan = ls.filter((l, i) => !receptores.has(l.listId) && ls.findIndex((x) => x.listId === l.listId) === i)
+  if (!faltan.length) return
+  const ms = await db.select({ listId: listMembers.listId, userId: listMembers.userId }).from(listMembers)
+    .where(inArray(listMembers.listId, faltan.map((l) => l.listId)))
+  for (const l of faltan) {
+    const suyos = [l.ownerId, l.paraUserId, ...ms.filter((m) => m.listId === l.listId).map((m) => m.userId)]
+    receptores.set(l.listId, new Set(suyos.filter((id): id is string => !!id)))
+  }
+}
+
+/**
+ * Se conocen (ver simplificar.ts): amigos, o están (o estuvieron) juntos en un regalo grupal que no se canceló. Los que se
+ * deben algo ya están juntos en uno.
+ */
+async function quienesSeConocen(db: Db, ids: string[]): Promise<(a: string, b: string) => boolean> {
+  const otros = alias(groupGiftMembers, 'otros')
+  const [amigos, juntos] = await Promise.all([
+    db.select({ a: amistades.deUserId, b: amistades.paraUserId }).from(amistades)
+      .where(and(eq(amistades.estado, 'aceptada'), inArray(amistades.deUserId, ids), inArray(amistades.paraUserId, ids))),
+    db.selectDistinct({ a: groupGiftMembers.userId, b: otros.userId }).from(groupGiftMembers)
+      .innerJoin(otros, and(eq(otros.giftId, groupGiftMembers.giftId), ne(otros.userId, groupGiftMembers.userId)))
+      .innerJoin(groupGifts, eq(groupGifts.id, groupGiftMembers.giftId))
+      .where(and(inArray(groupGiftMembers.userId, ids), inArray(otros.userId, ids), inArray(groupGifts.estado, ['abierto', 'comprado']))),
+  ])
+  const pares = new Set([...amigos, ...juntos].flatMap(({ a, b }) => (b ? [`${a}|${b}`, `${b}|${a}`] : [])))
+  return (a, b) => pares.has(`${a}|${b}`)
+}
+
+/**
+ * El ovillo de userId (ver Ovillo): sigue las deudas que ven los dos, de persona en persona. lock: para saldar, con las
+ * partes de esos regalos bloqueadas y en orden (como corregirCompra y marcarPagado, que también las bloquean): una corrección
+ * o un "Ya le pagué" a la vez, o espera, o ya se ve acá.
+ */
+async function ovillo(db: Db, userId: string, lock = false): Promise<Ovillo> {
+  const abiertas = new Map<string, Abierta>()
+  const receptores = new Map<string, Set<string>>()
+  const gente = new Set([userId])
+  const ov: Ovillo = { abiertas: [], receptores, nombres: new Map(), planes: new Map() }
+  for (let frontera = [userId]; frontera.length && gente.size <= GENTE_PARA_SIMPLIFICAR;) {
+    const filas = await db.select({
+      giftId: groupGiftMembers.giftId, deudorId: groupGiftMembers.userId, encargadoId: groupGifts.organizerUserId, listId: items.listId,
+      moneda: groupGifts.moneda, compradoAt: groupGifts.compradoAt, monto: groupGiftMembers.monto, pagadoMonto: groupGiftMembers.pagadoMonto,
+      ownerId: lists.ownerId, paraUserId: lists.paraUserId,
+    }).from(groupGiftMembers)
+      .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
       .innerJoin(items, eq(groupGifts.itemId, items.id))
       .innerJoin(lists, eq(items.listId, lists.id))
-      .where(and(eq(groupGifts.organizerUserId, encargado), eq(groupGifts.moneda, moneda), enCuentasDe(t, userId)))
-    // Con lock y en orden: una corrección a la vez (corregirCompra) o espera, o ya se ve acá con las partes nuevas.
-    const filas = await t.select({ giftId: groupGiftMembers.giftId, userId: groupGiftMembers.userId, monto: groupGiftMembers.monto,
-      pagadoMonto: groupGiftMembers.pagadoMonto })
-      .from(groupGiftMembers)
-      // lo que queda por saldar, en las dos direcciones (las partes en 0 ya quedan saldadas al comprar)
-      .where(and(eq(groupGiftMembers.pagado, false), or(
-        and(eq(groupGiftMembers.userId, userId), inArray(groupGiftMembers.giftId, deEncargado(otroId))),
-        and(eq(groupGiftMembers.userId, otroId), inArray(groupGiftMembers.giftId, deEncargado(userId))),
-      )))
+      .where(and(
+        eq(groupGifts.estado, 'comprado'), eq(groupGiftMembers.pagado, false), ne(groupGiftMembers.userId, groupGifts.organizerUserId),
+        or(inArray(groupGiftMembers.userId, frontera), inArray(groupGifts.organizerUserId, frontera)),
+      ))
+    await cargarReceptores(db, receptores, filas)
+    frontera = []
+    for (const f of filas) {
+      const k = `${f.giftId}|${f.deudorId}`
+      if (abiertas.has(k) || !saldoDe(f)) continue
+      const abierta = { ...f, monto: f.monto ?? 0 }
+      abiertas.set(k, abierta)
+      if (!deLosDos(ov, abierta)) continue
+      for (const p of [f.deudorId, f.encargadoId]) {
+        if (!gente.has(p)) {
+          gente.add(p)
+          frontera.push(p)
+        }
+      }
+    }
+  }
+  if (lock && abiertas.size) {
+    const giftIds = [...new Set([...abiertas.values()].map((f) => f.giftId))]
+    const ahora = await db.select({ giftId: groupGiftMembers.giftId, userId: groupGiftMembers.userId, monto: groupGiftMembers.monto,
+      pagadoMonto: groupGiftMembers.pagadoMonto }).from(groupGiftMembers)
+      .where(inArray(groupGiftMembers.giftId, giftIds))
       .orderBy(asc(groupGiftMembers.giftId), asc(groupGiftMembers.userId))
       .for('update')
-    // lo que el otro le debe a userId: su saldo si el encargado es userId, el de userId al revés
-    const neto = filas.reduce((s, f) => s + (f.userId === otroId ? 1 : -1) * saldoDe(f), 0)
-    if (!filas.length || (visto !== undefined && neto !== visto)) return { saldadas: 0, neto }
-    // estas filas y no las que cumplan el filtro ahora: una compra que se cerró recién no estaba en el botón
+    for (const r of ahora) {
+      const f = abiertas.get(`${r.giftId}|${r.userId}`)
+      if (!f) continue
+      f.monto = r.monto ?? 0
+      f.pagadoMonto = r.pagadoMonto
+      if (!saldoDe(f)) abiertas.delete(`${r.giftId}|${r.userId}`)
+    }
+  }
+  ov.abiertas = [...abiertas.values()]
+    .sort((a, b) => (a.compradoAt?.getTime() ?? 0) - (b.compradoAt?.getTime() ?? 0) || a.giftId.localeCompare(b.giftId) || a.deudorId.localeCompare(b.deudorId))
+
+  // con dos no hay nada que simplificar; con demasiados no se arma (ver GENTE_PARA_SIMPLIFICAR)
+  if (gente.size < 3 || gente.size > GENTE_PARA_SIMPLIFICAR) return ov
+  const ids = [...gente]
+  const [nombres, conocen] = await Promise.all([
+    db.select({ id: users.id, nombre: users.nombre }).from(users).where(inArray(users.id, ids)), quienesSeConocen(db, ids),
+  ])
+  for (const u of nombres) ov.nombres.set(u.id, u.nombre)
+  const listaDe = new Map(ov.abiertas.map((f) => [f.giftId, f.listId]))
+  // el neto de cada par, en cada moneda (positivo: el primero le debe al segundo)
+  const pares = new Map<string, { moneda: Moneda; a: string; b: string; neto: number; regalos: Set<string> }>()
+  for (const f of ov.abiertas) {
+    if (!deLosDos(ov, f)) continue
+    const [a, b] = [f.deudorId, f.encargadoId].sort()
+    const k = `${f.moneda}|${a}|${b}`
+    const par = pares.get(k) ?? { moneda: f.moneda, a, b, neto: 0, regalos: new Set<string>() }
+    par.neto += (f.deudorId === a ? 1 : -1) * saldoDe(f)
+    par.regalos.add(f.giftId)
+    pares.set(k, par)
+  }
+  for (const moneda of new Set([...pares.values()].map((p) => p.moneda))) {
+    const deudas = [...pares.values()].filter((p) => p.moneda === moneda && p.neto)
+      .map((p) => ({ ...(p.neto > 0 ? { de: p.a, a: p.b } : { de: p.b, a: p.a }), monto: Math.abs(p.neto), regalos: [...p.regalos] }))
+    ov.planes.set(moneda, simplificar(deudas, { conocen, receptores: (giftId) => receptores.get(listaDe.get(giftId) ?? '') ?? [] }))
+  }
+  return ov
+}
+
+/** Lo que se salda al tocar el botón de una tarjeta. s: con signo, como el neto (positivo, te debe). */
+type Elemento =
+  /** Una parte que ve solo el que mira (el otro se sumó después al grupo de esa lista): no entra en el plan. */
+  | { tipo: 'parte'; parte: Abierta; s: number }
+  /** Lo que se deben directo entre los dos y no se pagó por otro camino. En 0, partes de los dos lados que se cancelan. */
+  | { tipo: 'directo'; s: number }
+  /** Un pago del plan entre los dos que saltea a otros. */
+  | { tipo: 'tramo'; tramo: Tramo; s: number }
+
+type Tarjeta = { otro: string; moneda: Moneda; neto: number; ajustes: AjusteCuenta[]; elementos: Elemento[] }
+
+type Vista = {
+  /** Por persona y moneda (`${otro}|${moneda}`). */
+  tarjetas: Map<string, Tarjeta>
+  rondas: (Tramo & { moneda: Moneda; con: string[] })[]
+  porVos: (PagoPorVos & { moneda: Moneda })[]
+}
+
+const primerNombre = (nombre: string) => nombre.split(' ')[0]
+
+/**
+ * Cuentas de userId según el plan: cada tarjeta es lo que hay que pagar (o cobrar) con alguien, con las partes de los dos y
+ * lo que cambió al simplificar (los ajustes: se lo pagás a otro, te lo paga otro, se cancela en ronda). Las partes y los
+ * ajustes suman el neto, y lo mismo los elementos (lo que se salda).
+ */
+function vistaDe(ov: Ovillo, userId: string): Vista {
+  const internas = new Map<string, Tarjeta & { deLosDos: boolean; directo: number; salteado: number }>()
+  const tarjeta = (otro: string, moneda: Moneda) => {
+    const k = `${otro}|${moneda}`
+    const t = internas.get(k) ?? { otro, moneda, neto: 0, ajustes: [], elementos: [], deLosDos: false, directo: 0, salteado: 0 }
+    internas.set(k, t)
+    return t
+  }
+  for (const f of ov.abiertas) {
+    if ((f.deudorId !== userId && f.encargadoId !== userId) || !laVe(ov, f, userId)) continue
+    const soyEncargado = f.encargadoId === userId
+    const otro = soyEncargado ? f.deudorId : f.encargadoId
+    const s = (soyEncargado ? 1 : -1) * saldoDe(f)
+    const t = tarjeta(otro, f.moneda)
+    t.neto += s
+    if (laVe(ov, f, otro)) {
+      t.deLosDos = true
+      t.directo += s
+    } else {
+      t.elementos.push({ tipo: 'parte', parte: f, s })
+    }
+  }
+
+  const nombre = (id: string) => ov.nombres.get(id) ?? 'Alguien'
+  const ajustar = (otro: string, moneda: Moneda, monto: number, texto: string) => {
+    const t = tarjeta(otro, moneda)
+    t.neto += monto
+    const ya = t.ajustes.find((a) => a.texto === texto)
+    if (ya) ya.monto += monto
+    else t.ajustes.push({ monto, texto })
+  }
+  const rondas: Vista['rondas'] = []
+  const porVos: Vista['porVos'] = []
+  for (const [moneda, plan] of ov.planes) {
+    for (const tramo of plan) {
+      const c = tramo.camino
+      const k = c.length - 1
+      const m = tramo.monto
+      // el directo es lo de las partes de los dos: no cambia nada
+      if (k === 1 || !c.includes(userId)) continue
+      const ronda = c[0] === c[k]
+      const [pagador, cobrador] = [c[0], c[k]]
+      for (let i = 0; i < (ronda ? k : k + 1); i++) {
+        if (c[i] !== userId) continue
+        // antes le debía a userId, userId le debía a despues: esas deudas se saldan con este tramo
+        const antes = i > 0 ? c[i - 1] : ronda ? c[k - 1] : null
+        const despues = i < k ? c[i + 1] : null
+        const resto = ronda ? [...c.slice(i + 1, k), ...c.slice(0, i)] : []
+        const texto = ronda ? `Se cancela en ronda con ${juntarNombres(resto.map(nombre))}`
+          : i === 0 ? `Se lo pagás a ${nombre(cobrador)}`
+          : i === k ? `Te lo paga ${nombre(pagador)}`
+          : `${nombre(pagador)} le paga a ${nombre(cobrador)} por vos`
+        if (antes) {
+          ajustar(antes, moneda, -m, texto)
+          tarjeta(antes, moneda).salteado -= m
+        }
+        if (despues) {
+          ajustar(despues, moneda, m, texto)
+          tarjeta(despues, moneda).salteado += m
+        }
+        if (ronda) {
+          rondas.push({ ...tramo, moneda, con: resto.map(nombre) })
+        } else if (i === 0) {
+          ajustar(cobrador, moneda, -m, `En vez de pagarle a ${nombre(c[1])}`)
+          tarjeta(cobrador, moneda).elementos.push({ tipo: 'tramo', tramo, s: -m })
+        } else if (i === k) {
+          ajustar(pagador, moneda, m, `En vez de que te pague ${nombre(c[k - 1])}`)
+          tarjeta(pagador, moneda).elementos.push({ tipo: 'tramo', tramo, s: m })
+        } else {
+          porVos.push({ de: nombre(pagador), a: nombre(cobrador), antes: nombre(antes!), despues: nombre(despues!), monto: m, moneda })
+        }
+      }
+    }
+  }
+
+  const orden = { parte: 0, directo: 1, tramo: 2 }
+  const tarjetas = new Map<string, Tarjeta>()
+  for (const [k, { deLosDos: hay, directo, salteado, ...t }] of internas) {
+    // Lo directo que queda: las partes de los dos menos lo que se paga por otro camino. Si todo se paga por otro camino no
+    // hay nada directo que saldar (ni partes de los dos lados que cancelar: se cancelan al pagar ese camino).
+    if (hay && (directo + salteado !== 0 || salteado === 0)) t.elementos.push({ tipo: 'directo', s: directo + salteado })
+    t.elementos.sort((a, b) => orden[a.tipo] - orden[b.tipo])
+    tarjetas.set(k, t)
+  }
+  return { tarjetas, rondas, porVos }
+}
+
+/**
+ * Salda monto de lo que de le debe a a (sus partes de los dos, de la más vieja a la más nueva), en el ovillo (las cambia y
+ * anota en tocadas lo que habían puesto antes). Lo que se deben al revés se cancela primero: es lo que dice el neto. No
+ * salda más que el neto.
+ */
+function saldarEntre(ov: Ovillo, moneda: Moneda, de: string, a: string, monto: number, tocar: (f: Abierta, monto: number) => void) {
+  const entre = ov.abiertas.filter((f) => f.moneda === moneda && deLosDos(ov, f) && saldoDe(f)
+    && ((f.deudorId === de && f.encargadoId === a) || (f.deudorId === a && f.encargadoId === de)))
+  const debe = (f: Abierta) => (f.deudorId === de ? 1 : -1) * saldoDe(f)
+  let queda = monto
+  for (const f of entre) {
+    if (debe(f) >= 0) continue
+    queda -= debe(f)
+    tocar(f, -debe(f))
+  }
+  for (const f of entre) {
+    const y = Math.min(Math.max(debe(f), 0), queda)
+    if (!y) continue
+    tocar(f, y)
+    queda -= y
+  }
+}
+
+/**
+ * Salda pago de una tarjeta (ver vistaDe) en el ovillo: primero se cancela lo que va al revés del neto (ya está descontado),
+ * después lo demás en orden (partes que ve uno solo, lo directo y lo que saltea a otros) hasta llegar a pago. Pagar un tramo
+ * salda ese monto de cada deuda del camino. Devuelve lo que se pagó de cada tramo, para avisarles a los del medio.
+ */
+function saldarTarjeta(ov: Ovillo, userId: string, t: Tarjeta, pago: number, tocar: (f: Abierta, monto: number) => void) {
+  const signo = t.neto < 0 ? -1 : 1
+  const tramos: { tramo: Tramo; monto: number }[] = []
+  const saldar = (e: Elemento, x: number) => {
+    if (e.tipo === 'parte') {
+      tocar(e.parte, x)
+    } else if (e.tipo === 'directo') {
+      const [de, a] = e.s < 0 ? [userId, t.otro] : [t.otro, userId]
+      saldarEntre(ov, t.moneda, de, a, x, tocar)
+    } else {
+      const c = e.tramo.camino
+      for (let i = 0; i < c.length - 1; i++) saldarEntre(ov, t.moneda, c[i], c[i + 1], x, tocar)
+      tramos.push({ tramo: e.tramo, monto: x })
+    }
+  }
+  let queda = pago
+  for (const e of t.elementos.filter((x) => x.s * signo < 0)) {
+    queda -= e.s * signo
+    saldar(e, Math.abs(e.s))
+  }
+  for (const e of t.elementos.filter((x) => x.s * signo >= 0)) {
+    const x = Math.min(Math.abs(e.s), queda)
+    // uno en 0 son partes de los dos lados que se cancelan: van igual
+    if (!x && e.s) continue
+    saldar(e, x)
+    queda -= x
+  }
+  return tramos
+}
+
+/** Guarda lo que cambió en el ovillo: lo de antes queda para "Deshacer" (ver marcarPagado). */
+async function guardarSaldos(t: Db, tocadas: Map<Abierta, number>) {
+  const ahora = new Date()
+  for (const [f, antes] of tocadas) {
+    const saldada = f.pagadoMonto === f.monto
     await t.update(groupGiftMembers)
-      .set({ pagadoAntes: sql`${groupGiftMembers.pagadoMonto}`, pagadoMonto: sql`${groupGiftMembers.monto}`, pagado: true, pagadoAt: new Date() })
-      .where(or(...filas.map((f) => and(eq(groupGiftMembers.giftId, f.giftId), eq(groupGiftMembers.userId, f.userId)))))
-    return { saldadas: filas.length, neto }
+      .set({ pagadoAntes: antes, pagadoMonto: f.pagadoMonto, pagado: saldada, pagadoAt: saldada ? ahora : null })
+      .where(and(eq(groupGiftMembers.giftId, f.giftId), eq(groupGiftMembers.userId, f.deudorId)))
+  }
+}
+
+/** Para saldar en el ovillo: achica lo que falta de una parte (o lo que se devuelve) y anota lo que tenía puesto antes. */
+function anotador() {
+  const tocadas = new Map<Abierta, number>()
+  const tocar = (f: Abierta, monto: number) => {
+    if (!tocadas.has(f)) tocadas.set(f, f.pagadoMonto)
+    f.pagadoMonto += Math.sign(saldoDe(f)) * monto
+  }
+  return { tocadas, tocar }
+}
+
+/** Lo que hizo saldarTarjetaCon, para los avisos: cuánto se pagó, de qué neto, y de qué tramos. */
+type SaldoHecho = { ok: true; tocadas: number; neto: number; pago: number; tramos: { tramo: Tramo; monto: number }[]; nombres: Map<string, string> }
+
+/**
+ * cambiaron: el neto ya no es el de la pantalla. monto_invalido: 0, con centavos o más que el neto. no_permitido: no hay nada
+ * con esa persona en esa moneda.
+ */
+export type PagoResult = { ok: true } | { ok: false; reason: 'cambiaron' | 'monto_invalido' | 'no_permitido' }
+
+/**
+ * Saldar con alguien, en una moneda: todo (monto undefined) o una parte. Salda lo de su tarjeta en Cuentas (el monto del
+ * botón): las partes que se deben los dos en las dos direcciones (deudas y lo que el encargado devuelve; las de la otra
+ * moneda, no: son otra tarjeta) y lo que se paga salteando a otros (ver simplificar.ts). Nunca una parte que no ve, como la
+ * de un regalo de un grupo al que se sumó después: esa la sigue viendo el otro, que la salda desde su lado.
+ * visto: el neto del botón (positivo, te debe). Si cambió (justo corrigieron una compra, o pagó alguien del plan), no salda
+ * nada: la pantalla vuelve con el de ahora. Si es el mismo, saldar las partes nuevas da lo mismo que lo que se pagó.
+ */
+async function saldarTarjetaCon(
+  db: Db, userId: string, otroId: string, p: { visto?: number; moneda: Moneda; monto?: number },
+): Promise<SaldoHecho | { ok: false; reason: 'cambiaron' | 'monto_invalido' | 'no_permitido' }> {
+  if (userId === otroId || !esUuid(otroId)) return { ok: false, reason: 'no_permitido' }
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const ov = await ovillo(t, userId, true)
+    const tarjeta = vistaDe(ov, userId).tarjetas.get(`${otroId}|${p.moneda}`)
+    if (!tarjeta?.elementos.length) return { ok: false, reason: 'no_permitido' }
+    if (p.visto !== undefined && tarjeta.neto !== p.visto) return { ok: false, reason: 'cambiaron' }
+    const todo = Math.abs(tarjeta.neto)
+    if (p.monto !== undefined && !(Number.isSafeInteger(p.monto) && p.monto > 0 && p.monto <= todo)) return { ok: false, reason: 'monto_invalido' }
+    const pago = p.monto ?? todo
+    const { tocadas, tocar } = anotador()
+    const tramos = saldarTarjeta(ov, userId, tarjeta, pago, tocar)
+    await guardarSaldos(t, tocadas)
+    return { ok: true, tocadas: tocadas.size, neto: tarjeta.neto, pago, tramos, nombres: ov.nombres }
   })
-  // "Ya le pagué todo": le debía (el neto es lo que el otro le debe), así que al otro le llega que le pagó. "Me pagó todo"
-  // o "Marcar todo como saldado" lo marca el que cobra: no hay a quién avisarle.
-  if (r.saldadas && r.neto < 0) await avisarPago(db, userId, otroId, -r.neto, { moneda }, enviar)
-  return r.saldadas
+}
+
+/**
+ * Después de saldar (ya fuera de la transacción, como los otros avisos): si el que tocó el botón pagaba, al otro le llega
+ * cuánto le pagó (y de quién era, si se salteó a alguien); "Me pagó" lo marca el que cobra, no hay a quién avisarle. A los
+ * del medio de un tramo que se pagó, siempre: se les saldó una deuda sin que hicieran nada.
+ */
+async function avisarSaldo(db: Db, userId: string, otroId: string, moneda: Moneda, r: SaldoHecho, enviar?: Enviar) {
+  const nombre = (id: string) => primerNombre(r.nombres.get(id) ?? 'Alguien')
+  const avisos: Promise<unknown>[] = []
+  if (r.neto < 0 && r.pago > 0) {
+    const porOtros = [...new Set(r.tramos.filter((x) => x.monto > 0 && x.tramo.camino[0] === userId).map((x) => x.tramo.camino.at(-2)!))]
+    avisos.push(avisarPago(db, userId, otroId, r.pago, { moneda, falta: -r.neto - r.pago, porOtros: porOtros.map(nombre) }, enviar))
+  }
+  for (const { tramo: { camino: c }, monto } of r.tramos) {
+    if (!monto) continue
+    for (let i = 1; i < c.length - 1; i++) {
+      avisos.push(avisar(db, c[i], {
+        tipo: 'pago', de: c[0], url: '/cuentas',
+        title: `💸 ${nombre(c[0])} le pagó ${plata(monto, moneda)} a ${nombre(c.at(-1)!)} por vos`,
+        body: `Ya no le debés eso a ${nombre(c[i + 1])}, y ${nombre(c[i - 1])} ya no te lo debe: se simplificó para hacer menos transferencias.`,
+      }, enviar).catch(() => 0))
+    }
+  }
+  await Promise.all(avisos)
+}
+
+/**
+ * "Ya le pagué todo" / "Me pagó todo" / "Marcar todo como saldado" (ver saldarTarjetaCon). Devuelve cuántas partes tocó: 0 si
+ * no salda nada.
+ */
+export async function saldarCon(db: Db, userId: string, otroId: string, visto?: number, moneda: Moneda = 'ARS', enviar?: Enviar): Promise<number> {
+  const r = await saldarTarjetaCon(db, userId, otroId, { visto, moneda })
+  if (!r.ok) return 0
+  await avisarSaldo(db, userId, otroId, moneda, r, enviar)
+  return r.tocadas
+}
+
+/**
+ * "Le pagué una parte" / "Me pagó una parte": una parte del neto con alguien (más que 0 y hasta el neto), en una moneda. Se
+ * salda en el orden de saldarTarjeta: lo más viejo primero, y lo que se pagaba al revés queda cancelado (ya estaba
+ * descontado del neto).
+ */
+export async function pagarParte(
+  db: Db, userId: string, otroId: string, monto: number, visto?: number, moneda: Moneda = 'ARS', enviar?: Enviar,
+): Promise<PagoResult> {
+  const r = await saldarTarjetaCon(db, userId, otroId, { visto, moneda, monto })
+  if (!r.ok) return r
+  await avisarSaldo(db, userId, otroId, moneda, r, enviar)
+  return { ok: true }
+}
+
+/**
+ * "Marcar como saldado" una ronda (ver simplificar.ts): se debían lo mismo en círculo, así que se cancela sin que nadie
+ * pague. clave y visto: los de la pantalla; si el plan cambió, no salda nada. A los demás de la ronda les llega.
+ */
+export async function saldarRonda(db: Db, userId: string, clave: string, visto: number, moneda: Moneda = 'ARS', enviar?: Enviar): Promise<boolean> {
+  const r = await db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const ov = await ovillo(t, userId, true)
+    const ronda = vistaDe(ov, userId).rondas.find((x) => x.moneda === moneda && x.camino.join('>') === clave && x.monto === visto)
+    if (!ronda) return null
+    const { tocadas, tocar } = anotador()
+    const c = ronda.camino
+    for (let i = 0; i < c.length - 1; i++) saldarEntre(ov, moneda, c[i], c[i + 1], ronda.monto, tocar)
+    await guardarSaldos(t, tocadas)
+    return { gente: c.slice(0, -1), nombres: ov.nombres }
+  })
+  if (!r) return false
+  const nombre = (id: string) => primerNombre(r.nombres.get(id) ?? 'Alguien')
+  await Promise.all(r.gente.map((id, i) => (id === userId ? null : avisar(db, id, {
+    tipo: 'pago', de: userId, url: '/cuentas',
+    // los demás en el orden de la ronda, desde el que sigue (como en Cuentas)
+    title: `🔄 Con ${juntarNombres([...r.gente.slice(i + 1), ...r.gente.slice(0, i)].map(nombre))} quedaron a mano`,
+    body: `Se debían ${plata(visto, moneda)} en ronda, así que se canceló sin que nadie pague.`,
+  }, enviar).catch(() => 0))))
+  return true
 }
 
 /** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño y a quien no ve la capa oculta (ver accesoALista) les devuelve []. */
@@ -685,14 +1095,41 @@ export type LineaCuenta = {
   fecha: Date
 }
 
+/**
+ * Lo que cambió al simplificar (ver simplificar.ts), en la tarjeta de alguien: "Se lo pagás a Carla" (le debías a este y
+ * se lo pagás a otro), "Te lo paga Ana", "En vez de pagarle a Bruno", "Se cancela en ronda con…".
+ */
+export type AjusteCuenta = {
+  /** Positivo: suma a lo que te debe (o resta a lo que le debés). */
+  monto: number
+  texto: string
+}
+
 /** Con alguien, en una moneda: con quien hay cuentas en pesos y en dólares, hay dos (no se mezclan). */
 export type CuentaPersona = Persona & {
   /** si no son pesos */
   moneda?: Moneda
-  /** Positivo: te debe. Negativo: le debés. */
+  /** Positivo: te debe. Negativo: le debés. Las partes y los ajustes. */
   neto: number
   lineas: LineaCuenta[]
+  ajustes: AjusteCuenta[]
 }
+
+/**
+ * Se deben lo mismo en círculo (vos al primero, el primero al segundo… y el último a vos): se cancela sin que nadie pague,
+ * cuando alguno lo marca (ver saldarRonda).
+ */
+export type RondaCuenta = {
+  /** el camino de la ronda, para marcarla: si cambió, no se marca */
+  clave: string
+  monto: number
+  moneda?: Moneda
+  /** los demás, en orden */
+  con: string[]
+}
+
+/** Un pago del plan que pasa por vos: de le paga a a, y con eso quedás a mano con antes (te debía) y con despues (le debías). */
+export type PagoPorVos = { de: string; a: string; antes: string; despues: string; monto: number; moneda?: Moneda }
 
 export type RegaloEnCurso = {
   giftId: string; itemTitulo: string; para: string; href: string | null; encargado: string; soyEncargado: boolean; personas: string[]
@@ -715,6 +1152,8 @@ export type Cuentas = {
   /** lo mismo en dólares, si hay algo en dólares */
   dolares?: { debes: number; teDeben: number }
   personas: CuentaPersona[]
+  rondas: RondaCuenta[]
+  porVos: PagoPorVos[]
   enCurso: RegaloEnCurso[]
   saldadas: (LineaCuenta & { con: string })[]
 }
@@ -781,17 +1220,25 @@ async function avisarCompra(db: Db, giftId: string, encargadoId: string, enviar?
 }
 
 /**
- * Le pagaron: al que cobra le llega quién y cuánto, de un regalo ("Ya le pagué") o de todo lo que se debían en una moneda
- * ("Ya le pagué todo", en saldarCon).
+ * Le pagaron: al que cobra le llega quién y cuánto, de un regalo ("Ya le pagué") o de lo que se debían en una moneda ("Ya
+ * le pagué todo" o una parte, en saldarCon y pagarParte). falta: lo que le sigue debiendo. porOtros: de quiénes era lo que
+ * le pagó salteándolos al simplificar (ver simplificar.ts).
  */
-async function avisarPago(db: Db, pagoId: string, cobraId: string, monto: number, de: { giftId: string } | { moneda: Moneda }, enviar?: Enviar) {
+async function avisarPago(
+  db: Db, pagoId: string, cobraId: string, monto: number, de: { giftId: string } | { moneda: Moneda; falta?: number; porOtros?: string[] }, enviar?: Enviar,
+) {
   const [quien, regalo] = await Promise.all([primerNombreDe(db, pagoId), 'giftId' in de ? delRegalo(db, de.giftId) : null])
   const moneda = regalo?.moneda ?? ('moneda' in de ? de.moneda : 'ARS')
-  await avisar(db, cobraId, {
-    tipo: 'pago', de: pagoId, url: '/cuentas',
-    title: `💸 ${quien} te pagó ${plata(monto, moneda)}`,
-    body: regalo ? `Su parte de "${regalo.titulo}", el regalo para ${regalo.para}.` : 'Todo lo que te debía de los regalos grupales: ya quedó saldado en Cuentas.',
-  }, enviar).catch(() => 0)
+  let body = regalo ? `Su parte de "${regalo.titulo}", el regalo para ${regalo.para}.` : ''
+  if ('moneda' in de) {
+    const { falta = 0, porOtros = [] } = de
+    const resto = falta ? `Le falta pagarte ${plata(falta, moneda)}.` : 'Ya quedó saldado en Cuentas.'
+    body = porOtros.length ? `Incluye lo que te debía ${juntarNombres(porOtros)}: se simplificó para hacer menos transferencias. ${resto}`
+      : falta ? `Una parte de lo que te debía de los regalos grupales. ${resto}`
+      : 'Todo lo que te debía de los regalos grupales: ya quedó saldado en Cuentas.'
+  }
+  await avisar(db, cobraId, { tipo: 'pago', de: pagoId, url: '/cuentas', title: `💸 ${quien} te pagó ${plata(monto, moneda)}`, body }, enviar)
+    .catch(() => 0)
 }
 
 /**
@@ -810,7 +1257,7 @@ const columnasDestino = (db: Db, userId: string) => ({
  * Deja afuera los regalos de listas de las que sos (o fuiste) dueño (ver enCuentasDe).
  */
 export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
-  const partes = await db.select({
+  const [partes, ov] = await Promise.all([db.select({
     giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre,
     deudorId: groupGiftMembers.userId, deudorNombre: deudores.nombre,
     monto: groupGiftMembers.monto, pagadoMonto: groupGiftMembers.pagadoMonto, pagado: groupGiftMembers.pagado, pagadoAt: groupGiftMembers.pagadoAt,
@@ -827,7 +1274,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       ne(groupGiftMembers.userId, groupGifts.organizerUserId),
       or(eq(groupGiftMembers.userId, userId), eq(groupGifts.organizerUserId, userId)),
     ))
-    .orderBy(desc(groupGifts.compradoAt))
+    .orderBy(desc(groupGifts.compradoAt)), ovillo(db, userId)])
 
   const porPersona = new Map<string, CuentaPersona>()
   const saldadas: Cuentas['saldadas'] = []
@@ -849,11 +1296,23 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       continue
     }
     const clave = `${otro.id}|${r.moneda}`
-    const persona = porPersona.get(clave) ?? { ...otro, moneda: enSuMoneda(r.moneda), neto: 0, lineas: [] }
+    const persona = porPersona.get(clave) ?? { ...otro, moneda: enSuMoneda(r.moneda), neto: 0, lineas: [], ajustes: [] }
     persona.neto += debo ? -linea.monto : linea.monto
     persona.lineas.push(linea)
     porPersona.set(clave, persona)
   }
+  // Lo que cambia al simplificar: a quién le pagás en vez de a quién (también con alguien con quien no tenías partes)
+  const vista = vistaDe(ov, userId)
+  for (const [clave, t] of vista.tarjetas) {
+    if (!t.ajustes.length) continue
+    const persona = porPersona.get(clave)
+      ?? { id: t.otro, nombre: ov.nombres.get(t.otro) ?? 'Alguien', moneda: enSuMoneda(t.moneda), neto: 0, lineas: [], ajustes: [] }
+    persona.ajustes = t.ajustes
+    persona.neto += t.ajustes.reduce((s, a) => s + a.monto, 0)
+    porPersona.set(clave, persona)
+  }
+  // Las que quedan en 0 sin nada que saldar no van: todo lo que se debían lo paga otro (o se cancela en ronda, más abajo)
+  for (const [clave, p] of porPersona) if (!p.neto && vista.tarjetas.get(clave)?.elementos.length === 0) porPersona.delete(clave)
 
   const abiertos = await db.select({
     giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre, ...columnasDestino(db, userId),
@@ -891,6 +1350,8 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     ...(hayDolares && { dolares: { debes: total('USD', -1), teDeben: total('USD', 1) } }),
     // los pesos antes que los dólares; primero a quien más le debés, después quien más te debe
     personas: personas.sort((a, b) => Number(!!a.moneda) - Number(!!b.moneda) || a.neto - b.neto),
+    rondas: vista.rondas.map((r) => ({ clave: r.camino.join('>'), monto: r.monto, moneda: enSuMoneda(r.moneda), con: r.con })),
+    porVos: vista.porVos.map(({ moneda, ...x }) => ({ ...x, moneda: enSuMoneda(moneda) })),
     enCurso: abiertos.map((a) => {
       const miembros = nombres.filter((n) => n.giftId === a.giftId)
       // Sin el link tampoco para el encargado: con el nuevo volvería a abrir (y seguir) la lista que le quisieron cerrar.

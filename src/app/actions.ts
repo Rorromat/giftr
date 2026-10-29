@@ -46,8 +46,8 @@ import {
   pedirAmistadPorMail, responderSolicitud,
 } from '@/lib/amigos'
 import {
-  cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, posponerRecordatorio, sacarDeRegalo,
-  salirDeRegalo, saldarCon, sumarseARegalo, type CompraResult, type DatosCompra,
+  cancelarRegalo, comprarRegalo, corregirCompra, dejarVolverARegalo, iniciarRegaloGrupal, marcarPagado, pagarParte, posponerRecordatorio,
+  sacarDeRegalo, salirDeRegalo, saldarCon, saldarRonda, sumarseARegalo, type CompraResult, type DatosCompra,
 } from '@/lib/regalos'
 import { esMoneda, parsePesos, partePesos, plata } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
@@ -809,6 +809,32 @@ export async function markPaidAction(formData: FormData) {
 export async function settleUpAction(formData: FormData) {
   const moneda = str(formData, 'moneda')
   await saldarCon(db, await usuarioRegalador(), str(formData, 'otroId') ?? '', entero(formData, 'neto'), esMoneda(moneda) ? moneda : 'ARS')
+  revalidarRegalo(formData)
+}
+
+/**
+ * "Le pagué una parte" / "Me pagó una parte" (ver pagarParte): monto es lo que escribió, de lo que decía la tarjeta (neto,
+ * en su moneda). Si no sale, el mensaje queda en el formulario.
+ */
+export async function payPartAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const userId = await usuarioRegalador()
+  const enForm = str(formData, 'moneda')
+  const moneda = esMoneda(enForm) ? enForm : 'ARS'
+  const neto = entero(formData, 'neto')
+  const monto = parsePesos(str(formData, 'monto')) ?? 0
+  const r = await pagarParte(db, userId, str(formData, 'otroId') ?? '', monto, neto, moneda)
+  revalidarRegalo(formData)
+  if (r.ok) return null
+  if (r.reason === 'cambiaron') return { error: 'Las cuentas cambiaron mientras tanto: fijate cuánto es ahora y anotalo de nuevo.' }
+  if (r.reason === 'no_permitido') return { error: 'Ya no hay nada para saldar acá.' }
+  const todo = Math.abs(neto ?? 0)
+  return { error: monto > todo && todo ? `Es más de ${neto! < 0 ? 'lo que le debés' : 'lo que te debe'} (${plata(todo, moneda)}).` : 'Poné cuánto fue.' }
+}
+
+/** "Marcar como saldado" una ronda (ver saldarRonda): clave y monto, los que mostraba la pantalla. */
+export async function settleRoundAction(formData: FormData) {
+  const moneda = str(formData, 'moneda')
+  await saldarRonda(db, await usuarioRegalador(), str(formData, 'clave') ?? '', entero(formData, 'monto') ?? 0, esMoneda(moneda) ? moneda : 'ARS')
   revalidarRegalo(formData)
 }
 
