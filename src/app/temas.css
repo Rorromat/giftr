@@ -283,23 +283,24 @@
     .gr-label { letter-spacing: 0.16em; font-size: 11px; color: var(--gr-ink); }
     .gr-number { font-weight: 400; font-style: italic; letter-spacing: -0.02em; }
     .gr-sticker, .gr-card { border: 1px solid rgb(41 32 30 / 0.22); box-shadow: none; }
-    .gr-hero { border-radius: 6px; box-shadow: none; }
+    .gr-hero { border-radius: 6px; box-shadow: none; --gr-accent: #29201E; --gr-on-accent: #EFEBE1; }
     .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-weight: 400; letter-spacing: -0.01em; }
     .gr-hero h1 { font-size: 34px; }
     .gr-empty { border: 1px dashed rgb(41 32 30 / 0.3); background: transparent; }
     .gr-btn, .gr-btn-primary {
       border-radius: 3px;
       border-color: var(--gr-ink);
-      background: transparent;
+      background: var(--gr-surface);
       box-shadow: none;
       text-transform: uppercase;
-      letter-spacing: 0.09em;
+      letter-spacing: 0.06em;
       font-size: 12.5px;
     }
     .gr-btn-primary, .gr-btn--dark { background: var(--gr-brand); color: var(--gr-on-brand); font-size: 13px; }
     .gr-btn--accent { background: var(--gr-accent); border-color: var(--gr-ink); }
     .gr-btn--hero { background: var(--gr-hero-btn); border-color: var(--gr-hero-btn); }
     .gr-chip { border-radius: 3px; border-color: rgb(41 32 30 / 0.35); background: transparent; }
+    .gr-chip[aria-pressed="true"], .gr-chip[aria-current="page"], .gr-chip:has(:checked) { background: var(--gr-brand); border-color: var(--gr-brand); }
     .gr-segmented { border-radius: 4px; background: transparent; border: 1px solid rgb(41 32 30 / 0.35); }
     .gr-segmented > * { border-radius: 2px; }
     .gr-input { border-radius: 3px; border: 1px solid rgb(41 32 30 / 0.5); background: #F4F1E9; }
@@ -324,6 +325,9 @@
         radial-gradient(120% 95% at 100% 0%, rgb(251 60 32 / 0.95) 0%, rgb(251 60 32 / 0.45) 26%, rgb(251 60 32 / 0) 62%),
         var(--gr-hero);
       border: 1px solid rgb(255 255 255 / 0.06);
+      /* lo de detalle (la estrella, la pastilla del cumple) en claro, que el brillo naranja ya está atrás */
+      --gr-accent: #F6F1EC;
+      --gr-on-accent: #1E1E20;
     }
     .gr-hero h1, .gr-hero h2 { font-family: var(--gr-font-display); font-weight: 600; letter-spacing: -0.03em; }
     .gr-btn { background: var(--gr-soft); border-color: rgb(255 255 255 / 0.08); box-shadow: none; }
@@ -449,3 +453,14 @@
 [data-tema="brasa"] .gr-lema { font-size: 33px; line-height: 1.05; }
 [data-tema="cielo"] :is(.font-brand, .font-display) { letter-spacing: -0.03em; }
 [data-tema="cielo"] .gr-lema { font-size: 44px; line-height: 0.95; }
+
+/* El título de la tarjeta destacada, más grande en la serif de Revista */
+[data-tema="revista"] .gr-hero h1 { font-size: 36px; line-height: 1; }
+/* En Brasa el botón principal es un degradé: vacío o deshabilitado se apaga del todo (las utilidades cambian solo el color). */
+[data-tema="brasa"] :is(.group\/deseo:has(#que-queres:placeholder-shown) .gr-btn-primary, .gr-btn-primary:disabled) {
+  background-image: none;
+  box-shadow: none;
+}
+/* Unbounded es ancha: los montos grandes de Cuentas, un poco más chicos para que entren en su tarjeta */
+[data-tema="brasa"] .gr-number.text-\[30px\] { font-size: 23px; }
+[data-tema="brasa"] .gr-number.text-\[22px\] { font-size: 18px; }

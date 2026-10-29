@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { fotoDeEstilo, muestraDeColor, type BloqueGustos, type SeccionGustos, type Talles } from '@/lib/gustos'
 import { paletaGusto } from '@/lib/colores-gustos'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
-import { Ilustrado, STICKER_GUSTO } from '@/components/Ilustrado'
+import { Ilustrado } from '@/components/Ilustrado'
+import { STICKER_GUSTO } from '@/stickers/ilustraciones'
 import { AvatarSticker, Icon } from '@/components/ui'
 
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */

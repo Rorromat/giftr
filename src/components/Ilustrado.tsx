@@ -6,8 +6,6 @@ import { Sticker } from '@/stickers/Sticker'
 import { STICKERS, type NombreSticker } from '@/stickers/giftr'
 import { PALETAS } from '@/stickers/paletas'
 import { alCambiarTema, temaPuesto } from '@/lib/tema'
-import type { FechaEspecial } from '@/lib/fechas-especiales'
-import type { PasoGustos } from '@/lib/gustos'
 
 // Con una propuesta de diseño puesta (ver lib/tema.ts), las ilustraciones son stickers de fun-isometric con sus colores;
 // con el diseño de siempre, las de siempre. Van las dos y CSS muestra una (gr-solo-actual y gr-solo-tema en temas.css),
@@ -59,19 +57,3 @@ export function DibujoVacio({ icon, sticker, className = '' }: { icon: IconName;
     </Ilustrado>
   )
 }
-
-/** El sticker de cada paso de los gustos. */
-export const STICKER_GUSTO: Record<PasoGustos, NombreSticker> = {
-  cumple: 'torta',
-  deportes: 'padel',
-  futbol: 'camiseta',
-  hobbies: 'auriculares',
-  ropa: 'bolsa',
-  colores: 'remera',
-  bebidas: 'cafe',
-  'no-regalar': 'tazas',
-}
-
-/** El de cada fecha especial, y el del amigo invisible aparte (null). */
-export const stickerDeFecha = (f: FechaEspecial | null): NombreSticker =>
-  f === 'navidad' ? 'arbol' : f === 'amigo' ? 'mate' : f === 'padre' ? 'corbata' : f === 'madre' ? 'flores' : f === 'ninos' ? 'barrilete' : 'antifaz'

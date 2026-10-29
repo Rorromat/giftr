@@ -38,7 +38,8 @@ export function Sticker({ icon, palette, loop, offset, enter, replayOnHover, lab
       ref={ref}
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       className={className}
-      style={{ display: 'block', width: '100%', aspectRatio: '1', ...style }}
+      // sin className ocupa el ancho de su lugar; con className, el tamaño lo da la clase (el ancho inline la pisaría)
+      style={{ display: 'block', aspectRatio: '1', ...(className ? {} : { width: '100%' }), ...style }}
       onPointerEnter={replayOnHover ? () => player.current?.replay() : undefined}
     />
   )
