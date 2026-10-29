@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
+// Sin bajada debajo del título: la de una ocupaba dos renglones y la de la otra uno, y las pestañas se corrían al cambiar.
 const PESTANAS = [
-  { href: '/regalos', nombre: 'Mis regalos', titulo: 'Tus regalos', bajada: 'Lo que reservaste, los regalos grupales en los que estás y tus amigos invisibles.' },
-  { href: '/cuentas', nombre: 'Cuentas', titulo: 'Cuentas', bajada: 'Los regalos grupales: quién le debe a quién.' },
+  { href: '/regalos', nombre: 'Mis regalos', titulo: 'Tus regalos' },
+  { href: '/cuentas', nombre: 'Cuentas', titulo: 'Cuentas' },
 ]
 
 /**
@@ -23,13 +24,9 @@ export function PestanasRegalos() {
   const pendiente = !!toque && toque.desde === path && toque.href !== path
   const marcada = pendiente ? toque.href : path
   const i = Math.max(0, PESTANAS.findIndex((p) => p.href === marcada))
-  const { titulo, bajada } = PESTANAS[i]
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h1 className="gr-title">{titulo}</h1>
-        <p className="text-[15px] text-gr-muted">{bajada}</p>
-      </div>
+      <h1 className="gr-title">{PESTANAS[i].titulo}</h1>
       {/* pendiente: mientras llega la otra, lo de abajo se apaga (ver .gr-segmented--desliza en tokens.css) */}
       <nav aria-label="Regalos y cuentas" className="gr-segmented gr-segmented--desliza" data-columna={i} data-pendiente={pendiente || undefined}>
         {PESTANAS.map((p) => (
