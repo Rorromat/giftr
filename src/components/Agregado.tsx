@@ -5,7 +5,8 @@ import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useT
 import { updatePriorityAction } from '@/app/actions'
 import { dejarPendiente } from '@/components/AlLlegarDelAgregado'
 import { leerCopiado } from '@/components/QueQueres'
-import { Arte, Hearts, Icon, PRIORIDADES, type IconName, type Prioridad } from '@/components/ui'
+import { IlustracionAgregado } from '@/components/IlustracionAgregado'
+import { Arte, Hearts, Icon, PRIORIDADES, type Prioridad } from '@/components/ui'
 import { colorDe, colorDeDeseo } from '@/lib/tapas'
 import { linkEnTexto, linkHttp, sitioDeLaTienda } from '@/lib/links'
 
@@ -100,11 +101,12 @@ export function mostrarAnotado(anotado: Anotado) {
   poner({ ...centroDelMas(), paso: 'listo', quieto: true, saliendo: false, anotado })
 }
 
-const CARTAS: { tipo: Tipo; icono: IconName; titulo: string; bajada: string; oscura?: boolean; r: string }[] = [
-  { tipo: 'link', icono: 'link', titulo: 'Pegar un link', bajada: 'De cualquier tienda', r: '-4deg' },
-  { tipo: 'foto', icono: 'camera', titulo: 'Sacarle una foto', bajada: 'Lo viste en una vidriera', oscura: true, r: '3deg' },
-  { tipo: 'galeria', icono: 'foto', titulo: 'Una foto del celu', bajada: 'Captura o galería', r: '2deg' },
-  { tipo: 'escribir', icono: 'lapiz', titulo: 'Escribirlo', bajada: 'Una idea o experiencia', r: '-3deg' },
+/** Las cuatro maneras de sumar un deseo, cada una con su ilustración (ver IlustracionAgregado). */
+const CARTAS: { tipo: Tipo; titulo: string; bajada: string; oscura?: boolean; r: string }[] = [
+  { tipo: 'link', titulo: 'Pegar un link', bajada: 'De cualquier tienda', r: '-4deg' },
+  { tipo: 'foto', titulo: 'Sacarle una foto', bajada: 'Lo viste en una vidriera', oscura: true, r: '3deg' },
+  { tipo: 'galeria', titulo: 'Una foto del celu', bajada: 'Captura o galería', r: '2deg' },
+  { tipo: 'escribir', titulo: 'Escribirlo', bajada: 'Una idea o experiencia', r: '-3deg' },
 ]
 
 const MIENTRAS: Record<Tipo, string> = {
@@ -229,7 +231,7 @@ export function Agregado() {
               {CARTAS.map((c, i) => (
                 <button key={c.tipo} type="button" onClick={() => elegir(c.tipo)} data-elegida={e.tipo === c.tipo || undefined}
                         className={`gr-carta${c.oscura ? ' gr-carta--oscura' : ''}`} style={{ '--i': i, '--r': c.r } as React.CSSProperties}>
-                  <Icon name={c.icono} size={22} strokeWidth={2.2} />
+                  <IlustracionAgregado dibujo={c.tipo} className="gr-carta__dibujo" />
                   <b>{c.titulo}<small>{c.bajada}</small></b>
                 </button>
               ))}
