@@ -69,7 +69,7 @@ function useAnclajeAbajo(ref: RefObject<HTMLElement | null>) {
 /**
  * La barra de abajo: una píldora de vidrio esmerilado con las cuatro secciones y, al costado, el + en un círculo del mismo
  * vidrio. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección: la sección tocada se marca
- * desde el toque mismo. El + abre el agregado (ver Agregado): gira y queda como × mientras la píldora se esconde. En
+ * desde el toque mismo, y su columna se estira con un rebote (las columnas se animan con CSS). El + abre el agregado (ver Agregado): gira y queda como × mientras la píldora se esconde. En
  * Agregar la barra se esconde entera (al editar un deseo o tus gustos, armar una sorpresa o un amigo invisible también), y
  * en un deseo, que tiene una sola acción principal, tampoco va.
  */
@@ -86,6 +86,10 @@ export function BottomNav() {
     || path.startsWith('/deseo/') || /^\/l\/[^/]+\/item\//.test(path)
   const { paso } = useAgregado()
   const abierto = paso !== ''
+  // La columna que se estira: la marcada. En Agregar (o un deseo) no hay marcada: queda la última mientras la barra baja.
+  const columna = DESTINOS.findIndex((d) => d.href === marcado)
+  const [ultima, setUltima] = useState(Math.max(columna, 0))
+  if (columna >= 0 && columna !== ultima) setUltima(columna)
 
   const ref = useRef<HTMLElement>(null)
   useAnclajeAbajo(ref)
@@ -96,7 +100,7 @@ export function BottomNav() {
       <nav ref={ref} aria-label="Navegación principal" className="gr-nav" data-oculta={oculta || undefined} data-abierto={abierto || undefined}
            inert={oculta}>
         {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
-        <div className="gr-nav__tabs" inert={abierto}>
+        <div className="gr-nav__tabs" data-columna={columna >= 0 ? columna : ultima} inert={abierto}>
           {DESTINOS.map((d) => (
             <Destino key={d.href} d={d} actual={actual} marcado={marcado} onNavigate={() => setToque({ href: d.href, desde: path })} />
           ))}
