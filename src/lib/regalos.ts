@@ -1495,6 +1495,9 @@ export async function posponerRecordatorio(db: Db, giftId: string, userId: strin
 export type EntradaHistorial = {
   id: string
   listId: string
+  /** El deseo que se regaló, y su foto (para verlo en su cuadrado de color en el historial). */
+  itemId: string
+  foto: string | null
   titulo: string
   /** Quien lo compró (en un regalo grupal, el encargado). */
   encargado: string
@@ -1502,6 +1505,9 @@ export type EntradaHistorial = {
   grupal: boolean
   nota: string | null
   fecha: Date
+  /** Solo en el historial de una lista (ver historialDeLista): lo compró quien mira (o armó el grupal), y en qué lugar de con está. */
+  esMia?: boolean
+  miLugar?: number
 }
 
 export type Historial = {
@@ -1510,14 +1516,15 @@ export type Historial = {
   ranking: { nombre: string; cantidad: number; esYo: boolean }[]
 }
 
-// quien: con qué agrupar el ranking ("u:<id>" o "g:<id>"). Queda del lado del servidor: el id de un invitado
-// es parte de su credencial y no puede llegar a la página (ni como key de React, que viaja en el HTML).
-type Compra = { entrada: EntradaHistorial; quien: string }
+// quien: con qué agrupar el ranking ("u:<id>" o "g:<id>"); conQuien, lo mismo de cada uno de con. Queda del lado del
+// servidor: el id de un invitado es parte de su credencial y no puede llegar a la página (ni como key de React, que viaja
+// en el HTML).
+type Compra = { entrada: EntradaHistorial; quien: string; conQuien: string[] }
 
 async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
   if (!listIds.length) return []
   const sueltas = await db.select({
-    id: claims.id, listId: items.listId, titulo: items.titulo, nota: claims.notaQueCompre, fecha: claims.updatedAt,
+    id: claims.id, listId: items.listId, itemId: items.id, foto: items.fotoUrl, titulo: items.titulo, nota: claims.notaQueCompre, fecha: claims.updatedAt,
     userId: claims.claimerUserId, guestId: claims.claimerGuestId, userNombre: users.nombre, guestNombre: guestIdentities.nombre,
   }).from(claims)
     .innerJoin(items, eq(claims.itemId, items.id))
@@ -1527,7 +1534,7 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
       noEsDeRegaloGrupal()))
 
   const grupales = await db.select({
-    id: groupGifts.id, listId: items.listId, titulo: items.titulo, nota: claims.notaQueCompre,
+    id: groupGifts.id, listId: items.listId, itemId: items.id, foto: items.fotoUrl, titulo: items.titulo, nota: claims.notaQueCompre,
     fecha: groupGifts.compradoAt, encargadoId: groupGifts.organizerUserId, encargado: users.nombre,
   }).from(groupGifts)
     .innerJoin(items, eq(groupGifts.itemId, items.id))
@@ -1544,15 +1551,17 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
   return [
     ...sueltas.map((s) => ({
       quien: s.userId ? `u:${s.userId}` : `g:${s.guestId}`,
+      conQuien: [],
       entrada: {
-        id: s.id, listId: s.listId, titulo: s.titulo, nota: s.nota, fecha: s.fecha, grupal: false, con: [],
+        id: s.id, listId: s.listId, itemId: s.itemId, foto: s.foto, titulo: s.titulo, nota: s.nota, fecha: s.fecha, grupal: false, con: [],
         encargado: s.userNombre ?? s.guestNombre ?? 'Alguien',
       },
     })),
     ...grupales.map((g) => ({
       quien: `u:${g.encargadoId}`,
+      conQuien: miembros.filter((m) => m.giftId === g.id && m.userId !== g.encargadoId).map((m) => `u:${m.userId}`),
       entrada: {
-        id: g.id, listId: g.listId, titulo: g.titulo, nota: g.nota, fecha: g.fecha ?? new Date(0), grupal: true,
+        id: g.id, listId: g.listId, itemId: g.itemId, foto: g.foto, titulo: g.titulo, nota: g.nota, fecha: g.fecha ?? new Date(0), grupal: true,
         encargado: g.encargado,
         con: miembros.filter((m) => m.giftId === g.id && m.userId !== g.encargadoId).map((m) => m.nombre),
       },
@@ -1572,7 +1581,7 @@ export async function historialDeLista(db: Db, listId: string, viewer: Viewer): 
     conteo.set(quien, fila)
   }
   return {
-    entradas: compras.map((c) => c.entrada),
+    entradas: compras.map((c) => ({ ...c.entrada, esMia: c.quien === yo, miLugar: c.conQuien.indexOf(yo) })),
     ranking: [...conteo.values()].sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre)),
   }
 }
