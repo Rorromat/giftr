@@ -401,8 +401,9 @@
   }
 
   /* Navegación inferior (<BottomNav>): una píldora de vidrio esmerilado con las cuatro secciones y, al costado, el + en un
-     círculo del mismo vidrio. La sección marcada va en el acento. El + abre el agregado (<Agregado>): gira y queda como ×,
-     mientras la píldora se esconde. */
+     círculo del mismo vidrio. La sección marcada va en el acento y se estira: las columnas se reparten con
+     grid-template-columns, que se anima con un rebote, así la marca crece en la nueva mientras se achica en la vieja, y su
+     ícono da un saltito. El + abre el agregado (<Agregado>): gira y queda como ×, mientras la píldora se esconde. */
   .gr-nav {
     position: fixed;
     left: max(14px, calc(50% - 224px + 14px));
@@ -421,9 +422,10 @@
     flex: 1;
     min-width: 0;
     height: 62px;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: center;
-    justify-content: space-around;
+    gap: 2px;
     padding: 0 6px;
     border-radius: var(--gr-radius-pill);
     background: var(--gr-glass);
@@ -431,14 +433,21 @@
     -webkit-backdrop-filter: blur(22px) saturate(1.8);
     backdrop-filter: blur(22px) saturate(1.8);
     box-shadow: var(--gr-shadow-float);
-    transition: opacity 250ms ease, transform 400ms var(--gr-barre);
+    transition: opacity 250ms ease, transform 400ms var(--gr-barre), grid-template-columns 420ms cubic-bezier(0.3, 1.3, 0.4, 1);
   }
+  .gr-nav__tabs[data-columna="0"] { grid-template-columns: 1.7fr 1fr 1fr 1fr; }
+  .gr-nav__tabs[data-columna="1"] { grid-template-columns: 1fr 1.7fr 1fr 1fr; }
+  .gr-nav__tabs[data-columna="2"] { grid-template-columns: 1fr 1fr 1.7fr 1fr; }
+  .gr-nav__tabs[data-columna="3"] { grid-template-columns: 1fr 1fr 1fr 1.7fr; }
   .gr-nav__tabs a {
     min-width: 0;
+    height: 50px;
     display: grid;
+    align-content: center;
     justify-items: center;
     gap: 2px;
-    padding: 6px 10px;
+    padding: 0 6px;
+    overflow: hidden;
     border-radius: var(--gr-radius-pill);
     color: var(--gr-ink);
     opacity: 0.62;
@@ -446,13 +455,16 @@
     font-size: 10.5px;
     text-decoration: none;
     white-space: nowrap;
-    transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+    transition: background-color 200ms ease, color 200ms ease, opacity 200ms ease;
   }
+  .gr-nav__tabs a svg { flex: none; }
   .gr-nav__tabs a[data-marcado] {
     color: var(--gr-acento);
     opacity: 1;
     background: color-mix(in oklch, var(--gr-acento) 14%, transparent);
   }
+  /* el ícono de la recién marcada: se encoge, salta y se acomoda */
+  .gr-nav__tabs a[data-marcado] svg { animation: gr-nav-salto 460ms var(--gr-entra); }
   .gr-mas {
     position: relative;
     z-index: 2;
@@ -746,6 +758,7 @@
    opacidad: un transform haría que los botones fijos de la página (como "Mandala por WhatsApp") se corran. */
 .gr-seccion { animation: gr-aparece 180ms ease-out; }
 @keyframes gr-aparece { from { opacity: 0; } }
+@keyframes gr-nav-salto { 0% { transform: scale(0.8); } 55% { transform: translateY(-2px) scale(1.14); } 100% { transform: none; } }
 /* Lo que cambia adentro de una sección sin salir de ella (las pestañas de Mis regalos y Cuentas): el mismo fundido, solo
    en lo que cambió. */
 .gr-fundido { animation: gr-aparece 180ms ease-out; }
@@ -1091,6 +1104,7 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
 
 @media (prefers-reduced-motion: reduce) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav__tabs, .gr-nav__tabs a { transition: none; }
+  .gr-nav__tabs a[data-marcado] svg { animation: none; }
   /* el agregado: aparece y se va sin barrer ni volar; las cartas, ya en su lugar */
   .gr-mas, .gr-agr__fondo, .gr-carta, .gr-previa, .gr-barrita i, .gr-listo > *, .gr-agr__elegir h2, .gr-agr__pie {
     transition-duration: 0.01s !important; transition-delay: 0s !important;
