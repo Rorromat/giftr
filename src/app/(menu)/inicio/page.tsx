@@ -28,8 +28,12 @@ import { misAmigosInvisibles } from '@/lib/amigo-invisible'
 import { especialesQueVienen } from '@/lib/fechas-especiales'
 import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
+import { Destacada, EstanteDeLista } from '@/components/Estante'
+import { getListForViewer } from '@/lib/lists'
+import { colorDe, tapaDe } from '@/lib/tapas'
 
-// Inicio: lo que viene. Arriba lo que te espera (los carteles, las propuestas, y "Para vos": lo último de la campanita que
+// Inicio: lo que viene. Arriba, lo próximo en grande: la tapa de esa persona (su color) y un estante con sus deseos. Después
+// lo que te espera (los carteles, las propuestas, y "Para vos": lo último de la campanita que
 // te pide algo), los próximos cumples y fechas de tu gente (con lo que ya hiciste para cada uno, y las fechas especiales con
 // tus amigos invisibles), lo nuevo de tus amigos, lo que tenés por comprar, las cuentas pendientes y alguien que quizás
 // conocés. Tu lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
@@ -58,17 +62,33 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
   const especiales = especialesQueVienen(hoy, juegos)
+  // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su color y el estante con sus deseos
+  const destacado = eventos.find((e) => !e.propio && e.href.startsWith('/l/'))
+  const token = destacado?.href.slice('/l/'.length)
+  const suLista = token ? await getListForViewer(db, token, { userId: session.userId }) : null
+  const unDueno = suLista && suLista.role !== 'owner' && !suLista.grupoNombre && suLista.perfiles.length === 1 ? suLista.perfiles[0] : null
+  const suColor = suLista ? (unDueno ? tapaDe(unDueno.id) : colorDe(suLista.listId)) : null
   // lo que vence antes primero (los grupales no vencen); si no, lo último que reservaste
   const aComprar = [...pendientes].sort((a, b) => (a.venceEnDias ?? Infinity) - (b.venceEnDias ?? Infinity)).slice(0, POR_COMPRAR)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos}
-                 left={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={20} /></Link>} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} id={session.userId} foto={foto} avisos={avisos}
+                 accion={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={19} /></Link>} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Lo que viene</h1>
-        <p className="text-[15px] text-gr-muted">Cumples, regalos y avisos de tu gente.</p>
+        <p className="text-sm text-gr-muted">Cumples, regalos y avisos de tu gente.</p>
       </div>
+
+      {destacado && suColor && token && suLista && (
+        <>
+          <Destacada e={destacado} color={suColor} hoy={hoy} />
+          {suLista.role !== 'owner' && (
+            <EstanteDeLista titulo={unDueno ? `Para ${unDueno.nombre.split(' ')[0]}` : `Para ${suLista.grupoNombre ?? suLista.ownerNombre}`}
+                            href={destacado.href} token={token} items={suLista.items} />
+          )}
+        </>
+      )}
 
       <Banners />
       {/* te proponen dividir un regalo: te sumás o no */}

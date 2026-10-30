@@ -23,7 +23,7 @@ const primerNombre = (n: string) => n.split(' ')[0]
 /** La etiqueta de una sorpresa, sobre su foto. */
 export function EtiquetaSorpresa({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full bg-gr-brand px-2.5 py-1 text-xs font-semibold text-gr-accent ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full bg-gr-brand px-2.5 py-1 text-xs font-semibold text-gr-on-brand ${className}`}>
       <span aria-hidden>🤫</span>Sorpresa
     </span>
   )
@@ -39,7 +39,7 @@ export function SorpresasEnLista({ token, nombre, sorpresas }: { token: string; 
     <section aria-labelledby="sorpresas-titulo" className="flex flex-col gap-3">
       <Link href={`/sorpresa/nueva?para=${token}`}
             className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
-        <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-accent">
+        <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-soft">
           <Icon name="gift" size={24} />
         </span>
         <span className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ export function SorpresasEnLista({ token, nombre, sorpresas }: { token: string; 
 export function ArmarSorpresa() {
   return (
     <Link href="/sorpresa/nueva" className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
-      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-accent"><Icon name="gift" size={22} /></span>
+      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft"><Icon name="gift" size={22} /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] leading-snug font-semibold">Armar una sorpresa</span>
         <span className="block text-[13px] leading-snug text-gr-muted">
@@ -108,7 +108,7 @@ export function ElegirParaQuien({ amigos }: { amigos: Persona[] }) {
   return (
     <div className="flex flex-col gap-3">
       <Link href="/sorpresa/nueva?sin=1" className="gr-card flex items-center gap-3 px-4 py-3.5">
-        <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-accent"><Icon name="gift" size={22} /></span>
+        <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft"><Icon name="gift" size={22} /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">Alguien que no usa GiftR</span>
           <span className="block text-[13px] leading-snug text-gr-muted">La abuela, un compañero de trabajo…</span>
@@ -123,7 +123,7 @@ export function ElegirParaQuien({ amigos }: { amigos: Persona[] }) {
             {amigos.map((a) => (
               <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
                 <Link href={`/sorpresa/nueva?amigo=${a.id}`} className="flex min-h-14 items-center gap-3 py-2">
-                  <AvatarSticker nombre={a.nombre} foto={a.foto} size={36} />
+                  <AvatarSticker id={a.id} nombre={a.nombre} foto={a.foto} size={36} />
                   <span className="min-w-0 flex-1 text-[15px] leading-tight font-semibold [overflow-wrap:anywhere]">{a.nombre}</span>
                   <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
                 </Link>

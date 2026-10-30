@@ -130,7 +130,7 @@ export default async function Sorpresa({ params, searchParams }: {
       </article>
 
       {deRegalo === 'sumado' && enUnRegalo && (
-        <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-medium">
+        <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
           <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
           {regalos.some((r) => r.soyParte && r.estado === 'comprado')
             ? '¡Listo, te sumaste! Ya estaba comprada: abajo ves cuánto te toca.'
@@ -153,7 +153,7 @@ export default async function Sorpresa({ params, searchParams }: {
 
       <section className="mt-2 flex flex-col gap-3">
         <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-          <Icon name="lock" size={16} strokeWidth={2} className="text-gr-accent" />
+          <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento" />
           {s.para.userId ? `Esto no lo ve ${quien}` : 'Para coordinar entre ustedes'}
         </h2>
         <ul className="flex flex-col gap-2">
@@ -167,7 +167,7 @@ export default async function Sorpresa({ params, searchParams }: {
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="itemId" value={item.id} />
           <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
-          <BotonEnviar className="gr-btn bg-gr-brand text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
+          <BotonEnviar className="gr-btn gr-btn--dark min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
         </form>
       </section>
 

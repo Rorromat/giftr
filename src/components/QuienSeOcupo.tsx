@@ -35,7 +35,7 @@ export function QuienSeOcupo({ historial, para }: { historial: Historial; para: 
                 <span className={`truncate text-sm ${r.esYo ? 'font-extrabold' : 'font-semibold'}`}>{nombre(r)}</span>
                 <span className="flex min-w-0 items-center gap-2">
                   {/* una sola serie: un solo color; el valor va escrito en la punta */}
-                  <span className="h-5 flex-none rounded-r-[4px] bg-gr-accent"
+                  <span className="h-5 flex-none rounded-r-[4px] bg-gr-acento"
                         style={{ width: `calc((100% - 2rem) * ${r.cantidad / max})` }} />
                   <span className="text-sm font-semibold tabular-nums">{r.cantidad}</span>
                 </span>

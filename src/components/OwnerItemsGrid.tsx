@@ -2,13 +2,10 @@ import Link from 'next/link'
 import { archiveItemAction, restoreItemAction } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { PrioritySelect } from '@/components/PrioritySelect'
-import { Icon, ItemPhoto } from '@/components/ui'
+import { Arte, Icon } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
 import { textoDueno } from '@/lib/compartir'
 import { paraBuscar } from '@/lib/buscar'
-
-/** El alto de las fotos de la grilla: todas iguales, para que la lista se lea de un vistazo. */
-const ALTO_FOTO = 176
 
 export const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
 
@@ -29,30 +26,32 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
 }
 
 /**
- * Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo). Nunca muestra reservas.
- * agregado: el que se acaba de agregar, marcado (ver RecienAgregado).
+ * Los deseos activos del dueño agrupados por categoría (Mi lista y la lista de un grupo), cada uno en su cuadrado de color.
+ * Nunca muestra reservas. agregado: el que se acaba de agregar, que entra primero con "Nuevo" (ver RecienAgregado).
  */
 export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerItemView[]; shareToken: string; agregado?: string }) {
-  const porCategoria = Object.groupBy(items, (i) => i.categoria ?? 'Sin categoría')
+  // el recién agregado primero, y su categoría arriba (groupBy deja las categorías en el orden en que aparecen)
+  const ordenados = agregado ? [...items].sort((a, b) => Number(b.id === agregado) - Number(a.id === agregado)) : items
+  const porCategoria = Object.groupBy(ordenados, (i) => i.categoria ?? 'Sin categoría')
   return Object.entries(porCategoria).map(([cat, catItems]) => (
     <section key={cat} data-buscar-grupo className="flex flex-col gap-2.5">
       <h3 className="gr-label">{cat}</h3>
-      <ul className="grid grid-cols-2 items-start gap-3">
+      <ul className="grid grid-cols-2 items-start gap-x-3 gap-y-[18px]">
         {catItems!.map((item) => {
           const precio = item.precio ?? item.rangoPrecio
           return (
             // Toda la card abre el deseo (el ::after del título la cubre); el menú y la prioridad van por arriba.
             <li key={item.id} id={`d-${item.id}`} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)}
-                className={`gr-card relative scroll-mt-24 ${item.id === agregado ? 'outline-3 outline-offset-2 outline-gr-accent' : ''}`}>
+                className="relative flex scroll-mt-24 flex-col gap-2">
               <div className="relative">
-                <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={ALTO_FOTO} />
+                <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} />
                 {item.id === agregado && (
-                  <span className="pointer-events-none absolute left-2 top-2 z-[1] rounded-full bg-gr-accent px-2.5 py-1 text-xs font-semibold">Recién agregado</span>
+                  <span className="pointer-events-none absolute left-2 top-2 z-[1] rounded-full bg-gr-acento px-2 py-0.5 text-[11px] font-extrabold text-gr-on-acento">Nuevo</span>
                 )}
                 <details className="group">
                   <summary aria-label={`Opciones de ${item.titulo}`}
                            className="absolute right-0.5 top-0.5 z-[2] flex size-11 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_4px_rgb(20_20_20/0.14)] group-open:bg-gr-brand group-open:text-gr-on-brand">
+                    <span className="flex size-8 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.14)] group-open:bg-gr-brand group-open:text-gr-on-brand">
                       <Icon name="more" size={18} strokeWidth={2.2} />
                     </span>
                   </summary>
@@ -75,12 +74,12 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
                   </div>
                 </details>
               </div>
-              <div className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
+              <div className="flex flex-col gap-0.5 px-0.5">
                 <Link href={`/deseo/${item.id}`}
-                      className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere] after:absolute after:inset-0 after:z-[1]">
+                      className="text-[15px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere] after:absolute after:inset-0 after:z-[1]">
                   {item.titulo}
                 </Link>
-                {precio && <p className="text-[15px] font-semibold">{precio}</p>}
+                {precio && <p className="text-[13px] text-gr-muted tabular-nums">{precio}</p>}
                 <div className="relative z-[2] self-start">
                   <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
                 </div>

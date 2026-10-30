@@ -10,7 +10,7 @@ import { AvatarSticker, QuizasLink } from '@/components/ui'
 // cuadradito: la foto de quien lo mandó queda chiquita, en la esquina.
 
 const AZUL = 'bg-gr-blue text-gr-on-blue'
-const LIMA = 'bg-gr-accent text-gr-ink'
+const LIMA = 'bg-gr-accent text-gr-on-accent'
 const GRIS = 'bg-gr-soft text-gr-ink'
 
 const DIBUJO = {
@@ -32,7 +32,7 @@ type Mueve = 'cae' | 'imprime' | 'sacude' | 'duda' | 'escribe' | 'parpadea' | 'e
 
 const ICONOS: Record<TipoEnBandeja, { fondo: string; dibujo: ReactNode; mueve: Mueve }> = {
   pago: { fondo: LIMA, dibujo: DIBUJO.moneda, mueve: 'cae' },
-  regalo_comprado: { fondo: 'bg-gr-brand text-gr-accent', dibujo: DIBUJO.ticket, mueve: 'imprime' },
+  regalo_comprado: { fondo: 'bg-gr-hero text-gr-accent', dibujo: DIBUJO.ticket, mueve: 'imprime' },
   invisible_sorteo: { fondo: AZUL, dibujo: DIBUJO.regalo, mueve: 'sacude' },
   invisible_pregunta: { fondo: AZUL, dibujo: DIBUJO.pregunta, mueve: 'duda' },
   invisible_respuesta: { fondo: AZUL, dibujo: DIBUJO.charla, mueve: 'escribe' },
@@ -89,7 +89,7 @@ export function ContenidoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja
         {e.cuerpo && <span className="line-clamp-2 text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">{e.cuerpo}</span>}
         <span className="text-xs font-medium text-gr-muted">{hace(e.createdAt)}</span>
       </span>
-      {e.nuevo && <span className="mt-2 size-2.5 flex-none rounded-full bg-gr-blue"><span className="sr-only">Nuevo</span></span>}
+      {e.nuevo && <span className="mt-2 size-2.5 flex-none rounded-full bg-gr-acento"><span className="sr-only">Nuevo</span></span>}
     </>
   )
 }

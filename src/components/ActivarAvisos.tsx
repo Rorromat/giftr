@@ -86,7 +86,7 @@ export function ActivarAvisos({ vapidPublica, bienvenida = false, alCambiar }: {
         </button>
       )}
       {estado === 'activado' && bienvenida && (
-        <p role="status" className="flex items-center gap-2 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-semibold">
+        <p role="status" className="flex items-center gap-2 rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-semibold">
           <Icon name="check" size={18} strokeWidth={2.6} className="flex-none" />¡Listo! Te vamos a avisar en este dispositivo.
         </p>
       )}

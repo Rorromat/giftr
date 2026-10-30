@@ -15,7 +15,7 @@ export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string })
   const [estado, sumar] = useActionState<EstadoSugerencia, FormData>(sumarSugerenciaAction, null)
   return (
     <li className="flex min-h-[72px] items-center gap-3 py-2.5">
-      <AvatarSticker nombre={p.nombre} foto={p.foto} size={44} />
+      <AvatarSticker id={p.id} nombre={p.nombre} foto={p.foto} size={44} />
       <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-[15px] leading-tight font-semibold [overflow-wrap:anywhere]">{p.nombre}</p>
         <p className="text-[13px] font-medium leading-snug text-gr-muted">
@@ -24,7 +24,7 @@ export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string })
       </div>
       {estado?.ok ? (
         <p role="status" className="flex flex-none items-center gap-1 text-[13px] font-semibold">
-          <Icon name="check" size={16} strokeWidth={2.6} className="text-gr-accent" />{estado.amigos ? '¡Amigos!' : 'Enviada'}
+          <Icon name="check" size={16} strokeWidth={2.6} className="text-gr-acento" />{estado.amigos ? '¡Amigos!' : 'Enviada'}
         </p>
       ) : (
         <div className="-mr-2 flex flex-none items-center">

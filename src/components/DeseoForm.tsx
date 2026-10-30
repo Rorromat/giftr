@@ -1,3 +1,4 @@
+import { AlLlegarDelAgregado } from '@/components/AlLlegarDelAgregado'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CampoPrecio } from '@/components/CamposDeseo'
 import { CompletarDesdeLink } from '@/components/CompletarDesdeLink'
@@ -75,7 +76,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
           {Object.entries(PRIORIDADES).map(([value, { label, corazones }]) => (
             <label key={value} className="gr-chip group h-11 gap-1.5 px-3.5 text-[13px] has-[:checked]:px-3">
               <input type="radio" name="prioridad" value={value} defaultChecked={value === (deseo?.prioridad ?? 'gustaria')} className="sr-only" />
-              <Hearts n={corazones} className="group-has-[:checked]:text-gr-accent" />
+              <Hearts n={corazones} className="group-has-[:checked]:text-gr-acento" />
               <span className="sr-only group-has-[:checked]:not-sr-only">{label}</span>
             </label>
           ))}
@@ -114,6 +115,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
           Escribí qué querés o pegá un link para agregarlo
         </p>
       </div>
+      {/* lo elegido en el agregado (el link copiado, la foto o escribirlo), al final: los campos ya escuchan */}
+      {!deseo && <AlLlegarDelAgregado />}
     </form>
   )
 }

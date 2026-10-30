@@ -6,7 +6,7 @@ import { AvatarSticker, Icon } from '@/components/ui'
 import { achicarFoto } from '@/lib/achicar-foto'
 
 /** Tu foto de perfil: tocás la foto (o el botón) y elegís una de la galería o sacás una. */
-export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string; foto: string | null; size?: number; propia: boolean }) {
+export function FotoPerfil({ id, nombre, foto, size = 84, propia }: { id?: string; nombre: string; foto: string | null; size?: number; propia: boolean }) {
   const input = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const [actual, setActual] = useState(foto)
@@ -36,7 +36,7 @@ export function FotoPerfil({ nombre, foto, size = 84, propia }: { nombre: string
     <div className="flex flex-col items-start gap-1.5">
       <button type="button" onClick={() => input.current?.click()} aria-label={actual ? 'Cambiar tu foto' : 'Subir tu foto'}
               className={`relative ${estado === 'subiendo' ? 'animate-pulse' : ''}`}>
-        <AvatarSticker nombre={nombre} foto={actual} size={size} />
+        <AvatarSticker id={id} nombre={nombre} foto={actual} size={size} />
         <span className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full border border-gr-line bg-gr-surface">
           <Icon name="camera" size={16} strokeWidth={2} />
         </span>

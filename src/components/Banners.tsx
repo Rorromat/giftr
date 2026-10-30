@@ -43,7 +43,7 @@ export async function Banners() {
       {/* solicitudes de amistad: se contestan en Tu gente */}
       {solicitudes.n > 0 && (
         <Link href="/gente#solicitudes" className="gr-card flex items-center gap-3 px-4 py-3.5 text-sm font-medium">
-          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-accent text-xl">🤝</span>
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-soft text-xl">🤝</span>
           <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
             {solicitudes.n === 1
               ? <><span className="font-semibold">{solicitudes.primero}</span> te mandó una solicitud de amistad</>
@@ -62,7 +62,7 @@ export async function Banners() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href={grupo ? `/agregar?lista=${grupo.listId}` : '/agregar'} className="gr-btn gr-btn--sm flex-none border-white">
+            <Link href={grupo ? `/agregar?lista=${grupo.listId}` : '/agregar'} className="gr-btn gr-btn--blanco gr-btn--sm flex-none">
               Agregar algo
             </Link>
             <form action={vistoCodazosAction}>
@@ -83,7 +83,7 @@ export async function Banners() {
         <QuizasLink key={w.claimId} href={w.href}
                     className="relative block rounded-[22px] bg-gr-brand px-4 py-3.5 text-sm font-medium text-gr-on-brand">
           {`¿Conseguiste "${w.itemTitulo}"? Te quedan `}
-          <span className="font-semibold text-gr-accent">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
+          <span className="font-semibold text-gr-acento">{w.diasRestantes} {w.diasRestantes === 1 ? 'día' : 'días'}</span>
           {' de reserva.'}
           {/* en el deseo se marca comprado o se libera */}
           {w.href && <span className="mt-0.5 block font-semibold underline underline-offset-4">Marcalo o liberalo</span>}
@@ -98,7 +98,7 @@ export async function Banners() {
             <div className="flex gap-4">
               <form action={boughtAction}>
                 <input type="hidden" name="claimId" value={w.claimId} />
-                <BotonEnviar className="min-h-11 font-semibold text-gr-accent underline underline-offset-4">Ya lo compré</BotonEnviar>
+                <BotonEnviar className="min-h-11 font-semibold text-gr-acento underline underline-offset-4">Ya lo compré</BotonEnviar>
               </form>
               <form action={releaseAction}>
                 <input type="hidden" name="claimId" value={w.claimId} />
@@ -119,7 +119,7 @@ export async function Banners() {
           </Link>
           <form action={postponeGroupGiftReminderAction}>
             <input type="hidden" name="giftId" value={r.giftId} />
-            <BotonEnviar className="min-h-11 text-xs font-semibold text-gr-accent underline underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
+            <BotonEnviar className="min-h-11 text-xs font-semibold text-gr-acento underline underline-offset-4">Sigue en pie: recordámelo en 2 semanas</BotonEnviar>
           </form>
         </div>
       ))}

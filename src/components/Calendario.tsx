@@ -81,7 +81,7 @@ export function CaraDe({ cara, size }: { cara: Cara; size: number }) {
   const especial = cara.tipo === 'especial' ? paletaDe(cara.fecha) : null
   return (
     <span aria-hidden style={{ width: size, height: size, background: especial?.fondo }}
-          className={`flex flex-none items-center justify-center rounded-full ${especial ? 'text-white' : 'bg-gr-brand text-gr-accent'}`}>
+          className={`flex flex-none items-center justify-center rounded-full ${especial ? 'text-white' : 'bg-gr-brand text-gr-on-brand'}`}>
       {cara.tipo === 'especial'
         ? <IconoFecha fecha={cara.fecha} size={Math.round(size * 0.62)} acento={especial!.acento} />
         : <Icon name="users" size={Math.round(size * 0.55)} />}
@@ -131,7 +131,7 @@ function VistaAnio({ meses, dias, cosas, orden, vacio }: Datos & { orden: string
     const caras = (dias[claveDelDia(mes, dia)]?.cosas ?? []).map((k) => cosas[k].cara)
     const especial = caras.find((c) => c.tipo === 'especial')
     if (especial) return { style: { background: paletaDe(especial.fecha).fondo } }
-    return { className: caras.length ? 'bg-gr-accent ring-1 ring-gr-ink/30' : hoy ? 'bg-gr-ink' : 'bg-gr-dot' }
+    return { className: caras.length ? 'bg-gr-acento' : hoy ? 'bg-gr-ink' : 'bg-gr-dot' }
   }
   return (
     <>
@@ -158,7 +158,7 @@ function VistaAnio({ meses, dias, cosas, orden, vacio }: Datos & { orden: string
           })}
         </ul>
         <p className="mx-1.5 mb-1.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-gr-line pt-3 text-xs text-gr-muted">
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-accent ring-1 ring-gr-ink/30" />Evento o cumple</span>
+          <span className="flex items-center gap-1.5"><span className="size-3 rounded-full bg-gr-acento" />Evento o cumple</span>
           {colores.length > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="size-3 rounded-full" style={{ background: `conic-gradient(${colores.join(', ')})` }} />Fecha especial
@@ -208,7 +208,7 @@ function Celda({ mes, dia, meses, dias, cosas }: Datos & { mes: number; dia: num
                 <CaraDe cara={gente[1]} size={24} />
               </span>
             ) : (
-              <span aria-hidden className="-ml-2.5 flex size-6 items-center justify-center rounded-full bg-gr-brand text-[10px] leading-none font-bold text-gr-accent ring-2 ring-gr-soft">
+              <span aria-hidden className="-ml-2.5 flex size-6 items-center justify-center rounded-full bg-gr-brand text-[10px] leading-none font-bold text-gr-on-brand ring-2 ring-gr-soft">
                 +{gente.length - 1}
               </span>
             )}

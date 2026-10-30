@@ -66,7 +66,7 @@ function Persona({ p }: { p: CuentaPersona }) {
   return (
     <li className="gr-card flex flex-col gap-1 p-4">
       <div className="flex items-center gap-3">
-        <AvatarSticker nombre={p.nombre} size={44} />
+        <AvatarSticker id={p.id} nombre={p.nombre} size={44} />
         <p className="min-w-0 flex-1 text-base leading-snug font-semibold [overflow-wrap:anywhere]">
           {p.neto === 0 ? `Con ${p.nombre} están a mano` : leDebo ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}
         </p>
@@ -239,8 +239,8 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
           <Total pesos={c.debes} dolares={c.dolares?.debes ?? 0} className="text-gr-hero-detail" />
         </div>
-        <div className="flex flex-col gap-1.5 rounded-[26px] bg-gr-accent p-4 shadow-card">
-          <span className="text-xs font-semibold tracking-[0.08em] text-gr-ink/60 uppercase">Te deben</span>
+        <div className="flex flex-col gap-1.5 rounded-[26px] border border-gr-line bg-gr-surface p-4">
+          <span className="text-xs font-semibold tracking-[0.08em] text-gr-muted uppercase">Te deben</span>
           <Total pesos={c.teDeben} dolares={c.dolares?.teDeben ?? 0} />
         </div>
       </div>

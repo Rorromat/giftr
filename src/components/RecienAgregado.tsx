@@ -1,28 +1,19 @@
 'use client'
 
-import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, useEffectEvent } from 'react'
+import { mostrarAnotado, type Anotado } from '@/components/Agregado'
 import { Icon } from '@/components/ui'
 
 /**
- * Después de agregar un deseo: la lista va hasta él (está marcado "Recién agregado", ver OwnerItemsGrid) y abajo aparece
- * "¡Listo! Ya está en tu lista" con "Agregar otro". El ?agregado= se saca de la dirección: al volver a entrar (o tirar
- * para actualizar) ya no es el recién agregado.
+ * Después de agregar un deseo: "¡Anotado!" con el color del deseo, donde se marca cuánto lo querés (ver Agregado). Al
+ * cerrarlo, la lista va hasta él, que entra primero (ver OwnerItemsGrid), y el ?agregado= se saca de la dirección.
  */
-export function RecienAgregado({ id, otro }: { id: string; otro: string }) {
-  useEffect(() => {
-    document.getElementById(`d-${id}`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
-    const url = new URL(location.href)
-    url.searchParams.delete('agregado')
-    history.replaceState(history.state, '', url)
-  }, [id])
-  return (
-    <p role="status" className="gr-toast [animation-duration:6s]">
-      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
-      <span className="min-w-0 flex-1"><span className="font-semibold text-gr-accent">¡Listo!</span> Ya está en tu lista</span>
-      <Link href={otro} className="flex-none font-semibold text-gr-accent underline underline-offset-4">Agregar otro</Link>
-    </p>
-  )
+export function RecienAgregado({ deseo }: { deseo: Anotado }) {
+  const { id } = deseo
+  const anotar = useEffectEvent(() => mostrarAnotado(deseo))
+  // una vez por deseo agregado (lo que se vuelva a armar la lista, al cambiar cuánto lo querés, no lo vuelve a abrir)
+  useEffect(() => { anotar() }, [id])
+  return null
 }
 
 /** Después de eliminar un deseo (ver EliminarDeseo): "Listo, lo eliminaste". El ?eliminado= se saca de la dirección. */
@@ -34,8 +25,8 @@ export function DeseoEliminado() {
   }, [])
   return (
     <p role="status" className="gr-toast [animation-duration:4s]">
-      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
-      <span className="min-w-0 flex-1"><span className="font-semibold text-gr-accent">Listo,</span> lo eliminaste</span>
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
+      <span className="min-w-0 flex-1"><span className="font-semibold">Listo,</span> lo eliminaste</span>
     </p>
   )
 }
@@ -50,8 +41,8 @@ export function GustosGuardados({ paso }: { paso: string }) {
   }, [paso])
   return (
     <p role="status" className="gr-toast [animation-duration:4s]">
-      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
-      <span className="min-w-0 flex-1"><span className="font-semibold text-gr-accent">Listo,</span> tu gente ya lo ve</span>
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
+      <span className="min-w-0 flex-1"><span className="font-semibold">Listo,</span> tu gente ya lo ve</span>
     </p>
   )
 }

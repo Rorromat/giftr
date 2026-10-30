@@ -8,7 +8,7 @@ const cargando = () => !!document.querySelector('main[aria-busy="true"], .gr-car
 
 /**
  * La animación de inicio: mientras la primera pantalla de la app está cargando, la estrella del ícono se pega en el
- * medio y gira a golpecitos; cuando llega, vuela a ser el contador de Mi lista (o se achica en las demás pantallas).
+ * medio y gira a golpecitos; cuando llega, se achica y se va.
  * La maneja el CSS (.gr-arranque en tokens.css) mirando si está la pantalla de carga, así arranca antes que el JS.
  * Esto solo la saca cuando terminó: va en el layout de la raíz, que no se vuelve a montar, así que no aparece en las
  * pantallas de carga de después (las de cada navegación).
@@ -52,7 +52,7 @@ export function Arranque() {
             <Starburst size={150} className="gr-arranque__giro" />
             <svg viewBox="0 0 100 100" className="gr-arranque__letra">
               <text x="50" y="50" dy="0.35em" textAnchor="middle" fontSize={56} fontWeight={800}
-                    fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>G</text>
+                    fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>G</text>
             </svg>
           </div>
         </div>

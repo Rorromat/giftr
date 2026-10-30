@@ -17,7 +17,8 @@ import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
 import { sitioDeLaTienda } from '@/lib/links'
-import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PageHeader } from '@/components/ui'
+import { Arte, AvatarStack, AvatarSticker, Icon, PageHeader } from '@/components/ui'
+import { colorDeDeseo } from '@/lib/tapas'
 import { CategoriaDeseo, FichasDeseo, NotaDeseo } from '@/components/FichaDeseo'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { Sello, type TipoSello } from '@/components/Sello'
@@ -113,33 +114,35 @@ export default async function DetalleItem({ params, searchParams }: {
 
   return (
     <main className="flex flex-col gap-4 pb-12 pt-2">
+      {/* toda la pantalla teñida con el color del deseo */}
+      <div aria-hidden className="gr-tenido" style={{ '--c': colorDeDeseo(item.id) } as React.CSSProperties} />
       {/* de quién es, para el que llega directo al deseo (un link por WhatsApp) */}
       <PageHeader title={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
 
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
-      <article className="gr-card">
-        <div className="relative">
-          <FotoAmpliable src={item.fotoUrl} titulo={item.titulo} iconoArriba={!!sello}>
-            <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={260} dimmed={!disponible && !mia && !enUnRegalo} />
+      <article className="flex flex-col gap-[18px]">
+        <div className="relative mx-auto w-[236px] max-w-full">
+          <FotoAmpliable src={item.fotoUrl} titulo={item.titulo}>
+            <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} apagado={!disponible && !mia && !enUnRegalo} className="gr-gran-arte" />
           </FotoAmpliable>
-          {/* pegado en la esquina, montado sobre el borde de la foto: el título le deja lugar */}
-          {sello && <Sello tipo={sello} clave={item.id} size={112} className="absolute right-3 top-[178px] z-[2]" />}
+          {/* pegado torcido en la esquina de arriba, montado sobre el borde del cuadrado */}
+          {sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute -right-10 -top-7 z-[2]" />}
         </div>
-        <div className="flex flex-col gap-4 p-4">
-          {/* qué es y cuánto sale; el sello le deja lugar */}
-          <div className={`flex flex-col gap-2 ${sello ? 'pr-[112px]' : ''}`}>
+        <div className="flex flex-col gap-4">
+          {/* qué es y cuánto sale */}
+          <div className="flex flex-col gap-2">
             {item.categoria && <CategoriaDeseo categoria={item.categoria} />}
-            <h1 className="text-2xl leading-tight font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">{item.titulo}</h1>
-            {precio && <p className="text-xl font-semibold">{precio}</p>}
+            <h1 className="gr-title text-[32px] [overflow-wrap:anywhere]">{item.titulo}</h1>
+            {precio && <p className="text-2xl font-extrabold tracking-[-0.03em] tabular-nums">{precio}</p>}
           </div>
           {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
           <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />
           {item.notas && (
             <NotaDeseo notas={item.notas} quien={`${ownerNombre} ${plural ? 'dicen' : 'dice'}`}
                        avatar={plural
-                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} size={28} />
-                         : <AvatarSticker nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
+                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} ids={detalle.perfiles.map((d) => d.id)} size={28} />
+                         : <AvatarSticker id={detalle.perfiles[0]?.id} nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
           )}
           {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
           {/* la tienda a lo ancho; abajo, de a dos con tu cuenta (con "Me lo robo" al lado, WhatsApp dice menos) */}
@@ -171,7 +174,7 @@ export default async function DetalleItem({ params, searchParams }: {
 
         {claims.filter((c) => !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
-            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-accent' : 'bg-gr-brand text-gr-accent'} border border-gr-line`}>
+            <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-acento text-gr-on-acento'}`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
             </span>
             <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -219,7 +222,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
 
         {deRegalo === 'sumado' && enUnRegalo && (
-          <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-accent px-4 py-3 text-sm font-medium">
+          <p role="status" className="flex items-start gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface/70 px-4 py-3 text-sm font-medium">
             <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
             {regalos.some((r) => r.soyParte && r.estado === 'comprado')
               ? '¡Listo, te sumaste! Ya estaba comprado: abajo ves cuánto te toca.'
@@ -277,7 +280,7 @@ export default async function DetalleItem({ params, searchParams }: {
       {giver && (
         <section className="mt-2 flex flex-col gap-3">
           <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-            <Icon name="lock" size={16} strokeWidth={2} className="text-gr-accent" />
+            <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento" />
             Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
           </h2>
           <ul className="flex flex-col gap-2">
@@ -291,7 +294,7 @@ export default async function DetalleItem({ params, searchParams }: {
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="itemId" value={item.id} />
             <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
-            <BotonEnviar className="gr-btn bg-gr-brand text-gr-accent min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
+            <BotonEnviar className="gr-btn gr-btn--dark min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
           </form>
         </section>
       )}

@@ -136,7 +136,7 @@ const CORRECCION: Record<string, string> = {
 export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: string }) {
   if (!motivo || !Object.hasOwn(CORRECCION, motivo)) return null
   return (
-    <div role="status" className="flex items-start gap-2 rounded-2xl bg-gr-accent py-1.5 pl-3.5 pr-1.5 text-sm font-semibold">
+    <div role="status" className="flex items-start gap-2 rounded-2xl bg-gr-soft py-1.5 pl-3.5 pr-1.5 text-sm font-semibold">
       <p className="flex-1 py-1.5">{CORRECCION[motivo]}</p>
       <Link href={cerrar} replace scroll={false} aria-label="Cerrar" className="-my-1 flex size-11 flex-none items-center justify-center">
         <Icon name="close" size={16} strokeWidth={3} />
@@ -213,7 +213,7 @@ export function RegaloGrupal({
     return (
       <div className="flex flex-col gap-1">
         <p className="flex items-start gap-2 text-sm font-medium">
-          <span className="mt-px flex size-5 flex-none items-center justify-center rounded-full bg-gr-accent">
+          <span className="mt-px flex size-5 flex-none items-center justify-center rounded-full bg-gr-brand text-gr-on-brand">
             <Icon name="check" size={11} strokeWidth={3} />
           </span>
           Regalo grupal de {juntarNombres(nombres)}: ya lo compraron.
@@ -340,7 +340,7 @@ export function RegaloGrupal({
                       {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                     </span>
                     <span className="text-lg font-semibold tabular-nums">{p(m.monto ?? 0)}</span>
-                    <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-accent' : 'bg-gr-brand text-gr-bg'}`}>
+                    <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-soft' : 'bg-gr-brand text-gr-bg'}`}>
                       {estado}
                     </span>
                     {puedoMarcar && (saldar ? marcar(true, saldar) : m.puso && marcar(false, 'Deshacer'))}

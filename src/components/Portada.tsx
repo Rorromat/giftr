@@ -234,7 +234,7 @@ export function Portada() {
               <div className="relative h-[196px]" style={{ background: f.fondo }}>
                 <svg aria-hidden viewBox="0 0 240 200" className="absolute inset-0 m-auto h-[176px] w-[212px]"><f.Dibujo /></svg>
                 <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-gr-surface py-1 pl-1 pr-2.5 text-xs font-semibold">
-                  <span aria-hidden className="flex size-5 items-center justify-center rounded-full bg-gr-brand text-[10px] font-bold text-gr-accent">{i + 1}</span>
+                  <span aria-hidden className="flex size-5 items-center justify-center rounded-full bg-gr-brand text-[10px] font-bold text-gr-on-brand">{i + 1}</span>
                   {f.nombre}
                 </span>
                 {/* al regalo le cae el sello, como cuando reservás */}
