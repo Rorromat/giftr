@@ -14,12 +14,21 @@ export const ID_TITULO = 'que-queres'
  * que haga falta). false si no había nada copiado (o no hay permiso para leerlo).
  */
 export async function pegarLink(form: HTMLFormElement): Promise<boolean> {
-  let copiado = ''
+  return ponerPegado(form, await leerCopiado())
+}
+
+/** Lo copiado, sin espacios alrededor; vacío si no hay nada (o no hay permiso para leerlo). */
+export async function leerCopiado(): Promise<string> {
   try {
-    copiado = (await navigator.clipboard.readText()).trim()
+    return (await navigator.clipboard.readText()).trim()
   } catch {
     // sin permiso o sin soporte: lo mismo que sin nada copiado
+    return ''
   }
+}
+
+/** Lo copiado va a "¿Qué querés?" como un pegado (ver pegarLink; el agregado lo lee antes, ver Agregado). */
+export function ponerPegado(form: HTMLFormElement, copiado: string): boolean {
   const input = form.elements.namedItem('titulo')
   if (!copiado || !(input instanceof HTMLInputElement)) return false
   input.value = copiado

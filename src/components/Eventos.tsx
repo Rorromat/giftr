@@ -53,7 +53,7 @@ function Estado({ e }: { e: Evento }) {
     <>
       {e.misReservas
         ? <TeOcupas e={e} />
-        : <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-xs font-semibold">Todavía no reservaste nada</p>}
+        : <p className="self-start rounded-full bg-gr-soft px-2.5 py-0.5 text-xs font-semibold">Todavía no reservaste nada</p>}
       {e.ultimo && <p className="line-clamp-2 text-xs text-gr-muted [overflow-wrap:anywhere]">El último lo compró {e.ultimo.encargado}: {e.ultimo.titulo}</p>}
     </>
   )
@@ -114,7 +114,7 @@ export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[];
       {quedan > 0 && (
         <li className="w-[160px] flex-none snap-start">
           <Link href="/eventos" className="gr-card flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-            <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-gr-accent"><Icon name="calendar" size={26} /></span>
+            <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-gr-soft"><Icon name="calendar" size={26} /></span>
             <span className="text-[17px] leading-tight font-semibold">{quedan === 1 ? '1 más' : `${quedan} más`}</span>
             <span className="text-[13px] font-semibold underline underline-offset-4">Todo el año</span>
           </Link>
@@ -169,7 +169,7 @@ export function TodoElAnio({ eventos, hoy, especiales = [] }: { eventos: Evento[
 export function CargaTuCumple() {
   return (
     <Link href="/perfil#cumple" className="gr-card flex items-center gap-3.5 p-4">
-      <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-accent"><Icon name="cake" size={24} /></span>
+      <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-soft"><Icon name="cake" size={24} /></span>
       <span className="min-w-0 flex-1 text-[15px] font-medium leading-snug">Cargá tu cumple para que tu gente lo tenga con tiempo.</span>
       <span className="gr-btn-primary gr-btn--sm flex-none">Cargar</span>
     </Link>

@@ -25,7 +25,8 @@ import { Banners } from '@/components/Banners'
 import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
-import { AvatarStack, AvatarSticker, Icon, ItemPhoto, PriorityTag, LogoSticker } from '@/components/ui'
+import { Arte, AvatarStack, AvatarSticker, BackLink, Icon, PriorityTag, LogoSticker, Tapa } from '@/components/ui'
+import { colorDe, tapaDe } from '@/lib/tapas'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
@@ -76,7 +77,7 @@ function YaLoReservaste({ item }: { item: Tarjeta }) {
   const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
   return (
     <span className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-gr-brand px-3.5 text-[13px] font-semibold text-gr-on-brand">
-      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.2} className="text-gr-accent" />
+      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.2} className="text-gr-acento" />
       {grupal ? 'En el regalo grupal' : compraste ? 'Ya lo compraste' : 'Ya lo reservaste'}
     </span>
   )
@@ -156,6 +157,9 @@ export default async function ListaAjena({
       ? <Link href={`/l/${token}/item/${itemId}?reservar=1#reservar`} className={variant === 'primary' ? 'gr-btn-primary w-full min-h-12' : 'gr-btn gr-btn--sm w-full'}>Reservar</Link>
       : <GuestGate token={token} itemId={itemId} identified={identified} variant={variant} volver={aqui} conCartel={!!reserva} />
 
+  // su tapa: la del dueño (la que eligió, o la que le toca), o la de la lista en común
+  const color = dueno ? tapaDe(dueno.id) : colorDe(vista.listId)
+
   const heroAccion = hero && (hero.claims.some((c) => c.esMia || c.grupal?.soyParte)
     ? <YaLoReservaste item={hero} />
     : reservar(hero.id, 'primary'))
@@ -163,42 +167,44 @@ export default async function ListaAjena({
   const heroSello = hero && selloDe(hero)
 
   return (
-    <main className="flex flex-col gap-4 pb-36 pt-2">
-      <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
-
-      <section className="gr-hero flex flex-col gap-4 p-5">
-        <div className="flex items-center gap-3.5">
+    <main className="flex flex-col gap-4 pb-36">
+      {/* Su tapa: su color pinta media pantalla y se funde con el fondo, con su foto y su nombre enormes */}
+      <Tapa color={color}>
+        <header className="grid min-h-14 grid-cols-[44px_1fr_44px] items-center">
+          {/* con tu cuenta, abajo está la barra; volver lleva a tu gente */}
+          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio />}</div>
+          <LogoSticker className="justify-self-center text-white" />
+        </header>
+        <div className="mt-1.5 flex flex-col items-center gap-3 text-center">
           {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
-          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none">
+          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`}
+                className="flex-none rounded-full shadow-[0_18px_40px_-12px_rgb(0_0_0/0.45)]">
             {vista.grupoFoto
-              ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={64} />
+              ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={104} />
               : vista.grupoNombre
-                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={52} />
-                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={64} className="ring-2 ring-gr-on-hero/20" />}
+                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} ids={vista.perfiles.map((d) => d.id)} size={72} />
+                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104}
+                                 color={`color-mix(in oklch, ${color} 70%, white)`} />}
           </Link>
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
-              {vista.grupoNombre ?? `Lista de ${vista.ownerNombre}`}
+          <div className="flex flex-col gap-1">
+            <h1 className="gr-title text-[40px] [overflow-wrap:anywhere]">
+              {vista.grupoNombre ?? <><span className="sr-only">Lista de </span>{vista.ownerNombre}</>}
             </h1>
-            <p className="text-sm text-gr-on-hero/70">
-              {vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.
+            <p className="gr-tapa__sub text-sm">
+              {cuenta ?? <>{vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.</>}
             </p>
           </div>
+          <Link href={`/l/${token}/perfil`} className="gr-btn gr-btn--vidrio w-full">
+            {vista.duenos.length > 1 ? 'Sus perfiles y sus gustos' : 'Su perfil y sus gustos'}
+          </Link>
+          {veTodo && (
+            <p className="gr-tapa__sub flex items-center gap-1.5 text-[12.5px]">
+              <Icon name="lock" size={13} className="flex-none" />
+              {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
+            </p>
+          )}
         </div>
-
-        {cuenta && (
-          <p className="flex items-center gap-2 self-start rounded-full bg-gr-accent py-1.5 pl-2.5 pr-3.5 text-sm font-semibold text-gr-ink">
-            <Icon name="cake" size={16} className="flex-none" />{cuenta}
-          </p>
-        )}
-
-        {veTodo && (
-          <p className="flex items-center gap-2 border-t border-gr-on-hero/10 pt-3.5 text-[13px] text-gr-on-hero/80">
-            <Icon name="lock" size={16} className="flex-none text-gr-hero-detail" />
-            {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
-          </p>
-        )}
-      </section>
+      </Tapa>
 
       <AvisoAmigo amigo={amigo} />
       {dueno && relacion && <AmigoEnLista dueno={{ ...dueno, usuario: null }} relacion={relacion} volver={`/l/${token}`} />}
@@ -243,7 +249,7 @@ export default async function ListaAjena({
             <div className="relative">
               {/* la foto lleva al deseo, como "Ver más" (que ya lo dice para los lectores de pantalla) */}
               <Link href={`/l/${token}/item/${hero.id}`} aria-hidden tabIndex={-1} className="block">
-                <ItemPhoto src={hero.fotoUrl} titulo={hero.titulo} height={240} />
+                <Arte id={hero.id} src={hero.fotoUrl} titulo={hero.titulo} className="rounded-none" style={{ aspectRatio: '4 / 3' }} />
               </Link>
               <PriorityTag prioridad={hero.prioridad} className="pointer-events-none absolute left-3 top-3 h-[30px]" />
               {hero.videoUrl && <ConVideo className="absolute bottom-3 left-3" />}
@@ -253,10 +259,10 @@ export default async function ListaAjena({
             </div>
             <div className="flex flex-col gap-3 p-4">
               <div className="flex flex-col gap-1">
-                <Link href={`/l/${token}/item/${hero.id}`} className="text-xl leading-snug font-semibold [overflow-wrap:anywhere]">
+                <Link href={`/l/${token}/item/${hero.id}`} className="text-[22px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere]">
                   {hero.titulo}
                 </Link>
-                {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-semibold">{hero.precio ?? hero.rangoPrecio}</p>}
+                {(hero.precio ?? hero.rangoPrecio) && <p className="text-[17px] font-bold tabular-nums">{hero.precio ?? hero.rangoPrecio}</p>}
                 {hero.notas && <p className="text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">{hero.notas}</p>}
                 {heroCupo && <p className="text-xs font-semibold text-gr-muted">{heroCupo}</p>}
               </div>
@@ -269,34 +275,35 @@ export default async function ListaAjena({
         )}
 
         {resto.length > 0 && (
-          <ul data-buscar-grupo className="grid grid-cols-2 items-stretch gap-3">
+          <ul data-buscar-grupo className="grid grid-cols-2 items-stretch gap-x-3 gap-y-[18px]">
             {resto.map((item) => {
               const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
               const cuantas = cupo(item)
               const sello = selloDe(item)
               return (
-                <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="gr-card relative flex flex-col">
+                <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="relative flex flex-col gap-2">
                   <div className="relative">
                     <Link href={`/l/${token}/item/${item.id}`} aria-hidden tabIndex={-1} className="block">
-                      <ItemPhoto src={item.fotoUrl} titulo={item.titulo} height={150} dimmed={!item.disponible} />
+                      <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} apagado={!item.disponible} />
                     </Link>
                     {sello && <Sello chico tipo={sello} clave={item.id} size={44} className="absolute left-1.5 top-1.5" />}
                     {item.videoUrl && <ConVideo className={`absolute top-2 ${sello ? 'left-12' : 'left-2'}`} />}
                     {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
-                    {!item.disponible && (
-                      <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-xl bg-gr-brand/90 px-2.5 py-1.5 text-[13px] leading-tight font-semibold text-gr-accent [overflow-wrap:anywhere]">
-                        {estadoNoDisponible(item)}
-                      </span>
-                    )}
                   </div>
-                  <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
-                    <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
+                  <div className="flex flex-1 flex-col gap-1 px-0.5">
+                    <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]">
                       {item.titulo}
                     </Link>
                     <div className="flex items-center gap-1.5">
-                      {(item.precio ?? item.rangoPrecio) && <p className="text-[15px] font-semibold">{item.precio ?? item.rangoPrecio}</p>}
+                      {(item.precio ?? item.rangoPrecio) && <p className="text-[13px] text-gr-muted tabular-nums">{item.precio ?? item.rangoPrecio}</p>}
                       {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
                     </div>
+                    {/* lo que ya no está libre, con el puntito del acento */}
+                    {!item.disponible && (
+                      <p className="flex items-start gap-1.5 text-xs leading-snug font-bold [overflow-wrap:anywhere]">
+                        <i aria-hidden className="mt-[5px] size-[7px] flex-none rounded-full bg-gr-acento" />{estadoNoDisponible(item)}
+                      </p>
+                    )}
                     {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
                     <div className="mt-auto flex flex-col items-stretch gap-0.5 pt-1.5">
                       {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}

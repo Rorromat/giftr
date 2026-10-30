@@ -18,7 +18,8 @@ import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
-import { AvatarStack, Icon, PageHeader, Seccion, SectionHeader } from '@/components/ui'
+import { AvatarStack, BackLink, Icon, Seccion, SectionHeader } from '@/components/ui'
+import { colorDe } from '@/lib/tapas'
 import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
@@ -42,6 +43,7 @@ export default async function Grupo({ params, searchParams }: {
   const paraInvitar = await amigosParaInvitar(db, grupo.id, session.userId)
 
   const activos = grupo.items.filter((i) => i.estadoDueno === 'activo')
+  const nuevoDeseo = agregado ? activos.find((i) => i.id === agregado) : undefined
   const fechaInvalida = errorFecha === 'invalida'
   const aviso = nuevo && Object.hasOwn(AVISOS, nuevo) ? AVISOS[nuevo] : null
   const otros = grupo.duenos.filter((d) => d.id !== session.userId).map((d) => d.nombre)
@@ -54,18 +56,25 @@ export default async function Grupo({ params, searchParams }: {
   const waInvitar = encodeURIComponent(`Armemos juntos la lista "${grupo.nombre}" en GiftR: ${inviteUrl}`)
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <PageHeader title="Lista en común" titulo="p" back="/mi-lista" backLabel="Volver a Mi lista"
-                  action={<Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn bg-gr-accent"><Icon name="plus" size={20} strokeWidth={2.4} /></Link>} />
-
-      <ListaHero etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
+    <Seccion className="flex flex-col gap-5 pb-36">
+      {/* la tapa de la lista: un color de la paleta por su id, el mismo con que la ven los que regalan */}
+      <ListaHero color={colorDe(grupo.id)} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
+                 arriba={(
+                   <header className="flex min-h-14 items-center justify-between gap-2">
+                     <BackLink href="/mi-lista" label="Volver a Mi lista" vidrio />
+                     <p className="text-[15px] font-bold">Lista en común</p>
+                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn gr-vidrio">
+                       <Icon name="plus" size={20} strokeWidth={2.4} />
+                     </Link>
+                   </header>
+                 )}
                  waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}
                  foto={<FotoDeLista key={grupo.fotoUrl ?? ''} foto={grupo.fotoUrl} grupoId={grupo.id} size={56} enHero />}>
         {/* Fecha del grupo (o su cumple): aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
         <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${grupo.esCumple}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full bg-gr-on-hero/10 py-1.5 pl-2.5 pr-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
-            <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none text-gr-accent" />
+          <summary className="gr-vidrio flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy, grupo.esCumple)}
           </summary>
           <form action={setGroupDateAction} className="mt-2 flex flex-col gap-3 rounded-2xl bg-gr-surface p-3 text-gr-ink">
@@ -86,13 +95,13 @@ export default async function Grupo({ params, searchParams }: {
       <Banners />
 
       {aviso && (
-        <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-medium">{aviso}</p>
+        <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">{aviso}</p>
       )}
 
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
       <section className="gr-card flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} />
+          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} ids={grupo.duenos.map((d) => d.id)} />
           <div className="min-w-0 flex-1">
             <p className="text-base leading-tight font-semibold">
               {otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora'}
@@ -176,7 +185,9 @@ export default async function Grupo({ params, searchParams }: {
         <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} agregado={agregado} />
       </div>
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
-      {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro={`/agregar?lista=${grupo.id}`} />}
+      {nuevoDeseo && (
+        <RecienAgregado deseo={{ id: nuevoDeseo.id, titulo: nuevoDeseo.titulo, foto: nuevoDeseo.fotoUrl, prioridad: nuevoDeseo.prioridad, grupo: true }} />
+      )}
       {eliminado === '1' && <DeseoEliminado />}
 
       <div className="flex flex-col gap-1">

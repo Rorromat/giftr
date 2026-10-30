@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google'
+import { Hanken_Grotesk } from 'next/font/google'
 import { ICONO_INICIO } from '@/app/icono-inicio'
 import { Arranque } from '@/components/Arranque'
 import { Refrescar } from '@/components/Refrescar'
@@ -7,8 +7,8 @@ import { RegistrarSW } from '@/components/RegistrarSW'
 import { ATRAPAR_PEDIDO_INSTALAR, SIN_ZOOM } from '@/lib/app-instalable'
 import './globals.css'
 
-const bricolage = Bricolage_Grotesque({ subsets: ['latin'], axes: ['opsz'], variable: '--font-bricolage' })
-const instrument = Instrument_Sans({ subsets: ['latin'], variable: '--font-instrument' })
+// Tapas: todo en Hanken Grotesk, los títulos en 900 (ver tokens.css)
+const hanken = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800', '900'], variable: '--font-hanken' })
 
 export const metadata: Metadata = {
   // Base de las URLs absolutas de la vista previa al compartir (og:image, og:url).
@@ -30,12 +30,16 @@ export const metadata: Metadata = {
 }
 
 // Como una app: sin zoom (ni con dos dedos, ni con doble toque, ni el que hace el iPhone al tocar un campo). Safari en
-// iPhone no respeta userScalable para el pellizco: ahí lo frenan touch-action (tokens.css) y SIN_ZOOM.
-export const viewport: Viewport = { themeColor: '#F4F4F0', width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false }
+// iPhone no respeta userScalable para el pellizco: ahí lo frenan touch-action (tokens.css) y SIN_ZOOM. La barra del sistema
+// toma el fondo de la app, de día y de noche.
+export const viewport: Viewport = {
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#F6F6F8' }, { media: '(prefers-color-scheme: dark)', color: '#0C0C0E' }],
+  colorScheme: 'light dark', width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false,
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${bricolage.variable} ${instrument.variable}`}>
+    <html lang="es" className={hanken.variable}>
       <head>
         {/* el pedido de instalar de Chrome, si llega antes de que hidrate (texto fijo, no viene del pedido) */}
         <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />

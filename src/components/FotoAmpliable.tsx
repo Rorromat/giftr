@@ -21,7 +21,7 @@ export function FotoAmpliable({ src, titulo, className = '', iconoArriba = false
         <>
           <button type="button" onClick={() => dialogo.current?.showModal()} aria-label={`Ver la foto de ${titulo} entera`}
                   className="absolute inset-0 z-[1] cursor-zoom-in">
-            <span aria-hidden className={`absolute ${iconoArriba ? 'top-3' : 'bottom-3'} right-3 flex size-9 items-center justify-center rounded-full bg-white/95 text-gr-ink shadow-[0_1px_4px_rgb(20_20_20/0.18)]`}>
+            <span aria-hidden className={`absolute ${iconoArriba ? 'top-3' : 'bottom-3'} right-3 flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]`}>
               <Icon name="expandir" size={17} strokeWidth={2.2} />
             </span>
           </button>

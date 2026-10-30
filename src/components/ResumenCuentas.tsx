@@ -26,7 +26,7 @@ function Persona({ p }: { p: CuentaPersona }) {
   const regalos = [...new Set([...p.lineas.map((l) => l.itemTitulo), ...p.ajustes.map((a) => a.texto)])]
   return (
     <li className="flex items-center gap-3 px-4 py-3">
-      <AvatarSticker nombre={p.nombre} size={40} />
+      <AvatarSticker id={p.id} nombre={p.nombre} size={40} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
           {p.neto === 0 ? `Con ${p.nombre} están a mano` : p.neto < 0 ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}
@@ -49,8 +49,8 @@ export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
             <span className="text-[11px] font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
             <Total pesos={cuentas.debes} dolares={cuentas.dolares?.debes ?? 0} className="text-gr-hero-detail" />
           </span>
-          <span className="flex flex-col gap-1 rounded-[20px] bg-gr-accent px-3.5 py-3">
-            <span className="text-[11px] font-semibold tracking-[0.08em] text-gr-ink/60 uppercase">Te deben</span>
+          <span className="flex flex-col gap-1 rounded-[20px] bg-gr-soft px-3.5 py-3">
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-gr-muted uppercase">Te deben</span>
             <Total pesos={cuentas.teDeben} dolares={cuentas.dolares?.teDeben ?? 0} />
           </span>
         </span>

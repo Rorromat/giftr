@@ -49,7 +49,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
       </div>
 
       <div className="gr-card flex items-center gap-3 p-4">
-        <AvatarSticker nombre={nombre} foto={foto} size={52} />
+        <AvatarSticker id={session.userId} nombre={nombre} foto={foto} size={52} />
         <div className="min-w-0 flex-1">
           <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">{nombre}</p>
           <p className="text-[13px] text-gr-muted">{foto ? 'Con tu foto' : 'Sin foto todavía'}</p>
@@ -60,7 +60,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
       <ul className="gr-card gr-rows flex flex-col">
         {filas.map((f) => (
           <li key={f.paso} className="flex items-center gap-3 px-4 py-3">
-            <span aria-hidden className={`flex size-10 flex-none items-center justify-center rounded-full ${f.valor ? 'bg-gr-accent' : 'bg-gr-soft'}`}>
+            <span aria-hidden className={`flex size-10 flex-none items-center justify-center rounded-full ${f.valor ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
               <Icon name={f.icono} size={19} strokeWidth={2} />
             </span>
             <div className="min-w-0 flex-1">

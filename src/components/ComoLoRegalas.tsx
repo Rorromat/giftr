@@ -31,7 +31,7 @@ export function ComoLoRegalas({ abierto = false, compro, dividimos }: { abierto?
           return (
             <button key={o.modo} type="button" role="radio" aria-checked={elegida} onClick={() => setModo(o.modo)}
                     className={`flex items-center gap-3 rounded-2xl border-2 px-3 py-3 text-left transition-colors ${elegida ? 'border-gr-ink bg-gr-surface' : 'border-gr-line bg-gr-bg'}`}>
-              <span aria-hidden className={`flex size-10 flex-none items-center justify-center rounded-full ${elegida ? 'bg-gr-accent' : 'bg-gr-soft'}`}>
+              <span aria-hidden className={`flex size-10 flex-none items-center justify-center rounded-full ${elegida ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
                 <Icon name={o.icono} size={19} />
               </span>
               <span className="min-w-0 flex-1">
@@ -39,7 +39,7 @@ export function ComoLoRegalas({ abierto = false, compro, dividimos }: { abierto?
                 <span className="block text-[13px] leading-snug text-gr-muted">{o.sub}</span>
               </span>
               <span aria-hidden className={`flex size-5 flex-none items-center justify-center rounded-full border-2 ${elegida ? 'border-gr-ink bg-gr-ink' : 'border-gr-line'}`}>
-                {elegida && <span className="size-2 rounded-full bg-gr-accent" />}
+                {elegida && <span className="size-2 rounded-full bg-gr-on-brand" />}
               </span>
             </button>
           )

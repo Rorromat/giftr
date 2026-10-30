@@ -7,7 +7,7 @@ import {
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
-import { AvatarSticker, Icon, ItemPhoto, PriorityTag, Starburst } from '@/components/ui'
+import { Arte, AvatarSticker, Icon, ItemPhoto, PriorityTag, Starburst } from '@/components/ui'
 
 // Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas grandes que pasan solas de a una, un segundo en cada una, y se
 // pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
@@ -23,7 +23,7 @@ const CADA_MS = 1700
 const PAUSA_MS = 2500
 
 /**
- * El carrusel de Inicio: los últimos deseos de tus amigos en tarjetas grandes, una al lado de la otra (como los Próximos).
+ * El estante de Inicio: los últimos deseos de tus amigos, cada uno en su cuadrado de color, uno al lado del otro.
  * Pasa solo de a una tarjeta, un segundo en cada una, y al llegar a la última vuelve a la primera. Mientras lo tenés
  * apretado (o recorrés las tarjetas con el teclado) no se mueve, y al soltarlo espera un poco. Con movimiento reducido no
  * se mueve solo. Cada una abre el feed en ese deseo.
@@ -76,25 +76,17 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
   }, [items.length])
 
   return (
-    <ul ref={ref} aria-label="Lo nuevo de tus amigos"
-        className="relative -mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <ul ref={ref} aria-label="Lo nuevo de tus amigos" className="gr-estante relative">
       {items.map((n) => (
-        <li key={n.id} className="w-[min(280px,76vw)] flex-none snap-center">
-          <Link href={`/novedades#d-${n.id}`} className="gr-card flex h-full flex-col gap-3 p-2.5 pb-4">
-            <div className="overflow-hidden rounded-[18px]">
-              <ItemPhoto src={n.foto} titulo={n.titulo} height={250} />
-            </div>
-            <div className="flex flex-col gap-1.5 px-1.5">
-              <h3 className="line-clamp-2 text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{n.titulo}</h3>
-              {n.precio && <p className="text-[15px] font-semibold leading-tight">{n.precio}</p>}
-              {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
-              <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-gr-muted">
-                <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={20} />
-                <span className="truncate">De {n.nombre}</span>
-              </div>
-              <p className="flex items-center gap-1.5 text-[13px] text-gr-muted">
-                <Icon name="clock" size={15} className="flex-none" />Agregado {n.hace}
-              </p>
+        <li key={n.id}>
+          <Link href={`/novedades#d-${n.id}`} className="flex flex-col gap-1.5">
+            <Arte id={n.id} src={n.foto} titulo={n.titulo} />
+            <h3 className="line-clamp-2 text-sm leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]">{n.titulo}</h3>
+            {n.precio && <p className="text-[13px] text-gr-muted tabular-nums">{n.precio}</p>}
+            {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
+              <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
+              <span className="truncate">{n.nombre.split(' ')[0]} · {n.hace}</span>
             </div>
           </Link>
         </li>
@@ -118,7 +110,7 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
         <input type="hidden" name="itemId" value={itemId} />
         {variante === 'icono' ? (
           <BotonEnviar aria-label="Me lo robo: sumarlo a tu lista"
-                       className="flex size-9 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
+                       className="flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
             <Icon name="copiar" size={17} strokeWidth={2.2} />
           </BotonEnviar>
         ) : (
@@ -131,9 +123,9 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
         <p key={estado.n} role="status" className="gr-toast">
           {estado.ok ? (
             <>
-              <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-accent" />
+              <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
               <span className="min-w-0 flex-1">{estado.yaLoTenias ? 'Ya lo tenías en tu lista.' : '¡Robado! Ya está en tu lista.'}</span>
-              <Link href={`/deseo/${estado.itemId}`} className="flex-none font-semibold text-gr-accent underline underline-offset-4">Ver</Link>
+              <Link href={`/deseo/${estado.itemId}`} className="flex-none font-semibold underline underline-offset-4">Ver</Link>
             </>
           ) : <span>{estado.texto}</span>}
         </p>
@@ -148,7 +140,7 @@ function Reservar({ n }: { n: NovedadVista }) {
   const href = `/l/${n.token}/item/${n.item.id}`
   if (mia) {
     return (
-      <Link href={href} className="gr-btn gr-btn--sm w-full gap-1.5 border-gr-accent bg-gr-accent">
+      <Link href={href} className="gr-btn gr-btn--accent gr-btn--sm w-full gap-1.5">
         <Icon name="check" size={17} strokeWidth={2.6} />Lo reservaste
       </Link>
     )
@@ -167,7 +159,7 @@ export function TarjetaNovedad({ n }: { n: NovedadVista }) {
   return (
     <article id={`d-${n.item.id}`} className="gr-card flex scroll-mt-4 flex-col gap-3 p-3 pb-3.5">
       <Link href={`/l/${n.token}`} className="flex items-center gap-2.5 px-0.5">
-        <AvatarSticker nombre={n.dueno.nombre} foto={n.dueno.foto} size={38} />
+        <AvatarSticker id={n.dueno.id} nombre={n.dueno.nombre} foto={n.dueno.foto} size={38} />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-[15px] font-semibold [overflow-wrap:anywhere]">{n.dueno.nombre}</span>
           <span className="text-xs font-medium text-gr-muted">agregó a su lista · {n.hace}</span>

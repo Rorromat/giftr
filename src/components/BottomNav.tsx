@@ -3,18 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { Icon, Starburst, type IconName } from '@/components/ui'
+import { Agregado, abrirAgregado, cerrarAgregado, useAgregado } from '@/components/Agregado'
+import { Icon, type IconName } from '@/components/ui'
 import { instalada } from '@/lib/app-instalable'
 
-const DESTINOS: { href: string; label: string; nombre: string; icon: IconName; columna: number }[] = [
-  { href: '/inicio', label: 'Inicio', nombre: 'Inicio', icon: 'home', columna: 0 },
-  { href: '/gente', label: 'Tu gente', nombre: 'Gente', icon: 'users', columna: 1 },
-  { href: '/regalos', label: 'Tus regalos y cuentas', nombre: 'Regalos', icon: 'gift', columna: 2 },
-  { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user', columna: 3 },
+const DESTINOS: { href: string; label: string; nombre: string; icon: IconName }[] = [
+  { href: '/inicio', label: 'Inicio', nombre: 'Inicio', icon: 'home' },
+  { href: '/gente', label: 'Tu gente', nombre: 'Gente', icon: 'users' },
+  { href: '/regalos', label: 'Tus regalos y cuentas', nombre: 'Regalos', icon: 'gift' },
+  { href: '/mi-lista', label: 'Vos: tu lista y tu perfil', nombre: 'Vos', icon: 'user' },
 ]
-
-/** Dónde está el botón de agregar un deseo (ver BotonAgregar): en Inicio y en lo tuyo (tu lista y tu perfil). */
-const CON_AGREGAR = new Set(['/inicio', '/mi-lista', '/perfil'])
 
 /**
  * La sección del menú a la que pertenece una pantalla: todo el año, lo nuevo de tus amigos, las fechas especiales y Avisos
@@ -69,11 +67,11 @@ function useAnclajeAbajo(ref: RefObject<HTMLElement | null>) {
 }
 
 /**
- * Píldora blanca flotante. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección: la
- * sección marcada se estira en negro con su nombre (las columnas se animan con CSS), desde el toque mismo.
- * Agregar un deseo no es una sección: es la estrella lima que flota arriba de la punta derecha, en Inicio y en lo tuyo
- * (ver BotonAgregar). En Agregar la barra se esconde: la estrella gira y se va mientras la hoja de agregar sube (al
- * editar un deseo o tus gustos, armar una sorpresa o un amigo invisible también se esconde).
+ * La barra de abajo: una píldora de vidrio esmerilado con las cuatro secciones y, al costado, el + en un círculo del mismo
+ * vidrio. Vive en el layout de (menu), así que no se vuelve a montar al cambiar de sección: la sección tocada se marca
+ * desde el toque mismo. El + abre el agregado (ver Agregado): gira y queda como × mientras la píldora se esconde. En
+ * Agregar la barra se esconde entera (al editar un deseo o tus gustos, armar una sorpresa o un amigo invisible también), y
+ * en un deseo, que tiene una sola acción principal, tampoco va.
  */
 export function BottomNav() {
   const path = usePathname()
@@ -85,38 +83,30 @@ export function BottomNav() {
   const marcado = toque && toque.desde === path ? toque.href : actual
   const oculta = marcado === '/agregar' || path.startsWith('/editar/') || path === '/sorpresa/nueva' || /^\/sorpresa\/[^/]+\/editar$/.test(path)
     || path === '/invisible/nuevo' || /^\/invisible\/[^/]+\/editar$/.test(path) || /^\/perfil\/gustos\/[^/]+$/.test(path)
-  // En Agregar (o Editar) no hay columna marcada: la píldora se queda donde estaba mientras la barra baja.
-  const columna = DESTINOS.find((d) => d.href === marcado)?.columna
-  const [ultima, setUltima] = useState(columna)
-  if (columna !== undefined && columna !== ultima) setUltima(columna)
-  const columnaMarca = columna ?? ultima
+    || path.startsWith('/deseo/') || /^\/l\/[^/]+\/item\//.test(path)
+  const { paso } = useAgregado()
+  const abierto = paso !== ''
 
   const ref = useRef<HTMLElement>(null)
   useAnclajeAbajo(ref)
 
-  const destino = (d: (typeof DESTINOS)[number]) => (
-    <Destino key={d.href} d={d} actual={actual} marcado={marcado} onNavigate={() => setToque({ href: d.href, desde: path })} />
-  )
-
   return (
-    <nav ref={ref} aria-label="Navegación principal" className="gr-nav" data-columna={columnaMarca} data-oculta={oculta || undefined} inert={oculta}>
-      {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
-      {DESTINOS.map(destino)}
-      {/* adentro de la barra: se esconde con ella (en Agregar, con el teclado) y se corre con su --anclaje */}
-      {(CON_AGREGAR.has(path) || marcado === '/agregar') && (
-        <BotonAgregar onNavigate={() => setToque({ href: '/agregar', desde: path })} />
-      )}
-    </nav>
-  )
-}
-
-/** Agregar un deseo: una estrella lima (la de la marca) con un +, que flota abajo a la derecha. */
-function BotonAgregar({ onNavigate }: { onNavigate: () => void }) {
-  return (
-    <Link href="/agregar" prefetch aria-label="Agregar deseo" onNavigate={onNavigate} className="gr-fab">
-      <Starburst size={72} className="gr-fab__estrella" />
-      <Icon name="plus" size={30} strokeWidth={2.8} className="relative" />
-    </Link>
+    <>
+      <Agregado />
+      <nav ref={ref} aria-label="Navegación principal" className="gr-nav" data-oculta={oculta || undefined} data-abierto={abierto || undefined}
+           inert={oculta}>
+        {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
+        <div className="gr-nav__tabs" inert={abierto}>
+          {DESTINOS.map((d) => (
+            <Destino key={d.href} d={d} actual={actual} marcado={marcado} onNavigate={() => setToque({ href: d.href, desde: path })} />
+          ))}
+        </div>
+        <button type="button" className="gr-mas" aria-label={abierto ? 'Cerrar' : 'Agregar un deseo'} aria-expanded={abierto}
+                onClick={() => (abierto ? cerrarAgregado() : abrirAgregado())}>
+          <Icon name="plus" size={24} strokeWidth={2.4} />
+        </button>
+      </nav>
+    </>
   )
 }
 
@@ -124,8 +114,8 @@ function Destino({ d, actual, marcado, onNavigate }: { d: (typeof DESTINOS)[numb
   return (
     <Link href={d.href} prefetch onNavigate={onNavigate} aria-label={d.label}
           aria-current={actual === d.href ? 'page' : undefined} data-marcado={marcado === d.href || undefined}>
-      <Icon name={d.icon} strokeWidth={2} />
-      <span aria-hidden className="gr-nav__nombre">{d.nombre}</span>
+      <Icon name={d.icon} size={22} strokeWidth={2} />
+      <span aria-hidden>{d.nombre}</span>
     </Link>
   )
 }

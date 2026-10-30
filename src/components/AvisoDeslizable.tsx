@@ -158,7 +158,7 @@ export function AvisoDeslizable({ id, titulo, children }: { id: string; titulo: 
             </button>
           </form>
           <button type="button" onClick={archivar} aria-label={`Archivar: ${titulo}`}
-                  className="flex flex-1 flex-col items-center justify-center gap-1 bg-gr-brand text-gr-accent">
+                  className="flex flex-1 flex-col items-center justify-center gap-1 bg-gr-brand text-gr-on-brand">
             <Icon name="archivar" size={20} /> Archivar
           </button>
         </div>

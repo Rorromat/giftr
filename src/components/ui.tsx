@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { colorDe, colorDeDeseo, tapaDe } from '@/lib/tapas'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -34,13 +35,13 @@ export function Starburst({ children, sub, label, size = 62, fontSize = 40, clas
       <polygon points={STAR_POINTS} fill="var(--gr-accent)" />
       {children != null && (
         <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
-              fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {children}
         </text>
       )}
       {sub && (
         <text x="50" y="70" dy="0.35em" textAnchor="middle" fontSize={17} fontWeight={800}
-              fill="var(--gr-ink)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {sub}
         </text>
       )}
@@ -64,7 +65,7 @@ export function Hearts({ n, className = '' }: { n: number; className?: string })
   )
 }
 
-/** Etiqueta de prioridad: negra con corazones lima si es "mucho", blanca si no (con una sombrita, sobre la foto). */
+/** Etiqueta de prioridad: en tinta con los corazones en el acento si es "mucho", blanca si no (con una sombrita, sobre la foto). */
 export function PriorityTag({ prioridad, children, className = '' }: {
   prioridad: Prioridad
   children?: React.ReactNode
@@ -76,7 +77,7 @@ export function PriorityTag({ prioridad, children, className = '' }: {
     <span
       role="img" aria-label={label}
       className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-[0_1px_4px_rgb(20_20_20/0.14)] ${
-        dark ? 'bg-gr-brand text-gr-accent' : 'bg-white/95 text-gr-ink'} ${className}`}
+        dark ? 'bg-gr-brand text-gr-acento' : 'bg-white/95 text-[#121216]'} ${className}`}
     >
       <Hearts n={corazones} />
       {children && <span className={dark ? 'text-gr-on-brand' : ''}>{children}</span>}
@@ -105,27 +106,34 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
 }
 
-/** Avatar redondo: la foto si hay, si no las iniciales sobre lima (Lista compartida, Perfil). */
-export function AvatarSticker({ nombre, foto, size = 56, className = '' }: { nombre: string; foto?: string | null; size?: number; className?: string }) {
+/**
+ * Avatar redondo: la foto si hay, si no las iniciales en blanco sobre el color de esa persona: su tapa (con su id), o uno de
+ * la paleta por su nombre si no se sabe quién es.
+ */
+export function AvatarSticker({ nombre, foto, size = 56, id, color, className = '' }: {
+  nombre: string; foto?: string | null; size?: number; id?: string; color?: string; className?: string
+}) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
     <div aria-hidden
-         className={`flex flex-none items-center justify-center overflow-hidden rounded-full bg-gr-accent font-semibold ${className}`}
-         style={{ width: size, height: size, fontSize: size * 0.38 }}>
+         className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-extrabold tracking-[-0.02em] text-white ${className}`}
+         style={{ width: size, height: size, fontSize: size * 0.36, background: color ?? (id ? tapaDe(id) : colorDe(nombre)) }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
       {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
   )
 }
 
-/** Avatares redondos superpuestos con un aro blanco: la foto de cada dueño o su inicial (el primero en lima). */
-export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: { nombres: string[]; fotos?: (string | null)[]; size?: number; className?: string }) {
+/** Avatares redondos superpuestos con un aro del color de la tarjeta: la foto de cada dueño o su inicial sobre su color. */
+export function AvatarStack({ nombres, fotos = [], ids = [], size = 40, className = '' }: {
+  nombres: string[]; fotos?: (string | null)[]; ids?: string[]; size?: number; className?: string
+}) {
   return (
     <div aria-hidden className={`flex flex-none ${className}`}>
       {nombres.map((n, i) => (
         <span key={i}
-              className={`flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-semibold ${i ? 'bg-gr-soft' : 'bg-gr-accent'}`}
-              style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
+              className="flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-extrabold text-white"
+              style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i, background: ids[i] ? tapaDe(ids[i]) : colorDe(n) }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
           {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
         </span>
@@ -139,31 +147,32 @@ export function QuizasLink({ href, className, children }: { href: string | null;
   return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
 }
 
-export function BackLink({ href, label }: { href: string; label: string }) {
+export function BackLink({ href, label, vidrio = false }: { href: string; label: string; vidrio?: boolean }) {
   return (
-    <Link href={href} aria-label={label} className="gr-icon-btn">
+    <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="back" size={20} strokeWidth={2.4} />
     </Link>
   )
 }
 
-/** El logo: "GiftR" con la estrella lima. */
+/** El logo: "GiftR" en 900 con el puntito del acento. */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 font-brand text-[26px] leading-none font-extrabold tracking-[-0.05em] ${className}`}>
+    <span className={`inline-flex items-center gap-1 font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
       GiftR
-      <Starburst size={18} className="-mt-3" />
+      <i aria-hidden className="-mt-2.5 size-[7px] rounded-full bg-gr-acento" />
     </span>
   )
 }
 
 /** La campanita de Avisos, con cuántos nuevos hay. */
-export function Campana({ nuevos }: { nuevos: number }) {
+export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: boolean }) {
   return (
-    <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'} className="gr-icon-btn relative">
-      <Icon name="bell" size={20} />
+    <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
+          className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
+      <Icon name="bell" size={19} />
       {nuevos > 0 && (
-        <span aria-hidden className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-gr-brand px-1.5 text-[11px] font-bold leading-none text-gr-accent ring-2 ring-gr-bg">
+        <span aria-hidden className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gr-acento px-1.5 text-[11px] font-bold leading-none text-gr-on-acento ring-2 ring-gr-bg">
           {nuevos > 9 ? '9+' : nuevos}
         </span>
       )}
@@ -172,21 +181,61 @@ export function Campana({ nuevos }: { nuevos: number }) {
 }
 
 /**
- * Barra de arriba de las secciones del menú: algo a la izquierda, el logo al medio y a la derecha la campanita de Avisos
- * (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto.
+ * Barra de arriba de las secciones del menú: el logo a la izquierda y a la derecha lo que sume la pantalla (accion), la
+ * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto. Sobre una tapa
+ * (sobreTapa) el logo va en blanco y los botones, de vidrio.
  */
-export function AppHeader({ left, nombre, foto, avisos }: { left?: React.ReactNode; nombre: string; foto: string | null; avisos?: number }) {
+export function AppHeader({ accion, id, nombre, foto, avisos, sobreTapa = false }: {
+  accion?: React.ReactNode; id: string; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean
+}) {
   return (
-    <header className="grid min-h-14 grid-cols-[1fr_auto_1fr] items-center">
-      <div className="justify-self-start">{left}</div>
-      <LogoSticker />
-      <div className="flex items-center gap-2.5 justify-self-end">
-        {avisos !== undefined && <Campana nuevos={avisos} />}
-        <Link href="/perfil" prefetch aria-label="Tu perfil">
-          <AvatarSticker nombre={nombre} foto={foto} size={40} className="shadow-card" />
+    <header className="flex min-h-14 items-center justify-between gap-3">
+      <LogoSticker className={sobreTapa ? 'text-white' : ''} />
+      <div className="flex items-center gap-2">
+        {accion}
+        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
+        <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
+          <AvatarSticker nombre={nombre} foto={foto} id={id} size={40} className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
         </Link>
       </div>
     </header>
+  )
+}
+
+/**
+ * La tapa de una lista: el color de la persona (o de la lista) pinta de arriba, de lado a lado, y se funde con el fondo.
+ * Lo de adentro va en blanco. Va primero en la pantalla, sin margen arriba.
+ */
+export function Tapa({ color, className = '', children }: { color: string; className?: string; children: React.ReactNode }) {
+  return (
+    <section className={`gr-tapa ${className}`} style={{ '--c': color } as React.CSSProperties}>
+      {children}
+    </section>
+  )
+}
+
+/**
+ * El arte de un deseo: un cuadrado de su color (ver colorDeDeseo) con la foto encima, como un sticker; sin foto (o si no
+ * carga), la estrella con la inicial. Ocupa el ancho de su lugar.
+ */
+export function Arte({ id, src, titulo, apagado = false, className = '', style }: {
+  id: string
+  src: string | null
+  titulo: string
+  /** lo que ya no se puede reservar */
+  apagado?: boolean
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const estrella = (
+    <span className="gr-arte__sin-foto">
+      <Starburst size={84} fontSize={44} style={{ width: '46%', height: 'auto' }}>{titulo.trim().charAt(0).toUpperCase()}</Starburst>
+    </span>
+  )
+  return (
+    <div className={`gr-arte${apagado ? ' gr-arte--apagado' : ''} ${className}`} style={{ '--c': colorDeDeseo(id), ...style } as React.CSSProperties}>
+      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={estrella} className="gr-arte__foto" /> : estrella}
+    </div>
   )
 }
 
@@ -204,7 +253,7 @@ export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: 
   return (
     <header className="grid min-h-14 grid-cols-[48px_1fr_48px] items-center gap-2">
       <div>{back && <BackLink href={back} label={backLabel} />}</div>
-      <Titulo className="truncate text-center text-lg font-semibold tracking-[-0.01em]">{title}</Titulo>
+      <Titulo className="truncate text-center text-[17px] font-bold tracking-[-0.02em]">{title}</Titulo>
       <div className="justify-self-end">{action}</div>
     </header>
   )
@@ -256,6 +305,9 @@ const ICONS = {
   lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   camera: <><rect x="3" y="6" width="18" height="14" rx="3" /><circle cx="12" cy="13" r="3.5" /><path d="M9 6l1.5-2h3L15 6" /></>,
   paste: <><rect x="5" y="4.5" width="14" height="16.5" rx="2.5" /><path d="M9 4.5V3h6v1.5" /><path d="M9 11h6M9 15h4" /></>,
+  // el agregado: una foto de la galería y escribirlo
+  foto: <><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="1.8" /><path d="M4 18l5-5 4 4 2.5-2.5L21 19" /></>,
+  lapiz: <path d="M4 20h4L19.5 8.5a2.8 2.8 0 0 0-4-4L4 16z" />,
   chat: <path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   more: <><circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" /></>,

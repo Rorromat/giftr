@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     // como una app: en vertical (Android la traba así; el iPhone no hace caso, ahí aparece "Girá el teléfono")
     orientation: 'portrait',
-    background_color: '#F4F4F0',
-    theme_color: '#F4F4F0',
+    background_color: '#F6F6F8',
+    theme_color: '#F6F6F8',
     // Todos a sangre y sin transparencia (como el apple-touch-icon): si un sistema usa estos en vez del
     // apple-touch-icon, no le quedan esquinas transparentes que después pinta de negro.
     icons: [

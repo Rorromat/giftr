@@ -7,7 +7,7 @@ import { AvatarSticker, Icon } from '@/components/ui'
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
 export function IconoSeccion({ s, size = 36 }: { s: Pick<SeccionGustos, 'icono'>; size?: number }) {
   return (
-    <span aria-hidden className="flex flex-none items-center justify-center rounded-full bg-gr-accent"
+    <span aria-hidden className="flex flex-none items-center justify-center rounded-full bg-gr-accent text-gr-on-accent"
           style={{ width: size, height: size }}>
       <Icon name={s.icono} size={size * 0.55} strokeWidth={2} />
     </span>
@@ -169,7 +169,7 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
     <Link href={href} className={`flex flex-col gap-3 rounded-[22px] p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
       <span className="flex items-center gap-3">
         <MiniIlustracion paso={b.paso} />
-        <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-accent' : ''}`}>{b.titulo}</span>
+        <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-acento' : ''}`}>{b.titulo}</span>
         <span className="flex-none text-sm font-semibold underline underline-offset-4">Editar</span>
       </span>
       {b.partes.map((p) => (

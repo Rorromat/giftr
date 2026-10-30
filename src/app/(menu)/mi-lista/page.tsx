@@ -14,6 +14,7 @@ import { ListaHero } from '@/components/ListaHero'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
+import { tapaDe } from '@/lib/tapas'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string; eliminado?: string }> }) {
@@ -35,26 +36,26 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const hoy = hoyLocal()
   const fechaCumple = cumple ? proximaFecha(cumple.dia, cumple.mes, hoy) : null
   const dias = fechaCumple ? diasEntre(hoy, fechaCumple) : null
+  const color = tapaDe(session.userId)
+  const nuevo = agregado ? activos.find((i) => i.id === agregado) : undefined
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      {/* Vos: tu lista y, tocando tu foto, tu perfil. La barra mide 56 y la tarjeta arranca a 84 de arriba: su estrella
-          queda donde la busca la animación de inicio (ver ListaHero). */}
-      <AppHeader nombre={nombre} foto={foto} avisos={avisos} />
-
+    <Seccion className="flex flex-col gap-5 pb-48">
+      {/* Vos: tu lista con tu tapa (tus amigos la ven con el mismo color) y, tocando tu foto, tu perfil */}
       <ListaHero
-        destino
+        color={color}
+        arriba={<AppHeader id={session.userId} nombre={nombre} foto={foto} avisos={avisos} sobreTapa />}
         etiqueta={nombre.split(' ')[0]}
         titulo="Mi lista"
         cantidad={activos.length}
         waHref={`https://wa.me/?text=${waText}`}
         fecha={fechaCumple
-          ? <>Tu cumple {dias === 0 ? 'es hoy' : dias === 1 ? 'es mañana' : `es en ${dias} días`} · {fechaLarga(fechaCumple)}</>
-          : <Link href="/perfil#cumple" className="underline underline-offset-4">Cargá tu cumple</Link>}
+          ? <>tu cumple {dias === 0 ? 'es hoy' : dias === 1 ? 'es mañana' : `es en ${dias} días`}, el {fechaLarga(fechaCumple).toLowerCase()}</>
+          : <Link href="/perfil#cumple" className="underline underline-offset-4">cargá tu cumple</Link>}
       />
 
       {/* Tus listas: la tuya y las que armás con otros (grupos) */}
-      <nav aria-label="Tus listas" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
+      <nav aria-label="Tus listas" className="-mx-[18px] -mt-3 flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
         <Link href="/mi-lista" aria-current="page" className="gr-chip">Mi lista</Link>
         {grupos.map((g) => <Link key={g.id} href={`/grupos/${g.id}`} className="gr-chip">{g.nombre}</Link>)}
         <Link href="/grupos/nuevo" className="gr-chip">+ Lista en común</Link>
@@ -77,7 +78,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
-      {agregado && activos.some((i) => i.id === agregado) && <RecienAgregado id={agregado} otro="/agregar" />}
+      {nuevo && <RecienAgregado deseo={{ id: nuevo.id, titulo: nuevo.titulo, foto: nuevo.fotoUrl, prioridad: nuevo.prioridad, grupo: false }} />}
       {eliminado === '1' && <DeseoEliminado />}
     </Seccion>
   )

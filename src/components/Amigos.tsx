@@ -9,7 +9,7 @@ import type { Persona, Relacion } from '@/lib/amigos'
 export function PersonaFila({ p, size = 48, children }: { p: Persona; size?: number; children?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <AvatarSticker nombre={p.nombre} foto={p.foto} size={size} />
+      <AvatarSticker id={p.id} nombre={p.nombre} foto={p.foto} size={size} />
       <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">{p.nombre}</p>
         {p.usuario && <p className="truncate text-[13px] font-medium text-gr-muted">@{p.usuario}</p>}
@@ -97,7 +97,7 @@ export function AvisoAmigo({ amigo }: { amigo?: string }) {
   const m = amigo && Object.hasOwn(MENSAJES, amigo) ? MENSAJES[amigo] : null
   if (!m) return null
   return (
-    <p role="status" className={`flex items-start gap-2.5 rounded-[18px] px-4 py-3 text-sm font-medium ${m.bien ? 'bg-gr-accent text-gr-ink' : 'bg-gr-soft'}`}>
+    <p role="status" className={`flex items-start gap-2.5 rounded-[18px] px-4 py-3 text-sm font-medium ${m.bien ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
       {m.bien && <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />}{m.texto}
     </p>
   )

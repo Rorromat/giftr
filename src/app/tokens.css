@@ -1,54 +1,99 @@
-/* GiftR — sistema visual "Suave" (inspirado en Pasito): fondo claro, tarjetas blancas con un borde fino y una sombra leve,
-   botones píldora y una barra flotante blanca donde la sección activa se estira en negro con su nombre. La marca sigue
-   siendo tinta + lima (la estrella del logo): el negro para lo principal y la lima para los detalles sobre lo oscuro.
-   Bricolage queda para el logo y los números grandes; todo lo demás va en Instrument Sans.
-   Las fuentes las carga next/font en layout.tsx y exponen --font-bricolage / --font-instrument.
-   Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
+/* GiftR — sistema visual "Tapas". La base no tiene color: papel de día y casi negro de noche, según el modo del teléfono
+   (prefers-color-scheme). El color lo ponen las personas y sus deseos (ver lib/tapas.ts): cada lista tiene su tapa, que
+   pinta la pantalla de arriba y se funde con el fondo, y cada deseo tiñe su pantalla. Un solo acento de marca, y chico
+   (--gr-acento): el puntito del logo, la pestaña activa, los avisos sin leer y lo que ya reservaste. Los botones
+   principales van en tinta. La estrella lima queda en los stickers (el sello, la inicial de un deseo sin foto): --gr-accent.
+   Todo va en Hanken Grotesk (la carga next/font en layout.tsx y expone --font-hanken): los títulos en 900, grandes y
+   apretados. Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
 
 :root {
-  /* Color */
-  --gr-bg: #F4F4F0;
-  --gr-ink: #141414;
+  color-scheme: light dark;
+
+  /* La base */
+  --gr-bg: #F6F6F8;
   --gr-surface: #FFFFFF;
-  --gr-brand: #141414;      /* tarjeta destacada, pestaña activa, botón principal */
-  --gr-on-brand: #FFFFFF;
-  --gr-accent: #C8F31D;     /* lima: detalles sobre lo oscuro, insignias, el + */
-  --gr-muted: #66655F;
-  --gr-dot: #E2E1DB;
+  --gr-ink: #121216;
+  --gr-muted: #6C6C75;
   /* La superficie suave (botones secundarios, notas, vacíos) y las líneas: la fina separa, la marcada es el borde de lo que
-     se escribe (3:1 contra el fondo y contra el blanco, para que se vea dónde). */
-  --gr-soft: #EEEDE8;
-  --gr-line: #E6E5DF;
-  --gr-line-strong: #8D8C85;
-  --gr-blue: #2F5BEA;       /* tarjetas de aviso y festejo (codazos) */
+     se escribe (3:1 contra el fondo y contra la tarjeta, para que se vea dónde). */
+  --gr-soft: #EDEDF0;
+  --gr-dot: #DCDCE1;
+  --gr-line: rgb(18 18 22 / 0.09);
+  --gr-line-strong: #8A8A93;
+  /* Lo principal (botones, chips y pestañas elegidas) va en tinta: negro de día, blanco de noche */
+  --gr-brand: var(--gr-ink);
+  --gr-on-brand: #FFFFFF;
+
+  /* El acento de la marca: uno solo, y chico. Para probar otro, se cambia acá (y su texto encima). */
+  --gr-acento: #F2413B;
+  --gr-on-acento: #FFFFFF;
+  /* La estrella lima de los stickers, con su tinta: igual en los dos modos */
+  --gr-accent: #C8F31D;
+  --gr-on-accent: #141414;
+
+  /* Avisos y festejos (codazos): el azul de la paleta de tapas, que lleva texto blanco en los dos modos */
+  --gr-blue: #2D5BD0;
   --gr-on-blue: #FFFFFF;
   /* Las listas en común en Tu gente (la de Juancito, la de la abuela): el azul en su versión suave, con el texto en azul */
   --gr-comun: #EAF0FF;
   --gr-comun-line: #C5D3FF;
   --gr-comun-ink: #1F45C4;
-  /* La tarjeta destacada (.gr-hero) tiene sus propios colores, para poder ser oscura o clara: el fondo, el texto, los
-     detalles chicos (íconos, el número de Cuentas) y su botón. */
-  --gr-hero: #141414;
+  /* La tarjeta destacada (.gr-hero): tinta, con los detalles en el acento y su botón blanco. */
+  --gr-hero: #121216;
   --gr-on-hero: #FFFFFF;
-  --gr-hero-detail: #C8F31D;
-  --gr-hero-btn: #C8F31D;
-  --gr-on-hero-btn: #141414;
+  --gr-hero-detail: var(--gr-acento);
+  --gr-hero-btn: #FFFFFF;
+  --gr-on-hero-btn: #121216;
+
+  /* Vidrio esmerilado: la barra de abajo y el + */
+  --gr-glass: rgb(255 255 255 / 0.72);
+  --gr-glass-line: rgb(18 18 22 / 0.08);
+  /* Cuánto tiñe el color de un deseo el fondo de su pantalla */
+  --gr-tinte: 24%;
 
   /* Tipografía */
-  --gr-font-display: var(--font-bricolage), sans-serif;
-  --gr-font-body: var(--font-instrument), sans-serif;
+  --gr-font-display: var(--font-hanken), -apple-system, system-ui, sans-serif;
+  --gr-font-body: var(--font-hanken), -apple-system, system-ui, sans-serif;
 
   /* Forma */
   --gr-border: 1px solid var(--gr-line-strong);
-  --gr-radius-lg: 22px;
+  --gr-radius-lg: 20px;
   --gr-radius-md: 16px;
   --gr-radius-pill: 999px;
-  --gr-shadow: 0 1px 2px rgb(20 20 20 / 0.04), 0 6px 20px rgb(20 20 20 / 0.06);
-  --gr-shadow-float: 0 2px 6px rgb(20 20 20 / 0.06), 0 12px 32px rgb(20 20 20 / 0.14);
+  --gr-shadow: 0 1px 2px rgb(18 18 22 / 0.04);
+  --gr-shadow-float: 0 10px 30px -10px rgb(18 18 22 / 0.3);
+
+  /* Movimiento: el resorte de lo que entra y el barrido del círculo que se abre y se cierra */
+  --gr-entra: cubic-bezier(0.34, 1.45, 0.5, 1);
+  --gr-barre: cubic-bezier(0.65, 0, 0.25, 1);
 
   /* Espaciado */
   --gr-gutter: 18px;
   --gr-gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gr-bg: #0C0C0E;
+    --gr-surface: #1A1A1E;
+    --gr-ink: #F3F3F6;
+    --gr-muted: #9B9BA4;
+    --gr-soft: #242428;
+    --gr-dot: #3A3A40;
+    --gr-line: rgb(255 255 255 / 0.09);
+    --gr-line-strong: #6E6E77;
+    --gr-on-brand: #0C0C0E;
+    --gr-comun: #182038;
+    --gr-comun-line: #2E3D66;
+    --gr-comun-ink: #A6BCFF;
+    --gr-hero: #242429;
+    --gr-on-hero: #F3F3F6;
+    --gr-glass: rgb(30 30 34 / 0.66);
+    --gr-glass-line: rgb(255 255 255 / 0.1);
+    --gr-tinte: 34%;
+    --gr-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    --gr-shadow-float: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+  }
 }
 
 @layer base {
@@ -66,41 +111,42 @@
 }
 
 @layer components {
-  /* Tipografía: títulos tranquilos en Instrument; Bricolage solo para el logo y los números grandes (.gr-number) */
+  /* Tipografía: títulos en 900, grandes y apretados; las secciones en 800 */
   .gr-title {
-    font-family: var(--gr-font-body);
-    font-weight: 600;
-    font-size: 28px;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
+    font-family: var(--gr-font-display);
+    font-weight: 900;
+    font-size: 36px;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
     margin: 0;
   }
   .gr-heading {
-    font-family: var(--gr-font-body);
-    font-weight: 500;
-    font-size: 20px;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
+    font-family: var(--gr-font-display);
+    font-weight: 800;
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
     margin: 0;
   }
   .gr-label {
     font-family: var(--gr-font-body);
-    font-weight: 600;
-    font-size: 12px;
-    letter-spacing: 0.06em;
+    font-weight: 800;
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--gr-muted);
   }
   .gr-muted { color: var(--gr-muted); }
   .gr-number {
     font-family: var(--gr-font-display);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    font-variation-settings: 'opsz' 96;
+    font-weight: 900;
+    letter-spacing: -0.05em;
     line-height: 0.9;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Tarjeta: blanca, con un borde fino y una sombra leve; la foto va de lado a lado */
+  /* Tarjeta: la superficie con un borde fino, sin sombra; la foto va de lado a lado */
   .gr-sticker,
   .gr-card {
     background: var(--gr-surface);
@@ -115,13 +161,12 @@
     width: 100%;
     object-fit: cover;
   }
-  /* Tarjeta destacada (la de arriba de cada pantalla): negra, con lo importante en lima */
+  /* Tarjeta destacada (Cuentas, compartir tu lista): tinta, con lo importante en el acento */
   .gr-hero {
     position: relative;
     border-radius: 26px;
     background: var(--gr-hero);
     color: var(--gr-on-hero);
-    box-shadow: var(--gr-shadow);
   }
   /* Vacíos y explicaciones: relleno suave, sin borde */
   .gr-empty {
@@ -133,39 +178,39 @@
     line-height: 1.4;
   }
 
-  /* Etiquetas sobre fotos: chicas, blancas y con una sombrita, para que mande la foto */
+  /* Etiquetas sobre fotos: chicas, blancas y con una sombrita, para que mande la foto (blancas también de noche) */
   .gr-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     border-radius: var(--gr-radius-pill);
     background: rgb(255 255 255 / 0.95);
+    color: #121216;
     padding: 4px 10px;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 12px;
-    box-shadow: 0 1px 4px rgb(20 20 20 / 0.12);
+    box-shadow: 0 1px 4px rgb(18 18 22 / 0.12);
   }
   .gr-tag--dark { background: var(--gr-brand); color: var(--gr-on-brand); }
 
-  /* Botones: píldoras. La principal en negro; las demás, blancas con un borde fino. */
+  /* Botones: píldoras. La principal en tinta; las demás, la superficie con un borde fino. */
   .gr-btn,
   .gr-btn-primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 48px;
-    padding: 0 20px;
+    min-height: 46px;
+    padding: 0 18px;
     border: 1px solid var(--gr-line);
     border-radius: var(--gr-radius-pill);
     background: var(--gr-surface);
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
-    font-weight: 600;
+    font-weight: 700;
     font-size: 15px;
     text-decoration: none;
     cursor: pointer;
-    box-shadow: 0 1px 2px rgb(20 20 20 / 0.05);
     transition: transform 80ms ease;
   }
   .gr-btn:active, .gr-btn-primary:active { transform: scale(0.98); }
@@ -173,31 +218,43 @@
     border-color: var(--gr-brand);
     background: var(--gr-brand);
     color: var(--gr-on-brand);
-    min-height: 54px;
+    min-height: 52px;
     font-size: 16px;
   }
   .gr-btn--sm { min-height: 44px; font-size: 14px; padding: 0 16px; }
   .gr-btn--dark { border-color: var(--gr-brand); background: var(--gr-brand); color: var(--gr-on-brand); }
-  .gr-btn--accent { border-color: var(--gr-accent); background: var(--gr-accent); color: var(--gr-ink); }
+  .gr-btn--accent { border-color: var(--gr-acento); background: var(--gr-acento); color: var(--gr-on-acento); }
   .gr-btn--hero { border-color: var(--gr-hero-btn); background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
+  /* Sobre una tapa o un color: blanco, y de vidrio */
+  .gr-btn--blanco { border-color: #FFFFFF; background: #FFFFFF; color: #121216; }
+  .gr-btn--vidrio, .gr-vidrio {
+    border: 1px solid rgb(255 255 255 / 0.22);
+    background: rgb(255 255 255 / 0.18);
+    color: #FFFFFF;
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    backdrop-filter: blur(16px) saturate(1.6);
+  }
   .gr-icon-btn {
-    width: 44px;
-    height: 44px;
-    border: 0;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--gr-line);
     border-radius: 50%;
     background: var(--gr-surface);
     color: var(--gr-ink);
-    box-shadow: var(--gr-shadow);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: none;
   }
+  /* el área de toque llega a 44 aunque el círculo mida 40 */
+  .gr-icon-btn::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; }
+  .gr-icon-btn.gr-vidrio { border-color: rgb(255 255 255 / 0.22); background: rgb(255 255 255 / 0.18); color: #FFFFFF; }
   .gr-link {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 14px;
     text-decoration: underline;
     text-decoration-thickness: 1.5px;
@@ -216,7 +273,7 @@
     background: var(--gr-surface);
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
-    font-weight: 500;
+    font-weight: 600;
     font-size: 14px;
     white-space: nowrap;
     text-decoration: none;
@@ -224,9 +281,9 @@
   }
   .gr-chip[aria-pressed="true"],
   .gr-chip[aria-current="page"],
-  .gr-chip:has(:checked) { background: var(--gr-brand); border-color: var(--gr-brand); color: var(--gr-on-brand); font-weight: 600; }
+  .gr-chip:has(:checked) { background: var(--gr-brand); border-color: var(--gr-brand); color: var(--gr-on-brand); font-weight: 700; }
 
-  /* Segmentado: un riel suave con lo elegido en negro */
+  /* Segmentado: un riel suave con lo elegido en tinta */
   .gr-segmented {
     display: flex;
     min-height: 46px;
@@ -245,15 +302,15 @@
     background: transparent;
     color: var(--gr-ink);
     font-family: var(--gr-font-body);
-    font-weight: 500;
+    font-weight: 600;
     font-size: 15px;
     text-decoration: none;
     cursor: pointer;
   }
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-current="page"],
-  .gr-segmented > :has(:checked) { background: var(--gr-brand); color: var(--gr-on-brand); font-weight: 600; }
-  /* Pestañas de dos con la pastilla que se desliza (ver PestanasRegalos): el fondo negro lo lleva ::before y se corre a la
+  .gr-segmented > :has(:checked) { background: var(--gr-brand); color: var(--gr-on-brand); font-weight: 700; }
+  /* Pestañas de dos con la pastilla que se desliza (ver PestanasRegalos): el fondo lo lleva ::before y se corre a la
      marcada (data-columna) desde el toque, en vez de saltar de una a otra. */
   .gr-segmented--desliza { position: relative; isolation: isolate; }
   .gr-segmented--desliza::before {
@@ -262,8 +319,8 @@
     transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .gr-segmented--desliza[data-columna="1"]::before { transform: translateX(calc(100% + 4px)); }
-  .gr-segmented.gr-segmented--desliza > * { background: transparent; color: var(--gr-ink); font-weight: 500; transition: color 200ms ease; }
-  .gr-segmented.gr-segmented--desliza > [data-marcado] { color: var(--gr-on-brand); font-weight: 600; }
+  .gr-segmented.gr-segmented--desliza > * { background: transparent; color: var(--gr-ink); font-weight: 600; transition: color 200ms ease; }
+  .gr-segmented.gr-segmented--desliza > [data-marcado] { color: var(--gr-on-brand); font-weight: 700; }
   /* mientras llega la otra pestaña (si no estaba precargada), lo de abajo se apaga: el título ya es el de la otra */
   main:has(> .gr-segmented--desliza[data-pendiente]) > .gr-fundido { opacity: 0.45; transition: opacity 150ms ease; }
 
@@ -287,7 +344,7 @@
   .gr-input::placeholder { color: var(--gr-muted); }
   .gr-input:focus { outline: 2px solid var(--gr-ink); outline-offset: 1px; }
 
-  /* Avatares: con un aro blanco, para que se separen al superponerse */
+  /* Avatares: con un aro del color de la tarjeta, para que se separen al superponerse */
   .gr-avatar {
     width: 34px;
     height: 34px;
@@ -297,7 +354,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 13px;
   }
   .gr-avatar + .gr-avatar { margin-left: -9px; }
@@ -343,65 +400,344 @@
     padding: 8px 8px 8px 20px;
   }
 
-  /* Navegación inferior: píldora blanca flotante. La sección marcada se estira en negro y muestra su nombre (las columnas
-     se reparten con grid-template-columns, que se anima: la píldora negra crece en la nueva y se achica en la vieja).
-     Agregar un deseo es la estrella lima de arriba a la derecha (.gr-fab), que va adentro: se esconde y se corre con ella. */
+  /* Navegación inferior (<BottomNav>): una píldora de vidrio esmerilado con las cuatro secciones y, al costado, el + en un
+     círculo del mismo vidrio. La sección marcada va en el acento. El + abre el agregado (<Agregado>): gira y queda como ×,
+     mientras la píldora se esconde. */
   .gr-nav {
     position: fixed;
-    left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
-    right: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    left: max(14px, calc(50% - 224px + 14px));
+    right: max(14px, calc(50% - 224px + 14px));
     /* --anclaje: en iOS instalado, cuánto hay que correrla para que quede abajo de lo que se ve (ver BottomNav) */
     bottom: calc(22px - var(--anclaje, 0px));
     z-index: 20;
-    height: 64px;
-    border-radius: var(--gr-radius-pill);
-    background: var(--gr-surface);
-    border: 1px solid var(--gr-line);
-    box-shadow: var(--gr-shadow-float);
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 0 7px;
-    transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1), grid-template-columns 320ms cubic-bezier(0.3, 0, 0.2, 1);
+    gap: 8px;
+    pointer-events: none;
+    transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1);
   }
-  .gr-nav[data-columna="0"] { grid-template-columns: 2.2fr 1fr 1fr 1fr; }
-  .gr-nav[data-columna="1"] { grid-template-columns: 1fr 2.2fr 1fr 1fr; }
-  .gr-nav[data-columna="2"] { grid-template-columns: 1fr 1fr 2.2fr 1fr; }
-  .gr-nav[data-columna="3"] { grid-template-columns: 1fr 1fr 1fr 2.2fr; }
-  /* En Agregar la barra se esconde: primero la estrella gira y se achica, y enseguida la barra baja.
-     Al salir de Agregar vuelve a subir, sin esperar. */
+  .gr-nav > * { pointer-events: auto; }
+  .gr-nav__tabs {
+    flex: 1;
+    min-width: 0;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 6px;
+    border-radius: var(--gr-radius-pill);
+    background: var(--gr-glass);
+    border: 1px solid var(--gr-glass-line);
+    -webkit-backdrop-filter: blur(22px) saturate(1.8);
+    backdrop-filter: blur(22px) saturate(1.8);
+    box-shadow: var(--gr-shadow-float);
+    transition: opacity 250ms ease, transform 400ms var(--gr-barre);
+  }
+  .gr-nav__tabs a {
+    min-width: 0;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: var(--gr-radius-pill);
+    color: var(--gr-ink);
+    opacity: 0.62;
+    font-weight: 700;
+    font-size: 10.5px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+  }
+  .gr-nav__tabs a[data-marcado] {
+    color: var(--gr-acento);
+    opacity: 1;
+    background: color-mix(in oklch, var(--gr-acento) 14%, transparent);
+  }
+  .gr-mas {
+    position: relative;
+    z-index: 2;
+    width: 62px;
+    height: 62px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--gr-glass-line);
+    background: var(--gr-glass);
+    color: var(--gr-ink);
+    -webkit-backdrop-filter: blur(22px) saturate(1.8);
+    backdrop-filter: blur(22px) saturate(1.8);
+    box-shadow: var(--gr-shadow-float);
+    cursor: pointer;
+    transition: transform 500ms var(--gr-barre), background-color 300ms, color 300ms, border-color 300ms;
+  }
+  .gr-mas:active { transform: scale(0.92); }
+  /* con el agregado abierto: el + gira y queda como × blanco sobre el acento, y la píldora se va */
+  .gr-nav[data-abierto] .gr-nav__tabs { opacity: 0; transform: translateY(24px); pointer-events: none; }
+  .gr-nav[data-abierto] .gr-mas { transform: rotate(135deg); background: var(--gr-on-acento); color: var(--gr-acento); border-color: transparent; }
+  /* En Agregar (y en un deseo, con una sola acción principal) la barra se esconde: baja entera. */
   .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
   /* con el teclado abierto (iOS instalado) no flota arriba del teclado: se va */
   .gr-nav[data-teclado] { visibility: hidden; }
-  .gr-nav a {
-    min-width: 0;
-    display: flex; justify-content: center; align-items: center; gap: 7px; height: 48px;
-    border-radius: var(--gr-radius-pill);
-    color: var(--gr-ink); font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap; overflow: hidden;
-    transition: background-color 160ms ease, color 160ms ease;
-  }
-  .gr-nav a svg { flex: none; }
-  .gr-nav a[data-marcado] { background: var(--gr-brand); color: var(--gr-on-brand); }
-  .gr-nav a[data-marcado] svg { color: var(--gr-accent); }
-  /* el nombre aparece cuando la píldora ya creció */
-  .gr-nav__nombre { display: none; }
-  .gr-nav a[data-marcado] .gr-nav__nombre { display: inline; animation: gr-aparece 200ms ease-out 80ms both; }
-  /* Agregar un deseo: la estrella de la marca con un +, flotando arriba de la punta derecha de la barra (en Inicio y en
-     lo tuyo). Aparece con un rebote; se hunde al apretarla; en Agregar gira y se achica mientras la barra baja. */
-  .gr-nav a.gr-fab {
-    position: absolute; right: -2px; bottom: calc(100% + 12px);
-    width: 72px; height: 72px; border-radius: 0; overflow: visible;
-    color: var(--gr-ink);
-    filter: drop-shadow(0 6px 12px rgb(20 20 20 / 0.24));
-    animation: gr-fab-entra 320ms cubic-bezier(0.34, 1.5, 0.5, 1);
-    transition: transform 260ms cubic-bezier(0.34, 1.4, 0.5, 1), opacity 200ms ease;
-  }
-  .gr-fab__estrella { position: absolute; inset: 0; }
-  .gr-nav a.gr-fab:active { transform: scale(0.88) rotate(-15deg); }
-  .gr-nav[data-oculta] a.gr-fab { transform: rotate(90deg) scale(0.5); opacity: 0; }
-
 }
+
+/* Las piezas de las tapas, también en la capa de componentes (las utilidades de Tailwind las pueden pisar) */
+@layer components {
+  /* La tapa (<Tapa>): el color de la persona (--c) pinta la pantalla de arriba, de lado a lado, y se funde con el fondo. Arriba
+     a la derecha, un brillo más claro del mismo color. El texto encima va en blanco. */
+  .gr-tapa {
+    position: relative;
+    isolation: isolate;
+    margin-inline: calc(-1 * var(--gr-gutter));
+    padding: 8px var(--gr-gutter) 34px;
+    color: #FFFFFF;
+    background: linear-gradient(180deg, var(--c), color-mix(in oklch, var(--c) 82%, black) 58%, var(--gr-bg));
+    background: linear-gradient(in oklch 180deg, var(--c) 0%, color-mix(in oklch, var(--c) 82%, black) 58%, var(--gr-bg) 100%);
+  }
+  .gr-tapa::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(120% 70% at 85% 0%, color-mix(in oklch, var(--c) 55%, white) 0%, transparent 60%);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .gr-tapa .gr-muted, .gr-tapa__sub { color: rgb(255 255 255 / 0.78); }
+  .gr-tapa .gr-label { color: rgb(255 255 255 / 0.8); }
+  .gr-tapa :focus-visible { outline-color: #FFFFFF; }
+
+  /* La tarjeta grande de Inicio (el próximo cumple): el color de esa persona, de más claro a más oscuro */
+  .gr-destacada {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 14px;
+    min-height: 248px;
+    padding: 18px;
+    border-radius: 26px;
+    color: #FFFFFF;
+    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
+    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
+  }
+
+  /* Estantes: una fila de deseos que se desliza de costado (como los de Podcasts), de lado a lado de la pantalla */
+  .gr-estante {
+    display: flex;
+    gap: 12px;
+    margin-inline: calc(-1 * var(--gr-gutter));
+    padding: 2px var(--gr-gutter) 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gr-gutter);
+  }
+  .gr-estante::-webkit-scrollbar { display: none; }
+  .gr-estante > * { flex: none; width: 138px; scroll-snap-align: start; }
+
+  /* El arte de un deseo (<Arte>): un cuadrado de su color con la foto encima, como un sticker; sin foto, la estrella con la
+     inicial. Un brillo arriba a la izquierda. */
+  .gr-arte {
+    position: relative;
+    aspect-ratio: 1;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+    background: var(--c, var(--gr-soft));
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  }
+  .gr-arte::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(90% 70% at 25% 10%, rgb(255 255 255 / 0.28), transparent 60%);
+    pointer-events: none;
+  }
+  .gr-arte__foto {
+    position: absolute;
+    inset: 10%;
+    width: 80%;
+    height: 80%;
+    object-fit: cover;
+    border-radius: 12%;
+    background: #FFFFFF;
+    box-shadow: 0 10px 22px -10px rgb(0 0 0 / 0.55);
+  }
+  .gr-arte__sin-foto { position: absolute; inset: 0; display: grid; place-items: center; }
+  .gr-arte--apagado > * { opacity: 0.45; }
+
+  /* Un deseo: toda la pantalla teñida con su color (--c), más fuerte arriba, hasta fundirse con el fondo. Va fija detrás. */
+  .gr-tenido {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(180deg, color-mix(in oklch, var(--c) calc(var(--gr-tinte) + 14%), var(--gr-bg)), color-mix(in oklch, var(--c) var(--gr-tinte), var(--gr-bg)) 60%, var(--gr-bg));
+    background: linear-gradient(in oklch 180deg, color-mix(in oklch, var(--c) calc(var(--gr-tinte) + 14%), var(--gr-bg)), color-mix(in oklch, var(--c) var(--gr-tinte), var(--gr-bg)) 60%, var(--gr-bg));
+  }
+  /* sobre el teñido, las tarjetas dejan ver un poco el color */
+  .gr-sobre-tenido { background: color-mix(in oklch, var(--gr-surface) 70%, transparent); }
+  .gr-gran-arte { border-radius: 22px; box-shadow: 0 28px 50px -18px color-mix(in oklch, var(--c) 70%, black); }
+
+  /* El agregado (<Agregado>): el + se abre en un círculo del acento que llena la pantalla desde el botón (--x, --y), y las
+     cuatro maneras de sumar un deseo caen como cartas torcidas, con rebote. La elegida crece y las demás se caen; sale la
+     tarjeta del deseo mientras carga, y al final "¡Anotado!" con el color del deseo. Al cerrar, el círculo vuelve al +.
+     data-paso: "" (cerrado), abierto, pegando, listo. */
+  .gr-agr { position: fixed; inset: 0; z-index: 19; pointer-events: none; }
+  .gr-agr__fondo {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: var(--gr-acento);
+    color: var(--gr-on-acento);
+    clip-path: circle(0px at var(--x, 85%) var(--y, 92%));
+    transition: clip-path 550ms var(--gr-barre);
+  }
+  .gr-agr:not([data-paso=""]) { pointer-events: auto; }
+  .gr-agr:not([data-paso=""]) .gr-agr__fondo { clip-path: circle(150% at var(--x, 85%) var(--y, 92%)); }
+  /* "¡Anotado!" al llegar de Agregar: ya abierto, sin barrer, aparece con el color del deseo */
+  .gr-agr[data-quieto] .gr-agr__fondo { transition: none; }
+  .gr-agr[data-quieto][data-paso="listo"] .gr-agr__fondo { animation: gr-aparece 300ms ease-out; }
+  .gr-agr[data-quieto][data-paso="listo"] .gr-agr__listo { transition: none; }
+  /* ya en Agregar: el círculo no vuelve al + (ahí la barra está escondida), se apaga */
+  .gr-agr[data-saliendo] .gr-agr__fondo { clip-path: circle(150% at var(--x, 85%) var(--y, 92%)); opacity: 0; transition: opacity 350ms ease; }
+  .gr-agr__marco { position: absolute; inset: 0; max-width: 28rem; margin-inline: auto; }
+  .gr-agr__elegir {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 24px;
+    padding: max(56px, calc(env(safe-area-inset-top) + 32px)) 22px 120px;
+  }
+  .gr-agr__elegir h2 {
+    margin: 0;
+    font-family: var(--gr-font-display);
+    font-weight: 900;
+    font-size: 44px;
+    line-height: 0.92;
+    letter-spacing: -0.05em;
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 250ms, transform 500ms var(--gr-barre);
+  }
+  .gr-cartas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: center; padding-inline: 6px; }
+  .gr-carta {
+    aspect-ratio: 4 / 5;
+    max-height: 34dvh;
+    border: 0;
+    border-radius: 18px;
+    padding: 14px;
+    background: #FFFFFF;
+    color: #121216;
+    text-align: left;
+    display: grid;
+    align-content: space-between;
+    cursor: pointer;
+    box-shadow: 0 18px 30px -14px rgb(0 0 0 / 0.45);
+    opacity: 0;
+    transform: translateY(70px) scale(0.6) rotate(calc(var(--r) * 4));
+    transition: transform 450ms var(--gr-barre), opacity 200ms;
+  }
+  .gr-carta--oscura { background: #121216; color: #FFFFFF; }
+  .gr-carta b { font-size: 18px; font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; }
+  .gr-carta small { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; letter-spacing: 0; opacity: 0.6; }
+  .gr-agr__pie { margin: 0; font-size: 13px; font-weight: 600; text-align: center; opacity: 0; transition: opacity 300ms; }
+  .gr-agr[data-paso="abierto"] .gr-agr__elegir h2 { opacity: 1; transform: none; transition-delay: 160ms; }
+  .gr-agr[data-paso="abierto"] .gr-carta {
+    opacity: 1;
+    transform: rotate(var(--r));
+    transition: transform 700ms var(--gr-entra), opacity 250ms;
+    transition-delay: calc(var(--i) * 70ms + 200ms);
+  }
+  .gr-agr[data-paso="abierto"] .gr-carta:active { transform: rotate(var(--r)) scale(0.95); transition-delay: 0s; transition-duration: 150ms; }
+  .gr-agr[data-paso="abierto"] .gr-agr__pie { opacity: 0.75; transition-delay: 550ms; }
+  .gr-agr:is([data-paso="pegando"], [data-paso="listo"]) .gr-agr__elegir { pointer-events: none; }
+  .gr-agr:is([data-paso="pegando"], [data-paso="listo"]) .gr-agr__elegir h2 { opacity: 0; transform: translateY(-20px); }
+  .gr-agr:is([data-paso="pegando"], [data-paso="listo"]) .gr-carta {
+    opacity: 0;
+    transform: translateY(260px) rotate(calc(var(--r) * 6));
+    transition: transform 600ms cubic-bezier(0.5, 0, 0.75, 0), opacity 400ms 100ms;
+    transition-delay: calc(var(--i) * 40ms);
+  }
+  .gr-agr[data-paso="pegando"] .gr-carta[data-elegida] { opacity: 0; transform: scale(1.25) rotate(0deg); transition: transform 400ms var(--gr-barre), opacity 300ms 100ms; }
+
+  /* Mientras carga: la tarjeta del deseo, con una barrita */
+  .gr-agr__pegando { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; pointer-events: none; }
+  .gr-previa {
+    width: 236px;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 22px;
+    background: #FFFFFF;
+    color: #121216;
+    box-shadow: 0 30px 50px -20px rgb(0 0 0 / 0.5);
+    opacity: 0;
+    transform: translateY(40px) scale(0.85) rotate(-3deg);
+    transition: transform 600ms var(--gr-entra), opacity 250ms;
+  }
+  .gr-previa b { padding-inline: 4px; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+  .gr-previa small { padding-inline: 4px; font-size: 13px; color: #6C6C75; }
+  .gr-barrita { height: 4px; margin: 2px 4px 4px; overflow: hidden; border-radius: 4px; background: rgb(0 0 0 / 0.08); }
+  .gr-barrita i { display: block; width: 0; height: 100%; border-radius: 4px; background: #121216; }
+  .gr-agr[data-paso="pegando"] .gr-previa { opacity: 1; transform: rotate(-2deg); transition-delay: 200ms; }
+  .gr-agr[data-paso="pegando"] .gr-barrita i { width: 92%; transition: width 2.4s 350ms var(--gr-barre); }
+
+  /* ¡Anotado!: la pantalla toma el color del deseo (--c), con manchas borrosas que se mueven despacio */
+  .gr-agr__listo {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 60px 26px 120px;
+    background: var(--c, #2E7D5B);
+    color: #FFFFFF;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms;
+  }
+  .gr-agr[data-paso="listo"] .gr-agr__listo { opacity: 1; pointer-events: auto; }
+  .gr-mancha { position: absolute; width: 90%; aspect-ratio: 1; border-radius: 50%; filter: blur(42px); opacity: 0.9; }
+  .gr-mancha--1 { left: -30%; top: -10%; background: color-mix(in oklch, var(--c) 55%, white); }
+  .gr-mancha--2 { right: -35%; top: 30%; background: color-mix(in oklch, var(--c) 45%, black); }
+  .gr-mancha--3 { left: -10%; bottom: -30%; background: var(--gr-acento); opacity: 0.7; }
+  .gr-listo { position: relative; display: grid; justify-items: center; gap: 14px; width: 100%; max-width: 340px; }
+  .gr-listo > * { opacity: 0; transform: translateY(18px); transition: opacity 300ms, transform 600ms var(--gr-entra); }
+  .gr-agr[data-paso="listo"] .gr-listo > * { opacity: 1; transform: none; transition-delay: calc(var(--i) * 80ms + 150ms); }
+  .gr-listo h2 { margin: 0; font-family: var(--gr-font-display); font-weight: 900; font-size: 46px; line-height: 0.92; letter-spacing: -0.05em; }
+  .gr-listo .gr-arte { width: 120px; border-radius: 18px; box-shadow: 0 20px 40px -14px rgb(0 0 0 / 0.5); }
+  .gr-cuanto { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .gr-cuanto button {
+    min-height: 36px;
+    padding: 0 13px;
+    border: 1px solid rgb(255 255 255 / 0.3);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.14);
+    color: #FFFFFF;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .gr-cuanto button[aria-pressed="true"] { background: #FFFFFF; color: #121216; }
+
+  /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
+  .gr-nuevo { animation: gr-entra-deseo 700ms var(--gr-entra) both; }
+  @keyframes gr-entra-deseo { from { opacity: 0; transform: translateY(-24px) scale(0.96); } }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gr-agr[data-paso="listo"] .gr-mancha--1 { animation: gr-deriva 7s ease-in-out infinite alternate; }
+  .gr-agr[data-paso="listo"] .gr-mancha--2 { animation: gr-deriva 9s ease-in-out infinite alternate-reverse; }
+  .gr-agr[data-paso="listo"] .gr-mancha--3 { animation: gr-deriva 8s ease-in-out infinite alternate; }
+}
+@keyframes gr-deriva { to { transform: translate(18%, -12%) scale(1.15); } }
 
 /* Al llegar a una sección del menú (<Seccion> en ui.tsx) el contenido aparece con un fundido corto. Solo
    opacidad: un transform haría que los botones fijos de la página (como "Mandala por WhatsApp") se corran. */
@@ -423,8 +759,6 @@
 @keyframes gr-cal-sale { from { opacity: 0; transform: scale(1.25); } }
 @keyframes gr-cal-siguiente { from { opacity: 0; transform: translateX(32px); } }
 @keyframes gr-cal-anterior { from { opacity: 0; transform: translateX(-32px); } }
-/* la estrella de agregar aparece girando, con un rebote (ver .gr-fab) */
-@keyframes gr-fab-entra { from { transform: scale(0.4) rotate(-60deg); opacity: 0; } }
 
 /* El sello (<Sello>): la estrella con borde blanco, pegada torcida sobre la foto de lo que te tocó regalar. La primera vez
    que se ve cae grande, gira y queda pegada (gr-sello--cae, la pone Sello; antes, si todavía no se ve, espera escondida). */
@@ -538,8 +872,6 @@
   transform: translateX(-50%);
   animation: gr-toast 3.6s ease both;
 }
-/* con la estrella de agregar en la pantalla (ver .gr-fab), el cartel va arriba de ella */
-body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 170px); }
 /* Dos fotos que se alternan con un fundido (los estilos de la bienvenida): la de abajo queda y la de arriba aparece y se
    va. Cada una con su animation-delay, así no cambian todas juntas. Sin animaciones, se queda la de abajo. */
 .gr-alternar { opacity: 0; animation: gr-alternar 8s ease-in-out infinite; }
@@ -703,8 +1035,7 @@ body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
    un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), la estrella del
    ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de 30° la deja igual, así que aguanta lo
-   que tarde. Cuando llega la pantalla, en Mi lista vuela hasta el contador de deseos (data-arranque-destino) mientras se
-   ve la lista; en las demás se achica. Todo con CSS, así anda antes que el JS:
+   que tarde. Cuando llega la pantalla, se achica y se va. Todo con CSS, así anda antes que el JS:
    las transiciones de la salida no corren si la pantalla ya llegó sin la de carga (ahí no se ve nada). */
 .gr-arranque {
   position: fixed; inset: 0; z-index: 50;
@@ -720,24 +1051,17 @@ body:has(.gr-fab) .gr-toast { bottom: calc(max(16px, env(safe-area-inset-bottom)
   position: absolute; inset: 0; margin-inline: auto; max-width: 28rem;
   padding-inline: var(--gr-gutter); container-type: size;
 }
-/* Parado donde va el contador de Mi lista (la estrella de su tarjeta destacada): 8px de arriba + 56 de la barra + 20 de
-   separación + 22 adentro de la tarjeta, a 30px del borde derecho (la estrella mide 62 y esta 150: el centro cae 79px
-   adentro del marco). Mientras carga, en el medio. */
+/* Arriba a la derecha (donde estaba el contador de Mi lista) y, con el transform, en el medio mientras carga. */
 .gr-arranque__vuelo {
   position: absolute; top: 62px; right: 4px; width: 150px; height: 150px;
   transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(0);
-  /* al llegar se desvanece y deja ver el contador de abajo, con su número */
   opacity: 0;
   transition: transform 300ms cubic-bezier(0.5, -0.6, 0.7, 0.5), opacity 120ms linear 400ms;
-}
-body:has([data-arranque-destino]) .gr-arranque__vuelo {
-  transform: translate(0px, 0px) rotate(0deg) scale(0.413);
-  transition: transform 480ms cubic-bezier(0.5, -0.35, 0.3, 1), opacity 120ms linear 400ms;
 }
 .gr-arranque__pegado, .gr-arranque__sombra { position: absolute; inset: 0; }
 .gr-arranque__vuelo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* la sombra va solo mientras está pegada: al despegarse se va de una */
-.gr-arranque__sombra polygon { fill: var(--gr-ink); }
+.gr-arranque__sombra polygon { fill: var(--gr-on-accent); }
 .gr-arranque__letra { opacity: 0; transition: opacity 150ms ease-out; }
 
 /* Mientras carga. data-listo: ya llegó la primera pantalla (lo pone Arranque, así no vuelve en las de carga de después). */
@@ -763,9 +1087,12 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav a { transition: none; }
-  .gr-nav a.gr-fab { transition: none; animation: none; }
-  .gr-nav a[data-marcado] .gr-nav__nombre { animation: none; }
+  .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav__tabs, .gr-nav__tabs a { transition: none; }
+  /* el agregado: aparece y se va sin barrer ni volar; las cartas, ya en su lugar */
+  .gr-mas, .gr-agr__fondo, .gr-carta, .gr-previa, .gr-barrita i, .gr-listo > *, .gr-agr__elegir h2, .gr-agr__pie {
+    transition-duration: 0.01s !important; transition-delay: 0s !important;
+  }
+  .gr-nuevo { animation: none; }
   .gr-seccion, .gr-fundido, .gr-hoja, .gr-sello--cae { animation: none; }
   .gr-segmented--desliza::before, .gr-segmented.gr-segmented--desliza > * { transition: none; }
   .gr-cal-entra, .gr-cal-sale, .gr-cal-siguiente, .gr-cal-anterior { animation: none; }

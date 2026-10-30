@@ -19,7 +19,7 @@ const ICONO_CATEGORIA = new Map<string, IconName>([
 /** La categoría, arriba del nombre, con su ícono (una que no es de las de ahora, con una bolsa). */
 export function CategoriaDeseo({ categoria }: { categoria: string }) {
   return (
-    <p className="inline-flex items-center gap-1.5 self-start rounded-full bg-gr-soft py-1 pl-2 pr-3 text-[13px] font-semibold [overflow-wrap:anywhere]">
+    <p className="inline-flex items-center gap-1.5 self-start rounded-full border border-gr-line bg-gr-surface/70 py-1 pl-2 pr-3 text-[13px] font-semibold [overflow-wrap:anywhere]">
       <Icon name={ICONO_CATEGORIA.get(categoria) ?? 'bag'} size={15} strokeWidth={2.2} className="flex-none" />{categoria}
     </p>
   )
@@ -40,7 +40,7 @@ function prioridad(p: Prioridad, voz: Voz): Ficha {
   const visual = (
     <span className="flex gap-1">
       {[1, 2, 3].map((n) => (
-        <span key={n} className={n <= PRIORIDADES[p].corazones ? (oscura ? 'text-gr-accent' : 'text-gr-ink') : 'opacity-25'}>
+        <span key={n} className={n <= PRIORIDADES[p].corazones ? (oscura ? 'text-gr-acento' : 'text-gr-ink') : 'opacity-25'}>
           <Heart size={18} />
         </span>
       ))}
@@ -87,10 +87,10 @@ export function FichasDeseo({ deseo, voz, cupo }: {
         const ancha = fichas.length % 2 === 1 && i === fichas.length - 1
         return (
           <li key={f.clave}
-              className={`flex rounded-2xl p-3 ${ancha ? 'col-span-2 items-center gap-3' : 'flex-col gap-2'} ${f.oscura ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
+              className={`flex rounded-[18px] p-3 ${ancha ? 'col-span-2 items-center gap-3' : 'flex-col gap-2'} ${f.oscura ? 'bg-gr-brand text-gr-on-brand' : 'border border-gr-line bg-gr-surface/70'}`}>
             <span aria-hidden className="flex h-8 flex-none items-center">{f.visual}</span>
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[15px] leading-tight font-semibold">{f.titulo}</span>
+              <span className="text-[15px] leading-tight font-bold">{f.titulo}</span>
               {f.sub && (
                 <span className={`text-[13px] leading-snug ${f.alerta ? 'font-semibold' : f.oscura ? 'text-gr-on-brand/70' : 'text-gr-muted'}`}>{f.sub}</span>
               )}
@@ -107,7 +107,7 @@ export function NotaDeseo({ notas, quien, avatar }: { notas: string; quien: stri
   return (
     <div className="flex items-end gap-2">
       {avatar}
-      <div className="min-w-0 flex-1 rounded-[18px] rounded-bl-md bg-gr-soft px-3.5 py-2.5">
+      <div className="min-w-0 flex-1 rounded-[18px] rounded-bl-md border border-gr-line bg-gr-surface/70 px-3.5 py-2.5">
         <p className="text-xs font-semibold text-gr-muted">{quien}</p>
         <p className="mt-0.5 whitespace-pre-line text-[15px] leading-snug [overflow-wrap:anywhere]">{notas}</p>
       </div>

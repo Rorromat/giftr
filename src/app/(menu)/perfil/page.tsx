@@ -52,7 +52,7 @@ export default async function Perfil({ searchParams }: {
       <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" />
 
       <div className="gr-card flex items-center gap-4 p-4">
-        <FotoPerfil nombre={nombre} foto={foto} size={72} propia />
+        <FotoPerfil id={session.userId} nombre={nombre} foto={foto} size={72} propia />
         <div className="flex min-w-0 flex-col gap-0.5">
           <h2 className="text-xl leading-tight font-semibold [overflow-wrap:anywhere]">{nombre}</h2>
           {email && <p className="truncate text-sm text-gr-muted">{email}</p>}
@@ -100,7 +100,7 @@ export default async function Perfil({ searchParams }: {
           <CopyLinkButton url={shareUrl} />
         </section>
         {nuevo === 'regalar' && (
-          <p role="status" className="rounded-2xl bg-gr-accent px-3.5 py-3 text-sm font-medium">
+          <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">
             Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
           </p>
         )}

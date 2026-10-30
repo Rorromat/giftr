@@ -55,7 +55,7 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
             className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
         <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
           <span style={fecha ? { color: p.fondo } : undefined}
-                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-ink'}`}>
+                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-on-accent'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
           <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
@@ -72,7 +72,7 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
             {fecha ? fecha.cuando : fechaLarga(diaDe(juegos[0].fecha), hoy)}
           </p>
           {estado
-            ? <p className="self-start rounded-full bg-gr-accent px-2.5 py-0.5 text-xs font-semibold text-gr-ink">{estado}</p>
+            ? <p className="self-start rounded-full bg-gr-soft px-2.5 py-0.5 text-xs font-semibold">{estado}</p>
             : <p className="text-[13px] leading-snug opacity-85">Algo de su lista, una sorpresa o un amigo invisible.</p>}
         </div>
       </Link>
@@ -138,8 +138,8 @@ function YaLoTengo({ id, tengo }: { id: string; tengo: boolean }) {
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="tengo" value={tengo ? '0' : '1'} />
       <BotonEnviar aria-pressed={tengo}
-                   className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ${tengo ? 'bg-gr-accent' : 'bg-gr-soft'}`}>
-        <span aria-hidden className={`flex size-4 items-center justify-center rounded border-[1.5px] border-gr-ink ${tengo ? 'bg-gr-ink text-gr-accent' : ''}`}>
+                   className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ${tengo ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
+        <span aria-hidden className={`flex size-4 items-center justify-center rounded border-[1.5px] border-current ${tengo ? 'bg-gr-on-brand text-gr-brand' : ''}`}>
           {tengo && <Icon name="check" size={11} strokeWidth={3.4} />}
         </span>
         Ya tengo el regalo
@@ -198,7 +198,7 @@ export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] 
           {j.soyOrganizador ? 'Falta que sortees' : 'Falta sortear'} · {j.contestaron} de {j.invitados} contestaron
         </p>
       ) : !j.meToca ? (
-        <Link href={`${href}#te-toco`} className="self-start rounded-full bg-gr-accent px-3 py-1.5 text-[13px] font-bold">
+        <Link href={`${href}#te-toco`} className="self-start rounded-full bg-gr-brand px-3 py-1.5 text-[13px] font-bold text-gr-on-brand">
           Ya se sorteó: mirá a quién le regalás ›
         </Link>
       ) : (
@@ -234,7 +234,7 @@ export function ArmarJuego({ fecha }: { fecha?: FechaEspecial }) {
   return (
     <Link href={fecha ? `/invisible/nuevo?fecha=${fecha}` : '/invisible/nuevo'}
           className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
-      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-accent"><IconoFecha fecha={fecha ?? null} size={24} acento="currentColor" /></span>
+      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft"><IconoFecha fecha={fecha ?? null} size={24} acento="currentColor" /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] leading-snug font-semibold">Armar un amigo invisible</span>
         <span className="block text-[13px] leading-snug text-gr-muted">Con tus amigos de GiftR. Se sortea y cada uno ve solo a quién le regala.</span>
@@ -267,7 +267,7 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
         </p>
       )}
       <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
-        <Icon name="antifaz" size={20} className="flex-none text-gr-accent" />
+        <Icon name="antifaz" size={20} className="flex-none text-gr-acento" />
         Se sortea entre los que juegan y cada uno ve solo a quién le regala. Nadie más lo ve, tampoco vos que lo organizás.
       </p>
       <ElegirFechaDelJuego inicial={fechaEspecial} propuestas={propuestas}
@@ -390,7 +390,7 @@ export function GenteDelJuego({ v }: { v: VistaJuego }) {
       <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
         {lista.map((g) => (
           <li key={g.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
-            <AvatarSticker nombre={g.persona.nombre} foto={g.persona.foto} size={32} />
+            <AvatarSticker id={g.persona.id} nombre={g.persona.nombre} foto={g.persona.foto} size={32} />
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.persona.nombre}</span>
             <span className={`flex-none text-[13px] font-semibold ${g.estado === 'juega' && !v.sorteado ? '' : 'text-gr-muted'}`}>
               {v.sorteado ? (g.vio ? 'Ya vio ✓' : 'Todavía no vio') : ESTADOS[g.estado]}
@@ -527,14 +527,14 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   const { persona, token } = v.meToca
   return (
     <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
-      <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-accent"><Icon name="antifaz" size={18} />TE TOCÓ</span>
-      <AvatarSticker nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-accent" />
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento"><Icon name="antifaz" size={18} />TE TOCÓ</span>
+      <AvatarSticker id={persona.id} nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento" />
       <p className="text-[28px] leading-tight font-semibold [overflow-wrap:anywhere]">{persona.nombre}</p>
       <p className="text-[13px] opacity-80">
         Solo vos lo sabés.{v.soyOrganizador ? ' Nadie más lo ve.' : ` Ni ${primerNombre(v.organizador.nombre)} (que lo organiza) lo ve.`}
       </p>
       {tambien.length > 0 && (
-        <p className="text-[13px] font-semibold text-gr-accent">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
+        <p className="text-[13px] font-semibold text-gr-acento">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
       )}
       {token && <Link href={`/l/${token}`} className="gr-btn gr-btn--accent mt-1.5 h-12 w-full">Ver su lista y sus talles</Link>}
       <div className="mt-1 text-gr-ink"><YaLoTengo id={v.id} tengo={v.yaLoTengo} /></div>
@@ -600,7 +600,7 @@ export function QuienMeRegalo({ v }: { v: VistaJuego }) {
   if (v.meRegalo) {
     return (
       <div id="me-regalo" className="gr-card flex scroll-mt-6 items-center gap-3 p-4">
-        <AvatarSticker nombre={v.meRegalo.nombre} foto={v.meRegalo.foto} size={48} />
+        <AvatarSticker id={v.meRegalo.id} nombre={v.meRegalo.nombre} foto={v.meRegalo.foto} size={48} />
         <p className="min-w-0 flex-1 text-[15px] leading-snug">Te regaló <b>{v.meRegalo.nombre}</b></p>
       </div>
     )

@@ -266,7 +266,7 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
                      className={`size-full object-cover ${j ? 'gr-alternar absolute inset-0' : ''}`} />
               ))}
               <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent px-2.5 pb-2 pt-8 text-sm font-semibold text-white">{e}</span>
-              <span className="absolute right-1.5 top-1.5 hidden size-6 items-center justify-center rounded-full bg-gr-accent text-gr-ink group-has-[:checked]:flex">
+              <span className="absolute right-1.5 top-1.5 hidden size-6 items-center justify-center rounded-full bg-gr-acento text-gr-on-acento group-has-[:checked]:flex">
                 <Icon name="check" size={14} strokeWidth={3} />
               </span>
             </label>

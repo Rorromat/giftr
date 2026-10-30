@@ -29,7 +29,7 @@ export function PorQueAvisos({ tituloId, Titulo = 'h1' }: { tituloId?: string; T
       </div>
       <ul className="gr-card gr-rows flex flex-col">
         <li className="flex items-start gap-3 px-4 py-3.5">
-          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-accent text-lg">👉</span>
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-hero/10 text-lg">👉</span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] leading-snug font-semibold">Un codazo</p>
             <p className="text-[13px] leading-snug text-gr-muted">Alguien quiere saber qué regalarte y te pide que cargues tu lista.</p>

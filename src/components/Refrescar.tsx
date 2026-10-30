@@ -142,7 +142,7 @@ export function Refrescar() {
       <div ref={caja} aria-hidden className="gr-refrescar" data-fase={fase}>
         {fase === 'listo' || fase === 'sin-red' ? (
           <>
-            <Icon name={fase === 'listo' ? 'check' : 'close'} size={18} strokeWidth={2.6} className="text-gr-accent" />
+            <Icon name={fase === 'listo' ? 'check' : 'close'} size={18} strokeWidth={2.6} className="text-gr-acento" />
             <span>{fase === 'listo' ? 'Al día' : 'Sin conexión'}</span>
           </>
         ) : (

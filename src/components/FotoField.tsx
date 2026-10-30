@@ -342,11 +342,11 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
                // la que vino de otro link, mientras se trae la de este
                className={`h-[220px] w-full object-cover${trayendo ? ' motion-safe:animate-pulse' : ''}`} />
           <button type="button" aria-label="Quitar foto" onClick={quitar}
-                  className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
+                  className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
             <Icon name="close" size={14} strokeWidth={3} />
           </button>
           <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo}
-                  className="absolute bottom-2.5 right-2.5 flex h-9 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[13px] font-semibold shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
+                  className="absolute bottom-2.5 right-2.5 flex h-9 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[13px] font-semibold text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
             <Icon name="camera" size={15} strokeWidth={2.2} />Cambiar foto
           </button>
         </div>
@@ -355,7 +355,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
         // Mientras se trae la del link lo dice acá, y al llegar la foto queda en este lugar: no se corre nada.
         <div className={`flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[18px] bg-gr-soft px-3 py-5 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
           <div className="grid w-full grid-cols-2 gap-2">
-            <button type="button" onClick={pegarElLink} className="gr-btn h-[52px] gap-2 border-gr-accent bg-gr-accent text-[15px]">
+            <button type="button" onClick={pegarElLink} className="gr-btn gr-btn--dark h-[52px] gap-2 text-[15px]">
               <Icon name="paste" size={18} strokeWidth={2} />Pegar link
             </button>
             <button type="button" onClick={() => elegir.current?.click()} disabled={subiendo} className="gr-btn h-[52px] gap-2 text-[15px]">
