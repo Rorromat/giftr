@@ -231,7 +231,7 @@ export function Agregado() {
               {CARTAS.map((c, i) => (
                 <button key={c.tipo} type="button" onClick={() => elegir(c.tipo)} data-elegida={e.tipo === c.tipo || undefined}
                         className={`gr-carta${c.oscura ? ' gr-carta--oscura' : ''}`} style={{ '--i': i, '--r': c.r } as React.CSSProperties}>
-                  <IlustracionAgregado dibujo={c.tipo} className="gr-carta__dibujo" />
+                  <IlustracionAgregado dibujo={c.tipo} oscura={c.oscura} className="gr-carta__dibujo" />
                   <b>{c.titulo}<small>{c.bajada}</small></b>
                 </button>
               ))}
