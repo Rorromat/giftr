@@ -419,9 +419,14 @@
   }
   .gr-nav > * { pointer-events: auto; }
   .gr-nav__tabs {
+    position: relative;
     flex: 1;
     min-width: 0;
     height: 62px;
+    /* el dedo arrastra el selector (ver useDedoEnLaBarra): la barra no scrollea la página ni selecciona texto */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: center;
@@ -458,6 +463,33 @@
     transition: background-color 200ms ease, color 200ms ease, opacity 200ms ease;
   }
   .gr-nav__tabs a svg { flex: none; }
+  .gr-nav__tabs a { position: relative; z-index: 1; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  /* El selector que sigue al dedo: aparece al arrastrar, un poco más grande y con sombra, como una lupa, y va donde está el
+     dedo sin demora. Al soltar llega a la sección elegida con un rebote y se apaga mientras se prende la marca de esa. */
+  .gr-nav__dedo {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: var(--dedo-w, 90px);
+    height: 50px;
+    border-radius: var(--gr-radius-pill);
+    background: color-mix(in oklch, var(--gr-acento) 16%, var(--gr-surface));
+    box-shadow: 0 8px 20px -8px rgb(18 18 22 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.4);
+    transform: translateX(var(--dedo-x, 0px)) scale(1);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 300ms var(--gr-entra), width 300ms var(--gr-entra);
+  }
+  .gr-nav__tabs[data-dedo="arrastrando"] .gr-nav__dedo {
+    opacity: 1;
+    transform: translateX(var(--dedo-x, 0px)) scale(1.08);
+    transition: opacity 120ms ease, width 220ms ease;
+  }
+  .gr-nav__tabs[data-dedo="soltando"] .gr-nav__dedo { opacity: 1; }
+  /* mientras tanto, la marca de cada sección se apaga: el que marca es el selector */
+  .gr-nav__tabs[data-dedo] a[data-marcado] { background: transparent; }
+  .gr-nav__tabs[data-dedo="arrastrando"] a[data-marcado] { color: var(--gr-ink); opacity: 0.62; }
+  .gr-nav__tabs[data-dedo] a[data-bajo] { color: var(--gr-acento); opacity: 1; }
   .gr-nav__tabs a[data-marcado] {
     color: var(--gr-acento);
     opacity: 1;
@@ -1105,6 +1137,7 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
 @media (prefers-reduced-motion: reduce) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav__tabs, .gr-nav__tabs a { transition: none; }
   .gr-nav__tabs a[data-marcado] svg { animation: none; }
+  .gr-nav__dedo, .gr-nav__tabs[data-dedo] .gr-nav__dedo { transition: opacity 120ms ease; }
   /* el agregado: aparece y se va sin barrer ni volar; las cartas, ya en su lugar */
   .gr-mas, .gr-agr__fondo, .gr-carta, .gr-previa, .gr-barrita i, .gr-listo > *, .gr-agr__elegir h2, .gr-agr__pie {
     transition-duration: 0.01s !important; transition-delay: 0s !important;
