@@ -12,7 +12,7 @@ import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
 import { paletaDe } from '@/lib/colores-fechas'
-import { AvatarSticker, Icon, Starburst } from '@/components/ui'
+import { AvatarSticker, Faltan, Icon } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 import { estadoDeJuegos, MIN_JUGADORES, type MiJuego, type VistaJuego } from '@/lib/amigo-invisible'
 import { fechaCorta, fechaLarga } from '@/lib/events'
@@ -59,11 +59,7 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
           <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
-          <Starburst size={64} fontSize={t.dias > 99 ? 26 : 32} sub={t.dias === 0 ? undefined : t.dias === 1 ? 'día' : 'días'}
-                     label={t.dias === 0 ? 'Es hoy' : `Faltan ${t.dias} ${t.dias === 1 ? 'día' : 'días'}`}
-                     className="absolute right-2 top-2 drop-shadow-sm">
-            {t.dias === 0 ? '¡Hoy!' : t.dias}
-          </Starburst>
+          <Faltan dias={t.dias} className="absolute right-2.5 top-2.5" />
         </div>
         <div className="flex flex-1 flex-col gap-1 p-3.5">
           <h2 className="text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{fecha ? fecha.nombre : juegos[0].nombre}</h2>

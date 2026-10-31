@@ -159,7 +159,13 @@ export function BackLink({ href, label, vidrio = false }: {
  * El moño de la marca (ver lib/mono.ts), en los tonos del acento: si cambia el verde, cambia con él. tonos: otros (la
  * sombra de la animación de inicio va toda en tinta).
  */
-export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; className?: string; style?: React.CSSProperties }) {
+export function Mono({ tonos, borde, className = '', style }: {
+  tonos?: TonosMono
+  /** con un borde de este color alrededor, como pegado (sobre una foto) */
+  borde?: string
+  className?: string
+  style?: React.CSSProperties
+}) {
   const t = tonos ?? {
     claro: 'var(--gr-acento)',
     medio: 'color-mix(in oklch, var(--gr-acento) 80%, var(--gr-acento-oscuro))',
@@ -167,9 +173,38 @@ export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; clas
     nudo: 'var(--gr-acento-oscuro)',
   }
   return (
-    <svg aria-hidden viewBox="0 0 100 100" className={className} style={style}>
+    <svg aria-hidden viewBox="0 0 100 100" overflow="visible" className={className} style={style}>
+      {/* primero el borde de todo el moño junto, después el moño: así el borde queda solo afuera */}
+      {borde && (
+        <g fill="none" stroke={borde} strokeWidth={13} strokeLinejoin="round">
+          {PARTES_MONO.filter((p) => !p.opacidad).map((p) => <path key={p.d} d={p.d} />)}
+        </g>
+      )}
       {PARTES_MONO.map((p) => <path key={p.d} d={p.d} style={{ fill: t[p.tono] }} opacity={p.opacidad} />)}
     </svg>
+  )
+}
+
+/**
+ * Cuánto falta para una fecha (un cumple, una fecha especial), como una hojita de calendario: arriba la franja verde, el
+ * número grande y "días" abajo; el mismo día, "¡Hoy!". Es lo que distingue a las fechas de los regalos (que llevan el moño).
+ */
+export function Faltan({ dias, className = '' }: { dias: number; className?: string }) {
+  return (
+    <span role="img" aria-label={dias === 0 ? 'Es hoy' : `Faltan ${dias} ${dias === 1 ? 'día' : 'días'}`}
+          className={`flex w-[54px] flex-col overflow-hidden rounded-[14px] bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
+      <span className="bg-gr-acento py-[3px] text-[9.5px] leading-none font-extrabold tracking-[0.08em] text-gr-on-acento uppercase">
+        {dias === 0 ? 'Es' : 'Faltan'}
+      </span>
+      {dias === 0
+        ? <span className="py-2.5 text-[16px] leading-none font-black tracking-[-0.03em]">¡Hoy!</span>
+        : (
+          <>
+            <span className="pt-1.5 text-[24px] leading-none font-black tracking-[-0.04em] tabular-nums">{dias}</span>
+            <span className="pb-1.5 text-[11px] font-semibold text-[#6C6C75]">{dias === 1 ? 'día' : 'días'}</span>
+          </>
+        )}
+    </span>
   )
 }
 

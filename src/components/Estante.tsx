@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Arte, AvatarStack, Icon } from '@/components/ui'
+import { AvatarStack, Icon, PRIORIDADES } from '@/components/ui'
+import { TarjetaRegalo } from '@/components/TarjetaRegalo'
 import { fechaLarga, MESES, type Evento } from '@/lib/events'
 import type { GiverItemView, OwnerItemView } from '@/lib/serialize'
 
@@ -51,7 +52,7 @@ function estado(i: GiverItemView) {
   return i.claims.some((c) => c.esMia || c.grupal?.soyParte) ? 'Reservado por vos' : null
 }
 
-/** El estante con los deseos de una lista: los libres primero, cada uno en su cuadrado de color. */
+/** El estante con los deseos de una lista: los libres primero, cada uno como regalo posible (ver TarjetaRegalo). */
 export function EstanteDeLista({ titulo, href, token, items }: {
   titulo: string
   href: string
@@ -66,24 +67,13 @@ export function EstanteDeLista({ titulo, href, token, items }: {
         <Link href={href} className="inline-flex items-center gap-1.5">{titulo}<Icon name="chevron" size={18} strokeWidth={2.6} className="text-gr-muted" /></Link>
       </h2>
       <ul className="gr-estante">
-        {libres.slice(0, EN_EL_ESTANTE).map((i) => {
-          const ya = 'claims' in i ? estado(i) : null
-          const precio = i.precio ?? i.rangoPrecio
-          return (
-            <li key={i.id}>
-              <Link href={`/l/${token}/item/${i.id}`} className="flex flex-col gap-1.5">
-                <Arte src={i.fotoUrl} titulo={i.titulo} apagado={'disponible' in i && !i.disponible} />
-                <span className="mt-0.5 line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{i.titulo}</span>
-                {precio && <span className="text-sm text-gr-muted tabular-nums">{precio}</span>}
-                {ya && (
-                  <span className="flex items-center gap-1.5 text-xs font-bold">
-                    <i aria-hidden className="size-[7px] rounded-full bg-gr-acento" />{ya}
-                  </span>
-                )}
-              </Link>
-            </li>
-          )
-        })}
+        {libres.slice(0, EN_EL_ESTANTE).map((i) => (
+          <li key={i.id}>
+            <TarjetaRegalo href={`/l/${token}/item/${i.id}`} foto={i.fotoUrl} titulo={i.titulo} precio={i.precio ?? i.rangoPrecio}
+                           apagado={'disponible' in i && !i.disponible} corazones={PRIORIDADES[i.prioridad].corazones}
+                           estado={'claims' in i ? estado(i) : null} />
+          </li>
+        ))}
       </ul>
     </section>
   )

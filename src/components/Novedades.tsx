@@ -7,7 +7,8 @@ import {
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
-import { Arte, AvatarSticker, Icon, ItemPhoto, Mono, PriorityTag } from '@/components/ui'
+import { TarjetaRegalo } from '@/components/TarjetaRegalo'
+import { AvatarSticker, Icon, ItemPhoto, Mono, PriorityTag } from '@/components/ui'
 
 // Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas que pasan solas de a una, dos segundos en cada una, y se
 // pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
@@ -79,16 +80,14 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
     <ul ref={ref} aria-label="Lo nuevo de tus amigos" className="gr-estante relative">
       {items.map((n) => (
         <li key={n.id}>
-          <Link href={`/novedades#d-${n.id}`} className="flex flex-col gap-1.5">
-            <Arte src={n.foto} titulo={n.titulo} />
-            <h3 className="mt-0.5 line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{n.titulo}</h3>
-            {n.precio && <p className="text-sm text-gr-muted tabular-nums">{n.precio}</p>}
-            {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
-              <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
-              <span className="truncate">{n.nombre.split(' ')[0]} · {n.hace}</span>
-            </div>
-          </Link>
+          <TarjetaRegalo href={`/novedades#d-${n.id}`} foto={n.foto} titulo={n.titulo} precio={n.precio}
+                         pie={
+                           // div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar
+                           <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
+                             <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
+                             <span className="truncate">{n.nombre.split(' ')[0]} · {n.hace}</span>
+                           </div>
+                         } />
         </li>
       ))}
     </ul>

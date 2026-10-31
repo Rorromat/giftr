@@ -593,6 +593,38 @@
   .gr-estante::-webkit-scrollbar { display: none; }
   .gr-estante > * { flex: none; width: 200px; scroll-snap-align: start; }
 
+  /* Un regalo posible en un estante de Inicio (<TarjetaRegalo>): la foto en su tarjeta, con el moño pegado torcido en la
+     esquina como en un paquete (lo que la distingue de las fechas, que llevan la hojita de calendario) y el precio en verde. */
+  .gr-regalo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    padding: 6px 6px 10px;
+    border: 1px solid var(--gr-line);
+    border-radius: 22px;
+    background: var(--gr-surface);
+    box-shadow: var(--gr-shadow);
+  }
+  .gr-regalo__mono {
+    position: absolute;
+    left: -4px;
+    top: -4px;
+    width: 42px;
+    height: 42px;
+    rotate: -14deg;
+    filter: drop-shadow(0 2px 3px rgb(20 20 20 / 0.28));
+    pointer-events: none;
+  }
+  .gr-regalo__precio {
+    font-family: var(--gr-font-display);
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--gr-acento-texto);
+  }
+
   /* La foto de un deseo (<Arte>): a sangre, más alta que ancha (como en las tiendas), con las puntas redondeadas y un borde
      finito para que una foto de producto con fondo blanco no se pierda en la tarjeta. Sin foto, la estrella con la inicial
      sobre la superficie suave. */
