@@ -161,6 +161,10 @@ export default async function ListaAjena({
 
   // su tapa: la del dueño (la que eligió, o la que le toca), o la de la lista en común
   const color = dueno ? tapaDe(dueno.id) : colorDe(vista.listId)
+  // En una lista en común, arriba todo es de la lista (Bauti, sus regalos); el perfil y los gustos de cada uno de los que
+  // la arman van al final, abajo del historial. En la de una persona, su perfil va arriba: la lista es suya.
+  const enComun = !!vista.grupoNombre
+  const perfilDe = (id: string) => `/l/${token}/perfil${vista.perfiles[0]?.id === id ? '' : `?quien=${id}`}`
 
   /** Un deseo en la grilla: la foto (con su sello si te toca, y "Me lo robo"), qué es, cuánto sale y reservarlo. */
   const tarjeta = (item: Tarjeta) => {
@@ -216,14 +220,16 @@ export default async function ListaAjena({
           <LogoSticker className="justify-self-center" />
         </header>
         <div className="mt-1.5 flex flex-col items-center gap-3 text-center">
-          {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
-          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none rounded-full">
-            {vista.grupoFoto
+          {/* la de una persona: su foto lleva a su perfil. La de una lista en común, no: es de la lista, no de uno de ellos */}
+          {enComun ? (
+            vista.grupoFoto
               ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={104} />
-              : vista.grupoNombre
-                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={72} />
-                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104} className="bg-gr-surface" />}
-          </Link>
+              : <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={72} />
+          ) : (
+            <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none rounded-full">
+              <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104} className="bg-gr-surface" />
+            </Link>
+          )}
           <div className="flex flex-col gap-1">
             <h1 className="gr-title text-[40px] [overflow-wrap:anywhere]">
               {vista.grupoNombre ?? <><span className="sr-only">Lista de </span>{vista.ownerNombre}</>}
@@ -232,9 +238,7 @@ export default async function ListaAjena({
               {cuenta ?? <>{vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.</>}
             </p>
           </div>
-          <Link href={`/l/${token}/perfil`} className="gr-btn w-full">
-            {vista.duenos.length > 1 ? 'Sus perfiles y sus gustos' : 'Su perfil y sus gustos'}
-          </Link>
+          {!enComun && <Link href={`/l/${token}/perfil`} className="gr-btn w-full">Su perfil y sus gustos</Link>}
           {veTodo && (
             <p className="gr-tapa__sub flex items-center gap-1.5 text-[12.5px]">
               <Icon name="lock" size={13} className="flex-none" />
@@ -254,9 +258,9 @@ export default async function ListaAjena({
 
       <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 
-      {gustos.map((g) => (
+      {!enComun && gustos.map((g) => (
         <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
-                       href={`/l/${token}/perfil${vista.perfiles[0]?.id === g.id ? '' : `?quien=${g.id}`}`} />
+                       href={perfilDe(g.id)} />
       ))}
 
       <Banners />
@@ -307,11 +311,24 @@ export default async function ListaAjena({
                 identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
       </div>
 
-      {historial && <QuienSeOcupo historial={historial} para={vista.ownerNombre} />}
+      {/* lo que le regalaron: a la persona, o en una lista en común, a Bauti (no a los que la arman) */}
+      {historial && <QuienSeOcupo historial={historial} para={vista.grupoNombre ?? vista.ownerNombre} />}
 
-      {/* viendo la lista, el nombre con el que reserva solo sale acá; con "¿Es tu lista?" arriba, el link ya va ahí */}
-      {quien && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
-        <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} conCuenta={!!viewer.userId} /></div>
+      {/* en una lista en común, al final: cada uno de los que la arman, con su perfil y sus gustos (aunque no los haya cargado) */}
+      {enComun && (
+        <section aria-labelledby="quienes-la-arman" className="mt-6 flex flex-col gap-3">
+          <h2 id="quienes-la-arman" className="gr-heading">{vista.perfiles.length > 1 ? 'Quiénes la arman' : 'Quién la arma'}</h2>
+          {vista.perfiles.map((d) => (
+            <TarjetaPerfil key={d.id} nombre={d.nombre} foto={d.foto} secciones={gustos.find((g) => g.id === d.id)?.secciones ?? []}
+                           href={perfilDe(d.id)} />
+          ))}
+        </section>
+      )}
+
+      {/* un invitado: el nombre con el que reserva solo sale acá (con "¿Es tu lista?" arriba, el link ya va ahí). Con cuenta,
+          no: la sesión se cierra desde Perfil */}
+      {quien && !viewer.userId && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
+        <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} /></div>
       )}
 
       {/* con cuenta ya tiene su lista, y abajo va la barra (ver el layout) */}

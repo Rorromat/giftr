@@ -281,8 +281,8 @@ export default async function DetalleItem({ params, searchParams }: {
         </section>
       )}
 
-      {/* con "¿Es tu lista?" arriba, el link ya va ahí */}
-      {quien && !(detalle.role === 'anonimo' && detalle.motivo === 'confirmar') && <NoSoyYo nombre={quien} volver={aqui} conCuenta={logueado} />}
+      {/* un invitado (con "¿Es tu lista?" arriba, el link ya va ahí). Con cuenta, no: la sesión se cierra desde Perfil */}
+      {quien && !logueado && !(detalle.role === 'anonimo' && detalle.motivo === 'confirmar') && <NoSoyYo nombre={quien} volver={aqui} />}
 
     </main>
   )

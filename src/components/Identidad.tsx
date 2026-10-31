@@ -67,7 +67,7 @@ export function ConfirmarLista({ token, nombre, volver }: { token: string; nombr
         <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px]">No es mía: ver lo reservado</BotonEnviar>
       </form>
       <EntrarConGoogle volver={volver} />
-      <NoSoyYo nombre={nombre} volver={volver} conCuenta={false} />
+      <NoSoyYo nombre={nombre} volver={volver} />
     </section>
   )
 }
@@ -111,20 +111,12 @@ export function ExDueno() {
 }
 
 /**
- * "¿No sos X?": en un dispositivo compartido, para dejar de ser el último que se anotó (o cerrar la sesión de otro).
- * A un invitado se le pide confirmarlo: su cookie es lo único que lo identifica, y lo que reservó queda a su nombre sin
- * que nadie lo pueda manejar desde acá. Primero se le ofrece entrar con Google, que lo pasa a su cuenta.
+ * "¿No sos X?", solo para un invitado (sin cuenta): en un dispositivo compartido, para dejar de ser el último que se anotó.
+ * Con cuenta no va: la sesión se cierra desde Perfil, abajo de todo. Se le pide confirmarlo: su cookie es lo único que lo
+ * identifica, y lo que reservó queda a su nombre sin que nadie lo pueda manejar desde acá. Primero se le ofrece entrar con
+ * Google, que lo pasa a su cuenta.
  */
-export function NoSoyYo({ nombre, volver, conCuenta }: { nombre: string; volver: string; conCuenta: boolean }) {
-  if (conCuenta) {
-    return (
-      <form action={salirAction} className="flex flex-wrap items-center justify-center gap-x-1.5 text-[13px] font-medium">
-        <input type="hidden" name="volver" value={volver} />
-        <span className="[overflow-wrap:anywhere]">¿No sos {nombre}?</span>
-        <button className="min-h-11 font-semibold underline underline-offset-4">Salir</button>
-      </form>
-    )
-  }
+export function NoSoyYo({ nombre, volver }: { nombre: string; volver: string }) {
   return (
     <details className="group flex flex-col items-center text-center text-[13px] font-medium">
       <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-center gap-x-1.5 [&::-webkit-details-marker]:hidden">
