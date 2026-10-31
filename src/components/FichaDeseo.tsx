@@ -17,6 +17,8 @@ const segun = (voz: Voz, propia: string, uno: string, varios: string) => (voz ==
 const ICONO_CATEGORIA = new Map<string, IconName>([
   ['Tecnología', 'celu'], ['Casa', 'home'], ['Ropa', 'shirt'], ['Libros', 'libro'], ['Experiencias', 'entrada'], ['Hobbies', 'palette'],
 ])
+/** El ícono de una categoría; una que no es de las de ahora, una bolsa. */
+export const iconoDeCategoria = (categoria: string): IconName => ICONO_CATEGORIA.get(categoria) ?? 'bag'
 
 /**
  * Arriba de todo: la foto a sangre (tocándola se ve entera, ver FotoAmpliable), volver a la izquierda y lo de la derecha
@@ -55,7 +57,7 @@ export function NombreDeLaFicha({ titulo, categoria, lista, precio }: {
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[15px] text-gr-muted [overflow-wrap:anywhere]">
         {categoria && (
           <>
-            <Icon name={ICONO_CATEGORIA.get(categoria) ?? 'bag'} size={16} strokeWidth={2.2} className="flex-none" />
+            <Icon name={iconoDeCategoria(categoria)} size={16} strokeWidth={2.2} className="flex-none" />
             {categoria}
             <span aria-hidden>·</span>
           </>
