@@ -1,6 +1,6 @@
-// Tapas: la app es neutra (papel de día, casi negro de noche) y el color lo ponen las personas y sus deseos. Cada persona
-// tiene una tapa, un color que pinta el encabezado de su lista y se funde con el fondo; cada deseo, el suyo, que tiñe su
-// pantalla y el cuadrado de su foto. Son tonos medios, para que el texto blanco se lea encima en los dos modos.
+// Tapas: la app es neutra (papel de día, casi negro de noche) y el color lo ponen las fotos de los deseos y las personas:
+// cada una tiene una tapa, un color que pinta el encabezado de su lista y se funde con el fondo. Son tonos medios, para que
+// el texto blanco se lea encima en los dos modos.
 
 export const TAPAS = [
   { id: 'frambuesa', nombre: 'Frambuesa', color: '#B5476A' },
@@ -25,16 +25,10 @@ function hash(texto: string) {
   return h >>> 0
 }
 
-/** El color de la paleta que le toca a algo (una persona, una lista, un deseo) por su id. */
+/** El color de la paleta que le toca a algo (una persona o una lista) por su id. */
 export const colorDe = (clave: string) => TAPAS[hash(clave) % TAPAS.length].color
 
 /** La tapa de una persona: la que eligió en Perfil o, si no eligió, la que le toca por su id. */
 export function tapaDe(id: string, elegida?: string | null) {
   return TAPAS.find((t) => t.id === elegida)?.color ?? colorDe(id)
 }
-
-/**
- * El color de un deseo: uno de la paleta, por su id (con otra semilla que la de las personas, así un deseo no repite
- * siempre el color de la tapa de su dueño).
- */
-export const colorDeDeseo = (id: string) => colorDe(`deseo:${id}`)

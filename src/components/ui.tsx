@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
-import { colorDe, colorDeDeseo, tapaDe } from '@/lib/tapas'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -85,7 +84,7 @@ export function PriorityTag({ prioridad, children, className = '' }: {
   )
 }
 
-/** Foto del deseo a sangre; sin foto (o si no carga), la inicial sobre la superficie suave. */
+/** Foto del deseo a sangre; sin foto (o si no carga), un regalito gris sobre la superficie suave (como en Arte). */
 export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' }: {
   src: string | null
   titulo: string
@@ -93,10 +92,9 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   dimmed?: boolean
   className?: string
 }) {
-  const inicial = titulo.trim().charAt(0).toUpperCase()
   const placeholder = (
-    <div className={`flex items-center justify-center bg-gr-soft ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }}>
-      <Starburst size={Math.min(84, Math.round(height * 0.5))} fontSize={44}>{inicial}</Starburst>
+    <div className={`flex items-center justify-center bg-gr-soft text-gr-line-strong ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }}>
+      <Icon name="gift" size={Math.min(64, Math.round(height * 0.3))} strokeWidth={1.6} />
     </div>
   )
   if (!src) return placeholder
@@ -106,34 +104,31 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
 }
 
-/**
- * Avatar redondo: la foto si hay, si no las iniciales en blanco sobre el color de esa persona: su tapa (con su id), o uno de
- * la paleta por su nombre si no se sabe quién es.
- */
-export function AvatarSticker({ nombre, foto, size = 56, id, color, className = '' }: {
-  nombre: string; foto?: string | null; size?: number; id?: string; color?: string; className?: string
+/** Avatar redondo: la foto si hay, si no las iniciales sobre la superficie suave (o sobre color, si lo pide: en una tapa). */
+export function AvatarSticker({ nombre, foto, size = 56, color, className = '' }: {
+  nombre: string; foto?: string | null; size?: number; color?: string; className?: string
 }) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
     <div aria-hidden
-         className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-extrabold tracking-[-0.02em] text-white ${className}`}
-         style={{ width: size, height: size, fontSize: size * 0.36, background: color ?? (id ? tapaDe(id) : colorDe(nombre)) }}>
+         className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-bold tracking-[-0.02em] ${color ? 'text-white' : 'bg-gr-soft text-gr-ink'} ${className}`}
+         style={{ width: size, height: size, fontSize: size * 0.36, background: color }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
       {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
   )
 }
 
-/** Avatares redondos superpuestos con un aro del color de la tarjeta: la foto de cada dueño o su inicial sobre su color. */
-export function AvatarStack({ nombres, fotos = [], ids = [], size = 40, className = '' }: {
-  nombres: string[]; fotos?: (string | null)[]; ids?: string[]; size?: number; className?: string
+/** Avatares redondos superpuestos con un aro del color de la tarjeta: la foto de cada dueño o su inicial. */
+export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: {
+  nombres: string[]; fotos?: (string | null)[]; size?: number; className?: string
 }) {
   return (
     <div aria-hidden className={`flex flex-none ${className}`}>
       {nombres.map((n, i) => (
         <span key={i}
-              className="flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface font-extrabold text-white"
-              style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i, background: ids[i] ? tapaDe(ids[i]) : colorDe(n) }}>
+              className="flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface bg-gr-soft font-bold"
+              style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
           {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
         </span>
@@ -182,20 +177,19 @@ export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: b
 
 /**
  * Barra de arriba de las secciones del menú: el logo a la izquierda y a la derecha lo que sume la pantalla (accion), la
- * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto. Sobre una tapa
- * (sobreTapa) el logo va en blanco y los botones, de vidrio.
+ * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto.
  */
-export function AppHeader({ accion, id, nombre, foto, avisos, sobreTapa = false }: {
-  accion?: React.ReactNode; id: string; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean
+export function AppHeader({ accion, nombre, foto, avisos }: {
+  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number
 }) {
   return (
     <header className="flex min-h-14 items-center justify-between gap-3">
-      <LogoSticker className={sobreTapa ? 'text-white' : ''} />
+      <LogoSticker />
       <div className="flex items-center gap-2">
         {accion}
-        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
+        {avisos !== undefined && <Campana nuevos={avisos} />}
         <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
-          <AvatarSticker nombre={nombre} foto={foto} id={id} size={40} className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
+          <AvatarSticker nombre={nombre} foto={foto} size={40} />
         </Link>
       </div>
     </header>
@@ -203,8 +197,8 @@ export function AppHeader({ accion, id, nombre, foto, avisos, sobreTapa = false 
 }
 
 /**
- * La tapa de una lista: el color de la persona (o de la lista) pinta de arriba, de lado a lado, y se funde con el fondo.
- * Lo de adentro va en blanco. Va primero en la pantalla, sin margen arriba.
+ * La tapa de una lista: arriba, de lado a lado, un velo apenas teñido con el color de la persona (o de la lista) que se
+ * funde con el fondo. Va primero en la pantalla, sin margen arriba.
  */
 export function Tapa({ color, className = '', children }: { color: string; className?: string; children: React.ReactNode }) {
   return (
@@ -215,11 +209,10 @@ export function Tapa({ color, className = '', children }: { color: string; class
 }
 
 /**
- * El arte de un deseo: un cuadrado de su color (ver colorDeDeseo) con la foto encima, como un sticker; sin foto (o si no
- * carga), la estrella con la inicial. Ocupa el ancho de su lugar.
+ * La foto de un deseo, a sangre y más alta que ancha (ver .gr-arte); sin foto (o si no carga), un regalito gris sobre la
+ * superficie suave. Ocupa el ancho de su lugar; el alto, con style={{ aspectRatio }} si va otra proporción.
  */
-export function Arte({ id, src, titulo, apagado = false, className = '', style }: {
-  id: string
+export function Arte({ src, titulo, apagado = false, className = '', style }: {
   src: string | null
   titulo: string
   /** lo que ya no se puede reservar */
@@ -227,14 +220,14 @@ export function Arte({ id, src, titulo, apagado = false, className = '', style }
   className?: string
   style?: React.CSSProperties
 }) {
-  const estrella = (
-    <span className="gr-arte__sin-foto">
-      <Starburst size={84} fontSize={44} style={{ width: '46%', height: 'auto' }}>{titulo.trim().charAt(0).toUpperCase()}</Starburst>
+  const sinFoto = (
+    <span className="gr-arte__sin-foto text-gr-line-strong">
+      <Icon name="gift" size={40} strokeWidth={1.6} className="h-auto w-[30%]" />
     </span>
   )
   return (
-    <div className={`gr-arte${apagado ? ' gr-arte--apagado' : ''} ${className}`} style={{ '--c': colorDeDeseo(id), ...style } as React.CSSProperties}>
-      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={estrella} className="gr-arte__foto" /> : estrella}
+    <div className={`gr-arte${apagado ? ' gr-arte--apagado' : ''} ${className}`} style={style}>
+      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={sinFoto} className="gr-arte__foto" /> : sinFoto}
     </div>
   )
 }

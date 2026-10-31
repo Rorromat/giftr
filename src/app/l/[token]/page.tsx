@@ -172,19 +172,17 @@ export default async function ListaAjena({
       <Tapa color={color}>
         <header className="grid min-h-14 grid-cols-[44px_1fr_44px] items-center">
           {/* con tu cuenta, abajo está la barra; volver lleva a tu gente */}
-          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio />}</div>
-          <LogoSticker className="justify-self-center text-white" />
+          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" />}</div>
+          <LogoSticker className="justify-self-center" />
         </header>
         <div className="mt-1.5 flex flex-col items-center gap-3 text-center">
           {/* la foto lleva al perfil (en un grupo, al del primero; desde ahí se pasa a los demás) */}
-          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`}
-                className="flex-none rounded-full shadow-[0_18px_40px_-12px_rgb(0_0_0/0.45)]">
+          <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none rounded-full">
             {vista.grupoFoto
               ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={104} />
               : vista.grupoNombre
-                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} ids={vista.perfiles.map((d) => d.id)} size={72} />
-                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104}
-                                 color={`color-mix(in oklch, ${color} 70%, white)`} />}
+                ? <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={72} />
+                : <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104} className="bg-gr-surface" />}
           </Link>
           <div className="flex flex-col gap-1">
             <h1 className="gr-title text-[40px] [overflow-wrap:anywhere]">
@@ -194,7 +192,7 @@ export default async function ListaAjena({
               {cuenta ?? <>{vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.</>}
             </p>
           </div>
-          <Link href={`/l/${token}/perfil`} className="gr-btn gr-btn--vidrio w-full">
+          <Link href={`/l/${token}/perfil`} className="gr-btn w-full">
             {vista.duenos.length > 1 ? 'Sus perfiles y sus gustos' : 'Su perfil y sus gustos'}
           </Link>
           {veTodo && (
@@ -249,7 +247,7 @@ export default async function ListaAjena({
             <div className="relative">
               {/* la foto lleva al deseo, como "Ver más" (que ya lo dice para los lectores de pantalla) */}
               <Link href={`/l/${token}/item/${hero.id}`} aria-hidden tabIndex={-1} className="block">
-                <Arte id={hero.id} src={hero.fotoUrl} titulo={hero.titulo} className="rounded-none" style={{ aspectRatio: '4 / 3' }} />
+                <Arte src={hero.fotoUrl} titulo={hero.titulo} className="rounded-none" style={{ aspectRatio: '4 / 3' }} />
               </Link>
               <PriorityTag prioridad={hero.prioridad} className="pointer-events-none absolute left-3 top-3 h-[30px]" />
               {hero.videoUrl && <ConVideo className="absolute bottom-3 left-3" />}
@@ -284,7 +282,7 @@ export default async function ListaAjena({
                 <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="relative flex flex-col gap-2">
                   <div className="relative">
                     <Link href={`/l/${token}/item/${item.id}`} aria-hidden tabIndex={-1} className="block">
-                      <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} apagado={!item.disponible} />
+                      <Arte src={item.fotoUrl} titulo={item.titulo} apagado={!item.disponible} />
                     </Link>
                     {sello && <Sello chico tipo={sello} clave={item.id} size={44} className="absolute left-1.5 top-1.5" />}
                     {item.videoUrl && <ConVideo className={`absolute top-2 ${sello ? 'left-12' : 'left-2'}`} />}

@@ -62,7 +62,7 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
           <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
             {personales.map((c) => (
               <li key={c.listId} className="flex min-h-16 items-center gap-3 py-2">
-                <AvatarSticker id={c.duenos[0]?.id} nombre={c.nombre} foto={c.duenos[0]?.foto} size={38} />
+                <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={38} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{c.nombre}</span>
                   <span className="block text-[13px] text-gr-muted">{c.deseos === 1 ? '1 deseo' : `${c.deseos} deseos`}</span>

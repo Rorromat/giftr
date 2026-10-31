@@ -66,7 +66,7 @@ function Persona({ p }: { p: CuentaPersona }) {
   return (
     <li className="gr-card flex flex-col gap-1 p-4">
       <div className="flex items-center gap-3">
-        <AvatarSticker id={p.id} nombre={p.nombre} size={44} />
+        <AvatarSticker nombre={p.nombre} size={44} />
         <p className="min-w-0 flex-1 text-base leading-snug font-semibold [overflow-wrap:anywhere]">
           {p.neto === 0 ? `Con ${p.nombre} están a mano` : leDebo ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}
         </p>

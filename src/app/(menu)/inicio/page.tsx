@@ -73,7 +73,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} id={session.userId} foto={foto} avisos={avisos}
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos}
                  accion={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={19} /></Link>} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Lo que viene</h1>
@@ -82,7 +82,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
       {destacado && suColor && token && suLista && (
         <>
-          <Destacada e={destacado} color={suColor} hoy={hoy} />
+          <Destacada e={destacado} color={suColor} />
           {suLista.role !== 'owner' && (
             <EstanteDeLista titulo={unDueno ? `Para ${unDueno.nombre.split(' ')[0]}` : `Para ${suLista.grupoNombre ?? suLista.ownerNombre}`}
                             href={destacado.href} token={token} items={suLista.items} />

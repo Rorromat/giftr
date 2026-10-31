@@ -7,13 +7,12 @@ import { dejarPendiente } from '@/components/AlLlegarDelAgregado'
 import { leerCopiado } from '@/components/QueQueres'
 import { IlustracionAgregado } from '@/components/IlustracionAgregado'
 import { Arte, Hearts, Icon, PRIORIDADES, type Prioridad } from '@/components/ui'
-import { colorDe, colorDeDeseo } from '@/lib/tapas'
 import { linkEnTexto, linkHttp, sitioDeLaTienda } from '@/lib/links'
 
 // El agregado: el + de la barra de abajo se abre en un círculo del acento que llena la pantalla, y las cuatro maneras de
 // sumar un deseo caen como cartas. La elegida crece, las demás se caen y sale la tarjeta del deseo mientras se abre Agregar
 // con eso ya puesto (el link copiado, la foto, o el título para escribir): el formulario es el de siempre. Al guardar, en la
-// lista aparece "¡Anotado!" con el color del deseo (ver RecienAgregado) y al cerrarlo el círculo vuelve al + y el deseo
+// lista aparece "¡Anotado!" con su foto (ver RecienAgregado) y al cerrarlo el círculo vuelve al + y el deseo
 // nuevo entra primero. La animación es CSS (.gr-agr en tokens.css); acá, en qué paso está.
 
 type Paso = '' | 'abierto' | 'pegando' | 'listo'
@@ -207,11 +206,11 @@ export function Agregado() {
   const tienda = e.link ? sitioDeLaTienda(e.link) : null
   const previa = e.tipo && (
     <div className="gr-previa">
-      <div className="gr-arte" style={{ '--c': colorDe(e.link ?? e.foto ?? e.tipo) } as React.CSSProperties}>
+      <div className="gr-arte" style={{ aspectRatio: '1' }}>
         {e.foto
           // eslint-disable-next-line @next/next/no-img-element -- la foto recién elegida, todavía en el teléfono
           ? <img src={e.foto} alt="" className="gr-arte__foto" />
-          : <span className="gr-arte__sin-foto text-white"><Icon name={e.tipo === 'escribir' ? 'lapiz' : 'link'} size={44} strokeWidth={2.2} /></span>}
+          : <span className="gr-arte__sin-foto text-gr-muted"><Icon name={e.tipo === 'escribir' ? 'lapiz' : 'link'} size={44} strokeWidth={2.2} /></span>}
       </div>
       <b>{tienda ? `De ${tienda}` : e.tipo === 'escribir' ? 'Tu idea' : e.foto ? 'Tu foto' : 'Tu deseo'}</b>
       <small>{MIENTRAS[e.tipo]}</small>
@@ -241,13 +240,10 @@ export function Agregado() {
           <div className="gr-agr__pegando" aria-live="polite">{e.paso === 'pegando' && previa}</div>
         </div>
 
-        <div className="gr-agr__listo" style={a ? { '--c': colorDeDeseo(a.id) } as React.CSSProperties : undefined}>
-          <span aria-hidden className="gr-mancha gr-mancha--1" />
-          <span aria-hidden className="gr-mancha gr-mancha--2" />
-          <span aria-hidden className="gr-mancha gr-mancha--3" />
+        <div className="gr-agr__listo">
           {a && (
             <div className="gr-listo" role="status">
-              <Arte id={a.id} src={a.foto} titulo={a.titulo} style={{ '--i': 0 } as React.CSSProperties} />
+              <Arte src={a.foto} titulo={a.titulo} style={{ '--i': 0 } as React.CSSProperties} />
               <h2 style={{ '--i': 1 } as React.CSSProperties}>¡Anotado!</h2>
               <p className="text-base opacity-85 [overflow-wrap:anywhere]" style={{ '--i': 2 } as React.CSSProperties}>
                 {a.titulo} ya está en {a.grupo ? 'la lista' : 'tu lista'}.

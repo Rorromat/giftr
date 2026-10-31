@@ -44,7 +44,7 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
             <li key={item.id} id={`d-${item.id}`} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)}
                 className="relative flex scroll-mt-24 flex-col gap-2">
               <div className="relative">
-                <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} />
+                <Arte src={item.fotoUrl} titulo={item.titulo} />
                 {item.id === agregado && (
                   <span className="pointer-events-none absolute left-2 top-2 z-[1] rounded-full bg-gr-acento px-2 py-0.5 text-[11px] font-extrabold text-gr-on-acento">Nuevo</span>
                 )}

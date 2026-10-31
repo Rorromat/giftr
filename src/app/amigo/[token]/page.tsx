@@ -30,7 +30,7 @@ export default async function LinkDeAmigo({ params }: { params: Promise<{ token:
     <main className="flex min-h-[85dvh] flex-col gap-5 pb-12 pt-2">
       <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
       <section className="gr-hero flex flex-col items-center gap-3 px-5 pb-6 pt-7 text-center">
-        <AvatarSticker id={de.id} nombre={de.nombre} foto={de.foto} size={88} className="ring-4 ring-gr-on-hero/15" />
+        <AvatarSticker nombre={de.nombre} foto={de.foto} size={88} className="ring-4 ring-gr-on-hero/15" />
         <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">
           {relacion === 'yo' ? 'Tu link de amigo' : `${primer} te invita a ser amigos`}
         </h1>

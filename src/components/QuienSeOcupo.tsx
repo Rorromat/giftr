@@ -1,7 +1,7 @@
 import { fechaCorta, hoyLocal } from '@/lib/events'
 import { juntarNombres } from '@/lib/groups'
 import type { EntradaHistorial, Historial } from '@/lib/regalos'
-import { Arte } from '@/components/ui'
+import { Arte, Icon } from '@/components/ui'
 
 /** Cuántos regalos se ven de entrada; los de antes, abriendo "Ver los anteriores". */
 const A_LA_VISTA = 6
@@ -20,15 +20,16 @@ function quien(e: EntradaHistorial) {
   return `Regalo grupal ${e.esMia ? 'tuyo' : `de ${e.encargado}`}${con.length ? ` con ${juntarNombres(con)}` : ''}`
 }
 
-/** Un regalo del historial: el deseo en su cuadrado de color, quién lo compró (o el grupal, con quiénes) y cuándo. */
+/** Un regalo del historial, en su tarjeta: la foto a la izquierda, qué fue, quién lo compró (o el grupal, con quiénes) y cuándo. */
 function Regalo({ e }: { e: EntradaHistorial }) {
   return (
-    <li className="flex items-center gap-3 px-3.5 py-3">
-      <Arte id={e.itemId} src={e.foto} titulo={e.titulo} className="w-14 flex-none rounded-xl" />
-      <span className="min-w-0 flex-1 text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">
-        <span className="block text-[15px] leading-tight font-bold tracking-[-0.01em] text-gr-ink">{e.titulo}</span>
-        {quien(e)}{' · '}<span className="tabular-nums">{fecha(e.fecha)}</span>
-        {e.nota && <span className="block">Compró: {e.nota}</span>}
+    <li className="gr-card flex items-center gap-3.5 p-2.5 pr-4">
+      <Arte src={e.foto} titulo={e.titulo} className="w-[72px] flex-none rounded-[14px]" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">
+        <span className="text-[17px] leading-tight font-semibold text-gr-ink">{e.titulo}</span>
+        <span className="flex items-start gap-1.5"><Icon name="gift" size={16} className="mt-px flex-none" />{quien(e)}</span>
+        <span className="flex items-center gap-1.5 tabular-nums"><Icon name="calendar" size={16} className="flex-none" />{fecha(e.fecha)}</span>
+        {e.nota && <span className="text-[13px]">Compró: {e.nota}</span>}
       </span>
     </li>
   )
@@ -40,7 +41,7 @@ function Regalos({ entradas }: { entradas: EntradaHistorial[] }) {
   return anios.map((a) => (
     <div key={a} className="flex flex-col gap-2">
       <h3 className="gr-label">{a}</h3>
-      <ul className="gr-card divide-y divide-gr-line">
+      <ul className="flex flex-col gap-2.5">
         {entradas.filter((e) => anio(e.fecha) === a).map((e) => <Regalo key={e.id} e={e} />)}
       </ul>
     </div>
