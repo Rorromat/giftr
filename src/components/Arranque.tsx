@@ -1,14 +1,17 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Starburst } from '@/components/ui'
+import { Mono } from '@/components/ui'
+
+/** La sombra del moño, toda en tinta. */
+const SOMBRA = { claro: '#121216', medio: '#121216', oscuro: '#121216', nudo: '#121216' }
 
 // la pantalla de carga entera, o solo lo de abajo de una sección con pestañas (ver SkeletonContenido)
 const cargando = () => !!document.querySelector('main[aria-busy="true"], .gr-cargando[aria-busy="true"]')
 
 /**
- * La animación de inicio: mientras la primera pantalla de la app está cargando, la estrella del ícono se pega en el
- * medio y gira a golpecitos; cuando llega, se achica y se va.
+ * La animación de inicio: mientras la primera pantalla de la app está cargando, el moño del ícono se pega en el medio y
+ * late; cuando llega, se achica y se va.
  * La maneja el CSS (.gr-arranque en tokens.css) mirando si está la pantalla de carga, así arranca antes que el JS.
  * Esto solo la saca cuando terminó: va en el layout de la raíz, que no se vuelve a montar, así que no aparece en las
  * pantallas de carga de después (las de cada navegación).
@@ -48,12 +51,8 @@ export function Arranque() {
       <div className="gr-arranque__marco">
         <div className="gr-arranque__vuelo">
           <div className="gr-arranque__pegado">
-            <div className="gr-arranque__sombra"><Starburst size={150} className="gr-arranque__giro" /></div>
-            <Starburst size={150} className="gr-arranque__giro" />
-            <svg viewBox="0 0 100 100" className="gr-arranque__letra">
-              <text x="50" y="50" dy="0.35em" textAnchor="middle" fontSize={56} fontWeight={800}
-                    fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>G</text>
-            </svg>
+            <div className="gr-arranque__sombra"><Mono tonos={SOMBRA} className="gr-arranque__latido" /></div>
+            <Mono className="gr-arranque__latido" />
           </div>
         </div>
       </div>

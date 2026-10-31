@@ -1059,9 +1059,9 @@
 @keyframes gr-foto-grande { from { opacity: 0; } }
 
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
-   un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), la estrella del
-   ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de 30° la deja igual, así que aguanta lo
-   que tarde. Cuando llega la pantalla, se achica y se va. Todo con CSS, así anda antes que el JS:
+   un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), el moño del
+   ícono se pega en el medio y late, despacio, lo que tarde. Cuando llega la pantalla, se achica y se va. Todo con CSS,
+   así anda antes que el JS:
    las transiciones de la salida no corren si la pantalla ya llegó sin la de carga (ahí no se ve nada). */
 .gr-arranque {
   position: fixed; inset: 0; z-index: 50;
@@ -1086,9 +1086,8 @@
 }
 .gr-arranque__pegado, .gr-arranque__sombra { position: absolute; inset: 0; }
 .gr-arranque__vuelo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* la sombra va solo mientras está pegada: al despegarse se va de una */
-.gr-arranque__sombra polygon { fill: var(--gr-on-accent); }
-.gr-arranque__letra { opacity: 0; transition: opacity 150ms ease-out; }
+/* la sombra (el mismo moño, en tinta y suave) va solo mientras está pegada: al despegarse se va de una */
+.gr-arranque__sombra { opacity: 0.16; }
 
 /* Mientras carga. data-listo: ya llegó la primera pantalla (lo pone Arranque, así no vuelve en las de carga de después). */
 body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:not([data-listo]) {
@@ -1097,19 +1096,21 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-arranque__vuelo { opacity: 1; transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(1); transition: none; }
   .gr-arranque__pegado { animation: gr-se-pega 420ms cubic-bezier(0.3, 0, 0.2, 1) both; }
   .gr-arranque__sombra { transform: translate(7px, 7px); animation: gr-sombra 420ms ease-out both; }
-  .gr-arranque__giro { animation: gr-golpecito 600ms cubic-bezier(0.3, 0, 0.2, 1) 450ms infinite; }
-  .gr-arranque__letra { opacity: 1; transition: none; }
+  .gr-arranque__latido { animation: gr-latido 1100ms ease-in-out 450ms infinite; }
 }
 @keyframes gr-se-pega {
   from { opacity: 0; transform: scale(1.8) rotate(-25deg); }
   55% { opacity: 1; transform: scale(0.9) rotate(0deg); }
   78% { transform: scale(1.05) rotate(0deg); }
 }
-/* la sombra aparece cuando la estrella toca la pantalla */
+/* la sombra aparece cuando el moño toca la pantalla */
 @keyframes gr-sombra { from, 40% { transform: translate(0px, 0px); } }
-@keyframes gr-golpecito {
-  30% { transform: rotate(36deg); }
-  45%, to { transform: rotate(30deg); }
+/* late como un corazón: dos golpecitos y descansa */
+@keyframes gr-latido {
+  0%, 60%, 100% { transform: scale(1) rotate(0deg); }
+  15% { transform: scale(1.1) rotate(-5deg); }
+  30% { transform: scale(0.97) rotate(0deg); }
+  45% { transform: scale(1.06) rotate(3deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -14,13 +14,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#F6F6F8',
     // Todos a sangre y sin transparencia (como el apple-touch-icon): si un sistema usa estos en vez del
     // apple-touch-icon, no le quedan esquinas transparentes que después pinta de negro. En los deploys de prueba, los
-    // verdes con "DEV" (ver lib/entorno.ts), que sirven también de maskable: la etiqueta queda en la zona segura.
+    // blancos con "DEV" (ver lib/entorno.ts). Todos salen del moño, con scripts/iconos.mjs.
     icons: DE_PRUEBA
       ? [
         { src: '/dev/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: '/dev/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: '/dev/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        { src: '/dev/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/dev/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/dev/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ]
       : [
         { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

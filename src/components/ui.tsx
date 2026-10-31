@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { PARTES_MONO, type TonosMono } from '@/lib/mono'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -150,12 +151,30 @@ export function BackLink({ href, label, vidrio = false }: { href: string; label:
   )
 }
 
-/** El logo: "GiftR" en 900 con el puntito del acento. */
+/**
+ * El moño de la marca (ver lib/mono.ts), en los tonos del acento: si cambia el verde, cambia con él. tonos: otros (la
+ * sombra de la animación de inicio va toda en tinta).
+ */
+export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; className?: string; style?: React.CSSProperties }) {
+  const t = tonos ?? {
+    claro: 'var(--gr-acento)',
+    medio: 'color-mix(in oklch, var(--gr-acento) 80%, var(--gr-acento-oscuro))',
+    oscuro: 'color-mix(in oklch, var(--gr-acento) 55%, var(--gr-acento-oscuro))',
+    nudo: 'var(--gr-acento-oscuro)',
+  }
+  return (
+    <svg aria-hidden viewBox="0 0 100 100" className={className} style={style}>
+      {PARTES_MONO.map((p) => <path key={p.d} d={p.d} style={{ fill: t[p.tono] }} opacity={p.opacidad} />)}
+    </svg>
+  )
+}
+
+/** El logo: "GiftR" en 900 con el moño al final, un poco torcido. */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
+    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
       GiftR
-      <i aria-hidden className="-mt-2.5 size-[7px] rounded-full bg-gr-acento" />
+      <Mono className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />
     </span>
   )
 }
