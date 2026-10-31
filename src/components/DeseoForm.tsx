@@ -76,7 +76,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
           {Object.entries(PRIORIDADES).map(([value, { label, corazones }]) => (
             <label key={value} className="gr-chip group h-11 gap-1.5 px-3.5 text-[13px] has-[:checked]:px-3">
               <input type="radio" name="prioridad" value={value} defaultChecked={value === (deseo?.prioridad ?? 'gustaria')} className="sr-only" />
-              <Hearts n={corazones} className="group-has-[:checked]:text-gr-acento" />
+              <Hearts n={corazones} className="group-has-[:checked]:text-gr-on-acento" />
               <span className="sr-only group-has-[:checked]:not-sr-only">{label}</span>
             </label>
           ))}
@@ -108,7 +108,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       <div className="sticky bottom-0 z-10 -mx-[18px] mt-1 bg-gradient-to-t from-gr-bg from-70% to-transparent px-[18px] pb-[max(18px,env(safe-area-inset-bottom))] pt-3">
         {/* #que-queres: el título (ID_TITULO), escrito tal cual para que Tailwind arme la clase */}
         <BotonEnviar pendiente="Guardando…"
-                     className={`gr-btn-primary h-14 w-full text-[17px] group-has-[#que-queres:placeholder-shown]/deseo:border-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:bg-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:text-gr-muted`}>
+                     className={`gr-btn-primary h-14 w-full text-[17px] group-has-[#que-queres:placeholder-shown]/deseo:border-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:bg-gr-dot group-has-[#que-queres:placeholder-shown]/deseo:bg-none group-has-[#que-queres:placeholder-shown]/deseo:text-gr-muted`}>
           {boton}
         </BotonEnviar>
         <p className="mt-1.5 hidden text-center text-xs font-medium text-gr-muted group-has-[#que-queres:placeholder-shown]/deseo:block">

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { PARTES_MONO, type TonosMono } from '@/lib/mono'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -76,7 +77,7 @@ export function PriorityTag({ prioridad, children, className = '' }: {
     <span
       role="img" aria-label={label}
       className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-[0_1px_4px_rgb(20_20_20/0.14)] ${
-        dark ? 'bg-gr-brand text-gr-acento' : 'bg-white/95 text-[#121216]'} ${className}`}
+        dark ? 'bg-gr-brand text-gr-acento-sobre-tinta' : 'bg-white/95 text-[#121216]'} ${className}`}
     >
       <Hearts n={corazones} />
       {children && <span className={dark ? 'text-gr-on-brand' : ''}>{children}</span>}
@@ -150,12 +151,30 @@ export function BackLink({ href, label, vidrio = false }: { href: string; label:
   )
 }
 
-/** El logo: "GiftR" en 900 con el puntito del acento. */
+/**
+ * El moño de la marca (ver lib/mono.ts), en los tonos del acento: si cambia el verde, cambia con él. tonos: otros (la
+ * sombra de la animación de inicio va toda en tinta).
+ */
+export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; className?: string; style?: React.CSSProperties }) {
+  const t = tonos ?? {
+    claro: 'var(--gr-acento)',
+    medio: 'color-mix(in oklch, var(--gr-acento) 80%, var(--gr-acento-oscuro))',
+    oscuro: 'color-mix(in oklch, var(--gr-acento) 55%, var(--gr-acento-oscuro))',
+    nudo: 'var(--gr-acento-oscuro)',
+  }
+  return (
+    <svg aria-hidden viewBox="0 0 100 100" className={className} style={style}>
+      {PARTES_MONO.map((p) => <path key={p.d} d={p.d} style={{ fill: t[p.tono] }} opacity={p.opacidad} />)}
+    </svg>
+  )
+}
+
+/** El logo: "GiftR" en 900 con el moño al final, un poco torcido. */
 export function LogoSticker({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
+    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
       GiftR
-      <i aria-hidden className="-mt-2.5 size-[7px] rounded-full bg-gr-acento" />
+      <Mono className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />
     </span>
   )
 }
@@ -257,7 +276,7 @@ export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { tit
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h2 id={id} className="gr-heading">{title}</h2>
-      {href && <Link href={href} className="flex-none text-sm font-semibold">{linkLabel}</Link>}
+      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
     </div>
   )
 }

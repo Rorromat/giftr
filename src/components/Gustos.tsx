@@ -169,7 +169,7 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
     <Link href={href} className={`flex flex-col gap-3 rounded-[22px] p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
       <span className="flex items-center gap-3">
         <MiniIlustracion paso={b.paso} />
-        <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-acento' : ''}`}>{b.titulo}</span>
+        <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-acento-sobre-tinta' : ''}`}>{b.titulo}</span>
         <span className="flex-none text-sm font-semibold underline underline-offset-4">Editar</span>
       </span>
       {b.partes.map((p) => (

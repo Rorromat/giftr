@@ -13,7 +13,8 @@ export type DibujoAgregado = 'link' | 'foto' | 'galeria' | 'escribir'
 
 const TINTA = '#121216'
 const BLANCO = '#FFFFFF'
-const ACENTO = '#F2413B'
+// el detalle de cada una, en el acento de la marca
+const ACENTO = 'var(--gr-acento)'
 // los grises de la base (ver tokens.css), de más claro a más oscuro
 const GRIS_1 = '#EDEDF0'
 const GRIS_2 = '#DCDCE1'
@@ -125,9 +126,9 @@ export function IlustracionAgregado({ dibujo, oscura = false, className = '' }: 
             <path d="M93 102 L104 87 L112 96 L118 90 L127 102 Z" fill={GRIS_4} />
             <rect x="93" y="71" width="34" height="31" rx="3" fill="none" stroke={TINTA} strokeWidth="2" />
           </g>
-          {/* la elegida, con el tilde en el acento */}
+          {/* la elegida, con el tilde en el acento (en tinta, que se lee sobre el verde) */}
           <circle cx="132" cy="66" r="10" fill={ACENTO} stroke={TINTA} strokeWidth="3" />
-          <path d="M127 66.5 L130.5 70 L137 63" fill="none" stroke={BLANCO} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M127 66.5 L130.5 70 L137 63" fill="none" stroke={TINTA} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           <Destello cx={36} cy={52} s={6} fill={destello} /><Destello cx={124} cy={126} s={4} fill={GRIS_3} />
         </>
       )

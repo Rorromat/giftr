@@ -7,6 +7,7 @@ import { esFotoPublica, type ItemCompartido, type ListaCompartida } from '@/lib/
 import { bajarFoto, pedirAfuera } from '@/lib/bajar-foto'
 import { leerFotoDeseo } from '@/lib/fotos-deseo'
 import { idDeUrlFotoDeseo } from '@/lib/links'
+import { PARTES_MONO, TONOS_MONO } from '@/lib/mono'
 
 // Imágenes Open Graph (la vista previa de WhatsApp) con el estilo Sticker: crema, tinta, ácido y bordes gruesos.
 // Generador: next/og (Satori), que solo entiende flexbox y no lee WebP; las fotos pasan antes por sharp.
@@ -54,13 +55,23 @@ function Starburst({ size, texto, fontSize }: { size: number; texto: string; fon
   )
 }
 
+/** El moño de la marca (ver lib/mono.ts). */
+function Mono({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      {PARTES_MONO.map((p) => <path key={p.d} d={p.d} fill={TONOS_MONO[p.tono]} opacity={p.opacidad} />)}
+    </svg>
+  )
+}
+
 function Logo({ arriba = false }: { arriba?: boolean }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', position: 'absolute', right: 52, ...(arriba ? { top: 52 } : { bottom: 44 }) }}>
       <div style={{
         display: 'flex', padding: '4px 22px 10px', background: C.surface, border: `4px solid ${C.ink}`, borderRadius: 22,
         boxShadow: `6px 6px 0 ${C.ink}`, transform: 'rotate(-3deg)', fontSize: 52, fontWeight: 800, letterSpacing: -3, color: C.ink,
-      }}>GiftR</div>
+        alignItems: 'flex-start',
+      }}>GiftR<div style={{ display: 'flex', marginTop: -2, marginLeft: 4, transform: 'rotate(14deg)' }}><Mono size={50} /></div></div>
     </div>
   )
 }
@@ -159,7 +170,7 @@ export async function imagenLista(l: ListaCompartida) {
 export function imagenGenerica() {
   return render(
     <div style={{ ...fondo, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 30 }}>
-      <Starburst size={220} texto="G" fontSize={110} />
+      <Mono size={240} />
       <div style={{ display: 'flex', fontSize: 56, fontWeight: 800, letterSpacing: -2, color: C.ink }}>Pedí lo que querés sin pedirlo.</div>
     </div>,
   )

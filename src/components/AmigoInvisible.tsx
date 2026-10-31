@@ -267,7 +267,7 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
         </p>
       )}
       <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
-        <Icon name="antifaz" size={20} className="flex-none text-gr-acento" />
+        <Icon name="antifaz" size={20} className="flex-none text-gr-acento-sobre-tinta" />
         Se sortea entre los que juegan y cada uno ve solo a quién le regala. Nadie más lo ve, tampoco vos que lo organizás.
       </p>
       <ElegirFechaDelJuego inicial={fechaEspecial} propuestas={propuestas}
@@ -527,14 +527,14 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   const { persona, token } = v.meToca
   return (
     <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
-      <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento"><Icon name="antifaz" size={18} />TE TOCÓ</span>
-      <AvatarSticker nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento" />
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento-sobre-tinta"><Icon name="antifaz" size={18} />TE TOCÓ</span>
+      <AvatarSticker nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento-sobre-tinta" />
       <p className="text-[28px] leading-tight font-semibold [overflow-wrap:anywhere]">{persona.nombre}</p>
       <p className="text-[13px] opacity-80">
         Solo vos lo sabés.{v.soyOrganizador ? ' Nadie más lo ve.' : ` Ni ${primerNombre(v.organizador.nombre)} (que lo organiza) lo ve.`}
       </p>
       {tambien.length > 0 && (
-        <p className="text-[13px] font-semibold text-gr-acento">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
+        <p className="text-[13px] font-semibold text-gr-acento-sobre-tinta">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
       )}
       {token && <Link href={`/l/${token}`} className="gr-btn gr-btn--accent mt-1.5 h-12 w-full">Ver su lista y sus talles</Link>}
       <div className="mt-1 text-gr-ink"><YaLoTengo id={v.id} tengo={v.yaLoTengo} /></div>

@@ -40,7 +40,7 @@ function prioridad(p: Prioridad, voz: Voz): Ficha {
   const visual = (
     <span className="flex gap-1">
       {[1, 2, 3].map((n) => (
-        <span key={n} className={n <= PRIORIDADES[p].corazones ? (oscura ? 'text-gr-acento' : 'text-gr-ink') : 'opacity-25'}>
+        <span key={n} className={n <= PRIORIDADES[p].corazones ? (oscura ? 'text-gr-acento-sobre-tinta' : 'text-gr-ink') : 'opacity-25'}>
           <Heart size={18} />
         </span>
       ))}

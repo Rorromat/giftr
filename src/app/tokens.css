@@ -1,8 +1,8 @@
 /* GiftR — sistema visual "Tapas". La base no tiene color: papel de día y casi negro de noche, según el modo del teléfono
-   (prefers-color-scheme). El color lo ponen las personas y sus deseos (ver lib/tapas.ts): cada lista tiene su tapa, que
-   pinta la pantalla de arriba y se funde con el fondo, y cada deseo tiñe su pantalla. Un solo acento de marca, y chico
-   (--gr-acento): el puntito del logo, la pestaña activa, los avisos sin leer y lo que ya reservaste. Los botones
-   principales van en tinta. La estrella lima queda en los stickers (el sello, la inicial de un deseo sin foto): --gr-accent.
+   (prefers-color-scheme). El color lo ponen las fotos de los deseos y, apenas, la tapa de cada lista (ver lib/tapas.ts). Un
+   solo acento de marca, verde pino (--gr-acento), liso y en degradé (--gr-acento-degrade) en lo que hay que destacar: el
+   botón principal, la pestaña activa, el +, el agregado, los chips y pestañas elegidos, los "Ver más", los avisos sin leer y
+   el puntito del logo. La estrella lima queda en los stickers (el sello): --gr-accent.
    Todo va en Hanken Grotesk (la carga next/font en layout.tsx y expone --font-hanken): los títulos en 900, grandes y
    apretados. Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
 
@@ -20,13 +20,20 @@
   --gr-dot: #DCDCE1;
   --gr-line: rgb(18 18 22 / 0.09);
   --gr-line-strong: #8A8A93;
-  /* Lo principal (botones, chips y pestañas elegidas) va en tinta: negro de día, blanco de noche */
+  /* La tinta como superficie (tarjetas oscuras, el toast, lo que no es del acento): negro de día, blanco de noche */
   --gr-brand: var(--gr-ink);
   --gr-on-brand: #FFFFFF;
 
-  /* El acento de la marca: uno solo, y chico. Para probar otro, se cambia acá (y su texto encima). */
-  --gr-acento: #F2413B;
-  --gr-on-acento: #FFFFFF;
+  /* El acento de la marca, un verde vivo: de relleno, liso y en degradé (de un tono más claro arriba a la izquierda a uno más
+     oscuro abajo a la derecha), con tinta encima, que se lee en todo el recorrido. Como texto o ícono hace falta un tono más
+     oscuro (--gr-acento-oscuro): sobre el fondo y las tarjetas de día (--gr-acento-texto) y sobre lo que va en tinta de
+     noche, que es claro (--gr-acento-sobre-tinta). Para probar otro verde, se cambian estos tres. */
+  --gr-acento: #10B66E;
+  --gr-acento-oscuro: #08794A;
+  --gr-acento-degrade: linear-gradient(135deg, #3CD592 0%, #10B66E 50%, #0A9A5B 100%);
+  --gr-on-acento: #121216;
+  --gr-acento-texto: var(--gr-acento-oscuro);
+  --gr-acento-sobre-tinta: var(--gr-acento);
   /* La estrella lima de los stickers, con su tinta: igual en los dos modos */
   --gr-accent: #C8F31D;
   --gr-on-accent: #141414;
@@ -81,6 +88,8 @@
     --gr-line: rgb(255 255 255 / 0.09);
     --gr-line-strong: #6E6E77;
     --gr-on-brand: #0C0C0E;
+    --gr-acento-texto: var(--gr-acento);
+    --gr-acento-sobre-tinta: var(--gr-acento-oscuro);
     --gr-comun: #182038;
     --gr-comun-line: #2E3D66;
     --gr-comun-ink: #A6BCFF;
@@ -211,16 +220,17 @@
     transition: transform 80ms ease;
   }
   .gr-btn:active, .gr-btn-primary:active { transform: scale(0.98); }
+  /* el principal, en el acento en degradé */
   .gr-btn-primary {
-    border-color: var(--gr-brand);
-    background: var(--gr-brand);
-    color: var(--gr-on-brand);
+    border-color: transparent;
+    background: var(--gr-acento-degrade);
+    color: var(--gr-on-acento);
     min-height: 52px;
     font-size: 16px;
   }
   .gr-btn--sm { min-height: 44px; font-size: 14px; padding: 0 16px; }
   .gr-btn--dark { border-color: var(--gr-brand); background: var(--gr-brand); color: var(--gr-on-brand); }
-  .gr-btn--accent { border-color: var(--gr-acento); background: var(--gr-acento); color: var(--gr-on-acento); }
+  .gr-btn--accent { border-color: transparent; background: var(--gr-acento-degrade); color: var(--gr-on-acento); }
   .gr-btn--hero { border-color: var(--gr-hero-btn); background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
   /* Sobre una tapa o un color: blanco, y de vidrio */
   .gr-btn--blanco { border-color: #FFFFFF; background: #FFFFFF; color: #121216; }
@@ -278,7 +288,7 @@
   }
   .gr-chip[aria-pressed="true"],
   .gr-chip[aria-current="page"],
-  .gr-chip:has(:checked) { background: var(--gr-brand); border-color: var(--gr-brand); color: var(--gr-on-brand); font-weight: 700; }
+  .gr-chip:has(:checked) { background: var(--gr-acento); border-color: var(--gr-acento); color: var(--gr-on-acento); font-weight: 700; }
 
   /* Segmentado: un riel suave con lo elegido en tinta */
   .gr-segmented {
@@ -306,18 +316,18 @@
   }
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-current="page"],
-  .gr-segmented > :has(:checked) { background: var(--gr-brand); color: var(--gr-on-brand); font-weight: 700; }
+  .gr-segmented > :has(:checked) { background: var(--gr-acento-degrade); color: var(--gr-on-acento); font-weight: 700; }
   /* Pestañas de dos con la pastilla que se desliza (ver PestanasRegalos): el fondo lo lleva ::before y se corre a la
      marcada (data-columna) desde el toque, en vez de saltar de una a otra. */
   .gr-segmented--desliza { position: relative; isolation: isolate; }
   .gr-segmented--desliza::before {
     content: ''; position: absolute; z-index: -1; inset: 4px auto 4px 4px; width: calc(50% - 6px);
-    border-radius: var(--gr-radius-pill); background: var(--gr-brand);
+    border-radius: var(--gr-radius-pill); background: var(--gr-acento-degrade);
     transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .gr-segmented--desliza[data-columna="1"]::before { transform: translateX(calc(100% + 4px)); }
   .gr-segmented.gr-segmented--desliza > * { background: transparent; color: var(--gr-ink); font-weight: 600; transition: color 200ms ease; }
-  .gr-segmented.gr-segmented--desliza > [data-marcado] { color: var(--gr-on-brand); font-weight: 700; }
+  .gr-segmented.gr-segmented--desliza > [data-marcado] { color: var(--gr-on-acento); font-weight: 700; }
   /* mientras llega la otra pestaña (si no estaba precargada), lo de abajo se apaga: el título ya es el de la otra */
   main:has(> .gr-segmented--desliza[data-pendiente]) > .gr-fundido { opacity: 0.45; transition: opacity 150ms ease; }
 
@@ -398,7 +408,7 @@
   }
 
   /* Navegación inferior (<BottomNav>): una píldora de vidrio esmerilado con las cuatro secciones y, al costado, el + en un
-     círculo del mismo vidrio. La sección marcada va en el acento y se estira: las columnas se reparten con
+     círculo del acento en degradé. La sección marcada va en una píldora del acento y se estira: las columnas se reparten con
      grid-template-columns, que se anima con un rebote, así la marca crece en la nueva mientras se achica en la vieja, y su
      ícono da un saltito. El + abre el agregado (<Agregado>): gira y queda como ×, mientras la píldora se esconde. */
   .gr-nav {
@@ -461,6 +471,17 @@
   }
   .gr-nav__tabs a svg { flex: none; }
   .gr-nav__tabs a { position: relative; z-index: 1; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  /* la píldora del acento en degradé de la marcada: se prende en la nueva mientras se apaga en la vieja */
+  .gr-nav__tabs a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--gr-acento-degrade);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
   /* El selector que sigue al dedo: aparece al arrastrar, un poco más grande y con sombra, como una lupa, y va donde está el
      dedo sin demora. Al soltar llega a la sección elegida con un rebote y se apaga mientras se prende la marca de esa. */
   .gr-nav__dedo {
@@ -484,14 +505,11 @@
   }
   .gr-nav__tabs[data-dedo="soltando"] .gr-nav__dedo { opacity: 1; }
   /* mientras tanto, la marca de cada sección se apaga: el que marca es el selector */
-  .gr-nav__tabs[data-dedo] a[data-marcado] { background: transparent; }
+  .gr-nav__tabs[data-dedo] a[data-marcado]::before { opacity: 0; }
   .gr-nav__tabs[data-dedo="arrastrando"] a[data-marcado] { color: var(--gr-ink); opacity: 0.62; }
-  .gr-nav__tabs[data-dedo] a[data-bajo] { color: var(--gr-acento); opacity: 1; }
-  .gr-nav__tabs a[data-marcado] {
-    color: var(--gr-acento);
-    opacity: 1;
-    background: color-mix(in oklch, var(--gr-acento) 14%, transparent);
-  }
+  .gr-nav__tabs[data-dedo] a[data-bajo] { color: var(--gr-acento-texto); opacity: 1; }
+  .gr-nav__tabs a[data-marcado] { color: var(--gr-on-acento); opacity: 1; }
+  .gr-nav__tabs a[data-marcado]::before { opacity: 1; }
   /* el ícono de la recién marcada: se encoge, salta y se acomoda */
   .gr-nav__tabs a[data-marcado] svg { animation: gr-nav-salto 460ms var(--gr-entra); }
   .gr-mas {
@@ -504,19 +522,17 @@
     place-items: center;
     padding: 0;
     border-radius: 50%;
-    border: 1px solid var(--gr-glass-line);
-    background: var(--gr-glass);
-    color: var(--gr-ink);
-    -webkit-backdrop-filter: blur(22px) saturate(1.8);
-    backdrop-filter: blur(22px) saturate(1.8);
-    box-shadow: var(--gr-shadow-float);
+    border: 0;
+    background: var(--gr-acento-degrade);
+    color: var(--gr-on-acento);
+    box-shadow: 0 10px 26px -8px color-mix(in oklch, var(--gr-acento) 60%, transparent);
     cursor: pointer;
     transition: transform 500ms var(--gr-barre), background-color 300ms, color 300ms, border-color 300ms;
   }
   .gr-mas:active { transform: scale(0.92); }
   /* con el agregado abierto: el + gira y queda como × blanco sobre el acento, y la píldora se va */
   .gr-nav[data-abierto] .gr-nav__tabs { opacity: 0; transform: translateY(24px); pointer-events: none; }
-  .gr-nav[data-abierto] .gr-mas { transform: rotate(135deg); background: var(--gr-on-acento); color: var(--gr-acento); border-color: transparent; }
+  .gr-nav[data-abierto] .gr-mas { transform: rotate(135deg); background: var(--gr-on-acento); color: var(--gr-acento); }
   /* En Agregar (y en un deseo, con una sola acción principal) la barra se esconde: baja entera. */
   .gr-nav[data-oculta] { transform: translateY(calc(100% + 32px)); transition-delay: 90ms; }
   /* con el teclado abierto (iOS instalado) no flota arriba del teclado: se va */
@@ -606,7 +622,7 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
-    background: var(--gr-acento);
+    background: var(--gr-acento-degrade);
     color: var(--gr-on-acento);
     clip-path: circle(0px at var(--x, 85%) var(--y, 92%));
     transition: clip-path 550ms var(--gr-barre);
@@ -713,7 +729,7 @@
     place-items: center;
     overflow: hidden;
     padding: 60px 26px 120px;
-    color: #FFFFFF;
+    color: var(--gr-on-acento);
     text-align: center;
     opacity: 0;
     pointer-events: none;
@@ -729,17 +745,18 @@
   .gr-cuanto button {
     min-height: 36px;
     padding: 0 13px;
-    border: 1px solid rgb(255 255 255 / 0.3);
+    border: 1px solid color-mix(in oklch, var(--gr-on-acento) 22%, transparent);
     border-radius: 999px;
-    background: rgb(255 255 255 / 0.14);
-    color: #FFFFFF;
+    background: rgb(255 255 255 / 0.22);
+    color: var(--gr-on-acento);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
   }
-  .gr-cuanto button[aria-pressed="true"] { background: #FFFFFF; color: #121216; }
+  .gr-cuanto button[aria-pressed="true"] { background: var(--gr-on-acento); color: #FFFFFF; }
+  .gr-agr__listo .gr-btn--vidrio { border-color: color-mix(in oklch, var(--gr-on-acento) 22%, transparent); background: rgb(255 255 255 / 0.22); color: var(--gr-on-acento); }
 
   /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
   .gr-nuevo { animation: gr-entra-deseo 700ms var(--gr-entra) both; }
@@ -1042,9 +1059,9 @@
 @keyframes gr-foto-grande { from { opacity: 0; } }
 
 /* Animación de inicio (<Arranque> en el layout de la raíz). Mientras la primera pantalla está cargando (la de carga es
-   un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), la estrella del
-   ícono se pega en el medio y gira a golpecitos: con 12 puntas, cada golpecito de 30° la deja igual, así que aguanta lo
-   que tarde. Cuando llega la pantalla, se achica y se va. Todo con CSS, así anda antes que el JS:
+   un <main aria-busy>, o un .gr-cargando si lo de arriba de la sección ya está, ver SkeletonContenido), el moño del
+   ícono se pega en el medio y late, despacio, lo que tarde. Cuando llega la pantalla, se achica y se va. Todo con CSS,
+   así anda antes que el JS:
    las transiciones de la salida no corren si la pantalla ya llegó sin la de carga (ahí no se ve nada). */
 .gr-arranque {
   position: fixed; inset: 0; z-index: 50;
@@ -1069,9 +1086,8 @@
 }
 .gr-arranque__pegado, .gr-arranque__sombra { position: absolute; inset: 0; }
 .gr-arranque__vuelo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* la sombra va solo mientras está pegada: al despegarse se va de una */
-.gr-arranque__sombra polygon { fill: var(--gr-on-accent); }
-.gr-arranque__letra { opacity: 0; transition: opacity 150ms ease-out; }
+/* la sombra (el mismo moño, en tinta y suave) va solo mientras está pegada: al despegarse se va de una */
+.gr-arranque__sombra { opacity: 0.16; }
 
 /* Mientras carga. data-listo: ya llegó la primera pantalla (lo pone Arranque, así no vuelve en las de carga de después). */
 body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:not([data-listo]) {
@@ -1080,19 +1096,21 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-arranque__vuelo { opacity: 1; transform: translate(calc(61px - 50cqw), calc(50cqh - 157px)) rotate(0deg) scale(1); transition: none; }
   .gr-arranque__pegado { animation: gr-se-pega 420ms cubic-bezier(0.3, 0, 0.2, 1) both; }
   .gr-arranque__sombra { transform: translate(7px, 7px); animation: gr-sombra 420ms ease-out both; }
-  .gr-arranque__giro { animation: gr-golpecito 600ms cubic-bezier(0.3, 0, 0.2, 1) 450ms infinite; }
-  .gr-arranque__letra { opacity: 1; transition: none; }
+  .gr-arranque__latido { animation: gr-latido 1100ms ease-in-out 450ms infinite; }
 }
 @keyframes gr-se-pega {
   from { opacity: 0; transform: scale(1.8) rotate(-25deg); }
   55% { opacity: 1; transform: scale(0.9) rotate(0deg); }
   78% { transform: scale(1.05) rotate(0deg); }
 }
-/* la sombra aparece cuando la estrella toca la pantalla */
+/* la sombra aparece cuando el moño toca la pantalla */
 @keyframes gr-sombra { from, 40% { transform: translate(0px, 0px); } }
-@keyframes gr-golpecito {
-  30% { transform: rotate(36deg); }
-  45%, to { transform: rotate(30deg); }
+/* late como un corazón: dos golpecitos y descansa */
+@keyframes gr-latido {
+  0%, 60%, 100% { transform: scale(1) rotate(0deg); }
+  15% { transform: scale(1.1) rotate(-5deg); }
+  30% { transform: scale(0.97) rotate(0deg); }
+  45% { transform: scale(1.06) rotate(3deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1118,6 +1136,6 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-girar__tel { animation: none; }
   /* los íconos de los avisos, quietos (en su lugar, con los tres puntitos prendidos) */
   .gr-aviso-icono[data-mueve] > svg, .gr-aviso-icono[data-mueve] .gr-aviso__punto { animation: none; }
-  /* la estrella quieta mientras carga, y se va de una */
+  /* el moño quieto mientras carga (sin pegarse ni latir), y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }

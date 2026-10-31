@@ -77,7 +77,7 @@ function YaLoReservaste({ item }: { item: Tarjeta }) {
   const compraste = item.claims.some((c) => c.esMia && !c.grupal && c.estado === 'comprado')
   return (
     <span className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-gr-brand px-3.5 text-[13px] font-semibold text-gr-on-brand">
-      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.2} className="text-gr-acento" />
+      <Icon name={grupal ? 'users' : compraste ? 'check' : 'lock'} size={14} strokeWidth={2.2} className="text-gr-acento-sobre-tinta" />
       {grupal ? 'En el regalo grupal' : compraste ? 'Ya lo compraste' : 'Ya lo reservaste'}
     </span>
   )
