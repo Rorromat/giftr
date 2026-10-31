@@ -1,80 +1,51 @@
 import Link from 'next/link'
-import { AvatarStack, Icon, PRIORIDADES } from '@/components/ui'
-import { TarjetaRegalo } from '@/components/TarjetaRegalo'
-import { fechaLarga, MESES, type Evento } from '@/lib/events'
-import type { GiverItemView, OwnerItemView } from '@/lib/serialize'
+import { AvatarStack, Icon } from '@/components/ui'
+import { fechaLarga, type Evento } from '@/lib/events'
 
-// Inicio: lo próximo es una tarjeta grande con la foto de lo que más quiere esa persona y, abajo, un estante con sus
-// deseos, que se desliza de costado. Server components puros.
-
-/** Cuántos deseos van en el estante (los demás, en su lista). */
-const EN_EL_ESTANTE = 10
+// Inicio: lo próximo es una tarjeta grande con el color de esa persona y lo que más quiere pegado como stickers; toda la
+// tarjeta lleva a su lista. Server components puros.
 
 const conMayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 
+/** Cómo va cada sticker (hasta tres): dónde y qué tan torcido, del de más atrás al de más adelante. */
+const STICKERS = ['right-0 top-0 rotate-[8deg]', 'left-0 top-10 -rotate-[10deg]', 'right-7 top-[86px] rotate-[3deg]']
+
 /**
- * La tarjeta grande del próximo cumple (o fecha de una lista en común): la foto de lo que más quiere, a sangre (sin foto, su
- * color), quién es arriba, el día en un recuadro blanco y cuánto falta abajo. Toda la tarjeta lleva a su lista.
+ * La tarjeta grande del próximo cumple (o fecha de una lista en común): su color, quién es, lo que más quiere pegado como
+ * stickers torcidos en la esquina, cuánto falta y cuándo cae, y "Ver su lista" con cuántos deseos tiene. Toda la tarjeta
+ * lleva a su lista. deseos: cuántos tiene para regalar.
  */
-export function Destacada({ e, color }: { e: Evento; color: string }) {
+export function Destacada({ e, color, hoy, deseos }: { e: Evento; color: string; hoy: Date; deseos: number }) {
   const cuando = e.dias === 0 ? 'es hoy' : e.dias === 1 ? 'es mañana' : `es en ${e.dias} días`
   const quien = e.tipo === 'cumple' ? e.personas[0] : e.titulo
+  const verLista = e.tipo === 'cumple' ? 'Ver su lista' : 'Ver la lista'
   return (
-    <Link href={e.href} aria-label={`${e.titulo}: ${cuando}. Ver ${e.tipo === 'cumple' ? 'su lista' : 'la lista'}`}
+    <Link href={e.href} aria-label={`${e.titulo}: ${cuando}. ${verLista}`}
           className="gr-destacada" style={{ '--c': color } as React.CSSProperties}>
-      {e.fotos[0] && (
-        // eslint-disable-next-line @next/next/no-img-element -- la foto de un deseo, subida o de una tienda
-        <img src={e.fotos[0]} alt="" className="gr-destacada__foto" />
+      <div className="flex min-w-0 items-center gap-2.5 text-sm font-semibold">
+        <AvatarStack nombres={e.personas.slice(0, 3)} fotos={e.caras.slice(0, 3)} size={30} className="[&>span]:border-white/40 [&>span]:!bg-white/25" />
+        <span className="max-w-[45%] truncate">{quien}</span>
+      </div>
+      {/* lo que más quiere, como stickers pegados torcidos en la esquina */}
+      {e.fotos.length > 0 && (
+        <div aria-hidden className="pointer-events-none absolute right-3 top-3 h-[190px] w-[172px]">
+          {e.fotos.slice(0, 3).map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element -- fotos de los deseos, subidas o de tiendas
+            <img key={src} src={src} alt="" loading="lazy" className={`gr-destacada__sticker ${STICKERS[i]}`} />
+          ))}
+        </div>
       )}
-      <div className="flex items-start justify-between gap-3">
-        <AvatarStack nombres={e.personas.slice(0, 3)} fotos={e.caras.slice(0, 3)} size={44} className="[&>span]:border-white" />
-        <span aria-hidden className="flex w-14 flex-none flex-col items-center rounded-2xl bg-white py-1.5 text-[#121216]">
-          <span className="text-[26px] leading-none font-bold tabular-nums">{e.fecha.getUTCDate()}</span>
-          <span className="text-[13px] text-[#6C6C75]">{conMayuscula(MESES[e.fecha.getUTCMonth()].slice(0, 3))}</span>
+      <div className="relative flex flex-col gap-1">
+        <span className="gr-label text-white/80">{e.tipo === 'cumple' ? 'Cumple' : 'Es'} {cuando.replace(/^es /, '')}</span>
+        <h2 className="max-w-[8ch] text-[32px] leading-[0.95] font-black tracking-[-0.045em]">{conMayuscula(fechaLarga(e.fecha, hoy))}</h2>
+      </div>
+      <span className="gr-btn gr-btn--blanco relative w-full justify-between">
+        <span>{verLista}</span>
+        <span className="flex items-center gap-1 text-[#6C6C75]">
+          {deseos > 0 && <span className="text-sm font-semibold">{deseos} {deseos === 1 ? 'deseo' : 'deseos'}</span>}
+          <Icon name="chevron" size={18} strokeWidth={2.6} />
         </span>
-      </div>
-      <div className="flex flex-col gap-1">
-        <p className="text-[15px] font-medium text-white/90 [overflow-wrap:anywhere]">{quien}</p>
-        <h2 className="text-[30px] leading-[1.05] font-bold tracking-[-0.03em]">
-          {e.tipo === 'cumple' ? 'Cumple' : 'Es'} {cuando.replace(/^es /, '')}
-        </h2>
-        <p className="mt-1 text-sm text-white/80">{fechaLarga(e.fecha)} · {e.tipo === 'cumple' ? 'Ver su lista' : 'Ver la lista'}</p>
-      </div>
+      </span>
     </Link>
-  )
-}
-
-
-/** "Reservado por vos", "Comprado": lo que ya no está libre, con el puntito del acento. */
-function estado(i: GiverItemView) {
-  if (!i.claims.length) return null
-  if (i.claims.every((c) => c.estado === 'comprado')) return 'Comprado'
-  return i.claims.some((c) => c.esMia || c.grupal?.soyParte) ? 'Reservado por vos' : null
-}
-
-/** El estante con los deseos de una lista: los libres primero, cada uno como regalo posible (ver TarjetaRegalo). */
-export function EstanteDeLista({ titulo, href, token, items }: {
-  titulo: string
-  href: string
-  token: string
-  items: (GiverItemView | OwnerItemView)[]
-}) {
-  const libres = [...items].sort((a, b) => Number('disponible' in b ? b.disponible : true) - Number('disponible' in a ? a.disponible : true))
-  if (!libres.length) return null
-  return (
-    <section aria-label={titulo} className="flex flex-col gap-3">
-      <h2 className="gr-heading">
-        <Link href={href} className="inline-flex items-center gap-1.5">{titulo}<Icon name="chevron" size={18} strokeWidth={2.6} className="text-gr-muted" /></Link>
-      </h2>
-      <ul className="gr-estante">
-        {libres.slice(0, EN_EL_ESTANTE).map((i) => (
-          <li key={i.id}>
-            <TarjetaRegalo href={`/l/${token}/item/${i.id}`} foto={i.fotoUrl} titulo={i.titulo} precio={i.precio ?? i.rangoPrecio}
-                           apagado={'disponible' in i && !i.disponible} corazones={PRIORIDADES[i.prioridad].corazones}
-                           estado={'claims' in i ? estado(i) : null} />
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }

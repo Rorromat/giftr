@@ -552,28 +552,32 @@
   }
   .gr-tapa__sub { color: var(--gr-muted); }
 
-  /* La tarjeta grande de Inicio (el próximo cumple): la foto de lo que más quiere, a sangre, con un degradé oscuro arriba y
-     abajo para que se lea el texto en blanco. Sin foto, el color de esa persona. */
+  /* La tarjeta grande de Inicio (<Destacada>, lo próximo): el color de esa persona en degradé, lo que más quiere pegado
+     como stickers torcidos (foto con borde blanco y sombra) en la esquina, y abajo cuándo es y "Ver su lista". */
   .gr-destacada {
     position: relative;
-    isolation: isolate;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 320px;
-    padding: 16px 18px 18px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    align-items: end;
+    gap: 14px;
+    min-height: 268px;
+    padding: 18px;
     border-radius: 26px;
     color: #FFFFFF;
-    background: var(--c, #2A2A30);
+    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
+    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
   }
-  .gr-destacada__foto { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
-  .gr-destacada::after {
-    content: '';
+  .gr-destacada > :first-child { align-self: start; }
+  .gr-destacada__sticker {
     position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(180deg, rgb(0 0 0 / 0.3), transparent 28%, transparent 42%, rgb(0 0 0 / 0.8));
+    width: 96px;
+    height: 96px;
+    border: 4px solid #FFFFFF;
+    border-radius: 18px;
+    background: #FFFFFF;
+    object-fit: cover;
+    box-shadow: 0 14px 28px -10px rgb(0 0 0 / 0.5);
   }
 
   /* Estantes: una fila de deseos que se desliza de costado (como los de Podcasts), de lado a lado de la pantalla */

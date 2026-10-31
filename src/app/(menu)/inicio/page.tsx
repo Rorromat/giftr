@@ -28,7 +28,7 @@ import { misAmigosInvisibles } from '@/lib/amigo-invisible'
 import { especialesQueVienen } from '@/lib/fechas-especiales'
 import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
-import { Destacada, EstanteDeLista } from '@/components/Estante'
+import { Destacada } from '@/components/Estante'
 import { getListForViewer } from '@/lib/lists'
 import { colorDe, tapaDe } from '@/lib/tapas'
 
@@ -62,12 +62,17 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
   const especiales = especialesQueVienen(hoy, juegos)
-  // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su color y el estante con sus deseos
+  // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su color, lo que más quiere y cuántos deseos
+  // tiene. Abajo, en "Más adelante", va todo lo demás (sin repetirlo)
   const destacado = eventos.find((e) => !e.propio && e.href.startsWith('/l/'))
   const token = destacado?.href.slice('/l/'.length)
   const suLista = token ? await getListForViewer(db, token, { userId: session.userId }) : null
   const unDueno = suLista && suLista.role !== 'owner' && !suLista.grupoNombre && suLista.perfiles.length === 1 ? suLista.perfiles[0] : null
   const suColor = suLista ? (unDueno ? tapaDe(unDueno.id) : colorDe(suLista.listId)) : null
+  // la tarjeta va si su lista se pudo abrir; si no, ese evento queda abajo con los demás
+  const enGrande = destacado && suColor && suLista && suLista.role !== 'owner'
+    ? { e: destacado, color: suColor, deseos: suLista.items.filter((i) => !('disponible' in i) || i.disponible).length }
+    : null
   // lo que vence antes primero (los grupales no vencen); si no, lo último que reservaste
   const aComprar = [...pendientes].sort((a, b) => (a.venceEnDias ?? Infinity) - (b.venceEnDias ?? Infinity)).slice(0, POR_COMPRAR)
 
@@ -80,15 +85,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
         <p className="text-sm text-gr-muted">Cumples, regalos y avisos de tu gente.</p>
       </div>
 
-      {destacado && suColor && token && suLista && (
-        <>
-          <Destacada e={destacado} color={suColor} />
-          {suLista.role !== 'owner' && (
-            <EstanteDeLista titulo={unDueno ? `Para ${unDueno.nombre.split(' ')[0]}` : `Para ${suLista.grupoNombre ?? suLista.ownerNombre}`}
-                            href={destacado.href} token={token} items={suLista.items} />
-          )}
-        </>
-      )}
+      {enGrande && <Destacada e={enGrande.e} color={enGrande.color} hoy={hoy} deseos={enGrande.deseos} />}
 
       <Banners />
       {/* te proponen dividir un regalo: te sumás o no */}
@@ -125,8 +122,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
       {(eventos.length > 0 || especiales.length > 0) && (
         <>
-          <SectionHeader title="Próximos" href="/eventos" linkLabel="Todo el año" />
-          <Proximos eventos={eventos} hoy={hoy} especiales={especiales} />
+          <SectionHeader title={enGrande ? 'Más adelante' : 'Próximos'} href="/eventos" linkLabel="Todo el año" />
+          <Proximos eventos={enGrande ? eventos.filter((e) => e !== enGrande.e) : eventos} hoy={hoy} especiales={especiales} />
         </>
       )}
       {eventos.length === 0 && (
