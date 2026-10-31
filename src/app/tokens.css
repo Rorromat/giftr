@@ -568,7 +568,7 @@
   .gr-tapa .gr-label { color: rgb(255 255 255 / 0.8); }
   .gr-tapa :focus-visible { outline-color: #FFFFFF; }
 
-  /* La tarjeta grande de Inicio (<Destacada>, lo próximo): el color de esa persona en degradé, lo que más quiere pegado
+  /* La tarjeta grande de Inicio (<Destacada>, lo próximo): la tapa de su lista en degradé, lo que más quiere pegado
      como stickers torcidos (foto con borde blanco y sombra) en la esquina, y abajo cuándo es y "Ver su lista". */
   .gr-destacada {
     position: relative;
@@ -581,8 +581,9 @@
     padding: 18px;
     border-radius: 26px;
     color: #FFFFFF;
-    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
-    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 80%, white), var(--c) 45%, color-mix(in oklch, var(--c) 62%, black));
+    /* de la tapa de su lista (ver lib/tapas.ts) a más oscura, para que el texto blanco se lea también sobre el verde */
+    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 92%, black), color-mix(in oklch, var(--c) 72%, black) 55%, color-mix(in oklch, var(--c) 56%, black));
+    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 92%, black), color-mix(in oklch, var(--c) 72%, black) 55%, color-mix(in oklch, var(--c) 56%, black));
   }
   .gr-destacada > :first-child { align-self: start; }
   .gr-destacada__sticker {
