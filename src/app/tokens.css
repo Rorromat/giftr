@@ -546,11 +546,27 @@
      con el fondo. El color lo ponen las fotos: acá es solo un toque. El texto va en tinta, como en el resto. */
   .gr-tapa {
     position: relative;
+    isolation: isolate;
     margin-inline: calc(-1 * var(--gr-gutter));
-    padding: 8px var(--gr-gutter) 26px;
-    background: linear-gradient(180deg, color-mix(in oklch, var(--c) 14%, var(--gr-bg)), var(--gr-bg));
+    padding: 8px var(--gr-gutter) 84px;
+    color: #FFFFFF;
+    /* lo de adentro queda sobre el color; el fundido al fondo va en los últimos 84 px, abajo de todo */
+    background: linear-gradient(180deg, var(--c), color-mix(in oklch, var(--c) 70%, black) 50%, color-mix(in oklch, var(--c) 64%, black) calc(100% - 84px), var(--gr-bg));
+    background: linear-gradient(in oklch 180deg, var(--c) 0%, color-mix(in oklch, var(--c) 70%, black) 50%, color-mix(in oklch, var(--c) 64%, black) calc(100% - 84px), var(--gr-bg) 100%);
   }
-  .gr-tapa__sub { color: var(--gr-muted); }
+  /* un brillo arriba a la derecha, como luz sobre la tapa */
+  .gr-tapa::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(120% 60% at 85% 0%, color-mix(in oklch, var(--c) 55%, white) 0%, transparent 60%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .gr-tapa .gr-muted, .gr-tapa__sub { color: rgb(255 255 255 / 0.78); }
+  .gr-tapa .gr-label { color: rgb(255 255 255 / 0.8); }
+  .gr-tapa :focus-visible { outline-color: #FFFFFF; }
 
   /* La tarjeta grande de Inicio (<Destacada>, lo próximo): el color de esa persona en degradé, lo que más quiere pegado
      como stickers torcidos (foto con borde blanco y sombra) en la esquina, y abajo cuándo es y "Ver su lista". */

@@ -19,7 +19,7 @@ import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AvatarStack, BackLink, Icon, Seccion, SectionHeader } from '@/components/ui'
-import { colorDe } from '@/lib/tapas'
+import { TAPA_EN_COMUN } from '@/lib/tapas'
 import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
@@ -57,13 +57,13 @@ export default async function Grupo({ params, searchParams }: {
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36">
-      {/* la tapa de la lista: un color de la paleta por su id, el mismo con que la ven los que regalan */}
-      <ListaHero color={colorDe(grupo.id)} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
+      {/* la tapa de las listas en común, la misma con que la ven los que regalan */}
+      <ListaHero color={TAPA_EN_COMUN} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
                  arriba={(
                    <header className="flex min-h-14 items-center justify-between gap-2">
-                     <BackLink href="/mi-lista" label="Volver a Mi lista" />
+                     <BackLink href="/mi-lista" label="Volver a Mi lista" vidrio />
                      <p className="text-[15px] font-bold">Lista en común</p>
-                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn">
+                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn gr-vidrio">
                        <Icon name="plus" size={20} strokeWidth={2.4} />
                      </Link>
                    </header>
@@ -73,7 +73,7 @@ export default async function Grupo({ params, searchParams }: {
         {/* Fecha del grupo (o su cumple): aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
         <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${grupo.esCumple}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
-          <summary className="flex min-h-10 border border-gr-line bg-gr-surface cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <summary className="gr-vidrio flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
             <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy, grupo.esCumple)}
           </summary>

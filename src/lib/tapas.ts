@@ -1,6 +1,12 @@
-// Tapas: la app es neutra (papel de día, casi negro de noche) y el color lo ponen las fotos de los deseos y las personas:
-// cada una tiene una tapa, un color que pinta el encabezado de su lista y se funde con el fondo. Son tonos medios, para que
-// el texto blanco se lea encima en los dos modos.
+// Tapas: la app es neutra (papel de día, casi negro de noche) y el color lo ponen las fotos de los deseos y la tapa de cada
+// lista, el color que pinta su encabezado de arriba y se funde con el fondo: el verde de la marca en la de una persona
+// (todas iguales) y uva en la de una lista en común, para distinguirlas de un vistazo. La paleta (TAPAS) queda para la
+// tarjeta grande de Inicio, una por persona. Son tonos medios, para que el texto blanco se lea encima en los dos modos.
+
+/** La tapa de la lista de una persona (la tuya y la de cualquiera): el verde de la marca, la misma para todos. */
+export const TAPA_PERSONA = 'var(--gr-acento)'
+/** La tapa de una lista en común: uva, distinta de la de una persona. */
+export const TAPA_EN_COMUN = '#5B3FB5'
 
 export const TAPAS = [
   { id: 'frambuesa', nombre: 'Frambuesa', color: '#B5476A' },
