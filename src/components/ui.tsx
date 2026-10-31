@@ -202,23 +202,24 @@ export function Faltan({ dias, className = '' }: { dias: number; className?: str
 }
 
 /** El logo: "GiftR" en 900 con el moño al final, un poco torcido. */
-export function LogoSticker({ className = '' }: { className?: string }) {
+export function LogoSticker({ sobreTapa = false, className = '' }: { sobreTapa?: boolean; className?: string }) {
   return (
-    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${className}`}>
+    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${sobreTapa ? 'text-white' : ''} ${className}`}>
       GiftR
-      <Mono className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />
+      {/* sobre una tapa (que puede ser verde), el moño con borde blanco, como pegado */}
+      <Mono borde={sobreTapa ? '#FFFFFF' : undefined} className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />
     </span>
   )
 }
 
-/** La campanita de Avisos, con cuántos nuevos hay. */
+/** La campanita de Avisos, con cuántos nuevos hay. vidrio: sobre una tapa (y el número en blanco, que el verde no se vería). */
 export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: boolean }) {
   return (
     <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
           className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="bell" size={19} />
       {nuevos > 0 && (
-        <span aria-hidden className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gr-acento px-1.5 text-[11px] font-bold leading-none text-gr-on-acento ring-2 ring-gr-bg">
+        <span aria-hidden className={`absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${vidrio ? 'bg-white text-[#121216]' : 'bg-gr-acento text-gr-on-acento ring-2 ring-gr-bg'}`}>
           {nuevos > 9 ? '9+' : nuevos}
         </span>
       )}
@@ -228,19 +229,20 @@ export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: b
 
 /**
  * Barra de arriba de las secciones del menú: el logo a la izquierda y a la derecha lo que sume la pantalla (accion), la
- * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto.
+ * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto. Sobre una tapa
+ * (sobreTapa), el logo va en blanco y la campanita, de vidrio.
  */
-export function AppHeader({ accion, nombre, foto, avisos }: {
-  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number
+export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false }: {
+  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean
 }) {
   return (
     <header className="flex min-h-14 items-center justify-between gap-3">
-      <LogoSticker />
+      <LogoSticker sobreTapa={sobreTapa} />
       <div className="flex items-center gap-2">
         {accion}
-        {avisos !== undefined && <Campana nuevos={avisos} />}
+        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
         <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
-          <AvatarSticker nombre={nombre} foto={foto} size={40} />
+          <AvatarSticker nombre={nombre} foto={foto} size={40} className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
         </Link>
       </div>
     </header>
@@ -248,8 +250,8 @@ export function AppHeader({ accion, nombre, foto, avisos }: {
 }
 
 /**
- * La tapa de una lista: arriba, de lado a lado, un velo apenas teñido con el color de la persona (o de la lista) que se
- * funde con el fondo. Va primero en la pantalla, sin margen arriba.
+ * La tapa de una lista: su color (ver lib/tapas.ts) pinta de arriba, de lado a lado, y se oscurece hasta fundirse con el
+ * fondo. Lo de adentro va en blanco (los botones, de vidrio o blancos). Va primero en la pantalla, sin margen arriba.
  */
 export function Tapa({ color, className = '', children }: { color: string; className?: string; children: React.ReactNode }) {
   return (

@@ -26,7 +26,7 @@ import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { Arte, AvatarStack, AvatarSticker, BackLink, Icon, PriorityTag, LogoSticker, Tapa } from '@/components/ui'
-import { colorDe, tapaDe } from '@/lib/tapas'
+import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 import { iconoDeCategoria } from '@/components/FichaDeseo'
 
@@ -159,8 +159,8 @@ export default async function ListaAjena({
       ? <Link href={`/l/${token}/item/${itemId}?reservar=1#reservar`} className="gr-btn gr-btn--sm w-full">Reservar</Link>
       : <GuestGate token={token} itemId={itemId} identified={identified} volver={aqui} conCartel={!!reserva} />
 
-  // su tapa: la del dueño (la que eligió, o la que le toca), o la de la lista en común
-  const color = dueno ? tapaDe(dueno.id) : colorDe(vista.listId)
+  // su tapa: la de las personas (el verde, igual para todos) o la de las listas en común (ver lib/tapas.ts)
+  const color = vista.grupoNombre ? TAPA_EN_COMUN : TAPA_PERSONA
   // En una lista en común, arriba todo es de la lista (Bauti, sus regalos); el perfil y los gustos de cada uno de los que
   // la arman van al final, abajo del historial. En la de una persona, su perfil va arriba: la lista es suya.
   const enComun = !!vista.grupoNombre
@@ -216,8 +216,8 @@ export default async function ListaAjena({
       <Tapa color={color}>
         <header className="grid min-h-14 grid-cols-[44px_1fr_44px] items-center">
           {/* con tu cuenta, abajo está la barra; volver lleva a tu gente */}
-          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" />}</div>
-          <LogoSticker className="justify-self-center" />
+          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio />}</div>
+          <LogoSticker sobreTapa className="justify-self-center" />
         </header>
         <div className="mt-1.5 flex flex-col items-center gap-3 text-center">
           {/* la de una persona: su foto lleva a su perfil. La de una lista en común, no: es de la lista, no de uno de ellos */}
@@ -238,7 +238,7 @@ export default async function ListaAjena({
               {cuenta ?? <>{vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.</>}
             </p>
           </div>
-          {!enComun && <Link href={`/l/${token}/perfil`} className="gr-btn w-full">Su perfil y sus gustos</Link>}
+          {!enComun && <Link href={`/l/${token}/perfil`} className="gr-btn gr-btn--vidrio w-full">Su perfil y sus gustos</Link>}
           {veTodo && (
             <p className="gr-tapa__sub flex items-center gap-1.5 text-[12.5px]">
               <Icon name="lock" size={13} className="flex-none" />

@@ -30,7 +30,7 @@ import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 import { Destacada } from '@/components/Estante'
 import { getListForViewer } from '@/lib/lists'
-import { colorDe, tapaDe } from '@/lib/tapas'
+import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
 
 // Inicio: lo que viene. Arriba, lo próximo en grande: la tapa de esa persona (su color) y un estante con sus deseos. Después
 // lo que te espera (los carteles, las propuestas, y "Para vos": lo último de la campanita que
@@ -62,13 +62,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   // La primera vez que entra: los pasos de bienvenida con sus gustos.
   if (bienvenida) redirect('/bienvenida')
   const especiales = especialesQueVienen(hoy, juegos)
-  // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su color, lo que más quiere y cuántos deseos
-  // tiene. Abajo, en "Más adelante", va todo lo demás (sin repetirlo)
+  // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su tapa (la de su lista: el verde si es de
+  // una persona, uva si es en común), lo que más quiere y cuántos deseos tiene. Abajo, en "Más adelante", va todo lo demás
+  // (sin repetirlo)
   const destacado = eventos.find((e) => !e.propio && e.href.startsWith('/l/'))
   const token = destacado?.href.slice('/l/'.length)
   const suLista = token ? await getListForViewer(db, token, { userId: session.userId }) : null
-  const unDueno = suLista && suLista.role !== 'owner' && !suLista.grupoNombre && suLista.perfiles.length === 1 ? suLista.perfiles[0] : null
-  const suColor = suLista ? (unDueno ? tapaDe(unDueno.id) : colorDe(suLista.listId)) : null
+  const suColor = suLista ? (suLista.role !== 'owner' && suLista.grupoNombre ? TAPA_EN_COMUN : TAPA_PERSONA) : null
   // la tarjeta va si su lista se pudo abrir; si no, ese evento queda abajo con los demás
   const enGrande = destacado && suColor && suLista && suLista.role !== 'owner'
     ? { e: destacado, color: suColor, deseos: suLista.items.filter((i) => !('disponible' in i) || i.disponible).length }

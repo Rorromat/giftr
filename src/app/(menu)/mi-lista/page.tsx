@@ -14,7 +14,7 @@ import { ListaHero } from '@/components/ListaHero'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
-import { tapaDe } from '@/lib/tapas'
+import { TAPA_PERSONA } from '@/lib/tapas'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
 export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string; eliminado?: string }> }) {
@@ -36,15 +36,14 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const hoy = hoyLocal()
   const fechaCumple = cumple ? proximaFecha(cumple.dia, cumple.mes, hoy) : null
   const dias = fechaCumple ? diasEntre(hoy, fechaCumple) : null
-  const color = tapaDe(session.userId)
   const nuevo = agregado ? activos.find((i) => i.id === agregado) : undefined
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48">
-      {/* Vos: tu lista con tu tapa (tus amigos la ven con el mismo color) y, tocando tu foto, tu perfil */}
+      {/* Vos: tu lista con la tapa de las personas (la misma que ven tus amigos) y, tocando tu foto, tu perfil */}
       <ListaHero
-        color={color}
-        arriba={<AppHeader nombre={nombre} foto={foto} avisos={avisos} />}
+        color={TAPA_PERSONA}
+        arriba={<AppHeader nombre={nombre} foto={foto} avisos={avisos} sobreTapa />}
         etiqueta={nombre.split(' ')[0]}
         titulo="Mi lista"
         cantidad={activos.length}

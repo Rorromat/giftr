@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { AvatarStack, Icon } from '@/components/ui'
 import { fechaLarga, type Evento } from '@/lib/events'
 
-// Inicio: lo próximo es una tarjeta grande con el color de esa persona y lo que más quiere pegado como stickers; toda la
+// Inicio: lo próximo es una tarjeta grande con la tapa de su lista y lo que más quiere pegado como stickers; toda la
 // tarjeta lleva a su lista. Server components puros.
 
 const conMayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
@@ -11,9 +11,9 @@ const conMayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 const STICKERS = ['right-0 top-0 rotate-[8deg]', 'left-0 top-10 -rotate-[10deg]', 'right-7 top-[86px] rotate-[3deg]']
 
 /**
- * La tarjeta grande del próximo cumple (o fecha de una lista en común): su color, quién es, lo que más quiere pegado como
- * stickers torcidos en la esquina, cuánto falta y cuándo cae, y "Ver su lista" con cuántos deseos tiene. Toda la tarjeta
- * lleva a su lista. deseos: cuántos tiene para regalar.
+ * La tarjeta grande del próximo cumple (o fecha de una lista en común): la tapa de su lista (verde o uva, ver
+ * lib/tapas.ts), quién es, lo que más quiere pegado como stickers torcidos en la esquina, cuánto falta y cuándo cae, y "Ver
+ * su lista" con cuántos deseos tiene. Toda la tarjeta lleva a su lista. deseos: cuántos tiene para regalar.
  */
 export function Destacada({ e, color, hoy, deseos }: { e: Evento; color: string; hoy: Date; deseos: number }) {
   const cuando = e.dias === 0 ? 'es hoy' : e.dias === 1 ? 'es mañana' : `es en ${e.dias} días`
