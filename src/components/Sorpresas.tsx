@@ -30,11 +30,14 @@ export function EtiquetaSorpresa({ className = '' }: { className?: string }) {
 }
 
 /**
- * En la lista de alguien, para los que le regalan con su cuenta: regalarle algo que no está en su lista y las sorpresas que
- * ya le armaron (con quién y si estás). Él no ve nada de esto.
+ * En la lista de alguien (o una en común), para los que le regalan con su cuenta: regalarle algo que no está en su lista y
+ * las sorpresas que ya le armaron (con quién y si estás). Él (o los que arman la lista) no ve nada de esto.
  */
-export function SorpresasEnLista({ token, nombre, sorpresas }: { token: string; nombre: string; sorpresas: SorpresaEnLista[] }) {
-  const quien = primerNombre(nombre)
+export function SorpresasEnLista({ token, nombre, enComun = false, sorpresas }: {
+  token: string; nombre: string; enComun?: boolean; sorpresas: SorpresaEnLista[]
+}) {
+  // la de una persona, por su primer nombre; la de una lista en común, entera ("Bauti", "Casamiento de Ana")
+  const quien = enComun ? nombre : primerNombre(nombre)
   return (
     <section aria-labelledby="sorpresas-titulo" className="flex flex-col gap-3">
       <Link href={`/sorpresa/nueva?para=${token}`}
@@ -137,7 +140,8 @@ export function ElegirParaQuien({ amigos }: { amigos: Persona[] }) {
 }
 
 export type ParaDelForm =
-  | { tipo: 'lista'; token: string; nombre: string }
+  /** enComun: una lista en común (Bauti), que no la ven ni él ni los que la arman */
+  | { tipo: 'lista'; token: string; nombre: string; enComun?: boolean }
   | { tipo: 'amigo'; id: string; nombre: string }
   | { tipo: 'sin' }
 
@@ -171,7 +175,8 @@ export function FormSorpresa({ para, amigos, hoy, error, editar }: {
 
       <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <span aria-hidden>🤫</span>
-        {quien ? `${quien} no la ve nunca: solo los que le regalan.` : 'Como no usa GiftR, la ven solo los que la arman con vos.'}
+        {para.tipo === 'lista' && para.enComun ? `No la ven nunca ni ${quien} ni los que arman su lista: solo los que le regalan.`
+          : quien ? `${quien} no la ve nunca: solo los que le regalan.` : 'Como no usa GiftR, la ven solo los que la arman con vos.'}
       </p>
 
       {para.tipo === 'sin' && (

@@ -106,6 +106,9 @@ export const lists = pgTable('lists', {
   // Solo en una sorpresa: para quién es (vacío si no usa GiftR) y quién la armó.
   paraUserId: uuid('para_user_id').references(() => users.id),
   creadaPor: uuid('creada_por').references(() => users.id),
+  // Solo en una sorpresa para una lista en común (Bauti): esa lista. Los que la arman (o la armaron) no la ven, como el que
+  // recibe una sorpresa (ver esOFueDuenoSql). Vacío en todas las demás.
+  paraListId: uuid('para_list_id').references((): AnyPgColumn => lists.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   // Un grupo que es el cumple de alguien (la lista de Juancito): su fecha es la del cumple, todos los años (ver
   // ANIO_DE_CUMPLE), y en Eventos y en el link dice "Cumple de…".
@@ -115,6 +118,8 @@ export const lists = pgTable('lists', {
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
+  // y las de una lista en común, en esa lista
+  index('lists_para_list_id_idx').on(t.paraListId).where(sql`${t.paraListId} is not null`),
   // la limpieza de fotos subidas que nadie usa (ver guardarFotoDeseo) también mira las de los grupos
   index('lists_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)).where(sql`${t.fotoUrl} is not null`),
 ])

@@ -260,6 +260,13 @@
       "when": 1793155941483,
       "tag": "0036_pagos_parciales",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793483518859,
+      "tag": "0037_sorpresa_para_lista",
+      "breakpoints": true
     }
   ]
 }

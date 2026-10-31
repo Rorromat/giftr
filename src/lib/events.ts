@@ -317,11 +317,13 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
       (c.estado === 'reservado' || c.updatedAt >= desde))
     const grupales = new Set(suyos.filter((c) => enGrupales.has(c.id)).map((c) => c.itemId))
     const u = ultimos.get(e.listId)
-    // una sorpresa es un regalo grupal; en el cumple de alguien, también las sorpresas para él de este evento
+    // una sorpresa es un regalo grupal; en el cumple de alguien (o la fecha de una lista en común), también las sorpresas
+    // para él (o para esa lista) de este evento
     const enSorpresa = esSorpresa.has(e.listId)
     const paraEl = enSorpresa ? 0 : sorpresas.filter((r) => {
       const l = todas.find((t) => t.list.id === e.listId)?.list
-      return !!l?.ownerId && r.list.paraUserId === l.ownerId && (r.estado === 'abierto' || r.compradoEl >= desde)
+      const paraEsta = (!!l?.ownerId && r.list.paraUserId === l.ownerId) || r.list.paraListId === e.listId
+      return paraEsta && (r.estado === 'abierto' || r.compradoEl >= desde)
     }).length
     return {
       ...e, fotos, misReservas: new Set(suyos.map((c) => c.itemId)).size + paraEl,
@@ -353,13 +355,15 @@ export async function dejarDeSeguir(db: Db, userId: string, listId: string) {
 
 /**
  * La fecha de una lista (el cumple del dueño, todos los años, o la del grupo; null si no tiene) y su corteEvento. La de
- * una sorpresa: el cumple de quien la recibe o, si no usa GiftR, la que cargaron (una sola vez).
+ * una sorpresa: el cumple de quien la recibe, la de la lista en común para la que es o, si no usa GiftR, la que cargaron
+ * (una sola vez).
  */
 async function fechaDeLista(db: Db, listId: string): Promise<{ f: (FechaEvento & { esCumple: boolean }) | null; corte: Date | null }> {
   if (!esUuid(listId)) return { f: null, corte: null }
   const [row] = await db.select({ list: lists, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes })
     .from(lists).leftJoin(users, eq(sql`coalesce(${lists.ownerId}, ${lists.paraUserId})`, users.id)).where(eq(lists.id, listId))
   if (!row) return { f: null, corte: null }
+  if (row.list.paraListId) return fechaDeLista(db, row.list.paraListId)
   const corte = row.list.corteEvento
   if (row.list.tipo === 'personal' || row.list.paraUserId) {
     return { corte, f: row.cumpleDia && row.cumpleMes ? { esCumple: true, dia: row.cumpleDia, mes: row.cumpleMes, anio: null, anual: true } : null }

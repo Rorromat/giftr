@@ -592,14 +592,19 @@ const laVe = (ov: Ovillo, f: Abierta, userId: string) => !ov.receptores.get(f.li
 /** La ven los dos: solo esas se simplifican (la que ve uno solo la salda él, desde su lado). */
 const deLosDos = (ov: Ovillo, f: Abierta) => laVe(ov, f, f.deudorId) && laVe(ov, f, f.encargadoId)
 
-/** Los receptores de las listas que faltan (ver Ovillo): el dueño o el de la sorpresa vienen con la lista; los del grupo, de acá. */
-async function cargarReceptores(db: Db, receptores: Map<string, Set<string>>, ls: { listId: string; ownerId: string | null; paraUserId: string | null }[]) {
+/**
+ * Los receptores de las listas que faltan (ver Ovillo): el dueño o el de la sorpresa vienen con la lista; los del grupo (o
+ * los de la lista en común para la que es la sorpresa), de acá.
+ */
+async function cargarReceptores(
+  db: Db, receptores: Map<string, Set<string>>, ls: { listId: string; ownerId: string | null; paraUserId: string | null; paraListId: string | null }[],
+) {
   const faltan = ls.filter((l, i) => !receptores.has(l.listId) && ls.findIndex((x) => x.listId === l.listId) === i)
   if (!faltan.length) return
   const ms = await db.select({ listId: listMembers.listId, userId: listMembers.userId }).from(listMembers)
-    .where(inArray(listMembers.listId, faltan.map((l) => l.listId)))
+    .where(inArray(listMembers.listId, faltan.flatMap((l) => (l.paraListId ? [l.listId, l.paraListId] : [l.listId]))))
   for (const l of faltan) {
-    const suyos = [l.ownerId, l.paraUserId, ...ms.filter((m) => m.listId === l.listId).map((m) => m.userId)]
+    const suyos = [l.ownerId, l.paraUserId, ...ms.filter((m) => m.listId === l.listId || m.listId === l.paraListId).map((m) => m.userId)]
     receptores.set(l.listId, new Set(suyos.filter((id): id is string => !!id)))
   }
 }
@@ -636,7 +641,7 @@ async function ovillo(db: Db, userId: string, lock = false): Promise<Ovillo> {
     const filas = await db.select({
       giftId: groupGiftMembers.giftId, deudorId: groupGiftMembers.userId, encargadoId: groupGifts.organizerUserId, listId: items.listId,
       moneda: groupGifts.moneda, compradoAt: groupGifts.compradoAt, monto: groupGiftMembers.monto, pagadoMonto: groupGiftMembers.pagadoMonto,
-      ownerId: lists.ownerId, paraUserId: lists.paraUserId,
+      ownerId: lists.ownerId, paraUserId: lists.paraUserId, paraListId: lists.paraListId,
     }).from(groupGiftMembers)
       .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
       .innerJoin(items, eq(groupGifts.itemId, items.id))

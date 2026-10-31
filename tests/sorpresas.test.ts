@@ -14,7 +14,7 @@ import { crearSorpresa, duenoDelLink, editarSorpresa, esSorpresa, sorpresaParaEd
 import { getUnreadNotifications, textoDeAviso } from '@/lib/notifications'
 import { getItemForViewer, getListForViewer, getOwnList } from '@/lib/lists'
 import { misRegalos } from '@/lib/mis-regalos'
-import { guardarCumple, misEventos } from '@/lib/events'
+import { eventoDeLista, guardarCumple, misEventos, seguirLista } from '@/lib/events'
 import { novedadesDeAmigos } from '@/lib/novedades'
 import { itemParaCompartir, listaParaCompartir } from '@/lib/compartir'
 import { perfilPublico } from '@/lib/perfil'
@@ -24,6 +24,7 @@ import { reserveItem } from '@/lib/claims'
 import { createGuest } from '@/lib/guest'
 import { miGente } from '@/lib/gente'
 import { mandarCodazo } from '@/lib/codazos'
+import { crearGrupo, nuevaInvitacion, relacionConLista, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 
 async function usuario(db: Db, nombre: string) {
   return upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre.toLowerCase()}@test.com`, nombre })
@@ -101,7 +102,7 @@ test('EL TEST DE ORO de la sorpresa: el que la recibe no la ve por ningún lado,
   const suyo = JSON.stringify([
     await getOwnList(s.db, s.rodri.id), await misRegalos(s.db, s.rodri.id), await misCuentas(s.db, s.rodri.id),
     await invitacionesPendientes(s.db, s.rodri.id), await misEventos(s.db, s.rodri.id), await novedadesDeAmigos(s.db, s.rodri.id),
-    await miGente(s.db, s.rodri.id), await sorpresasPara(s.db, s.rodri.id, s.rodri.id),
+    await miGente(s.db, s.rodri.id), await sorpresasPara(s.db, { userId: s.rodri.id }, s.rodri.id),
   ])
   expect(suyo).not.toContain('Tocadiscos')
   expect(suyo).not.toContain(token)
@@ -152,22 +153,22 @@ test('sin sesión no se ve qué es: ni el link, ni la vista previa, ni como invi
 test('en la lista de Rodri: la ven los que le regalan (con quién y si están), hasta que pasa el cumple', async () => {
   const s = await setup()
   const { token } = await sorpresaDeEuge(s)
-  const paraAna = await sorpresasPara(s.db, s.rodri.id, s.ana.id)
+  const paraAna = await sorpresasPara(s.db, { userId: s.rodri.id }, s.ana.id)
   expect(paraAna).toEqual([{
     token, titulo: 'Tocadiscos vintage', foto: null, precio: '$120.000', encargado: 'Euge', personas: ['Euge'], soyParte: false, comprada: false,
   }])
-  expect((await sorpresasPara(s.db, s.rodri.id, s.euge.id))[0].soyParte).toBe(true)
+  expect((await sorpresasPara(s.db, { userId: s.rodri.id }, s.euge.id))[0].soyParte).toBe(true)
   // Ana (no es amiga de Euge) se suma desde ahí
   const vista = await sorpresaParaViewer(s.db, token, { userId: s.ana.id })
   if (vista?.estado !== 'abierta') throw new Error('esperaba la sorpresa')
   // no sigue la lista de Rodri: la sorpresa no le pasa su link
   expect(vista.para.token).toBeNull()
   expect(await sumarseARegalo(s.db, vista.regalos[0].id, s.ana.id, vista.item.id)).toBe(true)
-  expect((await sorpresasPara(s.db, s.rodri.id, s.ana.id))[0]).toMatchObject({ personas: ['Euge', 'Ana'], soyParte: true })
+  expect((await sorpresasPara(s.db, { userId: s.rodri.id }, s.ana.id))[0]).toMatchObject({ personas: ['Euge', 'Ana'], soyParte: true })
 
   // comprada: sigue (para este cumple) y les queda la cuenta, para Rodri
   expect(await comprarRegalo(s.db, vista.regalos[0].id, s.euge.id, { total: 120000 })).toEqual({ ok: true })
-  expect((await sorpresasPara(s.db, s.rodri.id, s.sofi.id))[0].comprada).toBe(true)
+  expect((await sorpresasPara(s.db, { userId: s.rodri.id }, s.sofi.id))[0].comprada).toBe(true)
   const cuentas = await misCuentas(s.db, s.ana.id)
   expect(cuentas.personas[0].lineas[0]).toMatchObject({ itemTitulo: 'Tocadiscos vintage', para: 'Rodri', href: `/sorpresa/${token}`, monto: 60000 })
   const mios = await misRegalos(s.db, s.ana.id)
@@ -185,7 +186,7 @@ test('en Próximos: el cumple de Rodri dice que estás en una sorpresa', async (
 
 test('desde la lista de alguien (con su link), aunque no sea mi amigo; un amigo que no es, no', async () => {
   const s = await setup()
-  expect(await duenoDelLink(s.db, s.tokenRodri, s.ana.id)).toMatchObject({ id: s.rodri.id, nombre: 'Rodri' })
+  expect(await duenoDelLink(s.db, s.tokenRodri, s.ana.id)).toEqual({ nombre: 'Rodri', enComun: false, excluir: [s.rodri.id] })
   expect(await duenoDelLink(s.db, s.tokenRodri, s.rodri.id)).toBeNull()
   const r = await crearSorpresa(s.db, s.ana.id, { para: { token: s.tokenRodri }, deseo: TOCADISCOS, invitar: [s.euge.id] })
   expect(r.ok).toBe(true)
@@ -204,7 +205,7 @@ test('un doble toque no arma dos', async () => {
   const a = await crearSorpresa(s.db, s.euge.id, datos, pushFalso().enviar)
   const b = await crearSorpresa(s.db, s.euge.id, datos, pushFalso().enviar)
   expect(b).toEqual(a)
-  expect(await sorpresasPara(s.db, s.rodri.id, s.ana.id)).toHaveLength(1)
+  expect(await sorpresasPara(s.db, { userId: s.rodri.id }, s.ana.id)).toHaveLength(1)
   expect(await invitacionesPendientes(s.db, s.sofi.id)).toHaveLength(1)
 })
 
@@ -240,7 +241,7 @@ test('si el que la armó cancela el regalo, la sorpresa se va', async () => {
   expect(await sorpresaParaViewer(s.db, token, { userId: s.sofi.id })).toEqual({
     estado: 'cancelada', para: expect.objectContaining({ nombre: 'Rodri' }),
   })
-  expect(await sorpresasPara(s.db, s.rodri.id, s.ana.id)).toEqual([])
+  expect(await sorpresasPara(s.db, { userId: s.rodri.id }, s.ana.id)).toEqual([])
   expect(await invitacionesPendientes(s.db, s.sofi.id)).toEqual([])
   expect((await misEventos(s.db, s.euge.id)).find((e) => e.titulo === 'Cumple de Rodri')).toMatchObject({ misSorpresas: 0 })
 })
@@ -286,4 +287,50 @@ test('editar la de alguien sin GiftR: su nombre y la fecha (vacía la saca); sin
   expect((await sorpresaParaEditar(s.db, r.token, s.euge.id))?.fecha).toBeNull()
   expect(await editarSorpresa(s.db, r.token, s.euge.id, { deseo: { titulo: 'Bata' }, nombre: '  ' })).toBe(false)
   expect((await sorpresaParaEditar(s.db, r.token, s.euge.id))?.para.nombre).toBe('el tío Juan')
+})
+
+test('una sorpresa para una lista en común (Bauti): la ven los que le regalan; los que la arman, nunca', async () => {
+  const s = await setup()
+  // Rodri arma con Juan la lista de Bauti, su hijo, que cumple el 20 de diciembre; Sofi le regala y Euge arma la sorpresa
+  const bauti = await crearGrupo(s.db, s.rodri.id, { nombre: 'Bauti', esCumple: true, eventoFecha: '2025-12-20', parentesco: 'Hijo' })
+  const invitacion = await nuevaInvitacion(s.db, bauti, s.rodri.id)
+  expect(await unirseAGrupo(s.db, invitacion!, s.juan.id)).toBe(bauti)
+  const [lista] = await s.db.select().from(lists).where(eq(lists.id, bauti))
+  await seguirLista(s.db, s.sofi.id, bauti, lista.shareToken)
+
+  // desde su lista: para quién y a quiénes no proponérsela (los que la arman); los que la arman no se la arman
+  expect(await duenoDelLink(s.db, lista.shareToken, s.euge.id)).toEqual({ nombre: 'Bauti', enComun: true, excluir: [s.rodri.id, s.juan.id] })
+  expect(await duenoDelLink(s.db, lista.shareToken, s.juan.id)).toBeNull()
+  expect(await crearSorpresa(s.db, s.juan.id, { para: { token: lista.shareToken }, deseo: TOCADISCOS, invitar: [] })).toEqual({ ok: false, reason: 'para' })
+
+  // Euge la arma y se la propone a Sofi, a Juan y a Rodri: solo le llega a Sofi
+  const { enviados, enviar } = pushFalso()
+  const r = await crearSorpresa(s.db, s.euge.id, { para: { token: lista.shareToken }, deseo: TOCADISCOS, invitar: [s.sofi.id, s.juan.id, s.rodri.id] }, enviar)
+  if (!r.ok) throw new Error('no se armó')
+  expect(enviados.map((e) => e.para)).toEqual([s.sofi.id])
+  expect(enviados[0].aviso.body).toBe('"Tocadiscos vintage" para Bauti: no está en su lista y no se entera. En partes iguales, ¿te sumás?')
+  const [sorpresa] = await s.db.select().from(lists).where(eq(lists.shareToken, r.token))
+  expect(sorpresa).toMatchObject({ paraListId: bauti, paraUserId: null, nombre: 'Bauti' })
+
+  // la ven los que le regalan, en la lista de Bauti y en su link, con la fecha de la lista
+  expect(await sorpresasPara(s.db, { listId: bauti }, s.sofi.id)).toMatchObject([{ token: r.token, titulo: 'Tocadiscos vintage', encargado: 'Euge' }])
+  const vista = await sorpresaParaViewer(s.db, r.token, { userId: s.sofi.id })
+  expect(vista).toMatchObject({ estado: 'abierta', para: { userId: null, esLista: true, nombre: 'Bauti', token: lista.shareToken } })
+  expect((await eventoDeLista(s.db, sorpresa.id))?.fecha.getUTCMonth()).toBe(11)
+
+  // los que la arman, nunca: ni en la lista, ni el link, y cuentan como los que la reciben (no reservan, no se suman)
+  for (const u of [s.rodri, s.juan]) {
+    expect(await sorpresasPara(s.db, { listId: bauti }, u.id)).toEqual([])
+    expect(await sorpresaParaViewer(s.db, r.token, { userId: u.id })).toBeNull()
+    expect(await relacionConLista(s.db, sorpresa.id, u.id)).toBe('dueno')
+  }
+  // y tampoco el que salió de la lista: la armaba
+  expect(await salirDeGrupo(s.db, bauti, s.juan.id)).toBe(true)
+  expect(await relacionConLista(s.db, sorpresa.id, s.juan.id)).toBe('ex')
+  expect(await sorpresaParaViewer(s.db, r.token, { userId: s.juan.id })).toBeNull()
+  expect(await sorpresasPara(s.db, { listId: bauti }, s.juan.id)).toEqual([])
+
+  // para quién no se cambia al editarla (no es alguien sin GiftR)
+  expect(await editarSorpresa(s.db, r.token, s.euge.id, { deseo: {}, nombre: 'Otro nombre' })).toBe(true)
+  expect((await s.db.select().from(lists).where(eq(lists.id, sorpresa.id)))[0].nombre).toBe('Bauti')
 })

@@ -1,11 +1,11 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
-import { claims, groupGiftMembers, groupGifts, items, listFollows, lists, users } from '@/db/schema'
+import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { misAmigos, personas } from '@/lib/amigos'
 import type { Enviar } from '@/lib/codazos'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal } from '@/lib/events'
-import { esToken, esUuid, fechaDeGrupoValida } from '@/lib/groups'
+import { esOFueDuenoDeLista, esToken, esUuid, fechaDeGrupoValida } from '@/lib/groups'
 import { invitarARegalo } from '@/lib/invitaciones'
 import { acotarDeseo, cambiarDeseo, type CambiosDeseo, type NewItemData } from '@/lib/items'
 import { LARGO, recortar } from '@/lib/limites'
@@ -21,21 +21,28 @@ import { newShareToken, urlFoto } from '@/lib/users'
 // - Para alguien de GiftR: la ven todos los que le regalan con sesión, en su lista (ver sorpresasPara), así se suma más
 //   gente y nadie le compra lo mismo. Él nunca: no es suya (no está en Mi lista ni en ninguna vista de dueño), y para lo
 //   de la capa oculta cuenta como dueño (ver esOFueDuenoSql), así que no la abre, no se suma y no lo invitan.
+// - Para una lista en común (Bauti): la ven los que le regalan, en esa lista. Los que la arman (o la armaron) nunca: es
+//   como si la recibieran ellos (ver esOFueDuenoSql). La fecha es la de la lista.
 // - Para alguien sin GiftR (la abuela): la ven el que la armó, los invitados y quien tenga el link.
 // - Su link se abre solo con sesión (ver sorpresaParaViewer): sin sesión no se sabe quién mira, y puede ser el que la
 //   recibe. Tampoco tiene vista previa que diga qué es (ver compartir.ts).
 // - Si el que la armó cancela el regalo, la sorpresa se va (ver cancelarRegalo).
 
 export type ParaSorpresa = {
-  /** null: no usa GiftR */
+  /** null: no usa GiftR, o es para una lista en común (esLista) */
   userId: string | null
+  /** para una lista en común (Bauti): nombre es el de la lista y token, su link (si el que mira la sigue) */
+  esLista: boolean
   nombre: string
   foto: string | null
   /** el link de su lista, solo si el que mira ya lo tiene (la sigue): una sorpresa no reparte el link de nadie */
   token: string | null
 }
 
-/** A quién: con el link de su lista (se armó desde ahí), un amigo, o alguien sin GiftR (su nombre y, si la saben, la fecha). */
+/**
+ * A quién: con el link de su lista (se armó desde ahí; la de una persona o una en común), un amigo, o alguien sin GiftR (su
+ * nombre y, si la saben, la fecha).
+ */
 export type ParaElegido = { token: string } | { amigo: string } | { nombre: string; fecha?: string | null }
 
 export type SorpresaCreada = { ok: true; token: string } | { ok: false; reason: 'para' | 'deseo' }
@@ -47,19 +54,27 @@ const nombreDeAfuera = (escrito: string) => recortar(escrito, LARGO.paraSorpresa
 const fechaQueViene = (f: string | null | undefined) =>
   f && fechaDeGrupoValida(f) && f >= hoyLocal().toISOString().slice(0, 10) ? f : null
 
-async function destinatario(db: Db, creadorId: string, para: ParaElegido) {
+type Destinatario = { paraUserId: string | null; paraListId: string | null; nombre: string | null; fecha: string | null }
+
+async function destinatario(db: Db, creadorId: string, para: ParaElegido): Promise<Destinatario | null> {
   if ('token' in para) {
     if (!esToken(para.token)) return null
-    const [l] = await db.select({ ownerId: lists.ownerId }).from(lists).where(and(eq(lists.shareToken, para.token), eq(lists.tipo, 'personal')))
-    return l?.ownerId && l.ownerId !== creadorId ? { paraUserId: l.ownerId, nombre: null, fecha: null } : null
+    const [l] = await db.select({ id: lists.id, tipo: lists.tipo, ownerId: lists.ownerId, nombre: lists.nombre }).from(lists)
+      .where(and(eq(lists.shareToken, para.token), inArray(lists.tipo, ['personal', 'grupo'])))
+    if (!l) return null
+    if (l.tipo === 'personal') return l.ownerId && l.ownerId !== creadorId ? { paraUserId: l.ownerId, paraListId: null, nombre: null, fecha: null } : null
+    // una lista en común: no si la arma (o la armó) el que la carga. El nombre de la lista queda en el de la sorpresa (para
+    // quién, en Cuentas y en los avisos); la fecha es la de la lista (ver fechaDeLista)
+    if (await esOFueDuenoDeLista(db, l.id, creadorId)) return null
+    return { paraUserId: null, paraListId: l.id, nombre: l.nombre ?? 'Lista en común', fecha: null }
   }
   if ('amigo' in para) {
     const ok = esUuid(para.amigo) && para.amigo !== creadorId && (await misAmigos(db, creadorId)).has(para.amigo)
-    return ok ? { paraUserId: para.amigo, nombre: null, fecha: null } : null
+    return ok ? { paraUserId: para.amigo, paraListId: null, nombre: null, fecha: null } : null
   }
   const nombre = nombreDeAfuera(para.nombre ?? '')
   // una fecha que ya pasó no es para cuándo se la dan
-  return nombre ? { paraUserId: null, nombre, fecha: fechaQueViene(para.fecha) } : null
+  return nombre ? { paraUserId: null, paraListId: null, nombre, fecha: fechaQueViene(para.fecha) } : null
 }
 
 /**
@@ -82,11 +97,11 @@ export async function crearSorpresa(
     const [repetida] = await t.select({ token: lists.shareToken }).from(lists).innerJoin(items, eq(items.listId, lists.id))
       .where(and(
         eq(lists.tipo, 'sorpresa'), eq(lists.creadaPor, creadorId), eq(items.titulo, deseo.titulo!), recienHecho(lists.createdAt),
-        para.paraUserId ? eq(lists.paraUserId, para.paraUserId) : eq(lists.nombre, para.nombre!),
+        para.paraUserId ? eq(lists.paraUserId, para.paraUserId) : para.paraListId ? eq(lists.paraListId, para.paraListId) : eq(lists.nombre, para.nombre!),
       ))
     if (repetida) return { token: repetida.token, itemId: null }
     const [lista] = await t.insert(lists).values({
-      tipo: 'sorpresa', shareToken: newShareToken(), paraUserId: para.paraUserId, creadaPor: creadorId,
+      tipo: 'sorpresa', shareToken: newShareToken(), paraUserId: para.paraUserId, paraListId: para.paraListId, creadaPor: creadorId,
       nombre: para.nombre, eventoFecha: para.fecha, eventoAnual: false,
     }).returning({ id: lists.id, token: lists.shareToken })
     const [item] = await t.insert(items).values({ ...deseo, titulo: deseo.titulo!, listId: lista.id }).returning({ id: items.id })
@@ -116,11 +131,14 @@ export type SorpresaEnLista = {
 }
 
 /**
- * Las sorpresas para alguien, para los que le regalan (en su lista): las que siguen abiertas y las compradas para el
- * evento que viene (lo de un cumple que ya pasó ya se regaló: está en Mis regalos). A él, nunca.
+ * Las sorpresas para alguien (o para una lista en común), para los que le regalan (en su lista): las que siguen abiertas
+ * y las compradas para el evento que viene (lo de un cumple que ya pasó ya se regaló: está en Mis regalos). A él (o a los
+ * que arman la lista), nunca.
  */
-export async function sorpresasPara(db: Db, paraUserId: string, viewerId: string): Promise<SorpresaEnLista[]> {
-  if (!esUuid(paraUserId) || paraUserId === viewerId) return []
+export async function sorpresasPara(db: Db, para: { userId: string } | { listId: string }, viewerId: string): Promise<SorpresaEnLista[]> {
+  if ('userId' in para ? !esUuid(para.userId) || para.userId === viewerId : !esUuid(para.listId) || await esOFueDuenoDeLista(db, para.listId, viewerId)) {
+    return []
+  }
   const filas = await db.select({
     listId: lists.id, token: lists.shareToken, titulo: items.titulo, foto: items.fotoUrl, precio: items.precio,
     giftId: groupGifts.id, estado: groupGifts.estado, encargadoId: groupGifts.organizerUserId, compradoEl: claims.updatedAt,
@@ -129,12 +147,12 @@ export async function sorpresasPara(db: Db, paraUserId: string, viewerId: string
     .innerJoin(groupGifts, eq(groupGifts.itemId, items.id))
     .innerJoin(claims, eq(groupGifts.claimId, claims.id))
     .where(and(
-      eq(lists.paraUserId, paraUserId), eq(lists.tipo, 'sorpresa'), eq(items.estadoDueno, 'activo'),
+      'userId' in para ? eq(lists.paraUserId, para.userId) : eq(lists.paraListId, para.listId), eq(lists.tipo, 'sorpresa'), eq(items.estadoDueno, 'activo'),
       inArray(groupGifts.estado, ['abierto', 'comprado']),
     ))
     .orderBy(desc(lists.createdAt))
   if (!filas.length) return []
-  // todas cuentan desde el mismo evento: el cumple de quien las recibe (ver desdeElUltimoEvento)
+  // todas cuentan desde el mismo evento: el cumple de quien las recibe, o la fecha de la lista (ver desdeElUltimoEvento)
   const desde = await desdeElUltimoEvento(db, filas[0].listId)
   const vigentes = filas.filter((f) => f.estado === 'abierto' || f.compradoEl >= desde)
   if (!vigentes.length) return []
@@ -175,14 +193,21 @@ export type VistaSorpresa =
   }
 
 async function paraDe(db: Db, list: typeof lists.$inferSelect, viewerId: string): Promise<ParaSorpresa> {
-  if (!list.paraUserId) return { userId: null, nombre: list.nombre ?? 'Alguien', foto: null, token: null }
+  if (list.paraListId) {
+    // la lista en común: su nombre y su foto de hoy, y su link si el que mira la sigue
+    const [l] = await db.select({ nombre: lists.nombre, foto: lists.fotoUrl, token: lists.shareToken, sigue: listFollows.userId }).from(lists)
+      .leftJoin(listFollows, and(eq(listFollows.listId, lists.id), eq(listFollows.userId, viewerId)))
+      .where(eq(lists.id, list.paraListId))
+    return { userId: null, esLista: true, nombre: l?.nombre ?? list.nombre ?? 'Lista en común', foto: l?.foto ?? null, token: l?.sigue ? l.token : null }
+  }
+  if (!list.paraUserId) return { userId: null, esLista: false, nombre: list.nombre ?? 'Alguien', foto: null, token: null }
   const [[u], [suya]] = await Promise.all([
     db.select({ id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, list.paraUserId)),
     db.select({ token: lists.shareToken }).from(lists)
       .innerJoin(listFollows, and(eq(listFollows.listId, lists.id), eq(listFollows.userId, viewerId)))
       .where(eq(lists.ownerId, list.paraUserId)),
   ])
-  return { userId: u.id, nombre: u.nombre, foto: urlFoto(u), token: suya?.token ?? null }
+  return { userId: u.id, esLista: false, nombre: u.nombre, foto: urlFoto(u), token: suya?.token ?? null }
 }
 
 /**
@@ -194,7 +219,8 @@ export async function sorpresaParaViewer(db: Db, token: string, viewer: Viewer):
   const [list] = await db.select().from(lists).where(and(eq(lists.shareToken, token), eq(lists.tipo, 'sorpresa')))
   if (!list) return null
   if (!viewer.userId) return { estado: 'sin_sesion' }
-  if (viewer.userId === list.paraUserId) return null
+  // es para él, o para una lista en común que arma (o armó): como un link que no es nada
+  if (viewer.userId === list.paraUserId || (list.paraListId && await esOFueDuenoDeLista(db, list.paraListId, viewer.userId))) return null
   const yo = { userId: viewer.userId }
   const [para, [item]] = await Promise.all([
     paraDe(db, list, viewer.userId),
@@ -234,14 +260,15 @@ export async function sorpresaParaEditar(db: Db, token: string, userId: string):
 /**
  * Quien la armó la edita: qué le regalan (nombre, foto, precio, detalles, link y video; sigue siendo uno solo) y, si es
  * para alguien sin GiftR, su nombre y la fecha (null la saca; undefined la deja). A los que están se les avisa si cambió
- * algo que les importa (ver cambiarDeseo), a él no. Para quién (alguien de GiftR) no cambia: sería otra sorpresa.
+ * algo que les importa (ver cambiarDeseo), a él no. Para quién (alguien de GiftR o una lista en común) no cambia: sería
+ * otra sorpresa.
  */
 export async function editarSorpresa(
   db: Db, token: string, userId: string, datos: { deseo: CambiosDeseo; nombre?: string; fecha?: string | null },
 ): Promise<boolean> {
   const row = await deQuienLaArmo(db, token, userId)
   if (!row) return false
-  if (!row.list.paraUserId && (datos.nombre !== undefined || datos.fecha !== undefined)) {
+  if (!row.list.paraUserId && !row.list.paraListId && (datos.nombre !== undefined || datos.fecha !== undefined)) {
     const nombre = datos.nombre === undefined ? undefined : nombreDeAfuera(datos.nombre)
     if (nombre === '') return false
     await db.update(lists).set({
@@ -260,11 +287,18 @@ export async function esSorpresa(db: Db, token: string): Promise<boolean> {
   return !!l
 }
 
-/** Para "¿Para quién?" desde la lista de alguien: quién es el dueño de ese link (de una lista personal que no es la mía). */
-export async function duenoDelLink(db: Db, token: string, viewerId: string) {
+/**
+ * Para "¿Para quién?" desde una lista: de quién es ese link (una lista personal que no es la mía, o una en común que no
+ * armo ni armé) y a quiénes no se les propone (el que la recibe, o los que arman la lista en común).
+ */
+export async function duenoDelLink(db: Db, token: string, viewerId: string): Promise<{ nombre: string; enComun: boolean; excluir: string[] } | null> {
   if (!esToken(token)) return null
-  const [l] = await db.select({ id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }).from(lists)
-    .innerJoin(users, eq(lists.ownerId, users.id))
-    .where(and(eq(lists.shareToken, token), eq(lists.tipo, 'personal')))
-  return l && l.id !== viewerId ? { id: l.id, nombre: l.nombre, foto: urlFoto(l) } : null
+  const [l] = await db.select({ id: lists.id, tipo: lists.tipo, nombre: lists.nombre, ownerId: lists.ownerId, dueno: users.nombre }).from(lists)
+    .leftJoin(users, eq(lists.ownerId, users.id))
+    .where(and(eq(lists.shareToken, token), inArray(lists.tipo, ['personal', 'grupo'])))
+  if (!l) return null
+  if (l.tipo === 'personal') return l.ownerId && l.dueno && l.ownerId !== viewerId ? { nombre: l.dueno, enComun: false, excluir: [l.ownerId] } : null
+  if (await esOFueDuenoDeLista(db, l.id, viewerId)) return null
+  const miembros = await db.select({ id: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, l.id))
+  return { nombre: l.nombre ?? 'Lista en común', enComun: true, excluir: miembros.map((m) => m.id) }
 }

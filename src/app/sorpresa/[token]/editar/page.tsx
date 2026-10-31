@@ -15,13 +15,15 @@ export default async function EditarSorpresa({ params, searchParams }: {
   if (!session?.userId) redirect('/')
   const s = await sorpresaParaEditar(db, token, session.userId)
   if (!s) notFound()
-  const deAfuera = !s.para.userId
-  const titulo = deAfuera ? 'Editar la sorpresa' : `Sorpresa para ${s.para.nombre.split(' ')[0]}`
+  // para alguien sin GiftR se edita también su nombre y la fecha; para alguien de GiftR o una lista en común, no
+  const deAfuera = !s.para.userId && !s.para.esLista
+  const titulo = deAfuera ? 'Editar la sorpresa' : `Sorpresa para ${s.para.esLista ? s.para.nombre : s.para.nombre.split(' ')[0]}`
 
   return (
     <main className="gr-hoja flex flex-col gap-1 pt-2 pb-8">
       <PageHeader title={titulo} back={`/sorpresa/${token}`} backLabel="Volver a la sorpresa" />
-      <FormSorpresa para={deAfuera ? { tipo: 'sin' } : { tipo: 'amigo', id: s.para.userId!, nombre: s.para.nombre }} amigos={[]}
+      <FormSorpresa para={deAfuera ? { tipo: 'sin' } : s.para.esLista ? { tipo: 'lista', token: s.para.token ?? '', nombre: s.para.nombre, enComun: true }
+        : { tipo: 'amigo', id: s.para.userId!, nombre: s.para.nombre }} amigos={[]}
                     hoy={hoyLocal().toISOString().slice(0, 10)} error={error === '1'}
                     editar={{ token, deseo: s.deseo, nombre: deAfuera ? s.para.nombre : null, fecha: s.fecha }} />
     </main>

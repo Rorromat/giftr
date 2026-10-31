@@ -7,7 +7,8 @@ import { updatePriorityAction } from '@/app/actions'
 import { dejarPendiente } from '@/components/AlLlegarDelAgregado'
 import { leerCopiado } from '@/components/QueQueres'
 import { IlustracionAgregado } from '@/components/IlustracionAgregado'
-import { Arte, Hearts, Icon, PRIORIDADES, type Prioridad } from '@/components/ui'
+import { ArmandoRegalo } from '@/components/ArmandoRegalo'
+import { Arte, Hearts, PRIORIDADES, type Prioridad } from '@/components/ui'
 import { linkEnTexto, linkHttp, sitioDeLaTienda } from '@/lib/links'
 
 // El agregado: el + de la barra de abajo se abre en un círculo del acento que llena la pantalla, y las cuatro maneras de
@@ -123,8 +124,8 @@ const MIENTRAS: Record<Tipo, string> = {
 
 /** Lo que tarda en irse a Agregar: lo que tardan las cartas en caerse (sin movimiento, nada). */
 const CAEN_MS = 450
-/** Lo mínimo que se ve la tarjeta mientras carga, para que no sea un parpadeo. */
-const PREVIA_MS = 1100
+/** Lo mínimo que se ve la tarjeta mientras carga: lo que tarda en armarse el regalo (ver ArmandoRegalo). */
+const PREVIA_MS = 1800
 
 /** La capa del agregado. Va con la barra de abajo (ver BottomNav), que tiene el +. */
 export function Agregado() {
@@ -212,12 +213,8 @@ export function Agregado() {
   const tienda = e.link ? sitioDeLaTienda(e.link) : null
   const previa = e.tipo && (
     <div className="gr-previa">
-      <div className="gr-arte" style={{ aspectRatio: '1' }}>
-        {e.foto
-          // eslint-disable-next-line @next/next/no-img-element -- la foto recién elegida, todavía en el teléfono
-          ? <img src={e.foto} alt="" className="gr-arte__foto" />
-          : <span className="gr-arte__sin-foto text-gr-muted"><Icon name={e.tipo === 'escribir' ? 'lapiz' : 'link'} size={44} strokeWidth={2.2} /></span>}
-      </div>
+      {/* el regalo que se arma, según cómo lo sumaste */}
+      <div className="gr-arte" style={{ aspectRatio: '1' }}><ArmandoRegalo tipo={e.tipo} foto={e.foto} /></div>
       <b>{tienda ? `De ${tienda}` : e.tipo === 'escribir' ? 'Tu idea' : e.foto ? 'Tu foto' : 'Tu deseo'}</b>
       <small>{MIENTRAS[e.tipo]}</small>
       <div className="gr-barrita"><i /></div>

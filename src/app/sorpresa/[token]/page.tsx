@@ -57,7 +57,7 @@ export default async function Sorpresa({ params, searchParams }: {
     )
   }
 
-  // el nombre de alguien sin GiftR va como lo escribieron ("la abuela Marta")
+  // el nombre de alguien sin GiftR (o de una lista en común) va como lo escribieron ("la abuela Marta", "Bauti")
   const quien = s.para.userId ? primerNombre(s.para.nombre) : s.para.nombre
   const volver = s.para.token ? { href: `/l/${s.para.token}`, label: `Volver a la lista de ${quien}` } : { href: '/regalos', label: 'Volver a Regalos' }
 
@@ -91,7 +91,9 @@ export default async function Sorpresa({ params, searchParams }: {
       <section className="flex flex-col gap-1.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <p className="flex items-start gap-2.5">
           <span aria-hidden>🤫</span>
-          {s.para.userId ? `${quien} no la ve: solo los que le regalan.` : 'No usa GiftR: la ven los que la arman.'}
+          {s.para.userId ? `${quien} no la ve: solo los que le regalan.`
+            : s.para.esLista ? `No la ven ni ${quien} ni los que arman su lista: solo los que le regalan.`
+              : 'No usa GiftR: la ven los que la arman.'}
         </p>
         {cuando && <p className="flex items-center gap-2 text-gr-on-brand/80"><Icon name="cake" size={16} className="flex-none" />{cuando}</p>}
       </section>
@@ -154,7 +156,7 @@ export default async function Sorpresa({ params, searchParams }: {
       <section className="mt-2 flex flex-col gap-3">
         <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
           <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />
-          {s.para.userId ? `Esto no lo ve ${quien}` : 'Para coordinar entre ustedes'}
+          {s.para.userId ? `Esto no lo ve ${quien}` : s.para.esLista ? 'Esto no lo ven los que arman su lista' : 'Para coordinar entre ustedes'}
         </h2>
         <ul className="flex flex-col gap-2">
           {comments.map((c) => (
