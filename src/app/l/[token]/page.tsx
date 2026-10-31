@@ -114,8 +114,8 @@ export default async function ListaAjena({
   // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
   const veTodo = vista.role === 'giver'
   const identified = identificado(viewer)
-  // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista) y regalarle algo que no está en
-  // su lista (las sorpresas, solo para los que ven la coordinación con sesión)
+  // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista). En la de una persona y en una
+  // en común: regalarle algo que no está en la lista (las sorpresas, solo para los que ven la coordinación con sesión)
   const dueno = !vista.grupoNombre && vista.perfiles.length === 1 ? vista.perfiles[0] : null
   const [evento, historial, gustos, quien, sorpresas] = await Promise.all([
     eventoDeLista(db, vista.listId),
@@ -123,7 +123,8 @@ export default async function ListaAjena({
     veTodo ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
-    veTodo && viewer.userId && dueno ? sorpresasPara(db, dueno.id, viewer.userId) : null,
+    veTodo && viewer.userId && (dueno || vista.grupoNombre)
+      ? sorpresasPara(db, dueno ? { userId: dueno.id } : { listId: vista.listId }, viewer.userId) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
   const relacion = viewer.userId && dueno ? await relacionCon(db, viewer.userId, dueno.id) : null
@@ -304,7 +305,9 @@ export default async function ListaAjena({
         ))}
       </div>
 
-      {sorpresas && dueno && <SorpresasEnLista token={token} nombre={dueno.nombre} sorpresas={sorpresas} />}
+      {sorpresas && (
+        <SorpresasEnLista token={token} nombre={dueno?.nombre ?? vista.grupoNombre ?? vista.ownerNombre} enComun={!dueno} sorpresas={sorpresas} />
+      )}
 
       <div className="mt-2">
         <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
