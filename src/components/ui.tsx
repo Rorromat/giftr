@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { PARTES_MONO, type TonosMono } from '@/lib/mono'
+import { ONDAS } from '@/lib/ondas'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -13,14 +14,12 @@ export const PRIORIDADES = {
 
 export type Prioridad = keyof typeof PRIORIDADES
 
-export const STAR_POINTS =
-  '50.0,2.0 59.8,13.3 74.0,8.4 76.9,23.1 91.6,26.0 86.7,40.2 98.0,50.0 86.7,59.8 91.6,74.0 76.9,76.9 74.0,91.6 59.8,86.7 50.0,98.0 40.2,86.7 26.0,91.6 23.1,76.9 8.4,74.0 13.3,59.8 2.0,50.0 13.3,40.2 8.4,26.0 23.1,23.1 26.0,8.4 40.2,13.3'
-
-/** Estrella de 12 puntas (contador). `label` la vuelve accesible; sin label es decorativa. */
-export function Starburst({ children, sub, label, size = 62, fontSize = 40, className = '', style }: {
+/**
+ * La insignia: el círculo verde ondulado del sello (sin el moño), con algo adentro ("!", "¡Listo!") o sola, de fondo de un
+ * ícono. `label` la vuelve accesible; sin label es decorativa.
+ */
+export function Insignia({ children, label, size = 62, fontSize = 40, className = '', style }: {
   children?: React.ReactNode
-  /** Segunda línea chica debajo del número ("días"). */
-  sub?: string
   label?: string
   size?: number
   fontSize?: number
@@ -32,17 +31,11 @@ export function Starburst({ children, sub, label, size = 62, fontSize = 40, clas
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       width={size} height={size} viewBox="0 0 100 100" className={className} style={style}
     >
-      <polygon points={STAR_POINTS} fill="var(--gr-accent)" />
+      <path d={ONDAS} fill="var(--gr-acento)" />
       {children != null && (
-        <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
-              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+        <text x="50" y="50" dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={900}
+              fill="var(--gr-on-acento)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {children}
-        </text>
-      )}
-      {sub && (
-        <text x="50" y="70" dy="0.35em" textAnchor="middle" fontSize={17} fontWeight={800}
-              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
-          {sub}
         </text>
       )}
     </svg>

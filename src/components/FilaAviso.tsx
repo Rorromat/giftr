@@ -10,7 +10,7 @@ import { AvatarSticker, QuizasLink } from '@/components/ui'
 // cuadradito: la foto de quien lo mandó queda chiquita, en la esquina.
 
 const AZUL = 'bg-gr-blue text-gr-on-blue'
-const LIMA = 'bg-gr-accent text-gr-on-accent'
+const VERDE = 'bg-gr-acento text-gr-on-acento'
 const GRIS = 'bg-gr-soft text-gr-ink'
 
 const DIBUJO = {
@@ -31,16 +31,16 @@ const DIBUJO = {
 type Mueve = 'cae' | 'imprime' | 'sacude' | 'duda' | 'escribe' | 'parpadea' | 'empuja' | 'saluda' | 'late'
 
 const ICONOS: Record<TipoEnBandeja, { fondo: string; dibujo: ReactNode; mueve: Mueve }> = {
-  pago: { fondo: LIMA, dibujo: DIBUJO.moneda, mueve: 'cae' },
-  regalo_comprado: { fondo: 'bg-gr-hero text-gr-accent', dibujo: DIBUJO.ticket, mueve: 'imprime' },
+  pago: { fondo: VERDE, dibujo: DIBUJO.moneda, mueve: 'cae' },
+  regalo_comprado: { fondo: 'bg-gr-hero text-gr-acento', dibujo: DIBUJO.ticket, mueve: 'imprime' },
   invisible_sorteo: { fondo: AZUL, dibujo: DIBUJO.regalo, mueve: 'sacude' },
   invisible_pregunta: { fondo: AZUL, dibujo: DIBUJO.pregunta, mueve: 'duda' },
   invisible_respuesta: { fondo: AZUL, dibujo: DIBUJO.charla, mueve: 'escribe' },
   invisible_invitacion: { fondo: AZUL, dibujo: DIBUJO.antifaz, mueve: 'parpadea' },
   codazo: { fondo: AZUL, dibujo: DIBUJO.codazo, mueve: 'empuja' },
-  propuesta_regalo: { fondo: LIMA, dibujo: DIBUJO.regalo, mueve: 'sacude' },
+  propuesta_regalo: { fondo: VERDE, dibujo: DIBUJO.regalo, mueve: 'sacude' },
   respuesta_propuesta: { fondo: GRIS, dibujo: DIBUJO.gente, mueve: 'late' },
-  amistad_pedida: { fondo: LIMA, dibujo: DIBUJO.sumar, mueve: 'saluda' },
+  amistad_pedida: { fondo: VERDE, dibujo: DIBUJO.sumar, mueve: 'saluda' },
   amistad_aceptada: { fondo: GRIS, dibujo: DIBUJO.gente, mueve: 'late' },
   // en el azul suave de las listas en común, como en Tu gente
   lista_en_comun: { fondo: 'bg-gr-comun text-gr-comun-ink', dibujo: DIBUJO.gente, mueve: 'saluda' },

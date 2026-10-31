@@ -1,4 +1,5 @@
 import { PARTES_MONO } from '@/lib/mono'
+import { ondas } from '@/lib/ondas'
 
 /** Lo que dice el sello en cada momento (dos renglones) y el tamaño de la letra para que entre en el círculo. */
 const TEXTOS = {
@@ -8,16 +9,6 @@ const TEXTOS = {
 } as const
 export type TipoSello = keyof typeof TEXTOS
 
-/** Un círculo con el borde ondulado (n ondas), como el de un sello: centro (cx, cy), radio r y la onda de radio o. */
-function ondas(cx: number, cy: number, r: number, n: number, o: number) {
-  const punto = (i: number) => {
-    const a = (i / n) * 2 * Math.PI - Math.PI / 2
-    return `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`
-  }
-  let d = `M${punto(0)}`
-  for (let i = 1; i <= n; i++) d += ` A${o} ${o} 0 0 1 ${punto(i)}`
-  return `${d}Z`
-}
 const GRANDE = ondas(50, 54, 42, 16, 8.6)
 const CHICO = ondas(50, 50, 44, 14, 9.5)
 

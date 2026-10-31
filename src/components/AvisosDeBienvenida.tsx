@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useRef, useState } from 'react'
 import { avisosPreguntadosAction } from '@/app/actions'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
-import { Icon, Starburst } from '@/components/ui'
+import { Icon, Insignia } from '@/components/ui'
 import type { EstadoAvisos } from '@/lib/avisos-del-navegador'
 
 // La pregunta de los avisos: en la bienvenida (/bienvenida/avisos) y, a los que ya estaban, en un cartel de una sola vez.
@@ -19,7 +19,7 @@ export function PorQueAvisos({ tituloId, Titulo = 'h1' }: { tituloId?: string; T
     <>
       <div className="gr-hero flex flex-col items-center gap-3 px-5 pb-6 pt-7 text-center">
         <span className="relative flex items-center justify-center">
-          <Starburst size={104} />
+          <Insignia size={104} />
           <Icon name="bell" size={40} strokeWidth={2.2} className="absolute text-gr-ink" />
         </span>
         <Titulo id={tituloId} className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">¿Te avisamos?</Titulo>

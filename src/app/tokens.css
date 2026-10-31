@@ -1,8 +1,8 @@
 /* GiftR — sistema visual "Tapas". La base no tiene color: papel de día y casi negro de noche, según el modo del teléfono
    (prefers-color-scheme). El color lo ponen las fotos de los deseos y, apenas, la tapa de cada lista (ver lib/tapas.ts). Un
-   solo acento de marca, verde pino (--gr-acento), liso y en degradé (--gr-acento-degrade) en lo que hay que destacar: el
-   botón principal, la pestaña activa, el +, el agregado, los chips y pestañas elegidos, los "Ver más", los avisos sin leer y
-   el puntito del logo. La estrella lima queda en los stickers (el sello): --gr-accent.
+   solo acento de marca, verde esmeralda (--gr-acento), liso y en degradé (--gr-acento-degrade) en lo que hay que destacar:
+   el botón principal, la pestaña activa, el +, el agregado, los chips y pestañas elegidos, los "Ver más", los avisos sin
+   leer, el moño del logo y los sellos.
    Todo va en Hanken Grotesk (la carga next/font en layout.tsx y expone --font-hanken): los títulos en 900, grandes y
    apretados. Las clases van en capas para que las utilidades de Tailwind puedan pisarlas. */
 
@@ -34,9 +34,6 @@
   --gr-on-acento: #121216;
   --gr-acento-texto: var(--gr-acento-oscuro);
   --gr-acento-sobre-tinta: var(--gr-acento);
-  /* La estrella lima de los stickers, con su tinta: igual en los dos modos */
-  --gr-accent: #C8F31D;
-  --gr-on-accent: #141414;
 
   /* Avisos y festejos (codazos): el azul de la paleta de tapas, que lleva texto blanco en los dos modos */
   --gr-blue: #2D5BD0;

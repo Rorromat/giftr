@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Starburst } from '@/components/ui'
+import { Insignia } from '@/components/ui'
 
 /**
  * Un link cortado o mal copiado de WhatsApp, una lista que cambió su link, un deseo que ya no está. No dice cuál de esas
@@ -8,7 +8,7 @@ import { Starburst } from '@/components/ui'
 export default function NoEncontrado() {
   return (
     <main className="flex min-h-[85dvh] flex-col items-center justify-center gap-4 py-12 text-center">
-      <Starburst size={120} fontSize={64} label="No está">?</Starburst>
+      <Insignia size={120} fontSize={64} label="No está">?</Insignia>
       <h1 className="gr-title">Esto no está</h1>
       <p className="text-[15px] font-medium leading-snug">
         Puede que el link esté cortado o que lo hayan cambiado. Pedíselo de nuevo a quien te lo mandó.

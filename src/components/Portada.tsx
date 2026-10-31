@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { SelloDibujo } from '@/components/SelloDibujo'
-import { Icon, PriorityTag, STAR_POINTS } from '@/components/ui'
+import { Icon, PriorityTag } from '@/components/ui'
+import { ONDAS } from '@/lib/ondas'
 
 // La portada: lo que hace la app, una carta por función, como un mazo. Pasan solas y despacio (la de arriba se va
 // volando de costado y sube la de abajo) o a mano: arrastrándola, con las flechas o con los puntitos. Cada carta con su
@@ -39,24 +40,24 @@ function Regalo() {
   return (
     <>
       {sombra(116, 180, 64)}
-      <path d="M116 74C96 48 76 58 98 74Z" fill="var(--gr-accent)" {...linea} strokeWidth={3} />
-      <path d="M116 74C136 48 156 58 134 74Z" fill="var(--gr-accent)" {...linea} strokeWidth={3} />
+      <path d="M116 74C96 48 76 58 98 74Z" fill="var(--gr-acento)" {...linea} strokeWidth={3} />
+      <path d="M116 74C136 48 156 58 134 74Z" fill="var(--gr-acento)" {...linea} strokeWidth={3} />
       <rect x="66" y="96" width="100" height="78" rx="6" fill={TINTA} />
       <rect x="58" y="74" width="116" height="26" rx="5" fill={TINTA} />
-      <rect x="108" y="74" width="16" height="100" fill="var(--gr-accent)" />
+      <rect x="108" y="74" width="16" height="100" fill="var(--gr-acento)" />
     </>
   )
 }
 
 /** Entre todos: el regalo en el medio y los que ponen alrededor. */
 function EntreTodos() {
-  const caras = [[42, 52, 'var(--gr-accent)', 'C'], [198, 52, '#FFD43B', 'M'], [42, 158, '#FF7FA8', 'E'], [198, 158, 'var(--gr-surface)', 'R']] as const
+  const caras = [[42, 52, 'var(--gr-acento)', 'C'], [198, 52, '#FFD43B', 'M'], [42, 158, '#FF7FA8', 'E'], [198, 158, 'var(--gr-surface)', 'R']] as const
   return (
     <>
       <path d="M54 62L106 108M186 62L134 108M54 152L106 126M186 152L134 126" fill="none" stroke={TINTA} strokeWidth={2.5} strokeDasharray="5 6" />
       <rect x="94" y="96" width="52" height="46" rx="5" fill="#2F5BEA" {...linea} strokeWidth={3.5} />
       <rect x="88" y="84" width="64" height="16" rx="4" fill="#2F5BEA" {...linea} strokeWidth={3.5} />
-      <rect x="114" y="84" width="12" height="58" fill="var(--gr-accent)" {...linea} strokeWidth={2} />
+      <rect x="114" y="84" width="12" height="58" fill="var(--gr-acento)" {...linea} strokeWidth={2} />
       {caras.map(([x, y, fondo, letra]) => (
         <g key={letra}>
           <circle cx={x} cy={y} r="20" fill={fondo} {...linea} strokeWidth={3} />
@@ -86,19 +87,22 @@ function Papelitos() {
         <text x="120" y="76" textAnchor="middle" fontSize={14} fontWeight={700} fill="var(--gr-muted)">Te tocó</text>
         <text x="120" y="132" textAnchor="middle" fontSize={36} fontWeight={800} fill={TINTA} style={{ fontFamily: 'var(--gr-font-display)' }}>Caro</text>
       </g>
-      <polygon points={STAR_POINTS} transform="translate(158 20) scale(0.36)" fill="var(--gr-accent)" stroke={TINTA} strokeWidth={6} strokeLinejoin="round" />
+      <path d={ONDAS} transform="translate(158 20) scale(0.36)" fill="var(--gr-acento)" stroke={TINTA} strokeWidth={6} strokeLinejoin="round" />
     </>
   )
 }
 
-/** Cumples: la cuenta regresiva en la estrella, como en Inicio. */
+/** Cumples: la cuenta regresiva en la hojita de calendario, como en Inicio (ver Faltan). */
 function Cuenta() {
   return (
     <>
-      <polygon points={STAR_POINTS} transform="translate(50 22) scale(1.4)" fill="var(--gr-accent)" stroke={TINTA} strokeWidth={2.8} strokeLinejoin="round" />
-      {/* el número y "días" adentro de la estrella, como en Starburst (más arriba del centro y abajo) */}
-      <text x="120" y="83" dy="0.35em" textAnchor="middle" fontSize={50} fontWeight={800} fill={TINTA} style={{ fontFamily: 'var(--gr-font-display)' }}>3</text>
-      <text x="120" y="119" dy="0.35em" textAnchor="middle" fontSize={22} fontWeight={800} fill={TINTA} style={{ fontFamily: 'var(--gr-font-display)' }}>días</text>
+      <g transform="rotate(-4 120 94)">
+        <rect x="64" y="26" width="112" height="134" rx="18" fill="var(--gr-surface)" {...linea} />
+        <path d="M64 44a18 18 0 0 1 18-18h76a18 18 0 0 1 18 18v12H64z" fill="var(--gr-acento)" {...linea} />
+        <text x="120" y="41" dy="0.35em" textAnchor="middle" fontSize={13} fontWeight={900} letterSpacing={1.5} fill={TINTA}>FALTAN</text>
+        <text x="120" y="96" dy="0.35em" textAnchor="middle" fontSize={56} fontWeight={900} fill={TINTA} style={{ fontFamily: 'var(--gr-font-display)' }}>3</text>
+        <text x="120" y="137" dy="0.35em" textAnchor="middle" fontSize={20} fontWeight={700} fill="var(--gr-muted)" style={{ fontFamily: 'var(--gr-font-display)' }}>días</text>
+      </g>
       <g fill={TINTA}><circle cx="34" cy="50" r="4" /><circle cx="206" cy="40" r="3" /><circle cx="214" cy="160" r="4" /><circle cx="28" cy="150" r="3" /></g>
     </>
   )
@@ -106,7 +110,7 @@ function Cuenta() {
 
 /** Caritas en fila, para los que regalan juntos. */
 function Caras({ letras }: { letras: string[] }) {
-  const fondos = ['bg-gr-accent', 'bg-[#FFD43B]', 'bg-[#FF7FA8]', 'bg-[#DCE8FF]']
+  const fondos = ['bg-gr-acento', 'bg-[#FFD43B]', 'bg-[#FF7FA8]', 'bg-[#DCE8FF]']
   return (
     <span aria-hidden className="flex pl-2">
       {letras.map((l, i) => (

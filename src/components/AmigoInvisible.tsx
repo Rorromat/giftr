@@ -55,7 +55,7 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
             className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
         <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
           <span style={fecha ? { color: p.fondo } : undefined}
-                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-on-accent'}`}>
+                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-acento text-gr-on-acento'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
           <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
