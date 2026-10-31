@@ -257,7 +257,7 @@ export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { tit
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h2 id={id} className="gr-heading">{title}</h2>
-      {href && <Link href={href} className="flex-none text-sm font-semibold">{linkLabel}</Link>}
+      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento">{linkLabel}</Link>}
     </div>
   )
 }

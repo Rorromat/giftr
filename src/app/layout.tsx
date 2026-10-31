@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   // El ícono de inicio del iPhone va adentro del HTML (data:): el instalador de iOS 27 no carga los que
   // vienen por red y pone la inicial sobre gris. /apple-touch-icon.png sigue en public/ para quien lo pida.
   // Declarar íconos acá pisa los de archivo, así que el de la pestaña (app/icon.png) va también, y el favicon está en public/
-  // (en app/ Next lo pone siempre). En los deploys de prueba, los de public/dev: rojos, con "DEV" (ver lib/entorno.ts).
+  // (en app/ Next lo pone siempre). En los deploys de prueba, los de public/dev: verdes, con "DEV" (ver lib/entorno.ts).
   icons: DE_PRUEBA
     ? {
       icon: [{ url: '/dev/favicon.ico', sizes: '48x48', type: 'image/x-icon' }, { url: '/dev/icon.png', sizes: '96x96', type: 'image/png' }],

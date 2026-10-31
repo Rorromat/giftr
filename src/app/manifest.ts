@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#F6F6F8',
     // Todos a sangre y sin transparencia (como el apple-touch-icon): si un sistema usa estos en vez del
     // apple-touch-icon, no le quedan esquinas transparentes que después pinta de negro. En los deploys de prueba, los
-    // rojos con "DEV" (ver lib/entorno.ts), que sirven también de maskable: la etiqueta queda en la zona segura.
+    // verdes con "DEV" (ver lib/entorno.ts), que sirven también de maskable: la etiqueta queda en la zona segura.
     icons: DE_PRUEBA
       ? [
         { src: '/dev/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

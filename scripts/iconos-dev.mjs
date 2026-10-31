@@ -1,15 +1,16 @@
 // Genera los íconos de los deploys de prueba (la rama dev y los previews de Vercel, ver lib/entorno.ts) en public/dev/: los
-// de siempre con el fondo en el rojo del acento en vez de negro y una etiqueta "DEV", para que no se confundan con la app de
+// de siempre con el fondo en el verde del acento en vez de negro y una etiqueta "DEV", para que no se confundan con la app de
 // verdad en la pestaña ni en la pantalla de inicio. La etiqueta queda adentro de la zona segura de los maskable (el círculo
 // del 80% del medio). Si cambian los íconos de public/: `node scripts/iconos-dev.mjs`.
 import { readFile, writeFile } from 'node:fs/promises'
 import sharp from 'sharp'
 
-const ROJO = [0xf2, 0x41, 0x3b]
+// el verde pino del acento (ver tokens.css)
+const PINO = [0x12, 0x86, 0x5f]
 // el fondo de los de siempre
 const NEGRO = [0x12, 0x12, 0x12]
 
-/** El ícono a sangre con el fondo negro pasado a rojo: se pinta lo oscuro que toca el borde (no la G, que está adentro de la estrella). */
+/** El ícono a sangre con el fondo negro pasado al verde del acento: se pinta lo oscuro que toca el borde (no la G, que está adentro de la estrella). */
 async function aRojo(archivo) {
   const { data, info } = await sharp(await readFile(archivo)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const { width: w, height: h } = info
@@ -30,8 +31,8 @@ async function aRojo(archivo) {
   for (let p = 0; p < w * h; p++) {
     if (!visto[p]) continue
     const t = lima(p)
-    // lo que tenía de negro pasa a rojo; el borde de la estrella, en la misma proporción
-    for (let c = 0; c < 3; c++) data[p * 4 + c] = Math.round(data[p * 4 + c] + (1 - t) * (ROJO[c] - NEGRO[c]))
+    // lo que tenía de negro pasa al verde; el borde de la estrella, en la misma proporción
+    for (let c = 0; c < 3; c++) data[p * 4 + c] = Math.round(data[p * 4 + c] + (1 - t) * (PINO[c] - NEGRO[c]))
   }
   return sharp(data, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer()
 }

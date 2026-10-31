@@ -13,7 +13,8 @@ export type DibujoAgregado = 'link' | 'foto' | 'galeria' | 'escribir'
 
 const TINTA = '#121216'
 const BLANCO = '#FFFFFF'
-const ACENTO = '#F2413B'
+// el detalle de cada una, en el acento de la marca
+const ACENTO = 'var(--gr-acento)'
 // los grises de la base (ver tokens.css), de más claro a más oscuro
 const GRIS_1 = '#EDEDF0'
 const GRIS_2 = '#DCDCE1'
