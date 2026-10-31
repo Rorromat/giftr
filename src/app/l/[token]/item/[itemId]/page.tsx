@@ -128,8 +128,9 @@ export default async function DetalleItem({ params, searchParams }: {
                              <Icon name="compartir" size={20} strokeWidth={2.2} />
                            </a>
                          </>
-                       }
-                       sello={sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute bottom-14 right-3 z-[2]" />} />
+                       }>
+          {sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute bottom-14 right-3 z-[2]" />}
+        </FotoDeLaFicha>
         {/* qué es, de quién (para el que llega directo al deseo, un link por WhatsApp) y cuánto sale */}
         <NombreDeLaFicha titulo={item.titulo} categoria={item.categoria} precio={precio}
                          lista={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} />

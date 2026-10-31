@@ -22,16 +22,17 @@ export const iconoDeCategoria = (categoria: string): IconName => ICONO_CATEGORIA
 
 /**
  * Arriba de todo: la foto a sangre (tocándola se ve entera, ver FotoAmpliable), volver a la izquierda y lo de la derecha
- * (compartir, "Me lo robo"), de vidrio oscuro para que se vean sobre cualquier foto. sello: el de lo que te tocó regalar.
+ * (compartir, "Me lo robo"), de vidrio oscuro para que se vean sobre cualquier foto. children: lo que va encima de la
+ * foto (el sello de lo que te tocó regalar).
  */
-export function FotoDeLaFicha({ foto, titulo, apagado = false, volver, volverLabel, acciones, sello }: {
+export function FotoDeLaFicha({ foto, titulo, apagado = false, volver, volverLabel, acciones, children }: {
   foto: string | null
   titulo: string
   apagado?: boolean
   volver: string
   volverLabel: string
   acciones?: React.ReactNode
-  sello?: React.ReactNode
+  children?: React.ReactNode
 }) {
   return (
     <div className="gr-ficha__portada">
@@ -42,7 +43,7 @@ export function FotoDeLaFicha({ foto, titulo, apagado = false, volver, volverLab
         <BackLink href={volver} label={volverLabel} vidrio="oscuro" />
         <div className="flex gap-2.5">{acciones}</div>
       </div>
-      {sello}
+      {children}
     </div>
   )
 }
