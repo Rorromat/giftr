@@ -29,6 +29,27 @@ export function SkeletonPage({ cards = 4 }: { cards?: number }) {
   )
 }
 
+/** La ficha de un deseo mientras llega: la foto a sangre, el nombre, el precio y las fichas (ver FichaDeseo). */
+export function SkeletonFicha() {
+  return (
+    <main aria-busy="true" className="flex flex-col gap-5 pb-36">
+      <span className="sr-only" role="status">Cargando…</span>
+      <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
+        <div className="gr-ficha__portada bg-gr-dot" />
+        <div className="flex flex-col gap-3">
+          <div className="h-9 w-4/5 rounded-full bg-gr-dot" />
+          <div className="h-4 w-2/5 rounded-full bg-gr-dot" />
+          <div className="h-10 w-1/3 rounded-full bg-gr-dot" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-[104px] rounded-[18px] bg-gr-dot" />
+          <div className="h-[104px] rounded-[18px] bg-gr-dot" />
+        </div>
+      </div>
+    </main>
+  )
+}
+
 /**
  * Lo de abajo de una sección con pestañas (Mis regalos y Cuentas) mientras llega: lo de arriba (el encabezado, el título
  * y las pestañas) ya está en su layout y no se toca. totales: las dos tarjetas de arriba de Cuentas. Es .gr-cargando con

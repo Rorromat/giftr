@@ -12,7 +12,7 @@ import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
 import { paletaDe } from '@/lib/colores-fechas'
-import { AvatarSticker, Icon, Starburst } from '@/components/ui'
+import { AvatarSticker, Faltan, Icon } from '@/components/ui'
 import type { Persona } from '@/lib/amigos'
 import { estadoDeJuegos, MIN_JUGADORES, type MiJuego, type VistaJuego } from '@/lib/amigo-invisible'
 import { fechaCorta, fechaLarga } from '@/lib/events'
@@ -55,15 +55,11 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
             className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
         <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
           <span style={fecha ? { color: p.fondo } : undefined}
-                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-accent text-gr-on-accent'}`}>
+                className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-acento text-gr-on-acento'}`}>
             {fecha ? 'FECHA ESPECIAL' : 'AMIGO INVISIBLE'}
           </span>
           <IlustracionFecha fecha={fecha?.id ?? null} size={150} firma={false} className="mt-4" />
-          <Starburst size={64} fontSize={t.dias > 99 ? 26 : 32} sub={t.dias === 0 ? undefined : t.dias === 1 ? 'día' : 'días'}
-                     label={t.dias === 0 ? 'Es hoy' : `Faltan ${t.dias} ${t.dias === 1 ? 'día' : 'días'}`}
-                     className="absolute right-2 top-2 drop-shadow-sm">
-            {t.dias === 0 ? '¡Hoy!' : t.dias}
-          </Starburst>
+          <Faltan dias={t.dias} className="absolute right-2.5 top-2.5" />
         </div>
         <div className="flex flex-1 flex-col gap-1 p-3.5">
           <h2 className="text-[17px] leading-snug font-semibold [overflow-wrap:anywhere]">{fecha ? fecha.nombre : juegos[0].nombre}</h2>

@@ -37,7 +37,7 @@ const GLIFOS: Record<FechaEspecial | 'aparte', Glifo> = {
 }
 
 /** El ícono de una fecha especial (o del aparte, con null): las líneas en el color del texto y el detalle en acento. */
-export function IconoFecha({ fecha, size = 24, acento = 'var(--gr-accent)', className = '' }: {
+export function IconoFecha({ fecha, size = 24, acento = 'var(--gr-acento)', className = '' }: {
   fecha: FechaEspecial | null
   size?: number
   /** el color del detalle relleno ("currentColor" para todo de un color) */

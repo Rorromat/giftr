@@ -7,7 +7,8 @@ import {
 } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
-import { Arte, AvatarSticker, Icon, ItemPhoto, PriorityTag, Starburst } from '@/components/ui'
+import { TarjetaRegalo } from '@/components/TarjetaRegalo'
+import { AvatarSticker, Icon, ItemPhoto, Mono, PriorityTag } from '@/components/ui'
 
 // Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas que pasan solas de a una, dos segundos en cada una, y se
 // pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
@@ -79,16 +80,14 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
     <ul ref={ref} aria-label="Lo nuevo de tus amigos" className="gr-estante relative">
       {items.map((n) => (
         <li key={n.id}>
-          <Link href={`/novedades#d-${n.id}`} className="flex flex-col gap-1.5">
-            <Arte src={n.foto} titulo={n.titulo} />
-            <h3 className="mt-0.5 line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{n.titulo}</h3>
-            {n.precio && <p className="text-sm text-gr-muted tabular-nums">{n.precio}</p>}
-            {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
-              <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
-              <span className="truncate">{n.nombre.split(' ')[0]} · {n.hace}</span>
-            </div>
-          </Link>
+          <TarjetaRegalo href={`/novedades#d-${n.id}`} foto={n.foto} titulo={n.titulo} precio={n.precio}
+                         pie={
+                           // div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar
+                           <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
+                             <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
+                             <span className="truncate">{n.nombre.split(' ')[0]} · {n.hace}</span>
+                           </div>
+                         } />
         </li>
       ))}
     </ul>
@@ -100,7 +99,10 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
  * el link a tu copia. boton: el botón con texto; icono: el redondo arriba de la foto (las tarjetas chicas de una lista).
  */
 export function BotonRobar({ token, itemId, variante = 'boton', className = '' }: {
-  token: string; itemId: string; variante?: 'boton' | 'icono'; className?: string
+  token: string; itemId: string
+  /** boton: con su texto; icono: blanco, sobre la foto de una tarjeta; vidrio: arriba de la ficha del deseo */
+  variante?: 'boton' | 'icono' | 'vidrio'
+  className?: string
 }) {
   const [estado, robar] = useActionState<EstadoRobo, FormData>(robarDeseoAction, null)
   return (
@@ -108,7 +110,11 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
       <form action={robar} className={className}>
         <input type="hidden" name="token" value={token} />
         <input type="hidden" name="itemId" value={itemId} />
-        {variante === 'icono' ? (
+        {variante === 'vidrio' ? (
+          <BotonEnviar aria-label="Me lo robo: sumarlo a tu lista" className="gr-icon-btn gr-vidrio-oscuro">
+            <Icon name="copiar" size={19} strokeWidth={2.2} />
+          </BotonEnviar>
+        ) : variante === 'icono' ? (
           <BotonEnviar aria-label="Me lo robo: sumarlo a tu lista"
                        className="flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
             <Icon name="copiar" size={17} strokeWidth={2.2} />
@@ -219,7 +225,7 @@ export function MasNovedades({ siguiente }: { siguiente: string | null }) {
       {mas.map((n) => <TarjetaNovedad key={n.item.id} n={n} />)}
       <div ref={fin} className="flex min-h-16 flex-col items-center justify-center gap-2 text-sm font-medium text-gr-muted">
         {cursor
-          ? <Starburst size={28} className={cargando ? 'gr-refrescar__estrella motion-safe:animate-spin' : ''} />
+          ? <Mono className={`size-[30px] ${cargando ? 'gr-latiendo' : ''}`} />
           : <p>Eso es todo por ahora. Tirá para abajo arriba de todo para ver si hay algo nuevo.</p>}
       </div>
     </>

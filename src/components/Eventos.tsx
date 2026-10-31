@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { calendarioDelAnio, diaEnElAnio, diasEntre, fechaCorta, fechaLarga, MESES, repartirProximos, SEMANA, type Evento } from '@/lib/events'
 import { diaEn, type FechaEspecialVista, type TarjetaEspecial } from '@/lib/fechas-especiales'
-import { AvatarStack, Icon, Starburst } from '@/components/ui'
+import { AvatarStack, Faltan, Icon } from '@/components/ui'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { CardEspecial } from '@/components/AmigoInvisible'
 import { Calendario } from '@/components/Calendario'
@@ -69,11 +69,7 @@ function CardProximo({ e, hoy, className = 'w-[252px] flex-none snap-start' }: {
       <Link href={e.href} className="gr-card relative flex h-full flex-col">
         <div className="relative">
           <Fotos e={e} />
-          <Starburst size={64} fontSize={e.dias > 99 ? 26 : 32} sub={e.dias === 0 ? undefined : e.dias === 1 ? 'día' : 'días'}
-                     label={e.dias === 0 ? 'Es hoy' : `Faltan ${e.dias} ${e.dias === 1 ? 'día' : 'días'}`}
-                     className="absolute right-2 top-2 drop-shadow-sm">
-            {e.dias === 0 ? '¡Hoy!' : e.dias}
-          </Starburst>
+          <Faltan dias={e.dias} className="absolute right-2.5 top-2.5" />
           {/* de quién es: su foto (en un grupo, la de cada uno), montada sobre el borde de las fotos de los deseos */}
           <AvatarStack nombres={e.personas.slice(0, 3)} fotos={e.caras.slice(0, 3)} size={52} className="absolute -bottom-6 left-3 drop-shadow-sm" />
         </div>

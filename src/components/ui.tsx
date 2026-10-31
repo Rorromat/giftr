@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
 import { PARTES_MONO, type TonosMono } from '@/lib/mono'
+import { ONDAS } from '@/lib/ondas'
 
 // Piezas base del sistema visual. Server components puros (sin estado); la foto que no carga cae al placeholder
 // desde un componente cliente (FotoConRespaldo).
@@ -13,14 +14,12 @@ export const PRIORIDADES = {
 
 export type Prioridad = keyof typeof PRIORIDADES
 
-export const STAR_POINTS =
-  '50.0,2.0 59.8,13.3 74.0,8.4 76.9,23.1 91.6,26.0 86.7,40.2 98.0,50.0 86.7,59.8 91.6,74.0 76.9,76.9 74.0,91.6 59.8,86.7 50.0,98.0 40.2,86.7 26.0,91.6 23.1,76.9 8.4,74.0 13.3,59.8 2.0,50.0 13.3,40.2 8.4,26.0 23.1,23.1 26.0,8.4 40.2,13.3'
-
-/** Estrella de 12 puntas (contador). `label` la vuelve accesible; sin label es decorativa. */
-export function Starburst({ children, sub, label, size = 62, fontSize = 40, className = '', style }: {
+/**
+ * La insignia: el círculo verde ondulado del sello (sin el moño), con algo adentro ("!", "¡Listo!") o sola, de fondo de un
+ * ícono. `label` la vuelve accesible; sin label es decorativa.
+ */
+export function Insignia({ children, label, size = 62, fontSize = 40, className = '', style }: {
   children?: React.ReactNode
-  /** Segunda línea chica debajo del número ("días"). */
-  sub?: string
   label?: string
   size?: number
   fontSize?: number
@@ -32,17 +31,11 @@ export function Starburst({ children, sub, label, size = 62, fontSize = 40, clas
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       width={size} height={size} viewBox="0 0 100 100" className={className} style={style}
     >
-      <polygon points={STAR_POINTS} fill="var(--gr-accent)" />
+      <path d={ONDAS} fill="var(--gr-acento)" />
       {children != null && (
-        <text x="50" y={sub ? 44 : 50} dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={800}
-              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
+        <text x="50" y="50" dy="0.35em" textAnchor="middle" fontSize={fontSize} fontWeight={900}
+              fill="var(--gr-on-acento)" style={{ fontFamily: 'var(--gr-font-display)' }}>
           {children}
-        </text>
-      )}
-      {sub && (
-        <text x="50" y="70" dy="0.35em" textAnchor="middle" fontSize={17} fontWeight={800}
-              fill="var(--gr-on-accent)" style={{ fontFamily: 'var(--gr-font-display)' }}>
-          {sub}
         </text>
       )}
     </svg>
@@ -143,9 +136,13 @@ export function QuizasLink({ href, className, children }: { href: string | null;
   return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
 }
 
-export function BackLink({ href, label, vidrio = false }: { href: string; label: string; vidrio?: boolean }) {
+export function BackLink({ href, label, vidrio = false }: {
+  href: string; label: string
+  /** de vidrio: claro sobre una tapa o un color; oscuro sobre una foto (se ve sobre cualquiera) */
+  vidrio?: boolean | 'oscuro'
+}) {
   return (
-    <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
+    <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio === 'oscuro' ? ' gr-vidrio-oscuro' : vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="back" size={20} strokeWidth={2.4} />
     </Link>
   )
@@ -155,7 +152,13 @@ export function BackLink({ href, label, vidrio = false }: { href: string; label:
  * El moño de la marca (ver lib/mono.ts), en los tonos del acento: si cambia el verde, cambia con él. tonos: otros (la
  * sombra de la animación de inicio va toda en tinta).
  */
-export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; className?: string; style?: React.CSSProperties }) {
+export function Mono({ tonos, borde, className = '', style }: {
+  tonos?: TonosMono
+  /** con un borde de este color alrededor, como pegado (sobre una foto) */
+  borde?: string
+  className?: string
+  style?: React.CSSProperties
+}) {
   const t = tonos ?? {
     claro: 'var(--gr-acento)',
     medio: 'color-mix(in oklch, var(--gr-acento) 80%, var(--gr-acento-oscuro))',
@@ -163,9 +166,38 @@ export function Mono({ tonos, className = '', style }: { tonos?: TonosMono; clas
     nudo: 'var(--gr-acento-oscuro)',
   }
   return (
-    <svg aria-hidden viewBox="0 0 100 100" className={className} style={style}>
+    <svg aria-hidden viewBox="0 0 100 100" overflow="visible" className={className} style={style}>
+      {/* primero el borde de todo el moño junto, después el moño: así el borde queda solo afuera */}
+      {borde && (
+        <g fill="none" stroke={borde} strokeWidth={13} strokeLinejoin="round">
+          {PARTES_MONO.filter((p) => !p.opacidad).map((p) => <path key={p.d} d={p.d} />)}
+        </g>
+      )}
       {PARTES_MONO.map((p) => <path key={p.d} d={p.d} style={{ fill: t[p.tono] }} opacity={p.opacidad} />)}
     </svg>
+  )
+}
+
+/**
+ * Cuánto falta para una fecha (un cumple, una fecha especial), como una hojita de calendario: arriba la franja verde, el
+ * número grande y "días" abajo; el mismo día, "¡Hoy!". Es lo que distingue a las fechas de los regalos (que llevan el moño).
+ */
+export function Faltan({ dias, className = '' }: { dias: number; className?: string }) {
+  return (
+    <span role="img" aria-label={dias === 0 ? 'Es hoy' : `Faltan ${dias} ${dias === 1 ? 'día' : 'días'}`}
+          className={`flex w-[54px] flex-col overflow-hidden rounded-[14px] bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
+      <span className="bg-gr-acento py-[3px] text-[9.5px] leading-none font-extrabold tracking-[0.08em] text-gr-on-acento uppercase">
+        {dias === 0 ? 'Es' : 'Faltan'}
+      </span>
+      {dias === 0
+        ? <span className="py-2.5 text-[16px] leading-none font-black tracking-[-0.03em]">¡Hoy!</span>
+        : (
+          <>
+            <span className="pt-1.5 text-[24px] leading-none font-black tracking-[-0.04em] tabular-nums">{dias}</span>
+            <span className="pb-1.5 text-[11px] font-semibold text-[#6C6C75]">{dias === 1 ? 'día' : 'días'}</span>
+          </>
+        )}
+    </span>
   )
 }
 
@@ -349,6 +381,8 @@ const ICONS = {
   basura: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12.4a2 2 0 0 0 2 1.6h6a2 2 0 0 0 2-1.6L18 7" /><path d="M9 7V4.5h6V7" /></>,
   // un secreto (el amigo invisible): un antifaz
   antifaz: <><path d="M2.5 11c0-3.2 4.6-4.4 9.5-1.9 4.9-2.5 9.5-1.3 9.5 1.9 0 3.9-4.6 5.2-7.3 2.7-1.2-1.1-3.2-1.1-4.4 0C7.1 16.2 2.5 14.9 2.5 11z" /><ellipse cx="7.6" cy="11.3" rx="1.9" ry="1.3" /><ellipse cx="16.4" cy="11.3" rx="1.9" ry="1.3" /></>,
+  // compartir: tres puntos unidos
+  compartir: <><circle cx="17.5" cy="5.5" r="2.5" /><circle cx="6.5" cy="12" r="2.5" /><circle cx="17.5" cy="18.5" r="2.5" /><path d="M8.7 10.7l6.6-3.9M8.7 13.3l6.6 3.9" /></>,
   // "Me lo robo": copiarlo a tu lista
   copiar: <><rect x="8.5" y="8.5" width="12" height="12" rx="3" /><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" /></>,
   // La ficha del deseo: tiene que ser este mismo (una mira), sirve algo parecido (≈), se puede repetir

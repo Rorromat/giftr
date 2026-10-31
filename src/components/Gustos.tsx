@@ -7,7 +7,7 @@ import { AvatarSticker, Icon } from '@/components/ui'
 /** Ícono de la sección en un cuadradito ácido, apenas girado. */
 export function IconoSeccion({ s, size = 36 }: { s: Pick<SeccionGustos, 'icono'>; size?: number }) {
   return (
-    <span aria-hidden className="flex flex-none items-center justify-center rounded-full bg-gr-accent text-gr-on-accent"
+    <span aria-hidden className="flex flex-none items-center justify-center rounded-full bg-gr-acento text-gr-on-acento"
           style={{ width: size, height: size }}>
       <Icon name={s.icono} size={size * 0.55} strokeWidth={2} />
     </span>

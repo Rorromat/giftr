@@ -2,11 +2,11 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Icon, Starburst } from '@/components/ui'
+import { Icon, Mono } from '@/components/ui'
 
 // Tirar para abajo desde arriba de todo trae lo último del servidor (router.refresh: no pierde el scroll ni lo que está
-// abierto). La estrella baja girando con el dedo; pasado el umbral, al soltar gira hasta que llega lo nuevo y dice "Al
-// día". En la app instalada no hay uno del sistema; en el navegador reemplaza al suyo (overscroll-behavior en el body),
+// abierto). El moño baja con el dedo y se va enderezando; pasado el umbral, al soltar late hasta que llega lo nuevo y dice
+// "Al día". En la app instalada no hay uno del sistema; en el navegador reemplaza al suyo (overscroll-behavior en el body),
 // que recargaba la página entera.
 
 /** Las pantallas donde lo que se ve lo pueden cambiar otros (Mis regalos: un regalo grupal en el que estás). No los formularios (Agregar, Editar, Perfil, un grupo nuevo). */
@@ -16,7 +16,7 @@ export const refrescaEn = (path: string) => DONDE.test(path)
 /** Cuánto hay que tirar (con la resistencia, la mitad de lo que baja el dedo) para que al soltar actualice. */
 const UMBRAL = 64
 const TOPE = 104
-/** Que la estrella llegue a girar aunque la respuesta sea instantánea. */
+/** Que el moño llegue a latir aunque la respuesta sea instantánea. */
 const MINIMO_MS = 600
 const LISTO_MS = 1100
 
@@ -52,7 +52,7 @@ export function Refrescar() {
     function empieza(e: TouchEvent) {
       if (e.touches.length !== 1 || window.scrollY > 0 || faseRef.current !== 'quieto') return
       // no desde un campo, la barra de abajo o algo que pide quedar afuera
-      if ((e.target as Element).closest?.('input, textarea, select, [contenteditable], nav, .gr-floatbar, [data-sin-refrescar]')) return
+      if ((e.target as Element).closest?.('input, textarea, select, [contenteditable], nav, .gr-floatbar, .gr-ficha__barra, [data-sin-refrescar]')) return
       y0 = e.touches[0].clientY
       x0 = e.touches[0].clientX
       siguiendo = true
@@ -120,7 +120,7 @@ export function Refrescar() {
     }
   }, [activo, router])
 
-  // Llegó lo nuevo (la transición del refresh terminó): "Al día", después de que la estrella haya girado un poco
+  // Llegó lo nuevo (la transición del refresh terminó): "Al día", después de que el moño haya latido un poco
   useEffect(() => {
     if (fase !== 'cargando' || pendiente) return
     const t = setTimeout(() => pasarA('listo'), Math.max(0, MINIMO_MS - (Date.now() - desde.current)))
@@ -146,7 +146,7 @@ export function Refrescar() {
             <span>{fase === 'listo' ? 'Al día' : 'Sin conexión'}</span>
           </>
         ) : (
-          <Starburst size={26} className="gr-refrescar__estrella" />
+          <Mono className="gr-refrescar__mono" />
         )}
       </div>
       <p role="status" className="sr-only">

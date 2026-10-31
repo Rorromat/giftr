@@ -8,7 +8,7 @@ import { MESES, miCumple } from '@/lib/events'
 import { yo } from '@/lib/perfil'
 import { bloquesDeGustos, type PasoGustos } from '@/lib/gustos'
 import { TallesIlustrados } from '@/components/TallesIlustrados'
-import { AvatarSticker, Icon, Starburst, type IconName, LogoSticker } from '@/components/ui'
+import { AvatarSticker, Icon, Insignia, type IconName, LogoSticker } from '@/components/ui'
 
 type Fila = { paso: PasoGustos; icono: IconName; titulo: string; valor: string | null }
 
@@ -40,7 +40,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
     <main className="flex flex-col gap-5 pb-12 pt-2">
       <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
       <div className="gr-hero flex flex-col items-center gap-3 px-5 pb-6 pt-7 text-center">
-        <Starburst size={120} fontSize={28} label="Listo">¡Listo!</Starburst>
+        <Insignia size={120} fontSize={24} label="Listo">¡Listo!</Insignia>
         <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">¡Todo listo{nombre ? `, ${nombre.split(' ')[0]}` : ''}!</h1>
         <p className="text-[15px] leading-snug text-gr-on-hero/75">
           {completas === filas.length ? 'Cargaste todo. ' : `Cargaste ${completas} de ${filas.length}. `}

@@ -1,5 +1,5 @@
-import { SkeletonPage } from '@/components/Skeleton'
+import { SkeletonFicha } from '@/components/Skeleton'
 
 export default function Loading() {
-  return <SkeletonPage cards={2} />
+  return <SkeletonFicha />
 }
