@@ -545,13 +545,12 @@ test('el 29/2 en la grilla del año: el 28 en los años que no son bisiestos, el
   expect(calendarioDelAnio(eventos, hoy)[1].eventos).toEqual([28])
 })
 
-test('Próximos: en el carrusel de Inicio, los próximos 5 de los tres meses que vienen; el resto, en Todo el año', () => {
+test('Próximos: en el carrusel de Inicio, los próximos 10 en orden (falte lo que falte); el resto, en Todo el año', () => {
   const ev = (dias: number) => ({ dias })
-  expect(repartirProximos([ev(3), ev(40), ev(90), ev(91), ev(341)])).toEqual({ primeros: [ev(3), ev(40), ev(90)], quedan: 2 })
-  // un cumple que pasó hace unos días es el del año que viene: no va como próximo
-  expect(repartirProximos([ev(341)])).toEqual({ primeros: [], quedan: 1 })
-  const muchos = [1, 2, 3, 4, 5, 6, 7, 8].map(ev)
-  expect(repartirProximos(muchos)).toEqual({ primeros: muchos.slice(0, 5), quedan: 3 })
+  // aunque falten meses: el cumple que pasó hace unos días va al final, como el del año que viene
+  expect(repartirProximos([ev(3), ev(40), ev(90), ev(91), ev(341)])).toEqual({ primeros: [ev(3), ev(40), ev(90), ev(91), ev(341)], quedan: 0 })
+  const muchos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(ev)
+  expect(repartirProximos(muchos)).toEqual({ primeros: muchos.slice(0, 10), quedan: 2 })
   expect(repartirProximos([])).toEqual({ primeros: [], quedan: 0 })
 })
 

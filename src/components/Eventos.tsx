@@ -87,8 +87,8 @@ function CardProximo({ e, hoy, className = 'w-[252px] flex-none snap-start' }: {
 }
 
 /**
- * Los próximos 5 (eventos y fechas especiales, por cercanía) en un carrusel; si hay más, la última tarjeta lleva a Todo el
- * año. Ver repartirProximos.
+ * Los próximos 10 (eventos y fechas especiales, por cercanía) en un carrusel, y al final "Ver más", que lleva a Todo el año
+ * (con cuántos más hay, si hay). Ver repartirProximos.
  */
 export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[]; hoy: Date; especiales?: TarjetaEspecial[] }) {
   const { primeros, quedan } = repartirProximos([
@@ -97,25 +97,17 @@ export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[];
       dias: t.dias, tarjeta: <CardEspecial key={t.tipo === 'fecha' ? t.fecha.id : t.juego.id} t={t} hoy={hoy} />,
     })),
   ].sort((a, b) => a.dias - b.dias))
-  if (!primeros.length) {
-    return (
-      <p className="gr-empty px-4 py-4 text-center text-sm">
-        Nada en los próximos tres meses. <Link href="/eventos" className="font-semibold underline underline-offset-2">Ver todo el año</Link>
-      </p>
-    )
-  }
+  if (!primeros.length) return null
   return (
     <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
       {primeros.map((p) => p.tarjeta)}
-      {quedan > 0 && (
-        <li className="w-[160px] flex-none snap-start">
-          <Link href="/eventos" className="gr-card flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-            <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-gr-soft"><Icon name="calendar" size={26} /></span>
-            <span className="text-[17px] leading-tight font-semibold">{quedan === 1 ? '1 más' : `${quedan} más`}</span>
-            <span className="text-[13px] font-semibold underline underline-offset-4">Todo el año</span>
-          </Link>
-        </li>
-      )}
+      <li className="w-[160px] flex-none snap-start">
+        <Link href="/eventos" className="gr-card flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+          <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto"><Icon name="calendar" size={26} /></span>
+          <span className="text-[17px] leading-tight font-semibold">Ver más</span>
+          <span className="text-[13px] text-gr-muted">{quedan > 0 ? `${quedan} más en el año` : 'Todo el año'}</span>
+        </Link>
+      </li>
     </ul>
   )
 }

@@ -12,7 +12,7 @@ import {
   amigoInvisibleParaViewer, asignar, borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego,
   estadoDeJuegos, marcarYaLoTengo, misAmigosInvisibles, preguntar, tambienTeToco, responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo,
 } from '@/lib/amigo-invisible'
-import { diaEn, especialesQueVienen, fechasQueVienen, proximaEspecial } from '@/lib/fechas-especiales'
+import { diaEn, especialesQueVienen, proximaEspecial } from '@/lib/fechas-especiales'
 import { hoyLocal } from '@/lib/events'
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
@@ -33,27 +33,23 @@ test('las fechas especiales de Argentina: fijas y los terceros domingos', () => 
   expect(iso(proximaEspecial('navidad', new Date(Date.UTC(2026, 11, 26))))).toBe('2027-12-25')
 })
 
-test('aparecen en Lo que viene un tiempo antes: Navidad 30 días, las demás 3 semanas', () => {
-  const nombres = (d: Date) => fechasQueVienen(d).map((f) => [f.id, f.dias])
-  expect(nombres(new Date(Date.UTC(2026, 10, 24)))).toEqual([]) // 31 días antes de Navidad
-  expect(nombres(new Date(Date.UTC(2026, 10, 25)))).toEqual([['navidad', 30]])
-  expect(nombres(new Date(Date.UTC(2026, 9, 1)))).toEqual([['madre', 17]])
-  expect(nombres(new Date(Date.UTC(2026, 6, 20)))).toEqual([['amigo', 0]])
-  expect(nombres(new Date(Date.UTC(2026, 6, 21)))).toEqual([]) // el del amigo ya pasó; el del niño está a 26 días
-})
-
-test('Lo que viene: las fechas cercanas, las lejanas con un amigo invisible tuyo, y los amigos invisibles sueltos', () => {
+test('Próximos: todas las fechas especiales en orden (falte lo que falte), con sus amigos invisibles, y los sueltos', () => {
   const juego = (id: string, dias: number, fechaEspecial: 'navidad' | 'amigo' | null) => ({
     id, nombre: id, fecha: '', fechaEspecial, presupuesto: null, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false,
     organizador: 'Euge', soyOrganizador: false, invitados: 3, contestaron: 3, meToca: null, yaLoTengo: false, preguntasSinContestar: 0,
   })
-  const hoy = new Date(Date.UTC(2026, 9, 26)) // Navidad, a 60 días
+  const hoy = new Date(Date.UTC(2026, 9, 26)) // Navidad, a 60 días; el Día de la Madre de este año ya pasó
   const t = especialesQueVienen(hoy, [juego('nav', 59, 'navidad'), juego('oficina', 10, null), juego('viejo', -3, null)])
   expect(t.map((x) => (x.tipo === 'fecha' ? [x.fecha.id, x.dias, x.juegos.map((j) => j.id)] : ['juego', x.dias, [x.juego.id]]))).toEqual([
     ['juego', 10, ['oficina']],
     ['navidad', 60, ['nav']],
+    ['padre', 237, []],
+    ['amigo', 267, []],
+    ['ninos', 293, []],
+    ['madre', 356, []],
   ])
-  expect(especialesQueVienen(hoy, [])).toEqual([])
+  // sin amigos invisibles, las cinco igual
+  expect(especialesQueVienen(hoy, []).map((x) => x.dias)).toEqual([60, 237, 267, 293, 356])
   // lo que dice la tarjeta: lo más urgente, sin nombres
   const e = (miEstado: 'invitado' | 'juega', sorteado: boolean, vi: boolean) => ({ miEstado, sorteado, vi })
   expect(estadoDeJuegos([])).toBeNull()

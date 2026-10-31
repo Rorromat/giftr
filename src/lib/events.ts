@@ -63,19 +63,15 @@ export function anioSiEstaLejos(f: Date, hoy: Date): number | null {
   return esLaProxima && !pasoHacePoco ? null : f.getUTCFullYear()
 }
 
-/** Hasta cuántos días adelante va un evento en el carrusel de Próximos (lo de después, en Todo el año). */
-export const HORIZONTE_PROXIMOS = 90
-
-/** Cuántos van en el carrusel de Próximos, en Inicio: más, satura (el resto, en Todo el año). */
-export const PROXIMOS_EN_INICIO = 5
+/** Cuántos van en el carrusel de Próximos, en Inicio (el resto, en Todo el año, con "Ver más"). */
+export const PROXIMOS_EN_INICIO = 10
 
 /**
- * Lo que va en el carrusel de Próximos (todo junto y ordenado por cercanía: eventos y fechas especiales): los primeros 5
- * de los próximos tres meses, y cuántos más hay (para "Todo el año"). Un cumple que pasó hace unos días es el del año que
- * viene: no va como próximo.
+ * Lo que va en el carrusel de Próximos (todo junto y ordenado por cercanía: eventos y fechas especiales): los primeros 10,
+ * falte lo que falte para cada uno, y cuántos más hay (para "Ver más").
  */
 export function repartirProximos<T extends { dias: number }>(eventos: T[]): { primeros: T[]; quedan: number } {
-  const primeros = eventos.filter((e) => e.dias <= HORIZONTE_PROXIMOS).slice(0, PROXIMOS_EN_INICIO)
+  const primeros = eventos.slice(0, PROXIMOS_EN_INICIO)
   return { primeros, quedan: eventos.length - primeros.length }
 }
 
