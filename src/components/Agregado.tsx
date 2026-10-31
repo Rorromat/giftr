@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from 'react'
+import { flushSync } from 'react-dom'
 import { updatePriorityAction } from '@/app/actions'
 import { dejarPendiente } from '@/components/AlLlegarDelAgregado'
 import { leerCopiado } from '@/components/QueQueres'
@@ -71,7 +72,12 @@ function olvidarAgregado() {
 export function abrirAgregado() {
   if (estado.foto) URL.revokeObjectURL(estado.foto)
   olvidarAgregado()
-  poner({ ...centroDelMas(), paso: 'abierto', quieto: false, saliendo: false, tipo: null, link: null, foto: null })
+  // El círculo cerrado primero se para en el + (sin animar) y recién ahí se abre: si no, la primera vez (que todavía no
+  // sabía dónde estaba el +) se abría viajando desde la esquina de arriba a la izquierda.
+  flushSync(() => poner({ ...centroDelMas(), quieto: true }))
+  const fondo = document.querySelector('.gr-agr__fondo')
+  if (fondo) void getComputedStyle(fondo).clipPath
+  poner({ paso: 'abierto', quieto: false, saliendo: false, tipo: null, link: null, foto: null })
 }
 
 /** Cierra: el círculo vuelve al +. Con el deseo recién anotado, entra primero en la lista. */
