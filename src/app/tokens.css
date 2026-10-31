@@ -1136,6 +1136,6 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-girar__tel { animation: none; }
   /* los íconos de los avisos, quietos (en su lugar, con los tres puntitos prendidos) */
   .gr-aviso-icono[data-mueve] > svg, .gr-aviso-icono[data-mueve] .gr-aviso__punto { animation: none; }
-  /* la estrella quieta mientras carga, y se va de una */
+  /* el moño quieto mientras carga (sin pegarse ni latir), y se va de una */
   .gr-arranque, .gr-arranque * { animation: none !important; transition: none !important; }
 }
