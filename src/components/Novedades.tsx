@@ -123,7 +123,7 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
         <p key={estado.n} role="status" className="gr-toast">
           {estado.ok ? (
             <>
-              <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
+              <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento-sobre-tinta" />
               <span className="min-w-0 flex-1">{estado.yaLoTenias ? 'Ya lo tenías en tu lista.' : '¡Robado! Ya está en tu lista.'}</span>
               <Link href={`/deseo/${estado.itemId}`} className="flex-none font-semibold underline underline-offset-4">Ver</Link>
             </>

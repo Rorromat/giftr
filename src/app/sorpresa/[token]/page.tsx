@@ -153,7 +153,7 @@ export default async function Sorpresa({ params, searchParams }: {
 
       <section className="mt-2 flex flex-col gap-3">
         <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-          <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento" />
+          <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />
           {s.para.userId ? `Esto no lo ve ${quien}` : 'Para coordinar entre ustedes'}
         </h2>
         <ul className="flex flex-col gap-2">

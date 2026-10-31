@@ -24,11 +24,16 @@
   --gr-brand: var(--gr-ink);
   --gr-on-brand: #FFFFFF;
 
-  /* El acento de la marca, verde pino: liso y en degradé (de un tono más claro arriba a la izquierda a uno más oscuro
-     abajo a la derecha; el texto blanco se lee en todo el recorrido). Para probar otro, se cambia acá. */
-  --gr-acento: #12865F;
-  --gr-on-acento: #FFFFFF;
-  --gr-acento-degrade: linear-gradient(135deg, #17996B 0%, #12865F 45%, #0E7350 100%);
+  /* El acento de la marca, un verde vivo: de relleno, liso y en degradé (de un tono más claro arriba a la izquierda a uno más
+     oscuro abajo a la derecha), con tinta encima, que se lee en todo el recorrido. Como texto o ícono hace falta un tono más
+     oscuro (--gr-acento-oscuro): sobre el fondo y las tarjetas de día (--gr-acento-texto) y sobre lo que va en tinta de
+     noche, que es claro (--gr-acento-sobre-tinta). Para probar otro verde, se cambian estos tres. */
+  --gr-acento: #10B66E;
+  --gr-acento-oscuro: #08794A;
+  --gr-acento-degrade: linear-gradient(135deg, #3CD592 0%, #10B66E 50%, #0A9A5B 100%);
+  --gr-on-acento: #121216;
+  --gr-acento-texto: var(--gr-acento-oscuro);
+  --gr-acento-sobre-tinta: var(--gr-acento);
   /* La estrella lima de los stickers, con su tinta: igual en los dos modos */
   --gr-accent: #C8F31D;
   --gr-on-accent: #141414;
@@ -83,6 +88,8 @@
     --gr-line: rgb(255 255 255 / 0.09);
     --gr-line-strong: #6E6E77;
     --gr-on-brand: #0C0C0E;
+    --gr-acento-texto: var(--gr-acento);
+    --gr-acento-sobre-tinta: var(--gr-acento-oscuro);
     --gr-comun: #182038;
     --gr-comun-line: #2E3D66;
     --gr-comun-ink: #A6BCFF;
@@ -500,7 +507,7 @@
   /* mientras tanto, la marca de cada sección se apaga: el que marca es el selector */
   .gr-nav__tabs[data-dedo] a[data-marcado]::before { opacity: 0; }
   .gr-nav__tabs[data-dedo="arrastrando"] a[data-marcado] { color: var(--gr-ink); opacity: 0.62; }
-  .gr-nav__tabs[data-dedo] a[data-bajo] { color: var(--gr-acento); opacity: 1; }
+  .gr-nav__tabs[data-dedo] a[data-bajo] { color: var(--gr-acento-texto); opacity: 1; }
   .gr-nav__tabs a[data-marcado] { color: var(--gr-on-acento); opacity: 1; }
   .gr-nav__tabs a[data-marcado]::before { opacity: 1; }
   /* el ícono de la recién marcada: se encoge, salta y se acomoda */
@@ -722,7 +729,7 @@
     place-items: center;
     overflow: hidden;
     padding: 60px 26px 120px;
-    color: #FFFFFF;
+    color: var(--gr-on-acento);
     text-align: center;
     opacity: 0;
     pointer-events: none;
@@ -738,17 +745,18 @@
   .gr-cuanto button {
     min-height: 36px;
     padding: 0 13px;
-    border: 1px solid rgb(255 255 255 / 0.3);
+    border: 1px solid color-mix(in oklch, var(--gr-on-acento) 22%, transparent);
     border-radius: 999px;
-    background: rgb(255 255 255 / 0.14);
-    color: #FFFFFF;
+    background: rgb(255 255 255 / 0.22);
+    color: var(--gr-on-acento);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
   }
-  .gr-cuanto button[aria-pressed="true"] { background: #FFFFFF; color: #121216; }
+  .gr-cuanto button[aria-pressed="true"] { background: var(--gr-on-acento); color: #FFFFFF; }
+  .gr-agr__listo .gr-btn--vidrio { border-color: color-mix(in oklch, var(--gr-on-acento) 22%, transparent); background: rgb(255 255 255 / 0.22); color: var(--gr-on-acento); }
 
   /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
   .gr-nuevo { animation: gr-entra-deseo 700ms var(--gr-entra) both; }

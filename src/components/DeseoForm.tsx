@@ -76,7 +76,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
           {Object.entries(PRIORIDADES).map(([value, { label, corazones }]) => (
             <label key={value} className="gr-chip group h-11 gap-1.5 px-3.5 text-[13px] has-[:checked]:px-3">
               <input type="radio" name="prioridad" value={value} defaultChecked={value === (deseo?.prioridad ?? 'gustaria')} className="sr-only" />
-              <Hearts n={corazones} className="group-has-[:checked]:text-gr-acento" />
+              <Hearts n={corazones} className="group-has-[:checked]:text-gr-on-acento" />
               <span className="sr-only group-has-[:checked]:not-sr-only">{label}</span>
             </label>
           ))}

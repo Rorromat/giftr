@@ -103,7 +103,7 @@ export default async function Perfil({ params, searchParams }: Props) {
         <section className="flex gap-3 rounded-[22px] border border-gr-line bg-gr-brand p-3.5 text-gr-bg">
           <IconoSeccion s={noRegalar} size={34} />
           <div className="flex min-w-0 flex-col gap-1.5">
-            <h2 className="text-lg leading-tight font-semibold text-gr-acento">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
+            <h2 className="text-lg leading-tight font-semibold text-gr-acento-sobre-tinta">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
             <p className="text-sm font-semibold">{noRegalar.items.join(' · ')}</p>
           </div>
         </section>

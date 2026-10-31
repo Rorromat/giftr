@@ -76,7 +76,7 @@ export function PriorityTag({ prioridad, children, className = '' }: {
     <span
       role="img" aria-label={label}
       className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-[0_1px_4px_rgb(20_20_20/0.14)] ${
-        dark ? 'bg-gr-brand text-gr-acento' : 'bg-white/95 text-[#121216]'} ${className}`}
+        dark ? 'bg-gr-brand text-gr-acento-sobre-tinta' : 'bg-white/95 text-[#121216]'} ${className}`}
     >
       <Hearts n={corazones} />
       {children && <span className={dark ? 'text-gr-on-brand' : ''}>{children}</span>}
@@ -257,7 +257,7 @@ export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { tit
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h2 id={id} className="gr-heading">{title}</h2>
-      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento">{linkLabel}</Link>}
+      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
     </div>
   )
 }

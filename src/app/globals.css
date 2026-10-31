@@ -9,6 +9,8 @@
   --color-gr-on-accent: var(--gr-on-accent);
   --color-gr-acento: var(--gr-acento);
   --color-gr-on-acento: var(--gr-on-acento);
+  --color-gr-acento-texto: var(--gr-acento-texto);
+  --color-gr-acento-sobre-tinta: var(--gr-acento-sobre-tinta);
   --color-gr-muted: var(--gr-muted);
   --color-gr-dot: var(--gr-dot);
   --color-gr-soft: var(--gr-soft);

@@ -25,7 +25,7 @@ export function DeseoEliminado() {
   }, [])
   return (
     <p role="status" className="gr-toast [animation-duration:4s]">
-      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento-sobre-tinta" />
       <span className="min-w-0 flex-1"><span className="font-semibold">Listo,</span> lo eliminaste</span>
     </p>
   )
@@ -41,7 +41,7 @@ export function GustosGuardados({ paso }: { paso: string }) {
   }, [paso])
   return (
     <p role="status" className="gr-toast [animation-duration:4s]">
-      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento" />
+      <Icon name="check" size={18} strokeWidth={2.6} className="flex-none text-gr-acento-sobre-tinta" />
       <span className="min-w-0 flex-1"><span className="font-semibold">Listo,</span> tu gente ya lo ve</span>
     </p>
   )

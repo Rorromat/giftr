@@ -24,7 +24,7 @@ export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string })
       </div>
       {estado?.ok ? (
         <p role="status" className="flex flex-none items-center gap-1 text-[13px] font-semibold">
-          <Icon name="check" size={16} strokeWidth={2.6} className="text-gr-acento" />{estado.amigos ? '¡Amigos!' : 'Enviada'}
+          <Icon name="check" size={16} strokeWidth={2.6} className="text-gr-acento-texto" />{estado.amigos ? '¡Amigos!' : 'Enviada'}
         </p>
       ) : (
         <div className="-mr-2 flex flex-none items-center">

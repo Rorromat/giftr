@@ -277,7 +277,7 @@ export default async function DetalleItem({ params, searchParams }: {
       {giver && (
         <section className="mt-2 flex flex-col gap-3">
           <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-            <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento" />
+            <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />
             Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
           </h2>
           <ul className="flex flex-col gap-2">
