@@ -9,7 +9,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { Arte, AvatarSticker, Icon, ItemPhoto, PriorityTag, Starburst } from '@/components/ui'
 
-// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas grandes que pasan solas de a una, un segundo en cada una, y se
+// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas que pasan solas de a una, dos segundos en cada una, y se
 // pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
 // botón "Me lo robo".
 
@@ -17,14 +17,14 @@ export type MiniNovedad = {
   id: string; titulo: string; foto: string | null; precio: string | null; hace: string; nombre: string; duenoFoto: string | null
 }
 
-/** Cada cuánto pasa sola a la tarjeta siguiente: un segundo quieta en cada una, más lo que tarda en deslizarse. */
-const CADA_MS = 1700
+/** Cada cuánto pasa sola a la tarjeta siguiente: dos segundos quieta en cada una, más lo que tarda en deslizarse. */
+const CADA_MS = 2700
 /** Después de soltarlo (o de moverlo con la ruedita), cuánto espera para volver a pasar solo. */
 const PAUSA_MS = 2500
 
 /**
  * El estante de Inicio: los últimos deseos de tus amigos, cada uno en su cuadrado de color, uno al lado del otro.
- * Pasa solo de a una tarjeta, un segundo en cada una, y al llegar a la última vuelve a la primera. Mientras lo tenés
+ * Pasa solo de a una tarjeta, dos segundos en cada una, y al llegar a la última vuelve a la primera. Mientras lo tenés
  * apretado (o recorrés las tarjetas con el teclado) no se mueve, y al soltarlo espera un poco. Con movimiento reducido no
  * se mueve solo. Cada una abre el feed en ese deseo.
  */
