@@ -143,9 +143,13 @@ export function QuizasLink({ href, className, children }: { href: string | null;
   return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
 }
 
-export function BackLink({ href, label, vidrio = false }: { href: string; label: string; vidrio?: boolean }) {
+export function BackLink({ href, label, vidrio = false }: {
+  href: string; label: string
+  /** de vidrio: claro sobre una tapa o un color; oscuro sobre una foto (se ve sobre cualquiera) */
+  vidrio?: boolean | 'oscuro'
+}) {
   return (
-    <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
+    <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio === 'oscuro' ? ' gr-vidrio-oscuro' : vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="back" size={20} strokeWidth={2.4} />
     </Link>
   )
@@ -349,6 +353,8 @@ const ICONS = {
   basura: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12.4a2 2 0 0 0 2 1.6h6a2 2 0 0 0 2-1.6L18 7" /><path d="M9 7V4.5h6V7" /></>,
   // un secreto (el amigo invisible): un antifaz
   antifaz: <><path d="M2.5 11c0-3.2 4.6-4.4 9.5-1.9 4.9-2.5 9.5-1.3 9.5 1.9 0 3.9-4.6 5.2-7.3 2.7-1.2-1.1-3.2-1.1-4.4 0C7.1 16.2 2.5 14.9 2.5 11z" /><ellipse cx="7.6" cy="11.3" rx="1.9" ry="1.3" /><ellipse cx="16.4" cy="11.3" rx="1.9" ry="1.3" /></>,
+  // compartir: tres puntos unidos
+  compartir: <><circle cx="17.5" cy="5.5" r="2.5" /><circle cx="6.5" cy="12" r="2.5" /><circle cx="17.5" cy="18.5" r="2.5" /><path d="M8.7 10.7l6.6-3.9M8.7 13.3l6.6 3.9" /></>,
   // "Me lo robo": copiarlo a tu lista
   copiar: <><rect x="8.5" y="8.5" width="12" height="12" rx="3" /><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" /></>,
   // La ficha del deseo: tiene que ser este mismo (una mira), sirve algo parecido (≈), se puede repetir

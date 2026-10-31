@@ -315,8 +315,12 @@
     cursor: pointer;
   }
   .gr-segmented > [aria-pressed="true"],
+  .gr-segmented > [aria-checked="true"],
   .gr-segmented > [aria-current="page"],
   .gr-segmented > :has(:checked) { background: var(--gr-acento-degrade); color: var(--gr-on-acento); font-weight: 700; }
+  /* el de la ficha del deseo (¿Cómo lo regalás?), más alto, como las pestañas de la referencia */
+  .gr-segmented--grande { min-height: 56px; padding: 5px; }
+  .gr-segmented--grande > * { font-size: 15px; }
   /* Pestañas de dos con la pastilla que se desliza (ver PestanasRegalos): el fondo lo lleva ::before y se corre a la
      marcada (data-columna) desde el toque, en vez de saltar de una a otra. */
   .gr-segmented--desliza { position: relative; isolation: isolate; }
@@ -612,6 +616,80 @@
   .gr-arte__sin-foto { position: absolute; inset: 0; display: grid; place-items: center; }
   .gr-arte--apagado > * { opacity: 0.45; }
 
+  /* La ficha de un deseo (ver FichaDeseo): la foto a sangre arriba de todo, que abajo se funde con el fondo; encima, volver
+     y compartir de vidrio oscuro (se ven sobre cualquier foto) y "Ver foto" al medio, donde empieza el degradé. El nombre
+     se apoya sobre el final de la foto. Sin foto, el regalito gris y más bajita. */
+  .gr-ficha__portada {
+    position: relative;
+    height: clamp(340px, 56svh, 500px);
+    margin-inline: calc(-1 * var(--gr-gutter));
+  }
+  .gr-ficha__portada:has(.gr-arte__sin-foto) { height: 300px; }
+  .gr-ficha__foto { aspect-ratio: auto; height: 100%; border-radius: 0; }
+  .gr-ficha__foto::after {
+    box-shadow: none;
+    background: linear-gradient(180deg, transparent 48%, color-mix(in oklch, var(--gr-bg) 70%, transparent) 78%, var(--gr-bg) 97%);
+  }
+  .gr-ficha__arriba {
+    position: absolute;
+    z-index: 2;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    inset-inline: var(--gr-gutter);
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .gr-ficha__arriba > * { pointer-events: auto; }
+  .gr-ficha__arriba .gr-icon-btn { width: 46px; height: 46px; }
+  .gr-icon-btn.gr-vidrio-oscuro, .gr-vidrio-oscuro {
+    border-color: rgb(255 255 255 / 0.16);
+    background: rgb(18 18 22 / 0.34);
+    color: #FFFFFF;
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    backdrop-filter: blur(16px) saturate(1.6);
+  }
+  .gr-ficha__pastilla {
+    position: absolute;
+    left: 50%;
+    bottom: 64px;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: var(--gr-radius-pill);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .gr-ficha__nombre { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; margin-top: -40px; }
+  .gr-ficha__precio {
+    margin-top: 6px;
+    font-family: var(--gr-font-display);
+    font-weight: 900;
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    color: var(--gr-acento-texto);
+  }
+  /* abajo de todo, fija, sobre un degradé al fondo (lo de atrás se apaga antes de llegar a los botones) */
+  .gr-ficha__barra {
+    position: fixed;
+    z-index: 20;
+    left: max(0px, calc(50% - 224px));
+    right: max(0px, calc(50% - 224px));
+    bottom: 0;
+    display: flex;
+    gap: 10px;
+    padding: 30px var(--gr-gutter) max(16px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, var(--gr-bg) 42%);
+    pointer-events: none;
+  }
+  .gr-ficha__barra > * { flex: 1 1 0; min-width: 0; pointer-events: auto; }
+  .gr-ficha__barra :is(.gr-btn, .gr-btn-primary) { width: 100%; min-height: 56px; }
+
 
   /* El agregado (<Agregado>): el + se abre en un círculo del acento que llena la pantalla desde el botón (--x, --y), y las
      cuatro maneras de sumar un deseo caen como cartas torcidas, con rebote. La elegida crece y las demás se caen; sale la
@@ -786,7 +864,7 @@
 @keyframes gr-cal-siguiente { from { opacity: 0; transform: translateX(32px); } }
 @keyframes gr-cal-anterior { from { opacity: 0; transform: translateX(-32px); } }
 
-/* El sello (<Sello>): la estrella con borde blanco, pegada torcida sobre la foto de lo que te tocó regalar. La primera vez
+/* El sello (<Sello>): el círculo verde ondulado con el moño, pegado torcido sobre la foto de lo que te tocó regalar. La primera vez
    que se ve cae grande, gira y queda pegada (gr-sello--cae, la pone Sello; antes, si todavía no se ve, espera escondida). */
 .gr-sello {
   transform: rotate(-10deg);
@@ -836,9 +914,10 @@
 }
 [aria-current="true"] > .gr-portada__punto { width: 22px; background: var(--gr-ink); opacity: 1; }
 
-/* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y la estrella gira y
-   crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
-   girando mientras llega lo nuevo y se vuelve "Al día". Fija arriba, encima de todo; no mueve la página. */
+/* Tirar para actualizar (<Refrescar> en el layout de la raíz). La píldora baja con el dedo (--tiron) y el moño se endereza
+   y crece con lo que falta para el umbral (--avance); pasado el umbral da un saltito (data-suelta). Al soltar se queda
+   latiendo (como al abrir la app) mientras llega lo nuevo y se vuelve "Al día". Fija arriba, encima de todo; no mueve la
+   página. */
 .gr-refrescar {
   --tiron: 0px;
   --avance: 0;
@@ -864,19 +943,20 @@
   transition: transform 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 200ms ease-out, background-color 200ms;
 }
 .gr-refrescar[data-fase="tirando"] { transition: none; }
-.gr-refrescar__estrella {
-  transform: rotate(calc(var(--avance) * 300deg)) scale(calc(0.55 + var(--avance) * 0.45));
+.gr-refrescar__mono {
+  width: 30px;
+  height: 30px;
+  transform: rotate(calc(-40deg + var(--avance) * 40deg)) scale(calc(0.55 + var(--avance) * 0.45));
   transition: transform 160ms ease-out;
 }
-.gr-refrescar[data-suelta] .gr-refrescar__estrella { transform: rotate(300deg) scale(1.18); }
-.gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: gr-gira 700ms linear infinite; }
+.gr-refrescar[data-suelta] .gr-refrescar__mono { transform: scale(1.18); }
+.gr-refrescar[data-fase="cargando"] .gr-refrescar__mono, .gr-latiendo { animation: gr-latido 1100ms ease-in-out infinite; }
 .gr-refrescar[data-fase="listo"], .gr-refrescar[data-fase="sin-red"] {
   padding: 0 16px 0 13px;
   background: var(--gr-brand);
   color: var(--gr-on-brand);
   animation: gr-aparece 160ms ease-out;
 }
-@keyframes gr-gira { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* El cartelito de abajo ("¡Robado! Ya está en tu lista"): sube, se queda un rato y se va solo. Arriba de la barra. */
 .gr-toast {
@@ -1129,8 +1209,8 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-portada__carta, .gr-portada__carta[data-lugar] { transform: none; transition: opacity 200ms ease; }
   .gr-portada__carta[data-lugar="abajo"] { opacity: 0; }
   .gr-portada__carta[data-lugar="arriba"] .gr-portada__sello { animation: none; opacity: 1; }
-  .gr-refrescar, .gr-refrescar__estrella { transition: opacity 200ms ease-out; }
-  .gr-refrescar[data-fase="cargando"] .gr-refrescar__estrella { animation: none; }
+  .gr-refrescar, .gr-refrescar__mono { transition: opacity 200ms ease-out; }
+  .gr-refrescar[data-fase="cargando"] .gr-refrescar__mono, .gr-latiendo { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }
   .gr-foto-grande[open] { animation: none; }
   .gr-girar__tel { animation: none; }

@@ -25,7 +25,7 @@ function anotar(clave: string) {
 }
 
 /**
- * El sello: la estrella del logo con borde blanco, pegada torcida sobre la foto de lo que te tocó regalar. "¡Es tuyo!" al
+ * El sello: un círculo verde ondulado con el moño del logo, pegado torcido sobre la foto de lo que te tocó regalar. "¡Es tuyo!" al
  * reservarlo, "¡Ya está!" al comprarlo y "¡Entre todos!" con el regalo grupal comprado; el chico (en las tarjetas) lleva
  * un tilde. Es adorno: al lado ya lo dice un texto.
  * Cae (gr-sello--cae) la primera vez que se ve en este navegador (`clave`, la misma para el grande y el chico), cuando

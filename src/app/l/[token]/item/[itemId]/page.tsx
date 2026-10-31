@@ -17,9 +17,8 @@ import { identificado } from '@/lib/types'
 import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
 import { sitioDeLaTienda } from '@/lib/links'
-import { Arte, AvatarStack, AvatarSticker, Icon, PageHeader } from '@/components/ui'
-import { CategoriaDeseo, FichasDeseo, NotaDeseo } from '@/components/FichaDeseo'
-import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { AvatarStack, AvatarSticker, Icon } from '@/components/ui'
+import { BarraDeLaFicha, BotonTienda, FichasDeseo, FotoDeLaFicha, NombreDeLaFicha, NotaDeseo } from '@/components/FichaDeseo'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
@@ -110,55 +109,40 @@ export default async function DetalleItem({ params, searchParams }: {
   const yaEstan = new Set([...(mio?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
+  // como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá
+  const reservable = disponible && !mia && !vencida && !enUnRegalo && !(detalle.role === 'anonimo' && detalle.motivo !== 'sin_identidad')
+  const verEnTienda = item.linkTienda && <BotonTienda link={item.linkTienda} tienda={tienda} />
 
   return (
-    <main className="flex flex-col gap-4 pb-12 pt-2">
-      {/* de quién es, para el que llega directo al deseo (un link por WhatsApp) */}
-      <PageHeader title={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
-
-      {invitado && <PreguntaInvitado nombre={invitado} />}
-
-      <article className="flex flex-col gap-[18px]">
-        <div className="relative">
-          <FotoAmpliable src={item.fotoUrl} titulo={item.titulo}>
-            <Arte src={item.fotoUrl} titulo={item.titulo} apagado={!disponible && !mia && !enUnRegalo} className="rounded-[22px]" style={{ aspectRatio: '1' }} />
-          </FotoAmpliable>
-          {/* pegado torcido en la esquina de arriba de la foto */}
-          {sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute -top-3 right-2 z-[2]" />}
-        </div>
-        <div className="flex flex-col gap-4">
-          {/* qué es y cuánto sale */}
-          <div className="flex flex-col gap-2">
-            {item.categoria && <CategoriaDeseo categoria={item.categoria} />}
-            <h1 className="gr-title text-[32px] [overflow-wrap:anywhere]">{item.titulo}</h1>
-            {precio && <p className="text-2xl font-extrabold tracking-[-0.03em] tabular-nums">{precio}</p>}
-          </div>
-          {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
-          <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />
-          {item.notas && (
-            <NotaDeseo notas={item.notas} quien={`${ownerNombre} ${plural ? 'dicen' : 'dice'}`}
-                       avatar={plural
-                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} size={28} />
-                         : <AvatarSticker nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
-          )}
-          {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
-          {/* la tienda a lo ancho; abajo, de a dos con tu cuenta (con "Me lo robo" al lado, WhatsApp dice menos) */}
-          <div className="grid grid-cols-2 gap-2">
-            {item.linkTienda && (
-              <a href={item.linkTienda} target="_blank" className="gr-btn gr-btn--sm col-span-2 min-w-0">
-                <span className="truncate">Ver en {tienda || 'la tienda'}</span>
-                <Icon name="external" size={16} strokeWidth={2} className="flex-none" />
-              </a>
-            )}
-            {/* "Me lo robo": con tu cuenta, sumarlo a tu lista (querés lo mismo) */}
-            {logueado && <BotonRobar token={token} itemId={item.id} />}
-            {/* Mandárselo a alguien: WhatsApp arma la vista previa con la foto (opengraph-image) */}
-            <a target="_blank" aria-label="Mandarlo por WhatsApp" className={`gr-btn gr-btn--sm gap-2 ${logueado ? '' : 'col-span-2'}`}
-               href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
-              <Icon name="chat" size={16} strokeWidth={2} />{logueado ? 'WhatsApp' : 'Mandarlo por WhatsApp'}
-            </a>
-          </div>
-        </div>
+    <main className="flex flex-col gap-5 pb-36">
+      <article className="flex flex-col gap-5">
+        {/* volver a la lista; arriba a la derecha, "Me lo robo" (con tu cuenta, sumarlo a tu lista) y mandárselo a alguien
+            (WhatsApp arma la vista previa con la foto, ver opengraph-image). El sello, si te toca a vos. */}
+        <FotoDeLaFicha foto={item.fotoUrl} titulo={item.titulo} apagado={!disponible && !mia && !enUnRegalo}
+                       volver={`/l/${token}`} volverLabel="Volver a la lista"
+                       acciones={
+                         <>
+                           {logueado && <BotonRobar token={token} itemId={item.id} variante="vidrio" />}
+                           <a target="_blank" aria-label="Mandarlo por WhatsApp" className="gr-icon-btn gr-vidrio-oscuro"
+                              href={`https://wa.me/?text=${encodeURIComponent(textoRegalador({ titulo: item.titulo, precio, para: ownerNombre }, `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${token}/item/${item.id}`))}`}>
+                             <Icon name="compartir" size={20} strokeWidth={2.2} />
+                           </a>
+                         </>
+                       }
+                       sello={sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute bottom-14 right-3 z-[2]" />} />
+        {/* qué es, de quién (para el que llega directo al deseo, un link por WhatsApp) y cuánto sale */}
+        <NombreDeLaFicha titulo={item.titulo} categoria={item.categoria} precio={precio}
+                         lista={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} />
+        {invitado && <PreguntaInvitado nombre={invitado} />}
+        {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
+        <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />
+        {item.notas && (
+          <NotaDeseo notas={item.notas} quien={`${ownerNombre} ${plural ? 'dicen' : 'dice'}`}
+                     avatar={plural
+                       ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} size={24} />
+                       : <AvatarSticker nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={24} className="text-[10px]" />} />
+        )}
+        {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
       </article>
 
       <section className="flex flex-col gap-2.5">
@@ -243,16 +227,16 @@ export default async function DetalleItem({ params, searchParams }: {
           </div>
         )}
 
-        {/* como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá.
-            "Reservar" abre las dos formas: lo compra él, o lo dividen (con sus amigos, ver ComoLoRegalas) */}
-        {disponible && !mia && !vencida && !enUnRegalo && !(detalle.role === 'anonimo' && detalle.motivo !== 'sin_identidad') && (
-          <ComoLoRegalas abierto={reservar === '1'}
+        {/* "Reservar", en la barra de abajo con la tienda, abre las dos formas: lo compra él, o lo dividen (con sus amigos,
+            ver ComoLoRegalas). Si no puede reservar, en la barra queda la tienda sola. */}
+        {reservable ? (
+          <ComoLoRegalas abierto={reservar === '1'} secundaria={verEnTienda}
                          compro={<GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva}
                                             texto="Reservarlo para mí" />}
                          dividimos={giver && (logueado
                            ? <FormDividir token={token} itemId={item.id} amigos={amigos} />
                            : <ArmarRegaloGrupal token={token} itemId={item.id} logueado={false} />)} />
-        )}
+        ) : <BarraDeLaFicha secundaria={verEnTienda} />}
 
         {miClaim && (
           <div className="gr-card flex flex-col gap-3 p-3.5">
