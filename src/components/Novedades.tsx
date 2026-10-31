@@ -80,9 +80,9 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
       {items.map((n) => (
         <li key={n.id}>
           <Link href={`/novedades#d-${n.id}`} className="flex flex-col gap-1.5">
-            <Arte id={n.id} src={n.foto} titulo={n.titulo} />
-            <h3 className="line-clamp-2 text-sm leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]">{n.titulo}</h3>
-            {n.precio && <p className="text-[13px] text-gr-muted tabular-nums">{n.precio}</p>}
+            <Arte src={n.foto} titulo={n.titulo} />
+            <h3 className="mt-0.5 line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{n.titulo}</h3>
+            {n.precio && <p className="text-sm text-gr-muted tabular-nums">{n.precio}</p>}
             {/* div: la foto es un div, y adentro de un <p> el navegador corta el párrafo y React no puede hidratar */}
             <div className="flex min-w-0 items-center gap-1.5 text-xs text-gr-muted">
               <AvatarSticker nombre={n.nombre} foto={n.duenoFoto} size={18} />
@@ -159,7 +159,7 @@ export function TarjetaNovedad({ n }: { n: NovedadVista }) {
   return (
     <article id={`d-${n.item.id}`} className="gr-card flex scroll-mt-4 flex-col gap-3 p-3 pb-3.5">
       <Link href={`/l/${n.token}`} className="flex items-center gap-2.5 px-0.5">
-        <AvatarSticker id={n.dueno.id} nombre={n.dueno.nombre} foto={n.dueno.foto} size={38} />
+        <AvatarSticker nombre={n.dueno.nombre} foto={n.dueno.foto} size={38} />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-[15px] font-semibold [overflow-wrap:anywhere]">{n.dueno.nombre}</span>
           <span className="text-xs font-medium text-gr-muted">agregó a su lista · {n.hace}</span>

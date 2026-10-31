@@ -26,7 +26,7 @@ function Persona({ p }: { p: CuentaPersona }) {
   const regalos = [...new Set([...p.lineas.map((l) => l.itemTitulo), ...p.ajustes.map((a) => a.texto)])]
   return (
     <li className="flex items-center gap-3 px-4 py-3">
-      <AvatarSticker id={p.id} nombre={p.nombre} size={40} />
+      <AvatarSticker nombre={p.nombre} size={40} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">
           {p.neto === 0 ? `Con ${p.nombre} están a mano` : p.neto < 0 ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}

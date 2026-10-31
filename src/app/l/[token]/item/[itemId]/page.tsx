@@ -18,7 +18,6 @@ import { hoyLocal, MESES, seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
 import { sitioDeLaTienda } from '@/lib/links'
 import { Arte, AvatarStack, AvatarSticker, Icon, PageHeader } from '@/components/ui'
-import { colorDeDeseo } from '@/lib/tapas'
 import { CategoriaDeseo, FichasDeseo, NotaDeseo } from '@/components/FichaDeseo'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { Sello, type TipoSello } from '@/components/Sello'
@@ -114,20 +113,18 @@ export default async function DetalleItem({ params, searchParams }: {
 
   return (
     <main className="flex flex-col gap-4 pb-12 pt-2">
-      {/* toda la pantalla teñida con el color del deseo */}
-      <div aria-hidden className="gr-tenido" style={{ '--c': colorDeDeseo(item.id) } as React.CSSProperties} />
       {/* de quién es, para el que llega directo al deseo (un link por WhatsApp) */}
       <PageHeader title={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} titulo="p" back={`/l/${token}`} backLabel="Volver a la lista" />
 
       {invitado && <PreguntaInvitado nombre={invitado} />}
 
       <article className="flex flex-col gap-[18px]">
-        <div className="relative mx-auto w-[236px] max-w-full">
+        <div className="relative">
           <FotoAmpliable src={item.fotoUrl} titulo={item.titulo}>
-            <Arte id={item.id} src={item.fotoUrl} titulo={item.titulo} apagado={!disponible && !mia && !enUnRegalo} className="gr-gran-arte" />
+            <Arte src={item.fotoUrl} titulo={item.titulo} apagado={!disponible && !mia && !enUnRegalo} className="rounded-[22px]" style={{ aspectRatio: '1' }} />
           </FotoAmpliable>
-          {/* pegado torcido en la esquina de arriba, montado sobre el borde del cuadrado */}
-          {sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute -right-10 -top-7 z-[2]" />}
+          {/* pegado torcido en la esquina de arriba de la foto */}
+          {sello && <Sello tipo={sello} clave={item.id} size={96} className="absolute -top-3 right-2 z-[2]" />}
         </div>
         <div className="flex flex-col gap-4">
           {/* qué es y cuánto sale */}
@@ -141,8 +138,8 @@ export default async function DetalleItem({ params, searchParams }: {
           {item.notas && (
             <NotaDeseo notas={item.notas} quien={`${ownerNombre} ${plural ? 'dicen' : 'dice'}`}
                        avatar={plural
-                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} ids={detalle.perfiles.map((d) => d.id)} size={28} />
-                         : <AvatarSticker id={detalle.perfiles[0]?.id} nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
+                         ? <AvatarStack nombres={detalle.duenos} fotos={detalle.perfiles.map((d) => d.foto)} size={28} />
+                         : <AvatarSticker nombre={ownerNombre} foto={detalle.perfiles[0]?.foto} size={32} />} />
           )}
           {item.videoUrl && <VideoDeseo url={item.videoUrl} titulo={item.titulo} />}
           {/* la tienda a lo ancho; abajo, de a dos con tu cuenta (con "Me lo robo" al lado, WhatsApp dice menos) */}
@@ -222,7 +219,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
 
         {deRegalo === 'sumado' && enUnRegalo && (
-          <p role="status" className="flex items-start gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface/70 px-4 py-3 text-sm font-medium">
+          <p role="status" className="flex items-start gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface px-4 py-3 text-sm font-medium">
             <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
             {regalos.some((r) => r.soyParte && r.estado === 'comprado')
               ? '¡Listo, te sumaste! Ya estaba comprado: abajo ves cuánto te toca.'

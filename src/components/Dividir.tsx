@@ -23,7 +23,7 @@ export function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: st
         {amigos.map((a) => (
           <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
           <label className="flex min-h-14 cursor-pointer items-center gap-3 py-2">
-            <AvatarSticker id={a.id} nombre={a.nombre} foto={a.foto} size={36} />
+            <AvatarSticker nombre={a.nombre} foto={a.foto} size={36} />
             <span className="min-w-0 flex-1 text-[15px] leading-tight font-semibold [overflow-wrap:anywhere]">{a.nombre}</span>
             <input type="checkbox" name="amigo" value={a.id} className="size-5 flex-none accent-[var(--gr-ink)]" />
           </label>
@@ -83,7 +83,7 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
           <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line px-3">
             {invitados.map((i) => (
               <li key={i.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
-                <AvatarSticker id={i.persona.id} nombre={i.persona.nombre} foto={i.persona.foto} size={28} />
+                <AvatarSticker nombre={i.persona.nombre} foto={i.persona.foto} size={28} />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">{i.persona.nombre}</span>
                 <span className={`flex-none text-[13px] font-semibold ${i.estado === 'se_sumo' ? '' : 'text-gr-muted'}`}>{ESTADOS[i.estado]}</span>
               </li>

@@ -70,7 +70,7 @@ function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: bo
     <li data-buscar={paraBuscar([c.nombre, ...(usuario ? [usuario] : [])].join(' '))}
         className="gr-card flex items-center gap-1 overflow-visible py-3 pl-3.5 pr-1.5">
       <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">
-        <AvatarSticker id={dueno?.id} nombre={c.nombre} foto={dueno?.foto} size={48} />
+        <AvatarSticker nombre={c.nombre} foto={dueno?.foto} size={48} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex flex-wrap items-center gap-x-2 text-base leading-tight font-semibold [overflow-wrap:anywhere]">
             {c.nombre}
@@ -177,7 +177,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader id={session.userId} nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="gr-title">Tu gente</h1>

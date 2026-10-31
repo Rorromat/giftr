@@ -52,7 +52,7 @@ export default async function Perfil({ searchParams }: {
       <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" />
 
       <div className="gr-card flex items-center gap-4 p-4">
-        <FotoPerfil id={session.userId} nombre={nombre} foto={foto} size={72} propia />
+        <FotoPerfil nombre={nombre} foto={foto} size={72} propia />
         <div className="flex min-w-0 flex-col gap-0.5">
           <h2 className="text-xl leading-tight font-semibold [overflow-wrap:anywhere]">{nombre}</h2>
           {email && <p className="truncate text-sm text-gr-muted">{email}</p>}

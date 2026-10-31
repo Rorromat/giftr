@@ -44,7 +44,7 @@ export default async function Perfil({ params, searchParams }: Props) {
       <PageHeader title={propio ? 'Tu perfil público' : `Perfil de ${p.nombre.split(' ')[0]}`} titulo="p" back={atras.href} backLabel={atras.texto} />
 
       <section className="gr-hero flex flex-col items-center gap-3 p-6 text-center">
-        <AvatarSticker id={p.id} nombre={p.nombre} foto={p.foto} size={96} className="ring-4 ring-gr-on-hero/15" />
+        <AvatarSticker nombre={p.nombre} foto={p.foto} size={96} className="ring-4 ring-gr-on-hero/15" />
         <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{p.nombre}</h1>
         {p.cumple && (
           <p className="flex items-center gap-1.5 rounded-full bg-gr-on-hero/10 py-1.5 pl-2.5 pr-3.5 text-sm font-semibold">
@@ -64,7 +64,7 @@ export default async function Perfil({ params, searchParams }: Props) {
         <nav aria-label="Otros dueños de la lista" className="flex flex-wrap gap-2">
           {p.otros.map((o) => (
             <Link key={o.id} href={`/l/${token}/perfil?quien=${o.id}`} className="gr-chip gap-2">
-              <AvatarSticker id={o.id} nombre={o.nombre} foto={o.foto} size={24} />Ver a {o.nombre.split(' ')[0]}
+              <AvatarSticker nombre={o.nombre} foto={o.foto} size={24} />Ver a {o.nombre.split(' ')[0]}
             </Link>
           ))}
         </nav>

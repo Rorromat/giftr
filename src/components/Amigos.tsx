@@ -9,7 +9,7 @@ import type { Persona, Relacion } from '@/lib/amigos'
 export function PersonaFila({ p, size = 48, children }: { p: Persona; size?: number; children?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <AvatarSticker id={p.id} nombre={p.nombre} foto={p.foto} size={size} />
+      <AvatarSticker nombre={p.nombre} foto={p.foto} size={size} />
       <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">{p.nombre}</p>
         {p.usuario && <p className="truncate text-[13px] font-medium text-gr-muted">@{p.usuario}</p>}

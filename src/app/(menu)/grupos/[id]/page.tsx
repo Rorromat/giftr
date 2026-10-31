@@ -61,19 +61,19 @@ export default async function Grupo({ params, searchParams }: {
       <ListaHero color={colorDe(grupo.id)} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
                  arriba={(
                    <header className="flex min-h-14 items-center justify-between gap-2">
-                     <BackLink href="/mi-lista" label="Volver a Mi lista" vidrio />
+                     <BackLink href="/mi-lista" label="Volver a Mi lista" />
                      <p className="text-[15px] font-bold">Lista en común</p>
-                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn gr-vidrio">
+                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn">
                        <Icon name="plus" size={20} strokeWidth={2.4} />
                      </Link>
                    </header>
                  )}
                  waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}
-                 foto={<FotoDeLista key={grupo.fotoUrl ?? ''} foto={grupo.fotoUrl} grupoId={grupo.id} size={56} enHero />}>
+                 foto={<FotoDeLista key={grupo.fotoUrl ?? ''} foto={grupo.fotoUrl} grupoId={grupo.id} size={56} />}>
         {/* Fecha del grupo (o su cumple): aparece en Eventos de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
         <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${grupo.esCumple}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
-          <summary className="gr-vidrio flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-10 border border-gr-line bg-gr-surface cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
             <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy, grupo.esCumple)}
           </summary>
@@ -101,7 +101,7 @@ export default async function Grupo({ params, searchParams }: {
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
       <section className="gr-card flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} ids={grupo.duenos.map((d) => d.id)} />
+          <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} />
           <div className="min-w-0 flex-1">
             <p className="text-base leading-tight font-semibold">
               {otros.length ? `Con ${juntarNombres(otros)}` : 'Solo vos por ahora'}

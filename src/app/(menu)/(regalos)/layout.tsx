@@ -15,7 +15,7 @@ export default async function RegalosLayout({ children }: { children: React.Reac
   const [{ nombre, foto }, avisos] = await Promise.all([yo(db, session.userId), avisosSinLeer(db, { userId: session.userId })])
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader id={session.userId} nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
       <PestanasRegalos />
       {children}
     </Seccion>

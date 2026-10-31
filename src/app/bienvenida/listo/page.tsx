@@ -49,7 +49,7 @@ export default async function Listo({ searchParams }: { searchParams: Promise<{ 
       </div>
 
       <div className="gr-card flex items-center gap-3 p-4">
-        <AvatarSticker id={session.userId} nombre={nombre} foto={foto} size={52} />
+        <AvatarSticker nombre={nombre} foto={foto} size={52} />
         <div className="min-w-0 flex-1">
           <p className="text-base leading-tight font-semibold [overflow-wrap:anywhere]">{nombre}</p>
           <p className="text-[13px] text-gr-muted">{foto ? 'Con tu foto' : 'Sin foto todavía'}</p>

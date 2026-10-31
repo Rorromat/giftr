@@ -390,7 +390,7 @@ export function GenteDelJuego({ v }: { v: VistaJuego }) {
       <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
         {lista.map((g) => (
           <li key={g.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
-            <AvatarSticker id={g.persona.id} nombre={g.persona.nombre} foto={g.persona.foto} size={32} />
+            <AvatarSticker nombre={g.persona.nombre} foto={g.persona.foto} size={32} />
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.persona.nombre}</span>
             <span className={`flex-none text-[13px] font-semibold ${g.estado === 'juega' && !v.sorteado ? '' : 'text-gr-muted'}`}>
               {v.sorteado ? (g.vio ? 'Ya vio ✓' : 'Todavía no vio') : ESTADOS[g.estado]}
@@ -528,7 +528,7 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   return (
     <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
       <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento"><Icon name="antifaz" size={18} />TE TOCÓ</span>
-      <AvatarSticker id={persona.id} nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento" />
+      <AvatarSticker nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento" />
       <p className="text-[28px] leading-tight font-semibold [overflow-wrap:anywhere]">{persona.nombre}</p>
       <p className="text-[13px] opacity-80">
         Solo vos lo sabés.{v.soyOrganizador ? ' Nadie más lo ve.' : ` Ni ${primerNombre(v.organizador.nombre)} (que lo organiza) lo ve.`}
@@ -600,7 +600,7 @@ export function QuienMeRegalo({ v }: { v: VistaJuego }) {
   if (v.meRegalo) {
     return (
       <div id="me-regalo" className="gr-card flex scroll-mt-6 items-center gap-3 p-4">
-        <AvatarSticker id={v.meRegalo.id} nombre={v.meRegalo.nombre} foto={v.meRegalo.foto} size={48} />
+        <AvatarSticker nombre={v.meRegalo.nombre} foto={v.meRegalo.foto} size={48} />
         <p className="min-w-0 flex-1 text-[15px] leading-snug">Te regaló <b>{v.meRegalo.nombre}</b></p>
       </div>
     )

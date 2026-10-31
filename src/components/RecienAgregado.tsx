@@ -5,7 +5,7 @@ import { mostrarAnotado, type Anotado } from '@/components/Agregado'
 import { Icon } from '@/components/ui'
 
 /**
- * Después de agregar un deseo: "¡Anotado!" con el color del deseo, donde se marca cuánto lo querés (ver Agregado). Al
+ * Después de agregar un deseo: "¡Anotado!" con su foto, donde se marca cuánto lo querés (ver Agregado). Al
  * cerrarlo, la lista va hasta él, que entra primero (ver OwnerItemsGrid), y el ?agregado= se saca de la dirección.
  */
 export function RecienAgregado({ deseo }: { deseo: Anotado }) {

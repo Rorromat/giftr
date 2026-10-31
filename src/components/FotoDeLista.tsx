@@ -11,7 +11,7 @@ import { achicarFoto } from '@/lib/achicar-foto'
  * como la de un deseo (/api/deseo/foto). Al crear la lista va en el formulario (campo "foto"); en el grupo (grupoId) se
  * guarda apenas sube.
  */
-export function FotoDeLista({ foto, grupoId, size = 72, enHero = false }: { foto: string | null; grupoId?: string; size?: number; enHero?: boolean }) {
+export function FotoDeLista({ foto, grupoId, size = 72 }: { foto: string | null; grupoId?: string; size?: number }) {
   const input = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const [actual, setActual] = useState(foto)
@@ -53,7 +53,6 @@ export function FotoDeLista({ foto, grupoId, size = 72, enHero = false }: { foto
     setEstado('listo')
   }
 
-  const texto = enHero ? 'text-gr-on-hero' : ''
   return (
     <div className="flex flex-none flex-col items-center gap-1">
       <button type="button" onClick={() => input.current?.click()} aria-label={actual ? 'Cambiar la foto de la lista' : 'Ponerle una foto a la lista'}
@@ -72,11 +71,11 @@ export function FotoDeLista({ foto, grupoId, size = 72, enHero = false }: { foto
       <input ref={input} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
              onChange={(e) => { subir(e.target.files?.[0]); e.target.value = '' }} />
       {!grupoId && <input type="hidden" name="foto" value={actual ?? ''} />}
-      {estado === 'error' && <p role="alert" className={`max-w-28 text-center text-xs font-semibold ${texto}`}>No pudimos subir esa foto. Probá con otra.</p>}
-      {estado === 'muchas' && <p role="alert" className={`max-w-28 text-center text-xs font-semibold ${texto}`}>Ya subiste muchas fotos hoy. Probá mañana.</p>}
-      {estado === 'subiendo' && <p role="status" className={`text-xs font-semibold ${enHero ? 'text-gr-on-hero/70' : 'text-gr-muted'}`}>Subiendo…</p>}
+      {estado === 'error' && <p role="alert" className="max-w-28 text-center text-xs font-semibold">No pudimos subir esa foto. Probá con otra.</p>}
+      {estado === 'muchas' && <p role="alert" className="max-w-28 text-center text-xs font-semibold">Ya subiste muchas fotos hoy. Probá mañana.</p>}
+      {estado === 'subiendo' && <p role="status" className="text-xs font-semibold text-gr-muted">Subiendo…</p>}
       {estado === 'listo' && actual && (
-        <button type="button" onClick={quitar} className={`min-h-8 text-xs font-semibold underline underline-offset-4 ${texto}`}>Quitar foto</button>
+        <button type="button" onClick={quitar} className="min-h-8 text-xs font-semibold underline underline-offset-4">Quitar foto</button>
       )}
     </div>
   )

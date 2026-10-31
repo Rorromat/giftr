@@ -34,7 +34,7 @@ export function ListaHero({ color, arriba, etiqueta, titulo, cantidad, fecha, wa
         </div>
         <p className="gr-tapa__sub text-sm">{deseos}{fecha && <> · {fecha}</>}</p>
         {children}
-        <a href={waHref} target="_blank" className="gr-btn gr-btn--blanco min-h-[50px] w-full gap-2">
+        <a href={waHref} target="_blank" className="gr-btn-primary w-full gap-2">
           <Icon name="chat" size={19} />
           Mandala por WhatsApp
         </a>

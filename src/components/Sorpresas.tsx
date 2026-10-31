@@ -123,7 +123,7 @@ export function ElegirParaQuien({ amigos }: { amigos: Persona[] }) {
             {amigos.map((a) => (
               <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
                 <Link href={`/sorpresa/nueva?amigo=${a.id}`} className="flex min-h-14 items-center gap-3 py-2">
-                  <AvatarSticker id={a.id} nombre={a.nombre} foto={a.foto} size={36} />
+                  <AvatarSticker nombre={a.nombre} foto={a.foto} size={36} />
                   <span className="min-w-0 flex-1 text-[15px] leading-tight font-semibold [overflow-wrap:anywhere]">{a.nombre}</span>
                   <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
                 </Link>
