@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { IlustracionRegla } from '@/components/IlustracionRegla'
+import { Icon } from '@/components/ui'
 import { GRUPOS_REGLAS, LARGO_REGLA_PROPIA, REGLAS, leerRegla, reglaDe, type LoQueTeToca, type Regla, type ReglaElegida } from '@/lib/reglas-invisible'
 
 // Las reglas del amigo invisible en la pantalla (ver lib/reglas-invisible.ts): su dibujo, elegir una al armarlo (o
@@ -47,76 +48,93 @@ export function ComoSeJuega({ regla }: { regla: Regla }) {
   )
 }
 
-/** El recuadro de "Cómo se juega" de la elegida: su dibujo grande, el nombre y lo de adentro. */
-function Explicacion({ id, nombre, children }: { id: string; nombre: string; children: React.ReactNode }) {
-  return (
-    <section aria-label={`Cómo se juega ${nombre}`} className="gr-card flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-3">
-        <IconoRegla id={id} size={64} />
-        <div className="min-w-0">
-          <p className="gr-label">Cómo se juega</p>
-          <p className="text-[18px] leading-tight font-extrabold">{nombre}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  )
-}
-
 /**
- * Elegir la regla al armar (o editar) el amigo invisible: opcional. Arriba, sin regla o una propia (que se escribe); abajo,
- * las de cada grupo, cada una en su tarjeta (dibujo, nombre y una línea) en una fila que se desliza. La elegida se marca y
- * abajo de su fila se explica cómo se juega. Con una que no lleva presupuesto, el formulario lo esconde
- * (data-sin-presupuesto, ver tokens.css). Va en el formulario como "regla" ('' sin regla, 'propia' con "reglaPropia").
- * inicial: la que tiene, como se guarda (ver leerRegla).
+ * Elegir la regla al armar (o editar) el amigo invisible: "Sin reglas" o "Con reglas". Con reglas se abre una hoja desde
+ * abajo con una propia primero y todas las de los grupos debajo; tocar una la elige y cierra la hoja, y en el formulario
+ * queda la elegida (su dibujo, cómo se juega y "Cambiar"); la propia, con el campo para escribirla. Si se cierra la hoja
+ * sin elegir, sigue sin reglas. Con una que no lleva presupuesto, el formulario lo esconde (data-sin-presupuesto, ver
+ * tokens.css). Va en el formulario como "regla" ('' sin regla, 'propia' con "reglaPropia"). inicial: la que tiene, como
+ * se guarda (ver leerRegla).
  */
 export function ElegirRegla({ inicial }: { inicial: string | null }) {
   const guardada = leerRegla(inicial)
   const [elegida, setElegida] = useState<string>(guardada?.tipo === 'propia' ? 'propia' : guardada?.regla.id ?? '')
+  // la propia recién elegida: el campo se enfoca para escribirla (al editar una que ya estaba, no)
+  const [escribir, setEscribir] = useState(false)
+  const hoja = useRef<HTMLDialogElement>(null)
   const regla = reglaDe(elegida)
-  const tarjeta = (id: string, nombre: string, corta: string) => {
-    const marcada = elegida === id
-    return (
-      <button key={id || 'ninguna'} type="button" role="radio" aria-checked={marcada} onClick={() => setElegida(marcada && id ? '' : id)}
-              className="gr-regla" data-marcada={marcada || undefined}>
-        <IconoRegla id={id || null} />
-        <span className="text-[14px] leading-tight font-bold">{nombre}</span>
-        <span className="text-[12px] leading-snug text-gr-muted">{corta}</span>
-      </button>
-    )
+  const abrir = () => hoja.current?.showModal()
+  const elegir = (id: string) => {
+    setElegida(id)
+    setEscribir(id === 'propia')
+    hoja.current?.close()
   }
+  const tarjeta = (id: string, nombre: string, corta: string) => (
+    <button key={id} type="button" onClick={() => elegir(id)} className="gr-regla w-auto" data-marcada={elegida === id || undefined}>
+      <IconoRegla id={id} />
+      <span className="text-[14px] leading-tight font-bold">{nombre}</span>
+      <span className="text-[12px] leading-snug text-gr-muted">{corta}</span>
+    </button>
+  )
   return (
-    // min-w-0: un fieldset se estira a lo que mide la fila de tarjetas (y lo de abajo se saldría de la pantalla)
+    // min-w-0: que un fieldset no se estire a lo que mide lo de adentro
     <fieldset className="flex min-w-0 flex-col gap-3" data-sin-presupuesto={regla?.sinPresupuesto || undefined}>
-      <legend className="gr-label mb-1">¿Con alguna regla? (opcional)</legend>
+      <legend className="gr-label mb-1">Reglas</legend>
       <input type="hidden" name="regla" value={elegida} />
-      <p className="-mt-1 text-[13px] leading-snug text-gr-muted">Para jugarlo distinto. Tocá una para ver cómo se juega, o escribí la de ustedes.</p>
-      <div role="radiogroup" aria-label="Regla del amigo invisible" className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="gr-reglas">
-            {tarjeta('', 'Sin regla', 'Cada uno regala lo que quiera, dentro del presupuesto.')}
-            {tarjeta('propia', 'Una propia', 'Escribí la regla de ustedes y cómo se juega.')}
-          </div>
-          {elegida === 'propia' && (
-            <Explicacion id="propia" nombre="Una regla propia">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[13px] font-semibold">La regla y cómo se juega</span>
-                <textarea name="reglaPropia" rows={4} maxLength={LARGO_REGLA_PROPIA} required
-                          defaultValue={guardada?.tipo === 'propia' ? guardada.texto : ''} className="gr-input"
-                          placeholder="Ej.: Todo tiene que ser verde. Se abren en ronda y cada uno adivina quién le regaló." />
-              </label>
-              <p className="text-[12px] leading-snug text-gr-muted">La ven todos los que juegan, en el amigo invisible.</p>
-            </Explicacion>
-          )}
-        </div>
-        {GRUPOS_REGLAS.map((g) => (
-          <div key={g.id} className="flex flex-col gap-2">
-            <p className="text-[13px] font-bold">{g.nombre}</p>
-            <div className="gr-reglas">{REGLAS.filter((r) => r.grupo === g.id).map((r) => tarjeta(r.id, r.nombre, r.corta))}</div>
-            {regla?.grupo === g.id && <Explicacion id={regla.id} nombre={regla.nombre}><ComoSeJuega regla={regla} /></Explicacion>}
-          </div>
-        ))}
+      <div role="radiogroup" aria-label="Reglas" className="gr-segmented">
+        <button type="button" role="radio" aria-checked={!elegida} onClick={() => setElegida('')}>Sin reglas</button>
+        <button type="button" role="radio" aria-checked={!!elegida} onClick={abrir}>Con reglas</button>
       </div>
+      {!elegida && <p className="text-[13px] leading-snug text-gr-muted">Cada uno regala lo que quiera, dentro del presupuesto.</p>}
+
+      {elegida && (
+        <section aria-label="La regla elegida" className="gr-card flex flex-col gap-3 p-4">
+          <div className="flex items-center gap-3">
+            <IconoRegla id={elegida} size={64} />
+            <div className="min-w-0 flex-1">
+              <p className="gr-label">La regla</p>
+              <p className="text-[18px] leading-tight font-extrabold">{regla?.nombre ?? 'Una regla propia'}</p>
+            </div>
+            <button type="button" onClick={abrir} className="gr-btn gr-btn--sm flex-none px-3.5">Cambiar</button>
+          </div>
+          {regla ? <ComoSeJuega regla={regla} /> : (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-semibold">La regla y cómo se juega</span>
+              <textarea name="reglaPropia" rows={4} maxLength={LARGO_REGLA_PROPIA} required autoFocus={escribir}
+                        defaultValue={guardada?.tipo === 'propia' ? guardada.texto : ''} className="gr-input"
+                        placeholder="Ej.: Todo tiene que ser verde. Se abren en ronda y cada uno adivina quién le regaló." />
+              <span className="text-[12px] leading-snug text-gr-muted">La ven todos los que juegan, en el amigo invisible.</span>
+            </label>
+          )}
+        </section>
+      )}
+
+      {/* la hoja con las reglas: tocar afuera o la X la cierra sin cambiar nada */}
+      <dialog ref={hoja} aria-labelledby="reglas-titulo" data-sin-refrescar className="gr-sheet"
+              onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close() }}>
+        <header className="flex items-center justify-between gap-3 px-[18px] pb-2 pt-4">
+          <h2 id="reglas-titulo" className="gr-heading">Elegí la regla</h2>
+          <button type="button" onClick={() => hoja.current?.close()} aria-label="Cerrar" className="gr-icon-btn">
+            <Icon name="close" size={20} strokeWidth={2.4} />
+          </button>
+        </header>
+        <div className="flex flex-col gap-5 overflow-y-auto overscroll-contain px-[18px] pb-[max(24px,env(safe-area-inset-bottom))] pt-1">
+          <button type="button" onClick={() => elegir('propia')} className="gr-regla w-auto flex-row items-center gap-3"
+                  data-marcada={elegida === 'propia' || undefined}>
+            <IconoRegla id="propia" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-[15px] leading-tight font-bold">Una propia</span>
+              <span className="text-[12px] leading-snug text-gr-muted">Escribí la regla de ustedes y cómo se juega.</span>
+            </span>
+          </button>
+          {GRUPOS_REGLAS.map((g) => (
+            <section key={g.id} className="flex flex-col gap-2">
+              <h3 className="text-[13px] font-bold">{g.nombre}</h3>
+              <div className="grid grid-cols-2 gap-2.5">{REGLAS.filter((r) => r.grupo === g.id).map((r) => tarjeta(r.id, r.nombre, r.corta))}</div>
+            </section>
+          ))}
+        </div>
+      </dialog>
     </fieldset>
   )
 }
