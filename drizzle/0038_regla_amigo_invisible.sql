@@ -1,0 +1,1 @@
+ALTER TABLE "amigos_invisibles" ADD COLUMN "regla" text;

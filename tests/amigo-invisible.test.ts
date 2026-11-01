@@ -12,6 +12,7 @@ import {
   amigoInvisibleParaViewer, asignar, borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego,
   estadoDeJuegos, marcarYaLoTengo, misAmigosInvisibles, preguntar, tambienTeToco, responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo,
 } from '@/lib/amigo-invisible'
+import { guardarRegla, leerRegla, loQueTeToca, reglaDe, turnoEnElRobo } from '@/lib/reglas-invisible'
 import { diaEn, especialesQueVienen, proximaEspecial } from '@/lib/fechas-especiales'
 import { hoyLocal } from '@/lib/events'
 
@@ -35,7 +36,7 @@ test('las fechas especiales de Argentina: fijas y los terceros domingos', () => 
 
 test('Próximos: todas las fechas especiales en orden (falte lo que falte), con sus amigos invisibles, y los sueltos', () => {
   const juego = (id: string, dias: number, fechaEspecial: 'navidad' | 'amigo' | null) => ({
-    id, nombre: id, fecha: '', fechaEspecial, presupuesto: null, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false,
+    id, nombre: id, regla: null, fecha: '', fechaEspecial, presupuesto: null, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false,
     organizador: 'Euge', soyOrganizador: false, invitados: 3, contestaron: 3, meToca: null, yaLoTengo: false, preguntasSinContestar: 0,
   })
   const hoy = new Date(Date.UTC(2026, 9, 26)) // Navidad, a 60 días; el Día de la Madre de este año ya pasó
@@ -283,4 +284,52 @@ test('que no se toquen, pocos para sortear, el que no contestó queda afuera, y 
   expect(await borrarAmigoInvisible(s.db, s.id, s.sofi.id)).toBe(false)
   expect(await borrarAmigoInvisible(s.db, s.id, s.euge.id)).toBe(true)
   expect(await amigoInvisibleParaViewer(s.db, s.id, s.euge.id)).toBeNull()
+})
+
+test('las reglas: se guarda la elegida (o la propia, con su texto) y "De tu casa" no lleva presupuesto', async () => {
+  const s = await setup()
+  // la de Navidad: con "De tu casa", el presupuesto se va
+  expect(await editarAmigoInvisible(s.db, s.id, s.euge.id, { nombre: 'Navidad con los chicos', fecha: enDias(30), regla: 'de-tu-casa', presupuesto: 25000 })).toBe(true)
+  expect(await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id)).toMatchObject({ regla: 'de-tu-casa', presupuesto: null })
+  // una que no existe, sin regla; una propia, con su texto (sin espacios de más); una propia vacía, sin regla
+  expect(await editarAmigoInvisible(s.db, s.id, s.euge.id, { nombre: 'Navidad', fecha: enDias(30), regla: 'inventada' })).toBe(true)
+  expect((await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id))?.regla).toBeNull()
+  await editarAmigoInvisible(s.db, s.id, s.euge.id, { nombre: 'Navidad', fecha: enDias(30), regla: 'propia', reglaPropia: '  Todo   verde.\n\n\n\nSe abre en ronda. ' })
+  const v = (await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id))!
+  expect(leerRegla(v.regla)).toEqual({ tipo: 'propia', texto: 'Todo verde.\n\nSe abre en ronda.' })
+  expect((await misAmigosInvisibles(s.db, s.sofi.id))[0].regla).toBe(v.regla)
+  await editarAmigoInvisible(s.db, s.id, s.euge.id, { nombre: 'Navidad', fecha: enDias(30), regla: 'propia', reglaPropia: '   ' })
+  expect((await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id))?.regla).toBeNull()
+  expect(guardarRegla('robo')).toBe('robo')
+  expect(leerRegla('robo')).toMatchObject({ tipo: 'catalogo', regla: { id: 'robo', nombre: 'Robo de regalos' } })
+})
+
+test('las reglas que le dan algo a cada uno: la inicial de a quién le regala, y un color, una palabra o una década del sorteo', () => {
+  const para = { id: '6b1e2c4e-1111-4222-8333-944455556666', nombre: 'Ángela Ruiz' }
+  expect(loQueTeToca(reglaDe('inicial'), 'juego', para)).toEqual({ tipo: 'inicial', letra: 'A' })
+  // del mismo par, siempre lo mismo; de otro par, puede cambiar
+  const color = loQueTeToca(reglaDe('color'), 'juego', para)
+  expect(color).toMatchObject({ tipo: 'color' })
+  expect(loQueTeToca(reglaDe('color'), 'juego', para)).toEqual(color)
+  expect(loQueTeToca(reglaDe('palabra'), 'juego', para)).toMatchObject({ tipo: 'palabra', palabra: expect.any(String) })
+  expect(loQueTeToca(reglaDe('epoca'), 'juego', para)).toMatchObject({ tipo: 'decada', decada: expect.stringMatching(/^los /) })
+  // las demás no dan nada
+  expect(loQueTeToca(reglaDe('de-tu-casa'), 'juego', para)).toBeNull()
+  expect(loQueTeToca(null, 'juego', para)).toBeNull()
+})
+
+test('Robo de regalos: a cada uno le toca un turno distinto, del 1 a cuántos juegan, y lo ve desde el sorteo', async () => {
+  const jugadores = ['a', 'b', 'c', 'd', 'e']
+  const turnos = jugadores.map((u) => turnoEnElRobo('juego', jugadores, u)!)
+  expect(turnos.map((t) => t.turno).sort()).toEqual([1, 2, 3, 4, 5])
+  expect(turnos.every((t) => t.de === 5)).toBe(true)
+  expect(turnoEnElRobo('juego', jugadores, 'z')).toBeNull()
+
+  const s = await setup()
+  await editarAmigoInvisible(s.db, s.id, s.euge.id, { nombre: 'Navidad', fecha: enDias(30), regla: 'robo' })
+  for (const u of [s.sofi, s.rodri, s.juan]) await responderJuego(s.db, s.id, u.id, true)
+  expect((await amigoInvisibleParaViewer(s.db, s.id, s.sofi.id))?.miTurno).toBeNull() // antes del sorteo, nada
+  await sortear(s.db, s.id, s.euge.id, s.enviar)
+  const mios = await Promise.all([s.euge, s.sofi, s.rodri, s.juan].map(async (u) => (await amigoInvisibleParaViewer(s.db, s.id, u.id))!.miTurno!))
+  expect(mios.map((t) => t.turno).sort()).toEqual([1, 2, 3, 4])
 })

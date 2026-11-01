@@ -404,6 +404,8 @@ export const amigosInvisibles = pgTable('amigos_invisibles', {
   nombre: text('nombre').notNull(),
   // la temática o lo que quieran decir ("algo hecho a mano", "todo de la Selección")
   descripcion: text('descripcion'),
+  // la regla con la que juegan, si eligieron una ("de-tu-casa", "robo"…, ver lib/reglas-invisible.ts); vacío: sin regla
+  regla: text('regla'),
   presupuesto: integer('presupuesto'), // en pesos; vacío: sin tope
   // cuándo se dan los regalos
   fecha: date('fecha').notNull(),

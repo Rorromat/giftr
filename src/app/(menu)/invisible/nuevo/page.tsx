@@ -20,7 +20,7 @@ export default async function NuevoAmigoInvisible({ searchParams }: { searchPara
     <main className="gr-hoja flex flex-col gap-1 pt-2 pb-8">
       <PageHeader title="Armar amigo invisible" back={fecha ? `/fechas/${fecha}` : '/regalos'} backLabel="Volver" />
       <FormJuego fechaEspecial={fecha} propuestas={propuestasDeFechas(hoy)} amigos={amigos} hoy={hoy.toISOString().slice(0, 10)} error={q.error === '1'}
-                 inicial={{ nombre: fecha ? `${datosDe(fecha).nombre} ${fechaPropuesta(fecha, hoy).slice(0, 4)}` : '', descripcion: '', presupuesto: '', fecha: fechaPropuesta(fecha, hoy) }} />
+                 inicial={{ nombre: fecha ? `${datosDe(fecha).nombre} ${fechaPropuesta(fecha, hoy).slice(0, 4)}` : '', descripcion: '', presupuesto: '', fecha: fechaPropuesta(fecha, hoy), regla: null }} />
     </main>
   )
 }
