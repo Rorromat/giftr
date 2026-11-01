@@ -245,7 +245,7 @@ export const notifications = pgTable('notifications', {
   leida: boolean('leida').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  // los avisos de cada uno (Banners, en cada pantalla) y los de un deseo (al editarlo o volver a ponerlo)
+  // los avisos de cada uno (Banners: en Inicio, y sin cuenta en la lista) y los de un deseo (al editarlo o volver a ponerlo)
   index('notifications_user_id_idx').on(t.userId),
   index('notifications_guest_id_idx').on(t.guestId),
   index('notifications_item_id_idx').on(t.itemId),

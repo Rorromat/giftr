@@ -13,6 +13,8 @@ import { PreguntaInvitado } from '@/components/Identidad'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
 /**
+ * Los carteles de avisos, arriba de Inicio (además de la campanita). Quien entró sin cuenta no tiene Inicio: los ve en la
+ * lista que abrió (ver /l/[token]).
  * Los carteles llevan al deseo; si no hay link (cambiaron el de la lista y no lo tiene), el mismo cartel sin link (el de
  * una reserva, con sus botones ahí mismo).
  */

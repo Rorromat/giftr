@@ -11,7 +11,6 @@ import { amigosParaInvitar } from '@/lib/invitar-a-grupo'
 import { ElegirAmigos } from '@/components/Dividir'
 import { FotoDeLista } from '@/components/FotoDeLista'
 import { CampoParentesco, CamposFecha } from '@/components/ListaEnComun'
-import { Banners } from '@/components/Banners'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
@@ -91,8 +90,6 @@ export default async function Grupo({ params, searchParams }: {
           </form>
         </details>
       </ListaHero>
-
-      <Banners />
 
       {aviso && (
         <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">{aviso}</p>

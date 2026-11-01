@@ -264,7 +264,9 @@ export default async function ListaAjena({
                        href={perfilDe(g.id)} />
       ))}
 
-      <Banners />
+      {/* los avisos van en Inicio (y en la campanita); quien entró sin cuenta no tiene Inicio: los suyos (una reserva que
+          vence, lo que reservó y ya no está) los ve acá */}
+      {!viewer.userId && <Banners />}
 
       <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
         <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
