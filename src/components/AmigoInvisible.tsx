@@ -9,6 +9,7 @@ import { CampoPrecio } from '@/components/CamposDeseo'
 import { Confirmar } from '@/components/Confirmar'
 import { ElegirAmigos } from '@/components/Dividir'
 import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
+import { ElegirRegla } from '@/components/ReglasInvisible'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
 import { paletaDe } from '@/lib/colores-fechas'
@@ -241,7 +242,8 @@ export function ArmarJuego({ fecha }: { fecha?: FechaEspecial }) {
 }
 
 /**
- * Armar (o editar) un amigo invisible: si es para una fecha especial o aparte, nombre, temática, presupuesto, cuándo se dan
+ * Armar (o editar) un amigo invisible: si es para una fecha especial o aparte, nombre, temática, la regla (si juegan con una,
+ * ver ElegirRegla), presupuesto, cuándo se dan
  * los regalos y, al armarlo, a qué amigos invitar. editar: el que ya está (sin elegir amigos: a más se los invita desde el
  * juego). propuestas: el día de cada fecha especial, para completarlo al elegirla.
  */
@@ -251,7 +253,7 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
   amigos: Persona[]
   hoy: string
   error: boolean
-  inicial: { nombre: string; descripcion: string; presupuesto: string; fecha: string }
+  inicial: { nombre: string; descripcion: string; presupuesto: string; fecha: string; regla: string | null }
   editar?: { id: string }
 }) {
   return (
@@ -278,12 +280,13 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
         <textarea name="descripcion" rows={3} maxLength={LARGO.temaInvisible} defaultValue={inicial.descripcion}
                   placeholder="Algo hecho a mano, un libro, todo de la Selección… Lo que acuerden." className="gr-input" />
       </label>
+      <ElegirRegla inicial={inicial.regla} />
       <div className="grid grid-cols-2 gap-3">
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="gr-label">Se dan los regalos</span>
           <input name="fecha" type="date" required min={hoy} defaultValue={inicial.fecha} className="gr-input" />
         </label>
-        <label className="flex min-w-0 flex-col gap-1.5">
+        <label className="gr-campo-presupuesto flex min-w-0 flex-col gap-1.5">
           <span className="gr-label">Presupuesto</span>
           <CampoPrecio name="presupuesto" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Hasta…" defaultValue={inicial.presupuesto}
                        className="gr-input" />
