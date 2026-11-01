@@ -1060,7 +1060,8 @@ export async function robarDeseoAction(_: EstadoRobo, formData: FormData): Promi
 function datosJuego(fd: FormData): DatosJuego {
   const f = str(fd, 'fechaEspecial')
   return {
-    nombre: str(fd, 'nombre') ?? '', descripcion: str(fd, 'descripcion') ?? null, presupuesto: parsePesos(str(fd, 'presupuesto')),
+    nombre: str(fd, 'nombre') ?? '', descripcion: str(fd, 'descripcion') ?? null, regla: str(fd, 'regla') ?? null,
+    reglaPropia: str(fd, 'reglaPropia') ?? null, presupuesto: parsePesos(str(fd, 'presupuesto')),
     fecha: str(fd, 'fecha') ?? '', fechaEspecial: esFechaEspecial(f) ? f : null,
   }
 }

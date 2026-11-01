@@ -173,6 +173,40 @@ export type ReglaId = (typeof REGLAS)[number]['id']
 export const esRegla = (s: unknown): s is ReglaId => typeof s === 'string' && REGLAS.some((r) => r.id === s)
 export const reglaDe = (id: string | null | undefined): Regla | null => REGLAS.find((r) => r.id === id) ?? null
 
+/** Una regla propia, la que escriben ellos: se guarda como este prefijo y su texto. */
+const PROPIA = 'propia:'
+/** Hasta cuánto se escribe en una regla propia. */
+export const LARGO_REGLA_PROPIA = 280
+
+/** La regla de un juego, para mostrarla: una de las de acá, o la propia con su texto. */
+export type ReglaElegida = { tipo: 'catalogo'; regla: Regla } | { tipo: 'propia'; texto: string }
+
+/** El texto acotado de una regla propia: sin espacios de más (los renglones quedan). */
+const textoPropio = (texto: string) => texto.replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, LARGO_REGLA_PROPIA).trim()
+
+/**
+ * Lo que se guarda de la regla: el id de una de las de acá, o (id 'propia') 'propia:' y lo que escribieron; null sin regla,
+ * con una que no es de las que hay o con una propia vacía.
+ */
+export function guardarRegla(id: string | null | undefined, texto?: string | null): string | null {
+  if (id === 'propia') {
+    const t = textoPropio(texto ?? '')
+    return t ? `${PROPIA}${t}` : null
+  }
+  return reglaDe(id)?.id ?? null
+}
+
+/** La regla guardada, para mostrarla (ver guardarRegla); null si no tiene o no se entiende. */
+export function leerRegla(guardada: string | null | undefined): ReglaElegida | null {
+  if (!guardada) return null
+  if (guardada.startsWith(PROPIA)) {
+    const texto = guardada.slice(PROPIA.length).trim()
+    return texto ? { tipo: 'propia', texto } : null
+  }
+  const regla = reglaDe(guardada)
+  return regla ? { tipo: 'catalogo', regla } : null
+}
+
 /** Los colores de "Un solo color": el nombre y cómo se ve. */
 export const COLORES = [
   { nombre: 'Rojo', hex: '#E5484D' }, { nombre: 'Naranja', hex: '#F76B15' }, { nombre: 'Amarillo', hex: '#FFC53D' },
@@ -223,4 +257,14 @@ export function loQueTeToca(regla: Regla | null, juegoId: string, para: { id: st
     case 'palabra': return { tipo: 'palabra', palabra: PALABRAS[n % PALABRAS.length] }
     case 'decada': return { tipo: 'decada', decada: DECADAS[n % DECADAS.length] }
   }
+}
+
+/**
+ * En "Robo de regalos", el turno de cada uno para abrir o robar: el orden sale del juego (siempre el mismo para los
+ * mismos que juegan). Null si no juega.
+ */
+export function turnoEnElRobo(juegoId: string, jugadores: string[], userId: string): { turno: number; de: number } | null {
+  const orden = [...jugadores].sort((a, b) => hash(`${juegoId}:turno:${a}`) - hash(`${juegoId}:turno:${b}`) || a.localeCompare(b))
+  const i = orden.indexOf(userId)
+  return i < 0 ? null : { turno: i + 1, de: orden.length }
 }

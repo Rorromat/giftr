@@ -267,6 +267,13 @@
       "when": 1793483518859,
       "tag": "0037_sorpresa_para_lista",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793556398518,
+      "tag": "0038_regla_amigo_invisible",
+      "breakpoints": true
     }
   ]
 }

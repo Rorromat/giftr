@@ -1,41 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { GRUPOS_REGLAS, REGLAS, reglaDe, type LoQueTeToca, type Regla } from '@/lib/reglas-invisible'
+import { IlustracionRegla } from '@/components/IlustracionRegla'
+import { GRUPOS_REGLAS, LARGO_REGLA_PROPIA, REGLAS, leerRegla, reglaDe, type LoQueTeToca, type Regla, type ReglaElegida } from '@/lib/reglas-invisible'
 
-// Las reglas del amigo invisible en la pantalla (ver lib/reglas-invisible.ts): su ícono, elegir una al armarlo (con cómo
-// se juega) y, en el juego, cuál es y lo que te toca a vos.
+// Las reglas del amigo invisible en la pantalla (ver lib/reglas-invisible.ts): su dibujo, elegir una al armarlo (o
+// escribir una propia), con cómo se juega, y en el juego cuál es y lo que te toca a vos.
 
-/** Los íconos de las reglas, con el trazo de los de la app (ver Icon): 24 × 24, línea redondeada. */
-const ICONOS: Record<string, React.ReactNode> = {
-  'de-tu-casa': <><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></>,
-  'segunda-mano': <><path d="M10 5.5a2 2 0 1 1 2 2v1.5" /><path d="M12 9L3.5 15.5c-.8.6-.4 1.9.6 1.9h15.8c1 0 1.4-1.3.6-1.9z" /></>,
-  bazar: <><path d="M3.5 10h17l-1.8 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8z" /><path d="M8 10l3-6M16 10l-3-6M9.5 13.5v3M14.5 13.5v3" /></>,
-  inicial: <><rect x="4" y="4" width="16" height="16" rx="3.5" /><path d="M9 16l3-8 3 8M10.1 13.2h3.8" /></>,
-  color: <><path d="M12 3.5s6 6.4 6 10.8a6 6 0 0 1-12 0C6 9.9 12 3.5 12 3.5z" /><path d="M9.3 14.5a2.8 2.8 0 0 0 2.2 2.6" /></>,
-  palabra: <><path d="M4.5 5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5V16h-1a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /><path d="M8 9h8M8 12h5" /></>,
-  epoca: <><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="8.5" cy="11" r="1.7" /><circle cx="15.5" cy="11" r="1.7" /><path d="M10.2 11h3.6M7.5 18l1.2-2.5h6.6L16.5 18" /></>,
-  bizarro: <><circle cx="10" cy="8" r="3.3" /><path d="M13.2 8.4h3.3l-2.1 1.7" /><path d="M4 13c0 3.6 3.2 6 8 6s8-2.5 8-5.6c0-1.5-1-2.4-2.4-2.4H12" /></>,
-  peor: <><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 5.5H5.5a3 3 0 0 0 2.8 4M16 5.5h2.5a3 3 0 0 1-2.8 4" /><path d="M12 13v3M9 20h6M10.5 16h3l.5 4h-4z" /><path d="M10.4 7.8l1.6 1 1.6-1" /></>,
-  envoltorio: <><rect x="3" y="3" width="18" height="18" rx="3" /><rect x="7" y="7" width="10" height="10" rx="2" /><rect x="10.5" y="10.5" width="3" height="3" rx="1" /></>,
-  robo: <><path d="M4 8.5h13.5l-3-3M20 15.5H6.5l3 3" /></>,
-  adivina: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l4.5 4.5" /><path d="M8.6 9a2 2 0 1 1 2.6 1.9c-.5.2-.7.6-.7 1.1v.3" /><path d="M10.5 14.4v.1" /></>,
-  tesoro: <><path d="M3.5 6.5l5.5-2 6 2 5.5-2v13l-5.5 2-6-2-5.5 2z" /><path d="M10.5 10.5l3.5 3.5M14 10.5l-3.5 3.5" /></>,
-  rima: <><path d="M19.5 4.5c-7.5.5-12 5.2-13 12.5L5 20" /><path d="M7 16.5c4-.8 8-3.7 10.5-9" /></>,
-  'hecho-a-mano': <><circle cx="6.5" cy="17" r="2.5" /><circle cx="6.5" cy="7" r="2.5" /><path d="M8.6 8.4L20 18M8.6 15.6L20 6" /></>,
-  experiencia: <><path d="M3.5 9V7a1 1 0 0 1 1-1h15a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6z" /><path d="M13.5 7v1.5M13.5 11.2v1.6M13.5 15.5V17" /></>,
-  cuatro: <><rect x="4" y="4" width="7" height="7" rx="1.8" /><rect x="13" y="4" width="7" height="7" rx="1.8" /><rect x="4" y="13" width="7" height="7" rx="1.8" /><rect x="13" y="13" width="7" height="7" rx="1.8" /></>,
-}
-
-/** El ícono de una regla, en un círculo del acento suave (el de "Sin regla", un círculo vacío). */
-export function IconoRegla({ id, size = 44, className = '' }: { id: string | null; size?: number; className?: string }) {
+/** El dibujo de una regla en su recuadro ('propia', o null: sin regla). */
+export function IconoRegla({ id, size = 56, className = '' }: { id: string | null; size?: number; className?: string }) {
   return (
-    <span aria-hidden className={`flex flex-none items-center justify-center rounded-full bg-gr-acento/15 text-gr-acento-texto ${className}`}
-          style={{ width: size, height: size }}>
-      <svg width={size * 0.52} height={size * 0.52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-           strokeLinecap="round" strokeLinejoin="round">
-        {id ? ICONOS[id] : <circle cx="12" cy="12" r="7" strokeDasharray="3 3" />}
-      </svg>
+    <span aria-hidden className={`flex flex-none items-center justify-center rounded-[16px] bg-gr-soft ${className}`} style={{ width: size, height: size }}>
+      <IlustracionRegla id={id ?? 'sin'} size={size * 0.86} />
     </span>
   )
 }
@@ -48,6 +24,7 @@ export function ComoSeJuega({ regla }: { regla: Regla }) {
     regla.personal === 'color' && 'GiftR le da a cada uno su color',
     regla.personal === 'palabra' && 'GiftR le da a cada uno su palabra',
     regla.personal === 'decada' && 'GiftR le da a cada uno su década',
+    regla.id === 'robo' && 'GiftR sortea el orden de los turnos',
   ].filter(Boolean) as string[]
   return (
     <div className="flex flex-col gap-3">
@@ -70,21 +47,39 @@ export function ComoSeJuega({ regla }: { regla: Regla }) {
   )
 }
 
+/** El recuadro de "Cómo se juega" de la elegida: su dibujo grande, el nombre y lo de adentro. */
+function Explicacion({ id, nombre, children }: { id: string; nombre: string; children: React.ReactNode }) {
+  return (
+    <section aria-label={`Cómo se juega ${nombre}`} className="gr-card flex flex-col gap-3 p-4">
+      <div className="flex items-center gap-3">
+        <IconoRegla id={id} size={64} />
+        <div className="min-w-0">
+          <p className="gr-label">Cómo se juega</p>
+          <p className="text-[18px] leading-tight font-extrabold">{nombre}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
 /**
- * Elegir la regla al armar (o editar) el amigo invisible: opcional. Las reglas por grupo, cada una en su tarjeta (ícono,
- * nombre y una línea) en una fila que se desliza; la elegida se marca y abajo de su fila se explica cómo se juega. Con una
- * que no lleva presupuesto, el formulario lo esconde (data-sin-presupuesto, ver tokens.css). Va en el formulario como
- * "regla" ('' sin regla).
+ * Elegir la regla al armar (o editar) el amigo invisible: opcional. Arriba, sin regla o una propia (que se escribe); abajo,
+ * las de cada grupo, cada una en su tarjeta (dibujo, nombre y una línea) en una fila que se desliza. La elegida se marca y
+ * abajo de su fila se explica cómo se juega. Con una que no lleva presupuesto, el formulario lo esconde
+ * (data-sin-presupuesto, ver tokens.css). Va en el formulario como "regla" ('' sin regla, 'propia' con "reglaPropia").
+ * inicial: la que tiene, como se guarda (ver leerRegla).
  */
 export function ElegirRegla({ inicial }: { inicial: string | null }) {
-  const [elegida, setElegida] = useState<string>(reglaDe(inicial)?.id ?? '')
+  const guardada = leerRegla(inicial)
+  const [elegida, setElegida] = useState<string>(guardada?.tipo === 'propia' ? 'propia' : guardada?.regla.id ?? '')
   const regla = reglaDe(elegida)
   const tarjeta = (id: string, nombre: string, corta: string) => {
     const marcada = elegida === id
     return (
       <button key={id || 'ninguna'} type="button" role="radio" aria-checked={marcada} onClick={() => setElegida(marcada && id ? '' : id)}
               className="gr-regla" data-marcada={marcada || undefined}>
-        <IconoRegla id={id || null} size={40} />
+        <IconoRegla id={id || null} />
         <span className="text-[14px] leading-tight font-bold">{nombre}</span>
         <span className="text-[12px] leading-snug text-gr-muted">{corta}</span>
       </button>
@@ -95,25 +90,30 @@ export function ElegirRegla({ inicial }: { inicial: string | null }) {
     <fieldset className="flex min-w-0 flex-col gap-3" data-sin-presupuesto={regla?.sinPresupuesto || undefined}>
       <legend className="gr-label mb-1">¿Con alguna regla? (opcional)</legend>
       <input type="hidden" name="regla" value={elegida} />
-      <p className="-mt-1 text-[13px] leading-snug text-gr-muted">Para jugarlo distinto. Tocá una para ver cómo se juega.</p>
+      <p className="-mt-1 text-[13px] leading-snug text-gr-muted">Para jugarlo distinto. Tocá una para ver cómo se juega, o escribí la de ustedes.</p>
       <div role="radiogroup" aria-label="Regla del amigo invisible" className="flex flex-col gap-4">
-        <div className="gr-reglas">{tarjeta('', 'Sin regla', 'Cada uno regala lo que quiera, dentro del presupuesto.')}</div>
+        <div className="flex flex-col gap-2">
+          <div className="gr-reglas">
+            {tarjeta('', 'Sin regla', 'Cada uno regala lo que quiera, dentro del presupuesto.')}
+            {tarjeta('propia', 'Una propia', 'Escribí la regla de ustedes y cómo se juega.')}
+          </div>
+          {elegida === 'propia' && (
+            <Explicacion id="propia" nombre="Una regla propia">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[13px] font-semibold">La regla y cómo se juega</span>
+                <textarea name="reglaPropia" rows={4} maxLength={LARGO_REGLA_PROPIA} required
+                          defaultValue={guardada?.tipo === 'propia' ? guardada.texto : ''} className="gr-input"
+                          placeholder="Ej.: Todo tiene que ser verde. Se abren en ronda y cada uno adivina quién le regaló." />
+              </label>
+              <p className="text-[12px] leading-snug text-gr-muted">La ven todos los que juegan, en el amigo invisible.</p>
+            </Explicacion>
+          )}
+        </div>
         {GRUPOS_REGLAS.map((g) => (
           <div key={g.id} className="flex flex-col gap-2">
             <p className="text-[13px] font-bold">{g.nombre}</p>
             <div className="gr-reglas">{REGLAS.filter((r) => r.grupo === g.id).map((r) => tarjeta(r.id, r.nombre, r.corta))}</div>
-            {regla?.grupo === g.id && (
-              <section aria-label={`Cómo se juega ${regla.nombre}`} className="gr-card flex flex-col gap-3 p-4">
-                <div className="flex items-center gap-3">
-                  <IconoRegla id={regla.id} size={48} />
-                  <div className="min-w-0">
-                    <p className="gr-label">Cómo se juega</p>
-                    <p className="text-[17px] leading-tight font-extrabold">{regla.nombre}</p>
-                  </div>
-                </div>
-                <ComoSeJuega regla={regla} />
-              </section>
-            )}
+            {regla?.grupo === g.id && <Explicacion id={regla.id} nombre={regla.nombre}><ComoSeJuega regla={regla} /></Explicacion>}
           </div>
         ))}
       </div>
@@ -121,39 +121,61 @@ export function ElegirRegla({ inicial }: { inicial: string | null }) {
   )
 }
 
-/** En el juego: cuál es la regla, y cómo se juega al tocarla. */
-export function ReglaDelJuego({ regla }: { regla: Regla }) {
+/** En el juego: cuál es la regla (de las de acá o la propia), y cómo se juega al tocarla. */
+export function ReglaDelJuego({ regla }: { regla: ReglaElegida }) {
+  const [id, nombre, corta] = regla.tipo === 'propia' ? ['propia', 'Una regla propia', 'La que pusieron para este amigo invisible.']
+    : [regla.regla.id, regla.regla.nombre, regla.regla.corta]
   return (
-    <details className="group gr-card">
+    <details className="group gr-card" open={regla.tipo === 'propia'}>
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
-        <IconoRegla id={regla.id} size={44} />
+        <IconoRegla id={id} size={56} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="gr-label">La regla</span>
-          <span className="text-[16px] leading-tight font-extrabold">{regla.nombre}</span>
-          <span className="text-[13px] leading-snug text-gr-muted group-open:hidden">{regla.corta} Tocá para ver cómo se juega.</span>
+          <span className="text-[17px] leading-tight font-extrabold">{nombre}</span>
+          <span className="text-[13px] leading-snug text-gr-muted group-open:hidden">{corta} Tocá para ver cómo se juega.</span>
         </span>
       </summary>
-      <div className="px-3.5 pb-4"><ComoSeJuega regla={regla} /></div>
+      <div className="px-3.5 pb-4">
+        {regla.tipo === 'propia'
+          ? <p className="whitespace-pre-line text-[15px] leading-snug [overflow-wrap:anywhere]">{regla.texto}</p>
+          : <ComoSeJuega regla={regla.regla} />}
+      </div>
     </details>
   )
 }
 
-/** Lo que te toca a vos con la regla, al ver a quién le regalás: la letra, el color, la palabra o la década. */
-export function LoQueTeTocaA({ toca, nombre }: { toca: LoQueTeToca; nombre: string }) {
-  const [titulo, valor] = toca.tipo === 'inicial' ? [`Tu regalo empieza con la letra de ${nombre}`, toca.letra]
-    : toca.tipo === 'color' ? ['Tu color', toca.nombre]
-      : toca.tipo === 'palabra' ? ['Tu palabra', `«${toca.palabra}»`]
-        : ['Tu década', toca.decada]
+/**
+ * Lo que te toca a vos con la regla, al ver a quién le regalás: la letra, el color (con cómo se ve), la palabra o la
+ * década. nombre: el de a quién le regalás.
+ */
+export function LoQueTeTocaA({ toca, nombre, className = '' }: { toca: LoQueTeToca; nombre: string; className?: string }) {
+  const [titulo, valor] = toca.tipo === 'inicial' ? [`Tu regalo empieza con la letra de ${nombre}`, `«${toca.letra}»`]
+    : toca.tipo === 'color' ? ['Tu color: todo el regalo de este color', toca.nombre]
+      : toca.tipo === 'palabra' ? ['Tu palabra: tu regalo la tiene que contar', `«${toca.palabra}»`]
+        : ['Tu década: algo de esa época', toca.decada]
   return (
-    <p className="flex items-center gap-3 rounded-[18px] bg-gr-soft px-4 py-3">
+    <p className={`flex items-center gap-3 rounded-[18px] bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
       {toca.tipo === 'color'
-        ? <span aria-hidden className="size-9 flex-none rounded-full border border-gr-line" style={{ background: toca.hex }} />
+        ? <span aria-hidden className="size-11 flex-none rounded-full border-2 border-gr-line" style={{ background: toca.hex }} />
         : toca.tipo === 'inicial'
-          ? <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-[10px] bg-gr-acento text-[20px] font-black text-gr-on-acento">{toca.letra}</span>
-          : null}
+          ? <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-[12px] bg-gr-acento text-[24px] font-black text-gr-on-acento">{toca.letra}</span>
+          : <IconoRegla id={toca.tipo === 'palabra' ? 'palabra' : 'epoca'} size={44} />}
       <span className="flex min-w-0 flex-col">
-        <span className="text-[12px] font-semibold text-gr-muted">{titulo}</span>
-        <span className="text-[17px] leading-tight font-extrabold">{valor}</span>
+        <span className="text-[12px] leading-snug font-semibold text-gr-muted">{titulo}</span>
+        <span className="text-[18px] leading-tight font-extrabold">{valor}</span>
+      </span>
+    </p>
+  )
+}
+
+/** En "Robo de regalos": en qué turno abrís (o robás), de cuántos. */
+export function TuTurno({ turno, de, className = '' }: { turno: number; de: number; className?: string }) {
+  return (
+    <p className={`flex items-center gap-3 rounded-[18px] bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
+      <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-acento text-[20px] font-black text-gr-on-acento">{turno}</span>
+      <span className="flex min-w-0 flex-col">
+        <span className="text-[12px] leading-snug font-semibold text-gr-muted">Robo de regalos: tu turno para abrir o robar</span>
+        <span className="text-[18px] leading-tight font-extrabold">{turno === 1 ? 'Arrancás vos' : `${turno}º de ${de}`}{turno === 1 && ` · de ${de}`}</span>
       </span>
     </p>
   )

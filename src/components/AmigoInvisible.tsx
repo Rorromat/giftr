@@ -9,7 +9,8 @@ import { CampoPrecio } from '@/components/CamposDeseo'
 import { Confirmar } from '@/components/Confirmar'
 import { ElegirAmigos } from '@/components/Dividir'
 import { ElegirFechaDelJuego } from '@/components/ElegirFechaDelJuego'
-import { ElegirRegla } from '@/components/ReglasInvisible'
+import { ElegirRegla, LoQueTeTocaA, ReglaDelJuego, TuTurno } from '@/components/ReglasInvisible'
+import { leerRegla, loQueTeToca } from '@/lib/reglas-invisible'
 import { IconoFecha } from '@/components/IconoFecha'
 import { IlustracionFecha } from '@/components/IlustracionFecha'
 import { paletaDe } from '@/lib/colores-fechas'
@@ -152,10 +153,13 @@ function YaLoTengo({ id, tengo }: { id: string; tengo: boolean }) {
  */
 export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] }) {
   const href = `/invisible/${j.id}`
+  const regla = leerRegla(j.regla)
   const datos = [
     fechaCorta(diaDe(j.fecha)), j.presupuesto && `hasta ${pesos(j.presupuesto)}`,
+    regla && (regla.tipo === 'propia' ? 'con regla propia' : regla.regla.nombre),
     j.soyOrganizador ? 'organizás vos' : `organiza ${primerNombre(j.organizador)}`,
   ].filter(Boolean).join(' · ')
+  const toca = j.meToca && regla?.tipo === 'catalogo' ? loQueTeToca(regla.regla, j.id, j.meToca) : null
   const pasado = j.dias < 0
   return (
     <article className="gr-card flex flex-col gap-3 p-3">
@@ -215,6 +219,7 @@ export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] 
                 Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.
               </p>
             )}
+            {toca && <LoQueTeTocaA toca={toca} nombre={primerNombre(j.meToca.nombre)} className="mx-2 mb-2" />}
           </details>
           <div className="flex flex-wrap items-center gap-2">
             <YaLoTengo id={j.id} tengo={j.yaLoTengo} />
@@ -326,6 +331,7 @@ const ESTADOS: Record<VistaJuego['gente'][number]['estado'], string> = { juega: 
 
 /** Los datos del juego: cuándo, hasta cuánto, quién organiza y la temática. */
 export function DatosDelJuego({ v }: { v: VistaJuego }) {
+  const regla = leerRegla(v.regla)
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -343,6 +349,7 @@ export function DatosDelJuego({ v }: { v: VistaJuego }) {
           <span className="gr-label mb-1 block">Temática</span>{v.descripcion}
         </p>
       )}
+      {regla && <ReglaDelJuego regla={regla} />}
     </div>
   )
 }
@@ -524,6 +531,8 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
     )
   }
   const { persona, token } = v.meToca
+  const regla = leerRegla(v.regla)
+  const toca = regla?.tipo === 'catalogo' ? loQueTeToca(regla.regla, v.id, persona) : null
   return (
     <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
       <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento-sobre-tinta"><Icon name="antifaz" size={18} />TE TOCÓ</span>
@@ -535,6 +544,8 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
       {tambien.length > 0 && (
         <p className="text-[13px] font-semibold text-gr-acento-sobre-tinta">Ojo: también te tocó en {tambien.map((n) => `«${n}»`).join(' y ')}.</p>
       )}
+      {toca && <LoQueTeTocaA toca={toca} nombre={primerNombre(persona.nombre)} className="mt-1.5 w-full" />}
+      {v.miTurno && <TuTurno turno={v.miTurno.turno} de={v.miTurno.de} className="mt-1.5 w-full" />}
       {token && <Link href={`/l/${token}`} className="gr-btn gr-btn--accent mt-1.5 h-12 w-full">Ver su lista y sus talles</Link>}
       <div className="mt-1 text-gr-ink"><YaLoTengo id={v.id} tengo={v.yaLoTengo} /></div>
     </div>

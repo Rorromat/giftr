@@ -20,7 +20,7 @@ export default async function EditarAmigoInvisible({ params, searchParams }: {
     <main className="gr-hoja flex flex-col gap-1 pt-2 pb-8">
       <PageHeader title="Editar amigo invisible" back={`/invisible/${v.id}`} backLabel="Volver" />
       <FormJuego fechaEspecial={v.fechaEspecial} propuestas={propuestasDeFechas()} amigos={[]} hoy={hoyLocal().toISOString().slice(0, 10)} error={q.error === '1'} editar={{ id: v.id }}
-                 inicial={{ nombre: v.nombre, descripcion: v.descripcion ?? '', presupuesto: v.presupuesto ? pesos(v.presupuesto) : '', fecha: v.fecha, regla: null }} />
+                 inicial={{ nombre: v.nombre, descripcion: v.descripcion ?? '', presupuesto: v.presupuesto ? pesos(v.presupuesto) : '', fecha: v.fecha, regla: v.regla }} />
     </main>
   )
 }

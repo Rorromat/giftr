@@ -9,6 +9,7 @@ import { esFechaEspecial, FECHAS_ESPECIALES, proximaEspecial, type FechaEspecial
 import { esUuid, fechaDeGrupoValida } from '@/lib/groups'
 import { LARGO, recortar } from '@/lib/limites'
 import { recienHecho } from '@/lib/repetido'
+import { guardarRegla, leerRegla, reglaDe, turnoEnElRobo } from '@/lib/reglas-invisible'
 
 // Amigo invisible: el que lo arma (el que organiza) le pone nombre, temática, presupuesto y la fecha en que se dan los
 // regalos, e invita amigos suyos (tienen que estar en GiftR). Cada uno acepta o no. Cuando están, lo sortea: a cada uno le
@@ -28,21 +29,29 @@ const hoyIso = () => hoyLocal().toISOString().slice(0, 10)
 export type DatosJuego = {
   nombre: string
   descripcion?: string | null
+  /** la regla con la que juegan: el id de una (ver lib/reglas-invisible.ts) o 'propia', con su texto; otra cosa, sin regla */
+  regla?: string | null
+  reglaPropia?: string | null
   presupuesto?: number | null
   /** 'YYYY-MM-DD': cuándo se dan los regalos */
   fecha: string
   fechaEspecial?: FechaEspecial | null
 }
 
-/** Lo cargado, acotado; null si falta el nombre o la fecha no sirve (una que no existe o que ya pasó). */
+/**
+ * Lo cargado, acotado; null si falta el nombre o la fecha no sirve (una que no existe o que ya pasó). Una regla que no es
+ * de las que hay, sin regla; con una que no lleva presupuesto ("De tu casa"), sin presupuesto.
+ */
 function limpiar(d: DatosJuego) {
   const nombre = recortar(d.nombre ?? '', LARGO.nombreGrupo)
   if (!nombre || !fechaDeGrupoValida(d.fecha) || d.fecha < hoyIso()) return null
   const p = d.presupuesto
+  const regla = guardarRegla(d.regla, d.reglaPropia)
   return {
     nombre,
     descripcion: recortar(d.descripcion ?? '', LARGO.temaInvisible) || null,
-    presupuesto: p && Number.isSafeInteger(p) && p > 0 && p <= PRESUPUESTO_MAXIMO ? p : null,
+    regla,
+    presupuesto: !reglaDe(regla)?.sinPresupuesto && p && Number.isSafeInteger(p) && p > 0 && p <= PRESUPUESTO_MAXIMO ? p : null,
     fecha: d.fecha,
     fechaEspecial: d.fechaEspecial && esFechaEspecial(d.fechaEspecial) ? d.fechaEspecial : null,
   }
@@ -104,7 +113,7 @@ export async function invitarAlJuego(db: Db, id: string, organizadorId: string, 
   return j ? sumarInvitados(db, j, organizadorId, ids, enviar) : 0
 }
 
-/** Cambiar el nombre, la temática, el presupuesto o la fecha (también después del sorteo). */
+/** Cambiar el nombre, la temática, la regla, el presupuesto o la fecha (también después del sorteo). */
 export async function editarAmigoInvisible(db: Db, id: string, organizadorId: string, datos: DatosJuego): Promise<boolean> {
   const j = await delOrganizador(db, id, organizadorId)
   const d = limpiar(datos)
@@ -231,6 +240,8 @@ export type VistaJuego = {
   id: string
   nombre: string
   descripcion: string | null
+  /** la regla con la que juegan, como se guarda (ver leerRegla), o null */
+  regla: string | null
   presupuesto: number | null
   /** 'YYYY-MM-DD' */
   fecha: string
@@ -260,6 +271,8 @@ export type VistaJuego = {
   meRegalo: Persona | null
   /** marqué "Ya tengo el regalo" */
   yaLoTengo: boolean
+  /** con la regla "Robo de regalos", desde el sorteo y si juego: mi turno para abrir o robar (ver turnoEnElRobo) */
+  miTurno: { turno: number; de: number } | null
 }
 
 /** El juego para uno que está (también un invitado que no contestó) o el que organiza; null para cualquier otro. */
@@ -289,7 +302,7 @@ export async function amigoInvisibleParaViewer(db: Db, id: string, userId: strin
   const fechaD = new Date(`${j.fecha}T00:00:00Z`)
   const anon = (p: typeof preguntas[number]): Pregunta => ({ id: p.id, texto: p.texto, respuesta: p.respuesta })
   return {
-    id, nombre: j.nombre, descripcion: j.descripcion, presupuesto: j.presupuesto, fecha: j.fecha,
+    id, nombre: j.nombre, descripcion: j.descripcion, regla: leerRegla(j.regla) ? j.regla : null, presupuesto: j.presupuesto, fecha: j.fecha,
     fechaEspecial: esFechaEspecial(j.fechaEspecial) ? j.fechaEspecial : null,
     cuando: fechaLarga(fechaD, hoy), dias: diasEntre(hoy, fechaD),
     organizador: gente.get(j.organizadorId)!, soyOrganizador, miEstado: mia.estado, sorteado: !!j.sorteadoAt,
@@ -310,6 +323,8 @@ export async function amigoInvisibleParaViewer(db: Db, id: string, userId: strin
     puedoRevelar: !!j.sorteadoAt && juego && hoyIso() > j.fecha && !mia.reveladoAt,
     meRegalo: mia.reveladoAt && quienMeRegala ? gente.get(quienMeRegala) ?? null : null,
     yaLoTengo: !!mia.yaLoTengoAt,
+    miTurno: j.sorteadoAt && juego && reglaDe(j.regla)?.id === 'robo'
+      ? turnoEnElRobo(id, filas.filter((f) => f.estado === 'juega').map((f) => f.userId), userId) : null,
   }
 }
 
@@ -380,6 +395,8 @@ export async function responderPregunta(db: Db, preguntaId: string, userId: stri
 export type MiJuego = {
   id: string
   nombre: string
+  /** la regla con la que juegan, como se guarda (ver leerRegla), o null */
+  regla: string | null
   fecha: string
   fechaEspecial: FechaEspecial | null
   presupuesto: number | null
@@ -430,7 +447,8 @@ export async function misAmigosInvisibles(db: Db, userId: string, hoy = hoyLocal
   const persona = new Map(tocan.map((p) => [p.id, p]))
   const cuenta = (id: string, cuales: string[]) => estados.filter((e) => e.id === id && cuales.includes(e.estado)).reduce((t, e) => t + e.n, 0)
   return filas.map(({ j, mia, org }) => ({
-    id: j.id, nombre: j.nombre, fecha: j.fecha, fechaEspecial: esFechaEspecial(j.fechaEspecial) ? j.fechaEspecial : null, presupuesto: j.presupuesto,
+    id: j.id, nombre: j.nombre, regla: leerRegla(j.regla) ? j.regla : null, fecha: j.fecha,
+    fechaEspecial: esFechaEspecial(j.fechaEspecial) ? j.fechaEspecial : null, presupuesto: j.presupuesto,
     dias: diasEntre(hoy, new Date(`${j.fecha}T00:00:00Z`)), miEstado: mia.estado as 'invitado' | 'juega', sorteado: !!j.sorteadoAt,
     vi: !!mia.vioAt, revelado: !!mia.reveladoAt, organizador: org, soyOrganizador: j.organizadorId === userId,
     invitados: cuenta(j.id, ['invitado', 'juega', 'no_juega']), contestaron: cuenta(j.id, ['juega', 'no_juega']),
