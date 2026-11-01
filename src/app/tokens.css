@@ -646,22 +646,9 @@
     filter: drop-shadow(0 2px 3px rgb(20 20 20 / 0.28));
     pointer-events: none;
   }
-  /* Las reglas del amigo invisible para elegir (<ElegirRegla>): por grupo, una fila de tarjetas que se desliza de lado a
-     lado; la elegida, con el borde y un velo del acento. */
-  .gr-reglas {
-    display: flex;
-    gap: 10px;
-    margin-inline: calc(-1 * var(--gr-gutter));
-    padding: 2px var(--gr-gutter) 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    scroll-snap-type: x proximity;
-    scroll-padding-inline: var(--gr-gutter);
-  }
-  .gr-reglas::-webkit-scrollbar { display: none; }
+  /* Una regla del amigo invisible para elegir, en la hoja de <ElegirRegla>: su tarjeta; la elegida, con el borde y un velo
+     del acento. */
   .gr-regla {
-    flex: none;
-    width: 168px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -672,7 +659,6 @@
     background: var(--gr-surface);
     color: var(--gr-ink);
     text-align: left;
-    scroll-snap-align: start;
     transition: border-color 150ms ease, background-color 150ms ease, transform 80ms ease;
   }
   .gr-regla:active { transform: scale(0.98); }
@@ -1261,6 +1247,25 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   animation: gr-foto-grande 180ms ease-out;
 }
 .gr-foto-grande::backdrop { background: transparent; }
+
+/* Una hoja que sube desde abajo (<dialog className="gr-sheet">), para elegir de una lista larga (las reglas del amigo
+   invisible): casi toda la pantalla, con lo de adentro desplazable; tocar afuera la cierra. */
+.gr-sheet {
+  width: 100%;
+  max-width: 448px;
+  max-height: 88svh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 28px 28px 0 0;
+  background: var(--gr-bg);
+  color: var(--gr-ink);
+  box-shadow: 0 -20px 50px -20px rgb(0 0 0 / 0.5);
+  overflow: hidden;
+}
+.gr-sheet[open] { display: flex; flex-direction: column; animation: gr-sheet-sube 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.gr-sheet::backdrop { background: rgb(18 18 22 / 0.55); }
+@keyframes gr-sheet-sube { from { transform: translateY(100%); } }
 /* toda la pantalla, aunque la foto sea chica: contain la agranda sin recortarla */
 .gr-foto-grande__img {
   width: 100%;
@@ -1359,6 +1364,7 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-refrescar[data-fase="cargando"] .gr-refrescar__mono, .gr-latiendo { animation: none; }
   .gr-toast { animation-name: gr-toast-quieto; }
   .gr-foto-grande[open] { animation: none; }
+  .gr-sheet[open] { animation: none; }
   .gr-girar__tel { animation: none; }
   /* los íconos de los avisos, quietos (en su lugar, con los tres puntitos prendidos) */
   .gr-aviso-icono[data-mueve] > svg, .gr-aviso-icono[data-mueve] .gr-aviso__punto { animation: none; }
