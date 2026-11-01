@@ -8,7 +8,6 @@ import { nombresDeMisGrupos } from '@/lib/groups'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { yo } from '@/lib/perfil'
 import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/events'
-import { Banners } from '@/components/Banners'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { ListaHero } from '@/components/ListaHero'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
@@ -59,8 +58,6 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         {grupos.map((g) => <Link key={g.id} href={`/grupos/${g.id}`} className="gr-chip">{g.nombre}</Link>)}
         <Link href="/grupos/nuevo" className="gr-chip">+ Lista en común</Link>
       </nav>
-
-      <Banners />
 
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
