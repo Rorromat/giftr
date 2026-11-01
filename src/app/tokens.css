@@ -351,6 +351,18 @@
   textarea.gr-input { padding: 12px 14px; }
   .gr-input::placeholder { color: var(--gr-muted); }
   .gr-input:focus { outline: 2px solid var(--gr-ink); outline-offset: 1px; }
+  /* Las fechas: en Safari (iPhone) el campo de fecha trae su propio ancho mínimo (no se achica a su columna y se mete abajo
+     del de al lado), no toma el alto ni el color (de noche, la fecha no se ve) y centra el valor. Sin su apariencia, es un
+     campo como los demás. */
+  .gr-input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    height: 50px;
+    line-height: 48px;
+  }
+  .gr-input[type="date"]::-webkit-date-and-time-value { margin: 0; text-align: left; }
 
   /* Avatares: con un aro del color de la tarjeta, para que se separen al superponerse */
   .gr-avatar {
