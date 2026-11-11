@@ -1,5 +1,5 @@
-import { SkeletonPage } from '@/components/Skeleton'
+import { SkeletonTapa } from '@/components/Skeleton'
 
 export default function Loading() {
-  return <SkeletonPage />
+  return <SkeletonTapa chips clase="gap-5 pb-48" />
 }

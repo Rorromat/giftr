@@ -1,5 +1,6 @@
-import { SkeletonPage } from '@/components/Skeleton'
+import { SkeletonPagina } from '@/components/Skeleton'
 
+// Todo el año: la tarjeta con los doce meses
 export default function Loading() {
-  return <SkeletonPage cards={2} />
+  return <SkeletonPagina cards={1} alto={420} />
 }

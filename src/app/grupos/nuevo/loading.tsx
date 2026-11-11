@@ -1,5 +1,5 @@
-import { SkeletonPage } from '@/components/Skeleton'
+import { SkeletonFormulario } from '@/components/Skeleton'
 
 export default function Loading() {
-  return <SkeletonPage cards={0} />
+  return <SkeletonFormulario campos />
 }
