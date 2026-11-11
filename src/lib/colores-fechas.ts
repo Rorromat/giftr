@@ -4,8 +4,8 @@ import type { FechaEspecial } from '@/lib/fechas-especiales'
 // su tarjeta, de su cabecera y de su cuadradito; el círculo y el piso de su ilustración (un tono más claro y uno más oscuro
 // que el fondo), y el detalle de su ícono. Navidad, roja (con el árbol verde y dorado); el Día del Amigo, noche violeta
 // (con la Luna); el del Padre, azul marino (con la corbata mostaza); el de la Madre, frambuesa (con flores rosas); el del
-// Niño, verde agua (con el barrilete amarillo y naranja). El aparte, negro con lima: los de la marca. El texto blanco sobre
-// cada fondo pasa el contraste de 4.5:1.
+// Niño, verde agua (con el barrilete amarillo y naranja). El aparte, negro con el verde de la marca (en su tono claro, el
+// del arranque del degradé: sobre negro se ve más que el liso). El texto blanco sobre cada fondo pasa el contraste de 4.5:1.
 
 export type PaletaFecha = {
   fondo: string
@@ -23,7 +23,7 @@ const PALETAS: Record<FechaEspecial | 'aparte', PaletaFecha> = {
   padre: { fondo: '#1F3C78', marco: '#2F5193', piso: '#16305F', acento: '#F2A93B' },
   madre: { fondo: '#C2386E', marco: '#D4527F', piso: '#9C2A57', acento: '#FFC1D5' },
   ninos: { fondo: '#0B7C78', marco: '#1C958F', piso: '#085F5C', acento: '#FFD447' },
-  aparte: { fondo: '#141414', marco: '#2A2A27', piso: '#000000', acento: '#C8F31D' },
+  aparte: { fondo: '#141414', marco: '#2A2A27', piso: '#000000', acento: '#3CD592' },
 }
 
 export const paletaDe = (f: FechaEspecial | null): PaletaFecha => PALETAS[f ?? 'aparte']

@@ -15,7 +15,8 @@ import type { PasoGustos } from '@/lib/gustos'
 const BLANCO = '#FFFFFF'
 const BLANCO_SOMBRA = '#E6E2DA'
 const TINTA = '#141414'
-const LIMA = '#C8F31D'
+// el verde de la marca en su tono claro (como en IlustracionFecha)
+const VERDE = '#3CD592'
 
 /** Un destello de cuatro puntas. */
 const Destello = ({ cx, cy, s, fill }: { cx: number; cy: number; s: number; fill: string }) => (
@@ -70,7 +71,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
           <rect x="60" y="86" width="5" height="2.6" rx="1.3" fill={BLANCO} transform="rotate(-25 62 87)" />
           <rect x="86" y="84" width="5" height="2.6" rx="1.3" fill={llama} transform="rotate(20 88 85)" />
           <rect x="100" y="88" width="5" height="2.6" rx="1.3" fill={BLANCO} transform="rotate(-10 102 89)" />
-          <rect x="72" y="89" width="5" height="2.6" rx="1.3" fill={LIMA} transform="rotate(35 74 90)" />
+          <rect x="72" y="89" width="5" height="2.6" rx="1.3" fill={VERDE} transform="rotate(35 74 90)" />
           {/* la vela */}
           <rect x="75" y="52" width="10" height="30" rx="3" fill={BLANCO} />
           <g clipPath={`url(#${id}-vela)`} stroke={glaseado} strokeWidth="3.5"><path d="M70 60 L90 52 M70 69 L90 61 M70 78 L90 70" /></g>
@@ -94,7 +95,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
             {/* el puño y el cuello */}
             <path d="M74 90 L80 100 L86 90" fill={marco} stroke={marco} strokeWidth="6" strokeLinejoin="round" />
             <rect x="74" y="98" width="12" height="38" rx="5" fill={TINTA} />
-            <path d="M74 106 L86 102 M74 114 L86 110 M74 122 L86 118 M74 130 L86 126" stroke={LIMA} strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M74 106 L86 102 M74 114 L86 110 M74 122 L86 118 M74 130 L86 126" stroke={VERDE} strokeWidth="2.2" strokeLinecap="round" />
             <path d={paleta_} fill={marco} stroke={marco} strokeWidth="9" strokeLinejoin="round" />
             {conSombra(paleta_, cabeza, cabezaSombra)}
             {agujeros.map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.6" fill={paleta.marco} />)}
@@ -142,7 +143,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
       break
     }
     case 'hobbies': {
-      const acento = paleta.acento, acentoSombra = '#A3C90B', copa = BLANCO, copaSombra = BLANCO_SOMBRA
+      const acento = paleta.acento, acentoSombra = '#10B66E', copa = BLANCO, copaSombra = BLANCO_SOMBRA
       const nota = (x: number, y: number, fill: string) => (
         <g fill={fill}>
           <ellipse cx={x} cy={y} rx="6" ry="4.6" transform={`rotate(-20 ${x} ${y})`} />
@@ -168,7 +169,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
       break
     }
     case 'ropa': {
-      const bolsa = '#FFF4E6', bolsaSombra = '#F0DCC2', seda = paleta.acento, sedaSombra = '#A3C90B'
+      const bolsa = '#FFF4E6', bolsaSombra = '#F0DCC2', seda = paleta.acento, sedaSombra = '#10B66E'
       dibujo = (
         <>
           <defs>{mitad(80)}</defs>
@@ -181,7 +182,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
           {conSombra('M46 72 H114 L118 126 Q118 133 111 133 H49 Q42 133 42 126 Z', bolsa, bolsaSombra)}
           {/* la etiqueta de la marca: la estrella de GiftR */}
           <circle cx="80" cy="106" r="14" fill={paleta.fondo} />
-          <polygon fill={LIMA} points={Array.from({ length: 24 }, (_, i) => {
+          <polygon fill={VERDE} points={Array.from({ length: 24 }, (_, i) => {
             const r = i % 2 ? 5.4 : 8.6
             const a = (Math.PI * i) / 12 - Math.PI / 2
             return `${(80 + r * Math.cos(a)).toFixed(1)},${(106 + r * Math.sin(a)).toFixed(1)}`
@@ -209,7 +210,7 @@ export function IlustracionGusto({ paso, size = 150, className = '' }: { paso: P
             <text x="104" y="84" textAnchor="middle" fontSize="15" fontWeight="800" fill={TINTA} style={{ fontFamily: 'var(--gr-font-display), system-ui, sans-serif' }}>M</text>
           </g>
           {/* el abanico de muestras */}
-          {[['#FF6B6B', -24], ['#4DABF7', -8], [LIMA, 8]].map(([color, giro]) => (
+          {[['#FF6B6B', -24], ['#4DABF7', -8], [VERDE, 8]].map(([color, giro]) => (
             <rect key={color} x="40" y="92" width="16" height="36" rx="5" fill={color as string} stroke={BLANCO} strokeWidth="2.5"
                   transform={`rotate(${giro} 48 126)`} />
           ))}
