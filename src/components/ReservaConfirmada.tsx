@@ -39,7 +39,7 @@ export function ReservaConfirmada({ vence, deseo, entrar, recuperar, cartel = fa
   const paraVolver = recuperar && <LinkParaVolver url={recuperar} />
   if (!cartel) return <div className="text-sm leading-snug font-medium"><p>{texto}</p>{conGoogle}{paraVolver}</div>
   return (
-    <div role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm leading-snug font-medium text-gr-on-brand">
+    <div role="status" className="flex items-start gap-2.5 rounded-gr-md bg-gr-brand px-4 py-3 text-sm leading-snug font-medium text-gr-on-brand">
       <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
       <div className="min-w-0 flex-1"><p>{texto}</p>{conGoogle}{paraVolver}</div>
     </div>

@@ -71,7 +71,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
         <QueQueres defaultValue={deseo?.titulo ?? compartido?.link ?? compartido?.titulo} />
         {/* $45.000 o 45000 (al dejarlo, y en el servidor, queda $45.000) */}
         <CampoPrecio name="precio" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Precio" defaultValue={deseo?.precio ?? ''}
-               aria-label="Precio" className="min-h-11 w-full rounded-xl bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
+               aria-label="Precio" className="min-h-11 w-full rounded-gr-sm bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
         {/* un rango de antes ("$10–30k") queda como estaba: ya no se carga aparte, alcanza con el precio */}
         <input type="hidden" name="rangoPrecio" value={deseo?.rangoPrecio ?? ''} />
         {/* al editar: decir que el precio sigue igual (si es de hace rato) o traerlo de nuevo de la tienda */}
@@ -93,7 +93,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       </div>
 
       {/* "Algo así" (una idea): sirve algo parecido. Tildado, tipo llega como idea antes que el exacto de abajo (vale el primero) */}
-      <div className="flex flex-col rounded-[18px] border border-gr-line bg-gr-surface">
+      <div className="flex flex-col rounded-gr-md border border-gr-line bg-gr-surface">
         <label className="flex min-h-[64px] cursor-pointer items-center gap-3 px-3.5 py-2.5">
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold">Me sirve algo parecido</span>
@@ -114,7 +114,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
 
       {/* lo que más se pide en un casamiento o un baby shower no es un objeto: es plata, y va por otro formulario */}
       {aporte && (
-        <Link href={aporte} className="flex min-h-[64px] items-center gap-3 rounded-[18px] border border-gr-line bg-gr-surface px-3.5 py-2.5">
+        <Link href={aporte} className="flex min-h-[64px] items-center gap-3 rounded-gr-md border border-gr-line bg-gr-surface px-3.5 py-2.5">
           <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
             <Icon name="wallet" size={20} strokeWidth={2.2} />
           </span>

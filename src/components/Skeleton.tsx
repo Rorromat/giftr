@@ -57,7 +57,7 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
           )}
           <div className="mt-5 flex flex-col gap-3.5">
             <div className="h-4 w-20 rounded-full bg-white/25" />
-            <div className="h-[46px] w-3/5 rounded-2xl bg-white/25" />
+            <div className="h-[46px] w-3/5 rounded-gr-md bg-white/25" />
             <div className="h-5 w-4/5 rounded-full bg-white/25" />
             <div className="h-[50px] rounded-full bg-white/25 md:w-[320px]" />
           </div>
@@ -100,7 +100,7 @@ export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?
           <div className="mt-1 flex items-center gap-3">
             <div className="size-14 flex-none rounded-full bg-white/25" />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="h-[26px] w-3/5 rounded-xl bg-white/25" />
+              <div className="h-[26px] w-3/5 rounded-gr-sm bg-white/25" />
               <div className="flex h-[18px] items-center"><div className="h-3 w-4/5 rounded-full bg-white/25" /></div>
             </div>
           </div>
@@ -108,7 +108,7 @@ export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?
         </div>
       </section>
       <div aria-hidden="true" className="relative -mt-14 flex flex-col gap-4 motion-safe:animate-pulse">
-        <div className="h-12 rounded-[22px] bg-gr-dot" />
+        <div className="h-12 rounded-gr-lg bg-gr-dot" />
         <div className="flex gap-2 py-1">
           {['w-[76px]', 'w-[118px]', 'w-[84px]'].map((w) => <div key={w} className={`h-[38px] flex-none rounded-full bg-gr-dot ${w}`} />)}
         </div>
@@ -139,17 +139,17 @@ export function SkeletonInicio({ botones = 3, filas = 0 }: { botones?: number; f
       <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
         <BarraApp botones={botones} />
         <div className="flex flex-col gap-1">
-          <div className="h-[35px] w-3/5 rounded-2xl bg-gr-dot" />
+          <div className="h-[35px] w-3/5 rounded-gr-md bg-gr-dot" />
           <div className="flex h-5 items-center"><div className="h-3.5 w-4/5 rounded-full bg-gr-dot" /></div>
         </div>
         {filas ? (
-          Array.from({ length: filas }, (_, i) => <div key={i} className="h-[76px] rounded-[20px] bg-gr-dot" />)
+          Array.from({ length: filas }, (_, i) => <div key={i} className="h-[76px] rounded-gr-lg bg-gr-dot" />)
         ) : (
           <>
-            <div className="h-[268px] rounded-[26px] bg-gr-dot" />
+            <div className="h-[268px] rounded-gr-xl bg-gr-dot" />
             <div className="h-[25px] w-2/5 rounded-full bg-gr-dot" />
             <div className="gr-estante">
-              {[0, 1, 2].map((i) => <div key={i} className="h-[316px] rounded-[22px] bg-gr-dot" />)}
+              {[0, 1, 2].map((i) => <div key={i} className="h-[316px] rounded-gr-lg bg-gr-dot" />)}
             </div>
           </>
         )}
@@ -181,7 +181,7 @@ export function SkeletonFormulario({ campos = false }: { campos?: boolean }) {
             {[0, 1, 2].map((i) => (
               <div key={i} className="gr-card flex flex-col gap-2.5 p-4">
                 <div className="h-5 w-2/5 rounded-full bg-gr-dot" />
-                <div className="h-[50px] rounded-[14px] bg-gr-dot" />
+                <div className="h-[50px] rounded-gr-sm bg-gr-dot" />
                 <div className="h-3.5 w-3/5 rounded-full bg-gr-dot" />
               </div>
             ))}
@@ -189,7 +189,7 @@ export function SkeletonFormulario({ campos = false }: { campos?: boolean }) {
         ) : (
           <div className="mt-1 flex flex-col gap-4">
             <div className="gr-card flex flex-col gap-1.5 p-2.5 pb-2">
-              <div className="h-[220px] rounded-[18px] bg-gr-dot" />
+              <div className="h-[220px] rounded-gr-md bg-gr-dot" />
               <div className="flex h-12 items-center px-1.5"><div className="h-6 w-3/5 rounded-full bg-gr-dot" /></div>
               <div className="flex h-11 items-center px-1.5"><div className="h-5 w-1/4 rounded-full bg-gr-dot" /></div>
             </div>
@@ -199,7 +199,7 @@ export function SkeletonFormulario({ campos = false }: { campos?: boolean }) {
                 {['w-[52px]', 'w-[132px]', 'w-11'].map((w) => <div key={w} className={`h-11 rounded-full bg-gr-dot ${w}`} />)}
               </div>
             </div>
-            <div className="h-[64px] rounded-[18px] bg-gr-dot" />
+            <div className="h-[64px] rounded-gr-md bg-gr-dot" />
             <div className="mt-4 h-14 rounded-full bg-gr-dot" />
           </div>
         )}
@@ -218,7 +218,7 @@ export function SkeletonPagina({ cards = 2, alto = 220 }: { cards?: number; alto
       <Cargando />
       <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
         <BarraPagina />
-        {Array.from({ length: cards }, (_, i) => <div key={i} className="rounded-[20px] bg-gr-dot" style={{ height: alto }} />)}
+        {Array.from({ length: cards }, (_, i) => <div key={i} className="rounded-gr-lg bg-gr-dot" style={{ height: alto }} />)}
       </div>
     </main>
   )
@@ -232,8 +232,8 @@ export function SkeletonInvitacion() {
       <div aria-hidden="true" className="flex w-full flex-col items-center gap-4 motion-safe:animate-pulse">
         <div className="size-[88px] rounded-full bg-gr-dot" />
         <div className="h-4 w-3/5 rounded-full bg-gr-dot" />
-        <div className="h-9 w-2/5 rounded-2xl bg-gr-dot" />
-        <div className="h-[104px] w-full rounded-[22px] bg-gr-dot" />
+        <div className="h-9 w-2/5 rounded-gr-md bg-gr-dot" />
+        <div className="h-[104px] w-full rounded-gr-lg bg-gr-dot" />
         <div className="mt-2 h-14 w-full rounded-full bg-gr-dot" />
       </div>
     </main>
@@ -253,8 +253,8 @@ export function SkeletonFicha() {
           <div className="h-10 w-1/3 rounded-full bg-gr-dot" />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="h-[104px] rounded-[18px] bg-gr-dot" />
-          <div className="h-[104px] rounded-[18px] bg-gr-dot" />
+          <div className="h-[104px] rounded-gr-md bg-gr-dot" />
+          <div className="h-[104px] rounded-gr-md bg-gr-dot" />
         </div>
       </div>
     </main>
@@ -273,12 +273,12 @@ export function SkeletonContenido({ filas = 3, totales = false }: { filas?: numb
       <div aria-hidden="true" className="flex flex-col gap-3 motion-safe:animate-pulse">
         {totales && (
           <div className="grid grid-cols-2 gap-3">
-            <div className="h-[96px] rounded-[26px] bg-gr-dot" />
-            <div className="h-[96px] rounded-[26px] bg-gr-dot" />
+            <div className="h-[96px] rounded-gr-xl bg-gr-dot" />
+            <div className="h-[96px] rounded-gr-xl bg-gr-dot" />
           </div>
         )}
         <div className="mt-1 h-6 w-2/5 rounded-full bg-gr-dot" />
-        {Array.from({ length: filas }, (_, i) => <div key={i} className="h-[76px] rounded-[22px] bg-gr-dot" />)}
+        {Array.from({ length: filas }, (_, i) => <div key={i} className="h-[76px] rounded-gr-lg bg-gr-dot" />)}
       </div>
     </div>
   )

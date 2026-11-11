@@ -126,7 +126,7 @@ const PISTAS: Record<BloqueGustos['paso'], string> = {
 /** La ilustración del paso en un cuadradito de su color (la misma del cartel de la bienvenida). */
 function MiniIlustracion({ paso }: { paso: BloqueGustos['paso'] }) {
   return (
-    <span aria-hidden className="flex size-12 flex-none items-center justify-center overflow-hidden rounded-2xl" style={{ background: paletaGusto(paso).fondo }}>
+    <span aria-hidden className="flex size-12 flex-none items-center justify-center overflow-hidden rounded-gr-md" style={{ background: paletaGusto(paso).fondo }}>
       <IlustracionGusto paso={paso} size={58} />
     </span>
   )
@@ -137,7 +137,7 @@ function TallesEnFila({ talles }: { talles: Talles }) {
   return (
     <span className="grid grid-cols-3 gap-2">
       {(['remera', 'pantalon', 'calzado'] as const).map((k) => (
-        <span key={k} className="flex flex-col rounded-2xl bg-gr-soft px-3 py-2">
+        <span key={k} className="flex flex-col rounded-gr-md bg-gr-soft px-3 py-2">
           <span className="text-[12px] font-semibold text-gr-muted">{k === 'remera' ? 'Remera' : k === 'pantalon' ? 'Pantalón' : 'Calzado'}</span>
           <span className={`font-display text-[22px] leading-tight font-bold ${talles[k] ? '' : 'text-gr-muted'}`}>{talles[k] ?? '—'}</span>
         </span>
@@ -154,7 +154,7 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
   const href = `/perfil/gustos/${b.paso}`
   if (!b.cargado) {
     return (
-      <Link href={href} className="flex min-h-[76px] items-center gap-3 rounded-[22px] border-2 border-dashed border-gr-line px-4 py-3">
+      <Link href={href} className="flex min-h-[76px] items-center gap-3 rounded-gr-lg border-2 border-dashed border-gr-line px-4 py-3">
         <MiniIlustracion paso={b.paso} />
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">{b.titulo}</span>
@@ -166,7 +166,7 @@ export function TarjetaBloque({ b, talles }: { b: BloqueGustos; talles: Talles }
   }
   const oscuro = b.paso === 'no-regalar'
   return (
-    <Link href={href} className={`flex flex-col gap-3 rounded-[22px] p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
+    <Link href={href} className={`flex flex-col gap-3 rounded-gr-lg p-4 ${oscuro ? 'border border-gr-line bg-gr-brand text-gr-bg' : 'gr-card'}`}>
       <span className="flex items-center gap-3">
         <MiniIlustracion paso={b.paso} />
         <span className={`min-w-0 flex-1 text-[15px] font-semibold ${oscuro ? 'text-gr-acento-sobre-tinta' : ''}`}>{b.titulo}</span>

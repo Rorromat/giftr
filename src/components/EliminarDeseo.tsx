@@ -19,7 +19,7 @@ export function EliminarDeseo({ itemId, titulo }: { itemId: string; titulo: stri
       </button>
       {/* data-sin-refrescar: tirar para abajo acá no actualiza la pantalla de atrás */}
       <dialog ref={dialogo} aria-labelledby="eliminar-titulo" data-sin-refrescar
-              className="m-auto w-[min(26rem,calc(100%-24px))] rounded-[28px] bg-gr-bg p-5 text-gr-ink shadow-float backdrop:bg-gr-ink/60">
+              className="m-auto w-[min(26rem,calc(100%-24px))] rounded-gr-xl bg-gr-bg p-5 text-gr-ink shadow-float backdrop:bg-gr-ink/60">
         <div className="flex flex-col gap-3">
           <span aria-hidden className="mx-auto flex size-14 items-center justify-center rounded-full bg-red-100 text-red-600">
             <Icon name="basura" size={26} />

@@ -57,7 +57,12 @@
 
   /* Forma */
   --gr-border: 1px solid var(--gr-line-strong);
+  /* Cuatro radios y la píldora: chico (fotos, campos chicos), medio (tarjetas y lo de adentro), grande (tarjetas grandes y
+     hojas) y el de las tapas y los diálogos. Lo de adentro siempre lleva uno menor que lo que lo contiene. */
+  --gr-radius-sm: 12px;
+  --gr-radius-md: 16px;
   --gr-radius-lg: 20px;
+  --gr-radius-xl: 28px;
   --gr-radius-pill: 999px;
   --gr-shadow: 0 1px 2px rgb(18 18 22 / 0.04);
   --gr-shadow-float: 0 10px 30px -10px rgb(18 18 22 / 0.3);
@@ -188,7 +193,7 @@
   /* Tarjeta destacada (Cuentas, compartir tu lista): tinta, con lo importante en el acento */
   .gr-hero {
     position: relative;
-    border-radius: 26px;
+    border-radius: var(--gr-radius-xl);
     background: var(--gr-hero);
     color: var(--gr-on-hero);
   }
@@ -369,7 +374,7 @@
     width: 100%;
     min-height: 50px;
     border: var(--gr-border);
-    border-radius: 14px;
+    border-radius: var(--gr-radius-sm);
     background: var(--gr-surface);
     padding: 0 14px;
     font-family: var(--gr-font-body);
@@ -609,7 +614,7 @@
     gap: 14px;
     min-height: 268px;
     padding: 18px;
-    border-radius: 26px;
+    border-radius: var(--gr-radius-xl);
     color: #FFFFFF;
     /* de la tapa de su lista (ver lib/tapas.ts) a más oscura, para que el texto blanco se lea también sobre el verde: como
        la tapa, arranca en el 72 % (con 92 %, el nombre de arriba quedaba en 3,3:1) */
@@ -622,7 +627,7 @@
     width: 96px;
     height: 96px;
     border: 4px solid #FFFFFF;
-    border-radius: 18px;
+    border-radius: var(--gr-radius-md);
     background: #FFFFFF;
     object-fit: cover;
     box-shadow: 0 14px 28px -10px rgb(0 0 0 / 0.5);
@@ -651,7 +656,7 @@
     height: 100%;
     padding: 6px 6px 10px;
     border: 1px solid var(--gr-line);
-    border-radius: 22px;
+    border-radius: var(--gr-radius-lg);
     background: var(--gr-surface);
     box-shadow: var(--gr-shadow);
   }
@@ -674,7 +679,7 @@
     gap: 6px;
     padding: 12px;
     border: 2px solid var(--gr-line);
-    border-radius: 20px;
+    border-radius: var(--gr-radius-lg);
     background: var(--gr-surface);
     color: var(--gr-ink);
     text-align: left;
@@ -700,7 +705,7 @@
     aspect-ratio: 4 / 5;
     width: 100%;
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: var(--gr-radius-md);
     background: var(--gr-soft);
   }
   .gr-arte::after {
@@ -839,7 +844,7 @@
     aspect-ratio: 4 / 5;
     max-height: 34dvh;
     border: 0;
-    border-radius: 18px;
+    border-radius: var(--gr-radius-md);
     padding: 8px 12px 13px;
     background: #FFFFFF;
     color: #121216;
@@ -884,7 +889,7 @@
     display: grid;
     gap: 10px;
     padding: 12px;
-    border-radius: 22px;
+    border-radius: var(--gr-radius-lg);
     background: #FFFFFF;
     color: #121216;
     box-shadow: 0 30px 50px -20px rgb(0 0 0 / 0.5);
@@ -964,7 +969,7 @@
   .gr-listo > * { opacity: 0; transform: translateY(18px); transition: opacity 300ms, transform 600ms var(--gr-entra); }
   .gr-agr[data-paso="listo"] .gr-listo > * { opacity: 1; transform: none; transition-delay: calc(var(--i) * 80ms + 150ms); }
   .gr-listo h2 { margin: 0; font-family: var(--gr-font-display); font-weight: 900; font-size: 46px; line-height: 0.92; letter-spacing: -0.05em; }
-  .gr-listo .gr-arte { width: 168px; border-radius: 20px; box-shadow: 0 24px 44px -16px rgb(0 0 0 / 0.5); }
+  .gr-listo .gr-arte { width: 168px; border-radius: var(--gr-radius-lg); box-shadow: 0 24px 44px -16px rgb(0 0 0 / 0.5); }
   .gr-agr__listo .gr-btn--vidrio { border-color: color-mix(in oklch, var(--gr-on-acento) 22%, transparent); background: rgb(255 255 255 / 0.22); color: var(--gr-on-acento); }
 
   /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
@@ -1115,7 +1120,7 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   gap: 10px;
   width: min(calc(100% - 36px), 412px);
   padding: 12px 16px;
-  border-radius: 18px;
+  border-radius: var(--gr-radius-md);
   background: var(--gr-brand);
   color: var(--gr-on-brand);
   font-size: 14px;
@@ -1256,7 +1261,7 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   margin: auto auto 0;
   padding: 0;
   border: 0;
-  border-radius: 28px 28px 0 0;
+  border-radius: var(--gr-radius-xl) var(--gr-radius-xl) 0 0;
   background: var(--gr-bg);
   color: var(--gr-ink);
   box-shadow: 0 -20px 50px -20px rgb(0 0 0 / 0.5);
@@ -1377,11 +1382,11 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
 
     /* La tapa: una tarjeta del ancho del marco, con las puntas de arriba redondeadas y un poco de aire arriba. A sangre,
        en una pantalla ancha era un rectángulo cortado a los costados; lo de adentro sigue alineado con lo de abajo. */
-    .gr-tapa { margin-top: calc(12px + env(safe-area-inset-top, 0px)); padding-top: 14px; border-radius: 28px 28px 0 0; }
+    .gr-tapa { margin-top: calc(12px + env(safe-area-inset-top, 0px)); padding-top: 14px; border-radius: var(--gr-radius-xl) var(--gr-radius-xl) 0 0; }
     .gr-tapa::before { border-radius: inherit; }
 
     /* La foto de la ficha, igual: con las puntas de arriba redondeadas (abajo se funde con el fondo) */
-    .gr-ficha__portada { margin-top: calc(12px + env(safe-area-inset-top, 0px)); overflow: hidden; border-radius: 28px 28px 0 0; }
+    .gr-ficha__portada { margin-top: calc(12px + env(safe-area-inset-top, 0px)); overflow: hidden; border-radius: var(--gr-radius-xl) var(--gr-radius-xl) 0 0; }
     .gr-ficha__arriba { top: 12px; }
 
     /* El agregado: en una pantalla alta, el título, las cartas y el pie van juntos al medio (repartidos de arriba a
@@ -1494,10 +1499,10 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
       width: var(--foto);
       height: calc(var(--foto) * 1.25);
       margin: 0;
-      border-radius: 28px;
+      border-radius: var(--gr-radius-xl);
     }
     /* entera, sin fundirse con el fondo: el nombre ya no se apoya en ella */
-    main.gr-ficha .gr-ficha__foto::after { background: none; box-shadow: inset 0 0 0 1px rgb(18 18 22 / 0.07); border-radius: 28px; }
+    main.gr-ficha .gr-ficha__foto::after { background: none; box-shadow: inset 0 0 0 1px rgb(18 18 22 / 0.07); border-radius: var(--gr-radius-xl); }
     main.gr-ficha .gr-ficha__arriba { top: 12px; inset-inline: 12px; }
     main.gr-ficha .gr-ficha__pastilla { bottom: 16px; }
     main.gr-ficha .gr-ficha__nombre { margin-top: 0; }
@@ -1571,7 +1576,7 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
 /* Como .gr-sheet, fuera de las capas: en pantallas anchas la hoja ya no sube pegada abajo, se centra como un diálogo
    (pegada al borde de una pantalla de 1280 quedaba como una pestaña suelta) */
 @media (min-width: 768px) {
-  .gr-sheet { max-width: 520px; max-height: min(80svh, 720px); margin: auto; border-radius: 28px; box-shadow: var(--gr-shadow-float); }
+  .gr-sheet { max-width: 520px; max-height: min(80svh, 720px); margin: auto; border-radius: var(--gr-radius-xl); box-shadow: var(--gr-shadow-float); }
   .gr-sheet[open] { animation: gr-sheet-aparece 200ms ease-out; }
 }
 @keyframes gr-sheet-aparece { from { opacity: 0; transform: translateY(16px) scale(0.98); } }

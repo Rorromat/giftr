@@ -141,7 +141,7 @@ export default async function DetalleItem({ params, searchParams }: {
       </h2>
       <ul className="flex flex-col gap-2">
         {comments.map((c) => (
-          <li key={c.id} className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
+          <li key={c.id} className="rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
             <span className="font-semibold">{c.autorNombre}:</span> {c.texto}
           </li>
         ))}
@@ -287,7 +287,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
 
         {deRegalo === 'sumado' && enUnRegalo && (
-          <p role="status" className="flex items-start gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface px-4 py-3 text-sm font-medium">
+          <p role="status" className="flex items-start gap-2.5 rounded-gr-md border border-gr-line bg-gr-surface px-4 py-3 text-sm font-medium">
             <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
             {regalos.some((r) => r.soyParte && r.estado === 'comprado')
               ? '¡Listo, te sumaste! Ya estaba comprado: abajo ves cuánto te toca.'

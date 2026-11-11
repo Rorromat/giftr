@@ -88,7 +88,7 @@ export default async function Sorpresa({ params, searchParams }: {
     <main className="flex flex-col gap-4 pb-36 pt-2">
       <PageHeader title={`Sorpresa para ${quien}`} back={volver.href} backLabel={volver.label} />
 
-      <section className="flex flex-col gap-1.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
+      <section className="flex flex-col gap-1.5 rounded-gr-md bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <p className="flex items-start gap-2.5">
           <span aria-hidden>🤫</span>
           {s.para.userId ? `${quien} no la ve: solo los que le regalan.`
@@ -112,7 +112,7 @@ export default async function Sorpresa({ params, searchParams }: {
             <p className="text-[13px] text-gr-muted">La propuso {s.creador}</p>
           </div>
           {item.notas && (
-            <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
+            <p className="rounded-gr-md bg-gr-soft px-3 py-2.5 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="font-semibold">{primerNombre(s.creador)} dice:</span> {item.notas}
             </p>
           )}
@@ -132,7 +132,7 @@ export default async function Sorpresa({ params, searchParams }: {
       </article>
 
       {deRegalo === 'sumado' && enUnRegalo && (
-        <p role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+        <p role="status" className="flex items-start gap-2.5 rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
           {regalos.some((r) => r.soyParte && r.estado === 'comprado')
             ? '¡Listo, te sumaste! Ya estaba comprada: abajo ves cuánto te toca.'
@@ -160,7 +160,7 @@ export default async function Sorpresa({ params, searchParams }: {
         </h2>
         <ul className="flex flex-col gap-2">
           {comments.map((c) => (
-            <li key={c.id} className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
+            <li key={c.id} className="rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
               <span className="font-semibold">{c.autorNombre}:</span> {c.texto}
             </li>
           ))}

@@ -15,7 +15,7 @@ export function TarjetaPostEvento() {
   return (
     <section aria-labelledby="post-evento" className="gr-card flex flex-col gap-3 p-4">
       <div className="flex items-center gap-3">
-        <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-2xl bg-gr-soft"><Icon name="gift" size={24} /></span>
+        <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-gr-md bg-gr-soft"><Icon name="gift" size={24} /></span>
         <div className="min-w-0 flex-1">
           <h2 id="post-evento" className="text-[17px] leading-snug font-bold tracking-[-0.01em]">¿Cómo te fue en tu cumple?</h2>
           <p className="text-sm leading-snug text-gr-muted">Marcá lo que te regalaron así tu lista queda al día.</p>
@@ -46,7 +46,7 @@ export function AgradecerPorWhatsApp({ className = '' }: { className?: string })
  */
 export function DeParteDe({ d }: { d: DeParte }) {
   return (
-    <div className="flex min-h-11 items-center gap-2 rounded-2xl bg-gr-soft px-3 py-1.5">
+    <div className="flex min-h-11 items-center gap-2 rounded-gr-md bg-gr-soft px-3 py-1.5">
       <span className="min-w-0 flex-1 text-[13px] leading-snug font-semibold [overflow-wrap:anywhere]">De parte de {d.nombre}</span>
       {d.agradecido ? (
         <span className="flex flex-none items-center gap-1 text-xs font-semibold text-gr-muted">
@@ -65,7 +65,7 @@ export function DeParteDe({ d }: { d: DeParte }) {
 }
 
 function Foto({ src, titulo }: { src: string | null; titulo: string }) {
-  return <div className="size-12 flex-none overflow-hidden rounded-xl"><ItemPhoto src={src} titulo={titulo} height={48} className="w-12" /></div>
+  return <div className="size-12 flex-none overflow-hidden rounded-gr-sm"><ItemPhoto src={src} titulo={titulo} height={48} className="w-12" /></div>
 }
 
 /**

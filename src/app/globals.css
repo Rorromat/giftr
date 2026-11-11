@@ -33,6 +33,10 @@
   --font-display: var(--gr-font-display);
   --font-sans: var(--gr-font-body);
   --font-brand: var(--gr-font-display);
+  --radius-gr-sm: var(--gr-radius-sm);
+  --radius-gr-md: var(--gr-radius-md);
+  --radius-gr-lg: var(--gr-radius-lg);
+  --radius-gr-xl: var(--gr-radius-xl);
   --shadow-card: var(--gr-shadow);
   --shadow-float: var(--gr-shadow-float);
 }

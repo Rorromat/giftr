@@ -62,7 +62,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
 
   return (
     <form action={enviar} className="flex flex-col gap-3">
-      {estado?.error && <p id={idError} role="alert" className="rounded-2xl bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
+      {estado?.error && <p id={idError} role="alert" className="rounded-gr-md bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
       <input type="hidden" name="giftId" value={giftId} />
       {token && itemId && (
         <>
@@ -84,7 +84,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
 
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">¿Cuánto salió en total?</span>
-        <span className="flex items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3.5">
+        <span className="flex items-center gap-1 rounded-gr-md border border-gr-line bg-gr-surface px-3.5">
           <span className="text-xl font-semibold">{signo}</span>
           <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
                  aria-invalid={estado?.error ? true : undefined}
@@ -99,12 +99,12 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
         <button type="button" aria-pressed={manual} onClick={pasarAMano}>A mano</button>
       </div>
 
-      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3.5">
+      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-gr-md border border-gr-line bg-gr-surface px-3.5">
         {miembros.map((m, i) => (
           <li key={m.userId} className="flex min-h-12 items-center justify-between gap-3 py-1.5">
             <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.esYo ? 'Vos' : m.nombre}</span>
             {manual ? (
-              <span className="flex items-center gap-1 rounded-xl border border-gr-line px-2">
+              <span className="flex items-center gap-1 rounded-gr-sm border border-gr-line px-2">
                 <span className="font-semibold">{signo}</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`} placeholder="0"
                        aria-invalid={totalN > 0 && diferencia !== 0 ? true : undefined} aria-describedby={idCuenta}

@@ -20,7 +20,7 @@ export function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: st
   return (
     <>
       {amigos.length >= BUSCAR_DESDE && <Buscador ambito={ambito} placeholder="Buscar un amigo" vacio="No tenés un amigo con «%s»." />}
-      <ul id={ambito} className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+      <ul id={ambito} className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line bg-gr-surface px-3">
         {amigos.map((a) => (
           <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
           <label className="flex min-h-14 cursor-pointer items-center gap-3 py-2">
@@ -81,7 +81,7 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
       {invitados.length > 0 && (
         <>
           <p className="gr-label">Les propusiste el regalo grupal</p>
-          <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line px-3">
+          <ul className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line px-3">
             {invitados.map((i) => (
               <li key={i.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
                 <AvatarSticker nombre={i.persona.nombre} foto={i.persona.foto} size={28} />
@@ -117,14 +117,14 @@ export function InvitacionesRegalo({ invitaciones, noSePudo, volver }: { invitac
     <section id="invitaciones" aria-labelledby="invitaciones-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
       <h2 id="invitaciones-titulo" className="gr-label">Te proponen un regalo grupal</h2>
       {noSePudo && (
-        <p role="status" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+        <p role="status" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           No te pudimos sumar: el regalo ya no está abierto, o ese deseo ya lo tenías reservado vos.
         </p>
       )}
       {invitaciones.map((i) => (
         <article key={i.id} className="gr-card flex flex-col gap-3 p-3.5">
           <Link href={i.href} className="flex items-center gap-3">
-            <div className="w-16 flex-none overflow-hidden rounded-2xl">
+            <div className="w-16 flex-none overflow-hidden rounded-gr-md">
               <ItemPhoto src={i.foto} titulo={i.titulo} height={64} />
             </div>
             <div className="min-w-0 flex-1">

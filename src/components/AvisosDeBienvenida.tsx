@@ -83,7 +83,7 @@ export function PreguntaAvisos({ vapidPublica }: { vapidPublica: string }) {
   return (
     // data-sin-refrescar: tirar para abajo acá no actualiza la pantalla de atrás
     <dialog ref={dialogo} aria-labelledby="pregunta-avisos" data-sin-refrescar
-            className="m-auto max-h-[calc(100dvh-24px)] w-[min(26rem,calc(100%-24px))] overflow-y-auto rounded-[28px] bg-gr-bg p-3 pb-4 text-gr-ink shadow-float backdrop:bg-gr-ink/60">
+            className="m-auto max-h-[calc(100dvh-24px)] w-[min(26rem,calc(100%-24px))] overflow-y-auto rounded-gr-xl bg-gr-bg p-3 pb-4 text-gr-ink shadow-float backdrop:bg-gr-ink/60">
       <div className="flex flex-col gap-3">
         <PorQueAvisos tituloId="pregunta-avisos" Titulo="h2" />
         <ActivarAvisos vapidPublica={vapidPublica} bienvenida alCambiar={setEstado} />

@@ -151,7 +151,7 @@ export function TarjetaNovedad({ n }: { n: NovedadVista }) {
           <span className="text-xs font-medium text-gr-muted">agregó a su lista · {n.hace}</span>
         </span>
       </Link>
-      <FotoAmpliable src={n.item.fotoUrl} titulo={n.item.titulo} className="overflow-hidden rounded-[18px]">
+      <FotoAmpliable src={n.item.fotoUrl} titulo={n.item.titulo} className="overflow-hidden rounded-gr-md">
         <ItemPhoto src={n.item.fotoUrl} titulo={n.item.titulo} height={320} />
         <PriorityTag prioridad={n.item.prioridad} className="absolute left-3 top-3 h-[30px]" />
       </FotoAmpliable>

@@ -68,7 +68,7 @@ const AZUL = 'bg-gr-blue text-gr-on-blue'
 /** El cuadradito de lo que no llegó como aviso (una reserva por vencer, un regalo abierto), del tamaño de los demás. */
 function Cuadradito({ icono, fondo }: { icono: IconName; fondo: string }) {
   return (
-    <span aria-hidden className={`flex size-11 flex-none items-center justify-center rounded-[14px] ${fondo}`}><Icon name={icono} size={22} /></span>
+    <span aria-hidden className={`flex size-11 flex-none items-center justify-center rounded-gr-sm ${fondo}`}><Icon name={icono} size={22} /></span>
   )
 }
 
@@ -206,7 +206,7 @@ export function ParaVosEnInicio({ pendientes, total }: { pendientes: Pendiente[]
  */
 export function CartelReserva({ w }: { w: ReservaPorVencer }) {
   return (
-    <QuizasLink href={w.href} className="relative block rounded-[22px] bg-gr-brand px-4 py-3.5 text-sm font-medium text-gr-on-brand">
+    <QuizasLink href={w.href} className="relative block rounded-gr-lg bg-gr-brand px-4 py-3.5 text-sm font-medium text-gr-on-brand">
       {`¿Conseguiste "${w.itemTitulo}"? Te ${w.diasRestantes === 1 ? 'queda ' : 'quedan '}`}
       <span className="font-semibold text-gr-acento-sobre-tinta">{dias(w.diasRestantes)}</span>
       {' de reserva.'}
@@ -234,7 +234,7 @@ export function CartelReserva({ w }: { w: ReservaPorVencer }) {
  */
 function CartelRegaloAbierto({ r }: { r: RegaloAbierto }) {
   return (
-    <div className="relative rounded-[22px] bg-gr-brand px-4 pb-1.5 pt-3.5 text-sm font-medium text-gr-on-brand">
+    <div className="relative rounded-gr-lg bg-gr-brand px-4 pb-1.5 pt-3.5 text-sm font-medium text-gr-on-brand">
       <Link href={r.href} className="block">
         {`El regalo grupal de "${r.itemTitulo}" que organizás sigue abierto.`}
         <span className="mt-0.5 block font-semibold underline underline-offset-4">Si ya lo compraste, dividí lo que salió; si no va, cancelalo</span>
@@ -251,7 +251,7 @@ function CartelRegaloAbierto({ r }: { r: RegaloAbierto }) {
 function CartelCodazos({ codazos }: { codazos: CodazoSinVer[] }) {
   const c = deCodazos(codazos)
   return (
-    <div className="flex flex-col gap-3 rounded-[22px] bg-gr-blue p-4 text-gr-on-blue shadow-card">
+    <div className="flex flex-col gap-3 rounded-gr-lg bg-gr-blue p-4 text-gr-on-blue shadow-card">
       <div className="flex items-start gap-3">
         <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-blue/15 text-xl">👉</span>
         <p className="text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">
@@ -350,7 +350,7 @@ export function ArmarJuegoDeFecha({ fecha }: { fecha: FechaEspecialVista }) {
   const p = paletaDe(fecha.id)
   return (
     <Link href={`/invisible/nuevo?fecha=${fecha.id}`} className="gr-card flex items-center gap-3.5 p-4">
-      <span aria-hidden className="flex size-[52px] flex-none items-center justify-center rounded-2xl text-white" style={{ background: p.fondo }}>
+      <span aria-hidden className="flex size-[52px] flex-none items-center justify-center rounded-gr-md text-white" style={{ background: p.fondo }}>
         <IconoFecha fecha={fecha.id} size={28} acento={p.acento} />
       </span>
       <span className="min-w-0 flex-1">

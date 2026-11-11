@@ -34,7 +34,7 @@ export default async function Bienvenida({ searchParams }: { searchParams: Promi
       <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
 
       {/* el cartel del cumple, con su color y su ilustración (los mismos que en Tus gustos) */}
-      <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-[26px] py-5 pl-5 pr-[124px] text-white shadow-card"
+      <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-gr-xl py-5 pl-5 pr-[124px] text-white shadow-card"
            style={{ background: paletaGusto('cumple').fondo }}>
         <IlustracionGusto paso="cumple" size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
         <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{nombre ? `¡Hola, ${nombre}!` : '¡Hola!'}</h1>

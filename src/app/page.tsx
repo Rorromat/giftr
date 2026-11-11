@@ -24,7 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
 
       {/* recién borró su cuenta (ver borrarCuentaAction): que sepa que ya está */}
       {cuenta === 'borrada' && !session?.userId && (
-        <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-center text-sm font-medium lg:col-span-2 lg:row-start-2">
+        <p role="status" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-center text-sm font-medium lg:col-span-2 lg:row-start-2">
           Listo: borramos tu cuenta y todo lo tuyo. Si algún día querés volver, entrás de nuevo y empezás de cero.
         </p>
       )}

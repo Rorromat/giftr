@@ -45,11 +45,11 @@ export function CuentasPendientes({ cuentas }: { cuentas: Cuentas }) {
       <SectionHeader id="cuentas-pendientes" title="Cuentas pendientes" href="/cuentas" linkLabel="Ver cuentas" />
       <Link href="/cuentas" className="gr-card flex flex-col">
         <span className="grid grid-cols-2 gap-2 p-2.5 pb-1">
-          <span className="gr-hero flex flex-col gap-1 rounded-[20px] px-3.5 py-3">
+          <span className="gr-hero flex flex-col gap-1 rounded-gr-lg px-3.5 py-3">
             <span className="text-[11px] font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
             <Total pesos={cuentas.debes} dolares={cuentas.dolares?.debes ?? 0} className="text-gr-hero-detail" />
           </span>
-          <span className="flex flex-col gap-1 rounded-[20px] bg-gr-soft px-3.5 py-3">
+          <span className="flex flex-col gap-1 rounded-gr-lg bg-gr-soft px-3.5 py-3">
             <span className="text-[11px] font-semibold tracking-[0.08em] text-gr-muted uppercase">Te deben</span>
             <Total pesos={cuentas.teDeben} dolares={cuentas.dolares?.teDeben ?? 0} />
           </span>

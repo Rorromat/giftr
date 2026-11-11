@@ -84,7 +84,7 @@ export default async function Grupo({ params, searchParams }: {
             <Icon name={grupo.esCumple ? 'cake' : 'calendar'} size={16} className="flex-none" />
             {rotuloFechaGrupo(grupo.eventoFecha, grupo.eventoAnual, hoy, grupo.esCumple)}
           </summary>
-          <form action={setGroupDateAction} className="mt-2 flex flex-col gap-3 rounded-2xl bg-gr-surface p-3 text-gr-ink">
+          <form action={setGroupDateAction} className="mt-2 flex flex-col gap-3 rounded-gr-md bg-gr-surface p-3 text-gr-ink">
             <input type="hidden" name="grupoId" value={grupo.id} />
             {fechaInvalida && <p role="alert" className="text-sm font-semibold">Esa fecha no existe en el calendario: elegí otra.</p>}
             <CamposFecha esCumple={grupo.esCumple} eventoFecha={grupo.eventoFecha} anual={grupo.eventoAnual} opcional={false}
@@ -100,7 +100,7 @@ export default async function Grupo({ params, searchParams }: {
       </ListaHero>
 
       {aviso && (
-        <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">{aviso}</p>
+        <p role="status" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm font-medium">{aviso}</p>
       )}
 
       {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. En la misma pantalla
@@ -118,7 +118,7 @@ export default async function Grupo({ params, searchParams }: {
         </div>
         {/* qué es la lista para cada uno: cada dueño el suyo (la abuela de uno es la madre del otro) */}
         <details key={grupo.miParentesco ?? ''} className="group flex flex-col">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-2xl bg-gr-comun px-3.5 text-sm [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-gr-md bg-gr-comun px-3.5 text-sm [&::-webkit-details-marker]:hidden">
             <span className="font-medium">Para vos {grupo.nombre} es: <b className="font-semibold text-gr-comun-ink">{grupo.miParentesco ?? 'sin decir'}</b></span>
             <span className="text-[13px] font-semibold underline underline-offset-4">Cambiar</span>
           </summary>

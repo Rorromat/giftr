@@ -29,12 +29,12 @@ export function PagoParcial({ otroId, neto, moneda = 'ARS' }: { otroId: string; 
         {leDebo ? 'Le pagué una parte' : 'Me pagó una parte'}
       </summary>
       <form action={enviar} className="flex flex-col gap-2">
-        {estado?.error && <p id={idError} role="alert" className="rounded-2xl bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
+        {estado?.error && <p id={idError} role="alert" className="rounded-gr-md bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
         <input type="hidden" name="otroId" value={otroId} />
         <input type="hidden" name="moneda" value={moneda} />
         <input type="hidden" name="neto" value={neto} />
         <div className="flex items-center gap-2">
-          <span className="flex min-w-0 flex-1 items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3">
+          <span className="flex min-w-0 flex-1 items-center gap-1 rounded-gr-md border border-gr-line bg-gr-surface px-3">
             <span className="font-semibold">{moneda === 'USD' ? 'US$' : '$'}</span>
             <input name="monto" inputMode="numeric" required autoComplete="off" placeholder="0"
                    aria-label={leDebo ? '¿Cuánto le pagaste?' : '¿Cuánto te pagó?'}

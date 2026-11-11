@@ -27,7 +27,7 @@ export function QuienSos({ token, volver }: { token: string; volver: string }) {
           <input type="hidden" name="token" value={token} />
           <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" autoComplete="name"
                  className="gr-input min-w-0 flex-1 shadow-none" />
-          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Listo</BotonEnviar>
+          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-gr-sm">Listo</BotonEnviar>
         </form>
         {estado?.error && <p role="alert" className="text-sm font-semibold">{estado.error}</p>}
         <EsTuLista volver={volver} />
@@ -85,7 +85,7 @@ export function ConfirmarLista({ token, nombre, volver }: { token: string; nombr
       </div>
       <form action={verLoReservadoAction}>
         <input type="hidden" name="token" value={token} />
-        <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-[14px]">No es mía: ver lo reservado</BotonEnviar>
+        <BotonEnviar className="gr-btn-primary gr-btn--sm w-full rounded-gr-sm">No es mía: ver lo reservado</BotonEnviar>
       </form>
       <EntrarConGoogle volver={volver} />
       <NoSoyYo nombre={nombre} volver={volver} />
@@ -176,7 +176,7 @@ export function PreguntaInvitado({ nombre }: { nombre: string }) {
       </div>
       <div className="flex items-center gap-3">
         <form action={unirInvitadoAction}>
-          <BotonEnviar className="gr-btn-primary gr-btn--sm rounded-[14px] px-4">Sí, soy yo</BotonEnviar>
+          <BotonEnviar className="gr-btn-primary gr-btn--sm rounded-gr-sm px-4">Sí, soy yo</BotonEnviar>
         </form>
         <form action={noSoyElInvitadoAction}>
           <button className="min-h-11 text-sm font-semibold underline underline-offset-4">No soy yo</button>
@@ -200,7 +200,7 @@ export function UnirInvitado({ nombre }: { nombre: string }) {
         </p>
       </div>
       <form action={unirInvitadoAction}>
-        <button className="gr-btn gr-btn--sm rounded-[14px] px-4 text-sm">Era yo: pasarlo a mi cuenta</button>
+        <button className="gr-btn gr-btn--sm rounded-gr-sm px-4 text-sm">Era yo: pasarlo a mi cuenta</button>
       </form>
     </section>
   )

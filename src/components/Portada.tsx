@@ -232,8 +232,8 @@ export function Portada({ className = '' }: { className?: string }) {
             setArrastre(null)
           }}>
         {/* la pila: las otras cartas debajo */}
-        <li aria-hidden className="absolute inset-x-6 top-4 h-[322px] -rotate-6 rounded-[22px] bg-gr-surface shadow-card" />
-        <li aria-hidden className="absolute inset-x-6 top-2 h-[322px] rotate-[5deg] rounded-[22px] bg-gr-surface shadow-card" />
+        <li aria-hidden className="absolute inset-x-6 top-4 h-[322px] -rotate-6 rounded-gr-lg bg-gr-surface shadow-card" />
+        <li aria-hidden className="absolute inset-x-6 top-2 h-[322px] rotate-[5deg] rounded-gr-lg bg-gr-surface shadow-card" />
         {/* todas del mismo alto: la que espera abajo no asoma */}
         {FUNCIONES.map((f, i) => {
           const donde = lugar(i, actual)

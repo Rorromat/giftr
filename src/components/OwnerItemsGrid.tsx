@@ -90,7 +90,7 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
                       <Icon name="more" size={18} strokeWidth={2.2} />
                     </span>
                   </summary>
-                  <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-2xl border border-gr-line bg-gr-surface shadow-float">
+                  <div className="absolute inset-x-2 top-12 z-10 flex flex-col overflow-hidden rounded-gr-md border border-gr-line bg-gr-surface shadow-float">
                     <Link href={`/editar/${item.id}`} className="flex min-h-11 items-center px-3 text-sm font-semibold">Editar</Link>
                     {/* El link del deseo es el de quien regala: WhatsApp muestra la foto y el precio */}
                     <a target="_blank" className="flex min-h-11 items-center border-t border-gr-line px-3 text-sm font-semibold"

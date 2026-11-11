@@ -70,7 +70,7 @@ function AdondeTransferir({ nombre, alias }: { nombre: string; alias?: string })
   if (!alias) return <p className="text-xs font-medium text-gr-muted">{nombre} todavía no cargó su alias para transferirle: pedíselo.</p>
   const tipo = tipoDeAlias(alias)
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-gr-soft py-1.5 pr-1.5 pl-3">
+    <div className="flex items-center gap-2 rounded-gr-md bg-gr-soft py-1.5 pr-1.5 pl-3">
       <p className="min-w-0 flex-1 text-sm leading-snug">
         <span className="block text-xs font-medium text-gr-muted">Transferile a su {tipo}</span>
         <span className="font-semibold select-all [overflow-wrap:anywhere]">{alias}</span>
@@ -262,7 +262,7 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
 function Corregir({ c }: { c: CompraParaCorregir }) {
   const alguienPone = c.miembros.some((m) => !m.esYo && m.monto > 0)
   return (
-    <li className="rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
+    <li className="rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5">
       <p className="text-sm leading-snug">
         <span className="font-semibold [overflow-wrap:anywhere]">{c.itemTitulo}</span> para {c.para}
         <span className="block text-xs font-medium text-gr-muted">
@@ -300,7 +300,7 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-on-hero/60 uppercase">Debés</span>
           <Total pesos={c.debes} dolares={c.dolares?.debes ?? 0} className="text-gr-hero-detail" />
         </div>
-        <div className="flex flex-col gap-1.5 rounded-[26px] border border-gr-line bg-gr-surface p-4">
+        <div className="flex flex-col gap-1.5 rounded-gr-xl border border-gr-line bg-gr-surface p-4">
           <span className="text-xs font-semibold tracking-[0.08em] text-gr-muted uppercase">Te deben</span>
           <Total pesos={c.teDeben} dolares={c.dolares?.teDeben ?? 0} />
         </div>

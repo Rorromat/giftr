@@ -24,7 +24,7 @@ function quien(e: EntradaHistorial) {
 function Regalo({ e }: { e: EntradaHistorial }) {
   return (
     <li className="gr-card flex items-center gap-3.5 p-2.5 pr-4">
-      <Arte src={e.foto} titulo={e.titulo} className="w-[72px] flex-none rounded-[14px]" />
+      <Arte src={e.foto} titulo={e.titulo} className="w-[72px] flex-none rounded-gr-sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm leading-snug text-gr-muted [overflow-wrap:anywhere]">
         <span className="text-[17px] leading-tight font-semibold text-gr-ink">{e.titulo}</span>
         <span className="flex items-start gap-1.5"><Icon name="gift" size={16} className="mt-px flex-none" />{quien(e)}</span>

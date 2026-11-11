@@ -24,7 +24,7 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       <p className="text-[15px] font-medium">{invitan} a armar juntos</p>
       <h1 className="text-[32px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
-      <p className="mt-1 rounded-[22px] bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
+      <p className="mt-1 rounded-gr-lg bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
         Vas a poder agregar y editar deseos de esta lista. Como es tuya también, no vas a ver quién regala qué, y aunque
         después salgas (o te saquen) de la lista no vas a poder reservar en ella. Si te llegó para regalar, no te sumes:
         pedí el link para regalar.

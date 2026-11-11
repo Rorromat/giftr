@@ -200,7 +200,7 @@ export function Mono({ tonos, borde, className = '', style }: {
 export function Faltan({ dias, className = '' }: { dias: number; className?: string }) {
   return (
     <span role="img" aria-label={dias === 0 ? 'Es hoy' : `Faltan ${dias} ${dias === 1 ? 'día' : 'días'}`}
-          className={`flex w-[54px] flex-col overflow-hidden rounded-[14px] bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
+          className={`flex w-[54px] flex-col overflow-hidden rounded-gr-sm bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
       <span className="bg-gr-acento py-[3px] text-[9.5px] leading-none font-extrabold tracking-[0.08em] text-gr-on-acento uppercase">
         {dias === 0 ? 'Es' : 'Faltan'}
       </span>

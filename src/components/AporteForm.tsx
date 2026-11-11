@@ -50,7 +50,7 @@ export function AporteForm({ action, deseo, grupos = [], grupoElegido, boton, al
         </label>
       )}
 
-      {aviso && <p role="alert" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-semibold">{aviso}</p>}
+      {aviso && <p role="alert" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm font-semibold">{aviso}</p>}
 
       <div className="gr-card flex flex-col gap-1.5 p-4">
         <span aria-hidden className="flex size-11 items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
@@ -58,7 +58,7 @@ export function AporteForm({ action, deseo, grupos = [], grupoElegido, boton, al
         </span>
         <label htmlFor="aporte-titulo" className="sr-only">¿Para qué es?</label>
         <input id="aporte-titulo" name="titulo" required maxLength={LARGO.titulo} placeholder="¿Para qué es? Luna de miel" defaultValue={deseo?.titulo ?? titulo}
-               className="block min-h-12 w-full rounded-xl bg-transparent px-1.5 text-[22px] leading-tight font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
+               className="block min-h-12 w-full rounded-gr-sm bg-transparent px-1.5 text-[22px] leading-tight font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
         <p className="px-1.5 text-[13px] leading-snug text-gr-muted">
           No se reserva: cada uno te transfiere lo que quiere, y pueden aportar todos.
         </p>

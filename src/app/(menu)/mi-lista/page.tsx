@@ -32,7 +32,7 @@ function ContaTusGustos({ cargados, total, siguiente }: ReturnType<typeof gustos
   const chica = cargados > 0
   return (
     <Link href={`/perfil/gustos/${siguiente}?volver=lista`} className={`gr-card flex items-center gap-3 ${chica ? 'px-3.5 py-2.5' : 'p-3.5'}`}>
-      <span aria-hidden className={`flex flex-none items-center justify-center overflow-hidden ${chica ? 'size-9 rounded-xl' : 'size-12 rounded-2xl'}`}
+      <span aria-hidden className={`flex flex-none items-center justify-center overflow-hidden ${chica ? 'size-9 rounded-gr-sm' : 'size-12 rounded-gr-md'}`}
             style={{ background: paletaGusto(siguiente).fondo }}>
         <IlustracionGusto paso={siguiente} size={chica ? 44 : 58} />
       </span>

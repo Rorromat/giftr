@@ -111,7 +111,7 @@ export function FichasDeseo({ deseo, voz, cupo }: {
     <>
       <ul className="grid auto-cols-fr grid-flow-col gap-2">
         {fichas.map((f) => (
-          <li key={f.clave} className="flex min-w-0 flex-col gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface p-3">
+          <li key={f.clave} className="flex min-w-0 flex-col gap-2.5 rounded-gr-md border border-gr-line bg-gr-surface p-3">
             <span aria-hidden className="flex h-10 min-w-10 items-center justify-center gap-0.5 self-start rounded-full bg-gr-soft px-2.5 text-gr-acento-texto">
               {f.visual}
             </span>

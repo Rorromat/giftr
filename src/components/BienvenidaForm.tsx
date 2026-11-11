@@ -156,7 +156,7 @@ export function BienvenidaForm({ nombreCompleto, foto, inicial, cumple, solo, vo
       <PageHeader title="Tus gustos" titulo="p" back={cancelar} backLabel="Cancelar" />
 
       {/* el cartel del paso, con su color y su ilustración */}
-      <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-[26px] py-5 pl-5 pr-[124px] text-white shadow-card"
+      <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-gr-xl py-5 pl-5 pr-[124px] text-white shadow-card"
            style={{ background: paletaGusto(PASOS_GUSTOS[paso]).fondo }}>
         <IlustracionGusto paso={PASOS_GUSTOS[paso]} size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
         <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em]">{PASOS[paso].titulo}</h1>
@@ -231,7 +231,7 @@ export function BienvenidaForm({ nombreCompleto, foto, inicial, cumple, solo, vo
         <Subtitulo>Tu estilo</Subtitulo>
         <div className="grid grid-cols-3 gap-2">
           {ESTILOS.map((e, i) => (
-            <label key={e} className="group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-gr-soft has-[:checked]:ring-[3px] has-[:checked]:ring-gr-ink has-[:checked]:ring-offset-2 has-[:checked]:ring-offset-gr-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-gr-ink">
+            <label key={e} className="group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-gr-md bg-gr-soft has-[:checked]:ring-[3px] has-[:checked]:ring-gr-ink has-[:checked]:ring-offset-2 has-[:checked]:ring-offset-gr-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-gr-ink">
               <input type="checkbox" name="estilos" value={e} defaultChecked={inicial.estilos.includes(e)} className="sr-only" />
               {fotosDeEstilo(e).map((src, j) => (
                 // eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/, ya del tamaño justo

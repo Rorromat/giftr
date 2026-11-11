@@ -82,7 +82,7 @@ export default async function Perfil({ params, searchParams }: Props) {
           </details>
         </section>
       ) : nadaCargado ? (
-        <div className="relative rounded-[22px] bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
+        <div className="relative rounded-gr-lg bg-gr-soft px-5 py-6 text-center text-[15px] font-medium leading-snug">
           {propio ? 'Todavía no cargaste tus gustos.' : `${primer} todavía no cargó sus gustos.`}
           {propio && <Link href="/perfil/gustos" className="mt-2 block font-semibold underline underline-offset-4">Cargarlos ahora</Link>}
         </div>
@@ -100,7 +100,7 @@ export default async function Perfil({ params, searchParams }: Props) {
       )}
 
       {noRegalar && (
-        <section className="flex gap-3 rounded-[22px] border border-gr-line bg-gr-brand p-3.5 text-gr-bg">
+        <section className="flex gap-3 rounded-gr-lg border border-gr-line bg-gr-brand p-3.5 text-gr-bg">
           <IconoSeccion s={noRegalar} size={34} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <h2 className="text-lg leading-tight font-semibold text-gr-acento-sobre-tinta">{propio ? 'Lo que no querés' : 'No le regales'}</h2>
@@ -110,13 +110,13 @@ export default async function Perfil({ params, searchParams }: Props) {
       )}
 
       {nota && (
-        <p className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm leading-snug">
+        <p className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm leading-snug">
           <span className="font-semibold">{propio ? 'Tu nota' : `${primer} dice`}:</span> {nota.items[0]}
         </p>
       )}
 
       <Link href={dueno ? suLista.href : `/l/${token}`}
-            className="gr-btn gr-btn--dark fixed bottom-[max(28px,env(safe-area-inset-bottom))] left-(--gr-centro-lectura) z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
+            className="gr-btn gr-btn--dark fixed bottom-[max(28px,env(safe-area-inset-bottom))] left-(--gr-centro-lectura) z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-gr-md px-[22px]">
         <Icon name="gift" size={20} strokeWidth={2} />
         {dueno ? suLista.texto : `Ver la lista de ${primer}`}
       </Link>

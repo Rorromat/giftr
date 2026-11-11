@@ -63,7 +63,7 @@ export function Aportar({ token, itemId, alias, mio, anotar, identified, para, p
         )}
         <div className="flex flex-col gap-1.5">
           <p className="text-sm font-medium">{mio ? `El ${tipo}, por si querés aportar de nuevo:` : `Transferí lo que quieras a este ${tipo}:`}</p>
-          <div className="flex items-center gap-2 rounded-2xl bg-gr-soft py-1.5 pl-3.5 pr-1.5">
+          <div className="flex items-center gap-2 rounded-gr-md bg-gr-soft py-1.5 pl-3.5 pr-1.5">
             <p className="min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{alias}</p>
             <CopiarAlias alias={alias} texto={`Copiar ${tipo}`} />
           </div>

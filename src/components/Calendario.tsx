@@ -144,7 +144,7 @@ function VistaAnio({ meses, dias, cosas, orden, vacio }: Datos & { orden: string
             return (
               <li key={m.nombre}>
                 <a {...enlace({ mes: i + 1 }, 'entrar')} aria-label={`${m.largo}: ${cuantas ? `${cuantas} ${cuantas === 1 ? 'fecha' : 'fechas'}` : 'sin fechas'}`}
-                   className="flex flex-col gap-1.5 rounded-xl p-1.5 transition-transform active:scale-95 active:bg-gr-soft">
+                   className="flex flex-col gap-1.5 rounded-gr-sm p-1.5 transition-transform active:scale-95 active:bg-gr-soft">
                   <span className={`self-start text-[13px] font-semibold ${m.actual ? 'rounded-full bg-gr-brand px-2 text-gr-on-brand' : ''}`}>{m.nombre}</span>
                   <span aria-hidden className="grid grid-cols-7 gap-[3px]">
                     {Array.from({ length: m.dias }, (_, d) => d + 1).map((d) => {
@@ -186,7 +186,7 @@ function Celda({ mes, dia, meses, dias, cosas }: Datos & { mes: number; dia: num
           className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[13px] leading-none font-semibold ${
             hoy ? 'bg-gr-brand text-gr-on-brand' : fondo ? 'text-white' : ''}`}>{dia}</span>
   )
-  const forma = 'flex h-[62px] flex-col items-center gap-1 rounded-xl pt-1.5'
+  const forma = 'flex h-[62px] flex-col items-center gap-1 rounded-gr-sm pt-1.5'
   if (!delDia) {
     return <li aria-current={hoy ? 'date' : undefined} className={`${forma} ${pasado ? 'text-gr-muted' : ''}`}>{numero}</li>
   }

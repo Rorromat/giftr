@@ -79,7 +79,7 @@ export default async function QueTeRegalaron({ searchParams }: { searchParams: P
             {activos.map((i) => (
               <li key={i.id}>
                 <label className="gr-card flex min-h-16 cursor-pointer items-center gap-3 p-2.5 pr-4 has-[:checked]:border-gr-ink">
-                  <div className="size-12 flex-none overflow-hidden rounded-xl"><ItemPhoto src={i.fotoUrl} titulo={i.titulo} height={48} className="w-12" /></div>
+                  <div className="size-12 flex-none overflow-hidden rounded-gr-sm"><ItemPhoto src={i.fotoUrl} titulo={i.titulo} height={48} className="w-12" /></div>
                   <span className="min-w-0 flex-1 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]">{i.titulo}</span>
                   <input type="checkbox" name="itemId" value={i.id} className="size-[22px] flex-none accent-gr-ink" />
                 </label>

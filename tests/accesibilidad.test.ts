@@ -201,7 +201,7 @@ test('las pantallas de carga copian la que viene: la tapa de su color, el logo a
   // la barra del menú: el logo a la izquierda y tres redondos a la derecha; la tarjeta grande, del alto de la de verdad
   expect(inicio).toContain('<div class="flex min-h-14 items-center justify-between gap-3">')
   expect(inicio.match(/size-10 rounded-full/g)).toHaveLength(3)
-  expect(inicio).toContain('h-[268px] rounded-[26px]')
+  expect(inicio).toContain('h-[268px] rounded-gr-xl')
   expect(regla('.gr-destacada')).toContain('min-height: 268px')
   const formulario = renderToStaticMarkup(createElement(SkeletonFormulario))
   expect(formulario).toContain('grid-cols-[48px_1fr_48px]')

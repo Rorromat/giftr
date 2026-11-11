@@ -107,7 +107,7 @@ export default async function Perfil({ searchParams }: {
           <CopyLinkButton url={shareUrl} />
         </section>
         {nuevo === 'regalar' && (
-          <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">
+          <p role="status" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm font-medium">
             Listo: tu link es nuevo. El de antes ya no anda: volvé a compartirlo.
           </p>
         )}

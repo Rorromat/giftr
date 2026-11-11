@@ -64,7 +64,7 @@ export default async function UnirmeAlJuego({ params }: { params: Promise<{ toke
   return (
     <main className="flex min-h-[85dvh] flex-col gap-5 pb-12 pt-2">
       <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
-      <section className="flex flex-col items-center gap-2 rounded-[26px] px-5 pb-6 pt-5 text-center text-white"
+      <section className="flex flex-col items-center gap-2 rounded-gr-xl px-5 pb-6 pt-5 text-center text-white"
                style={{ background: `radial-gradient(circle at 30% 20%, ${paleta.marco}, ${paleta.fondo} 70%)` }}>
         <IlustracionFecha fecha={inv.fechaEspecial} size={132} firma={false} />
         <p className="flex items-center gap-2 text-[15px] font-medium">
@@ -82,13 +82,13 @@ export default async function UnirmeAlJuego({ params }: { params: Promise<{ toke
       </section>
 
       {inv.descripcion && (
-        <p className="rounded-[18px] bg-gr-soft px-4 py-3 text-[15px] leading-snug whitespace-pre-line [overflow-wrap:anywhere]">
+        <p className="rounded-gr-md bg-gr-soft px-4 py-3 text-[15px] leading-snug whitespace-pre-line [overflow-wrap:anywhere]">
           <span className="gr-label mb-1 block">Temática</span>{inv.descripcion}
         </p>
       )}
       {regla && <ReglaDelJuego regla={regla} />}
 
-      <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-soft px-4 py-3 text-sm leading-snug font-medium">
+      <p className="flex items-start gap-2.5 rounded-gr-md bg-gr-soft px-4 py-3 text-sm leading-snug font-medium">
         <Icon name="antifaz" size={20} className="mt-px flex-none" />
         Se sortea entre los que juegan y cada uno ve solo a quién le regala. Nadie más lo sabe, tampoco {org}: por eso cada uno
         entra con su cuenta.

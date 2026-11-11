@@ -16,7 +16,7 @@ export function VideoDeseo({ url, titulo }: { url: string; titulo: string }) {
   }
   return (
     <figure className="flex flex-col gap-1.5">
-      <div className={`overflow-hidden rounded-2xl bg-gr-brand ${e.vertical ? 'mx-auto aspect-[9/16] w-full max-w-[300px]' : 'aspect-video w-full'}`}>
+      <div className={`overflow-hidden rounded-gr-md bg-gr-brand ${e.vertical ? 'mx-auto aspect-[9/16] w-full max-w-[300px]' : 'aspect-video w-full'}`}>
         <iframe src={e.src} title={`Video de ${titulo}`} loading="lazy" className="size-full border-0"
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin" />

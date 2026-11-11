@@ -54,7 +54,7 @@ export function IconoDeTipo({ tipo, animar = false, i = 0 }: { tipo: TipoEnBande
   const icono = ICONOS[tipo]
   return (
     <span aria-hidden data-mueve={animar ? icono.mueve : undefined} style={{ '--i': i } as CSSProperties}
-          className={`gr-aviso-icono flex size-11 flex-none items-center justify-center rounded-[14px] ${icono.fondo}`}>
+          className={`gr-aviso-icono flex size-11 flex-none items-center justify-center rounded-gr-sm ${icono.fondo}`}>
       <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {icono.dibujo}
       </svg>

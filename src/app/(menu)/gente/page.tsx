@@ -47,10 +47,10 @@ function Opciones({ nombre, children }: { nombre: string; children: React.ReactN
   return (
     <details className="relative flex-none">
       <summary aria-label={`Opciones de ${nombre}`}
-               className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
+               className="flex size-11 cursor-pointer list-none items-center justify-center rounded-gr-sm [&::-webkit-details-marker]:hidden">
         <Icon name="more" size={22} strokeWidth={2.2} />
       </summary>
-      <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
+      <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-gr-md border border-gr-line bg-gr-surface p-3 shadow-float">
         {children}
       </div>
     </details>
@@ -138,7 +138,7 @@ function EnComun({ c, hoy, deAmigo }: { c: Contacto; hoy: Date; deAmigo: boolean
   const buscar = paraBuscar([c.nombre, relacion, ...c.duenos.map((d) => d.nombre)].join(' '))
   if (!c.agregada) {
     return (
-      <li data-buscar={buscar} className="flex items-center gap-2 rounded-[22px] border-[1.5px] border-dashed border-gr-comun-line py-3 pl-3.5 pr-2">
+      <li data-buscar={buscar} className="flex items-center gap-2 rounded-gr-lg border-[1.5px] border-dashed border-gr-comun-line py-3 pl-3.5 pr-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">{contenido}</div>
         <form action={agregarListaAction} className="flex-none">
           <input type="hidden" name="listId" value={c.listId} />

@@ -69,7 +69,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
           {deseo.notas && <NotaDeseo notas={deseo.notas} quien={grupo ? 'La nota' : 'Tu nota'} />}
           <section aria-label="A dónde transfieren" className="flex flex-col gap-1.5">
             <p className="gr-label">Transfieren a este {tipo}</p>
-            <div className="flex items-center gap-2 rounded-2xl bg-gr-soft py-1.5 pl-3.5 pr-1.5">
+            <div className="flex items-center gap-2 rounded-gr-md bg-gr-soft py-1.5 pl-3.5 pr-1.5">
               <p className="min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{deseo.aporteAlias}</p>
               <CopiarAlias alias={deseo.aporteAlias} texto={`Copiar ${tipo}`} />
             </div>
@@ -78,7 +78,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
               Lo ve cualquiera que tenga el link de la lista.
             </p>
           </section>
-          <p className="flex items-start gap-2 rounded-2xl bg-gr-soft px-3.5 py-3 text-sm leading-snug font-medium">
+          <p className="flex items-start gap-2 rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm leading-snug font-medium">
             <Icon name="lock" size={17} className="mt-px flex-none" />
             Acá no vas a ver quién aportó ni cuánto: es una sorpresa. La plata la ves en tu cuenta.
           </p>

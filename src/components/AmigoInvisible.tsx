@@ -40,7 +40,7 @@ const diaDe = (fecha: string) => new Date(`${fecha}T00:00:00Z`)
 function TileJuego({ f }: { f: FechaEspecial | null }) {
   const p = paletaDe(f)
   return (
-    <span aria-hidden className="flex size-[52px] flex-none items-center justify-center rounded-2xl text-white" style={{ background: p.fondo }}>
+    <span aria-hidden className="flex size-[52px] flex-none items-center justify-center rounded-gr-md text-white" style={{ background: p.fondo }}>
       <IconoFecha fecha={f} size={28} acento={p.acento} />
     </span>
   )
@@ -58,7 +58,7 @@ export function CardEspecial({ t, hoy, className = 'w-[252px] flex-none snap-sta
   return (
     <li className={className}>
       <Link href={fecha ? `/fechas/${fecha.id}` : `/invisible/${juegos[0].id}`} style={{ background: p.fondo }}
-            className="relative flex h-full flex-col overflow-hidden rounded-[22px] text-white shadow-card">
+            className="relative flex h-full flex-col overflow-hidden rounded-gr-lg text-white shadow-card">
         <div className="relative flex h-[170px] items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, ${p.marco}, ${p.fondo} 70%)` }}>
           <span style={fecha ? { color: p.fondo } : undefined}
                 className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${fecha ? 'bg-white' : 'bg-gr-acento text-gr-on-acento'}`}>
@@ -217,7 +217,7 @@ export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] 
         </Link>
       ) : (
         <>
-          <details className="group rounded-2xl bg-gr-soft">
+          <details className="group rounded-gr-md bg-gr-soft">
             <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 text-sm [&::-webkit-details-marker]:hidden">
               <Icon name="antifaz" size={18} className="flex-none" />
               <span className="flex-none">Le regalás a</span>
@@ -248,7 +248,7 @@ export function FilaJuego({ j, tambien = [] }: { j: MiJuego; tambien?: string[] 
 export function ArmarJuego({ fecha }: { fecha?: FechaEspecial }) {
   return (
     <Link href={fecha ? `/invisible/nuevo?fecha=${fecha}` : '/invisible/nuevo'}
-          className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
+          className="flex items-center gap-3.5 rounded-gr-lg border-2 border-dashed border-gr-line-strong px-4 py-3.5">
       <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft"><IconoFecha fecha={fecha ?? null} size={24} acento="currentColor" /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] leading-snug font-semibold">Armar un amigo invisible</span>
@@ -278,11 +278,11 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
     <form action={editar ? editarAmigoInvisibleAction : crearAmigoInvisibleAction} className="mt-1 flex flex-col gap-4">
       {editar && <input type="hidden" name="id" value={editar.id} />}
       {error && (
-        <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+        <p role="alert" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           No lo pudimos guardar. Fijate que tenga nombre y una fecha que no haya pasado.
         </p>
       )}
-      <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
+      <p className="flex items-start gap-2.5 rounded-gr-md bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <Icon name="antifaz" size={20} className="flex-none text-gr-acento-sobre-tinta" />
         Se sortea entre los que juegan y cada uno ve solo a quién le regala. Nadie más lo ve, tampoco vos que lo organizás.
       </p>
@@ -314,7 +314,7 @@ export function FormJuego({ fechaEspecial, propuestas, amigos, hoy, error, inici
       {!editar && (
         <div className="flex flex-col gap-2.5">
           <p className="gr-label">¿Quiénes juegan?</p>
-          <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-soft px-4 py-3 text-sm leading-snug font-medium">
+          <p className="flex items-start gap-2.5 rounded-gr-md bg-gr-soft px-4 py-3 text-sm leading-snug font-medium">
             <Icon name="link" size={18} className="mt-0.5 flex-none" />
             Cuando lo armes te damos un link para mandar por WhatsApp: se suma cualquiera con su cuenta, aunque no sea tu amigo en GiftR.
           </p>
@@ -357,7 +357,7 @@ export function DatosDelJuego({ v }: { v: VistaJuego }) {
         </p>
       </div>
       {v.descripcion && (
-        <p className="rounded-[18px] bg-gr-soft px-4 py-3 text-[15px] leading-snug whitespace-pre-line [overflow-wrap:anywhere]">
+        <p className="rounded-gr-md bg-gr-soft px-4 py-3 text-[15px] leading-snug whitespace-pre-line [overflow-wrap:anywhere]">
           <span className="gr-label mb-1 block">Temática</span>{v.descripcion}
         </p>
       )}
@@ -392,7 +392,7 @@ export function MiRespuesta({ v }: { v: VistaJuego }) {
   }
   if (v.sorteado && !v.puedoSumarme) return null
   return (
-    <div className="flex items-center gap-3 rounded-[18px] bg-gr-soft px-4 py-3">
+    <div className="flex items-center gap-3 rounded-gr-md bg-gr-soft px-4 py-3">
       <p className="min-w-0 flex-1 text-sm font-medium">
         {v.miEstado === 'juega' ? 'Estás adentro. Cuando se sortee, te llega a quién le regalás.'
           : v.sorteado ? `Ya se sorteó y no estás jugando. Si te sumás, entrás cuando ${org} sortee de nuevo.` : 'Dijiste que no jugás.'}
@@ -415,7 +415,7 @@ export function GenteDelJuego({ v }: { v: VistaJuego }) {
         <h2 id="gente-titulo" className="gr-label">{v.sorteado ? `Juegan ${juegan.length}` : `${juegan.length} juegan · ${v.gente.length} invitados`}</h2>
         {v.sorteado && <span className="text-xs font-semibold text-gr-muted">{juegan.filter((g) => g.vio).length} ya vieron a quién les toca</span>}
       </div>
-      <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+      <ul className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line bg-gr-surface px-3">
         {lista.map((g) => (
           <li key={g.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
             <AvatarSticker nombre={g.persona.nombre} foto={g.persona.foto} size={32} />
@@ -441,7 +441,7 @@ export function CambiosDelJuego({ v }: { v: VistaJuego }) {
   if (!bajas.length && !esperan.length && !v.faltaSortearDeNuevo) return null
   const falta = v.faltaSortearDeNuevo
   return (
-    <div role="status" className={`flex flex-col gap-1.5 rounded-[18px] px-4 py-3 text-sm leading-snug font-medium ${falta ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
+    <div role="status" className={`flex flex-col gap-1.5 rounded-gr-md px-4 py-3 text-sm leading-snug font-medium ${falta ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
       {bajas.length > 0 && (
         <p>
           <b>{juntarNombres(bajas)}</b> {bajas.length === 1 ? 'se bajó' : 'se bajaron'}
@@ -488,11 +488,11 @@ export function SumarGente({ v, link, paraInvitar }: { v: VistaJuego; link: stri
             </p>
           </div>
           {v.altasCerradas ? (
-            <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">
+            <p role="status" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm font-medium">
               Cerraste las altas: el link no suma a nadie hasta que las abras.
             </p>
           ) : v.lleno ? (
-            <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">Ya son {MAX_JUGADORES}: no entra nadie más.</p>
+            <p role="status" className="rounded-gr-md bg-gr-soft px-3.5 py-3 text-sm font-medium">Ya son {MAX_JUGADORES}: no entra nadie más.</p>
           ) : (
             <>
               <a href={`https://wa.me/?text=${encodeURIComponent(textoParaInvitar(v, link))}`} target="_blank"
@@ -555,7 +555,7 @@ export function SumarGente({ v, link, paraInvitar }: { v: VistaJuego; link: stri
       {v.sacados.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {v.sacados.map((p) => (
-            <li key={p.id} className="flex min-h-11 items-center gap-2 rounded-2xl bg-gr-soft px-3.5">
+            <li key={p.id} className="flex min-h-11 items-center gap-2 rounded-gr-md bg-gr-soft px-3.5">
               <span className="min-w-0 flex-1 truncate text-sm">Sacaste a <b>{p.nombre}</b></span>
               <form action={dejarVolverAlJuegoAction}>
                 <input type="hidden" name="id" value={v.id} />
@@ -583,7 +583,7 @@ export function Organizar({ v, sorteo, excluirError }: { v: VistaJuego; sorteo?:
     <section aria-labelledby="organizar-titulo" className="flex flex-col gap-4">
       <h2 id="organizar-titulo" className="gr-label">{v.sorteado ? 'Sortear de nuevo' : 'Lo organizás vos'}</h2>
 
-      <div id="no-se-tocan" className="flex scroll-mt-6 flex-col gap-2.5 rounded-[22px] border-2 border-dashed border-gr-line-strong p-3.5">
+      <div id="no-se-tocan" className="flex scroll-mt-6 flex-col gap-2.5 rounded-gr-lg border-2 border-dashed border-gr-line-strong p-3.5">
         <p className="text-[15px] font-semibold">Que no se toquen</p>
         <p className="-mt-1.5 text-[13px] leading-snug text-gr-muted">
           Parejas, hermanos o los que ya se regalan igual: no les toca regalarse entre ellos.{v.sorteado && ' Vale para el sorteo que viene.'}
@@ -592,7 +592,7 @@ export function Organizar({ v, sorteo, excluirError }: { v: VistaJuego; sorteo?:
         {v.excluidos.length > 0 && (
           <ul className="flex flex-col gap-1.5">
             {v.excluidos.map(([a, b]) => (
-              <li key={`${a.id}-${b.id}`} className="flex min-h-11 items-center gap-2 rounded-2xl bg-gr-soft px-3">
+              <li key={`${a.id}-${b.id}`} className="flex min-h-11 items-center gap-2 rounded-gr-md bg-gr-soft px-3">
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">{primerNombre(a.nombre)} ↔ {primerNombre(b.nombre)}</span>
                 <form action={cambiarExcluidosAction}>
                   <input type="hidden" name="id" value={v.id} />
@@ -628,12 +628,12 @@ export function Organizar({ v, sorteo, excluirError }: { v: VistaJuego; sorteo?:
 
       <div id="sortear" className="flex scroll-mt-6 flex-col gap-2">
         {sorteo === 'pocos' && (
-          <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+          <p role="alert" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
             Para sortear tienen que jugar al menos {MIN_JUGADORES} (con vos). Esperá que contesten o sumá a más.
           </p>
         )}
         {sorteo === 'imposible' && (
-          <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+          <p role="alert" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
             Con los que no se tocan no hay forma de sortear: sacá alguno de la lista de arriba.
           </p>
         )}
@@ -649,7 +649,7 @@ export function Organizar({ v, sorteo, excluirError }: { v: VistaJuego; sorteo?:
             <summary className={`${v.faltaSortearDeNuevo ? 'gr-btn-primary' : 'gr-btn'} h-14 w-full cursor-pointer list-none text-[17px] [&::-webkit-details-marker]:hidden`}>
               Volver a sortear
             </summary>
-            <form action={sortearAction} className="mt-2 flex flex-col gap-2.5 rounded-2xl border border-gr-line bg-gr-surface p-3.5">
+            <form action={sortearAction} className="mt-2 flex flex-col gap-2.5 rounded-gr-md border border-gr-line bg-gr-surface p-3.5">
               <input type="hidden" name="id" value={v.id} />
               <p className="text-[13px] leading-snug font-medium">
                 {!v.faltaSortearDeNuevo && 'No hace falta: el sorteo de ahora sigue valiendo. Si igual querés mezclar todo: '}
@@ -670,7 +670,7 @@ export function Organizar({ v, sorteo, excluirError }: { v: VistaJuego; sorteo?:
             <summary className="gr-btn-primary h-14 w-full cursor-pointer list-none text-[17px] [&::-webkit-details-marker]:hidden">
               Sortear entre los {juegan.length} que juegan
             </summary>
-            <form action={sortearAction} className="mt-2 flex flex-col gap-2.5 rounded-2xl border border-gr-line bg-gr-surface p-3.5">
+            <form action={sortearAction} className="mt-2 flex flex-col gap-2.5 rounded-gr-md border border-gr-line bg-gr-surface p-3.5">
               <input type="hidden" name="id" value={v.id} />
               <p className="text-[13px] leading-snug font-medium">
                 {faltan > 0 && `${faltan === 1 ? 'Uno no contestó y queda afuera' : `${faltan} no contestaron y quedan afuera`}. `}
@@ -695,7 +695,7 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   if (!v.sorteado || v.miEstado !== 'juega') return null
   if (v.esperoSorteo) {
     return (
-      <div id="te-toco" role="status" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-soft px-5 py-6 text-center">
+      <div id="te-toco" role="status" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-gr-xl bg-gr-soft px-5 py-6 text-center">
         <Icon name="clock" size={28} />
         <p className="text-xl font-semibold">Falta sortear de nuevo</p>
         <p className="text-sm leading-snug">
@@ -709,7 +709,7 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   }
   if (!v.meToca) {
     return (
-      <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-3 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
+      <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-3 rounded-gr-xl bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
         <IlustracionFecha fecha={v.fechaEspecial} size={120} />
         <p className="text-xl font-semibold">Ya se sorteó</p>
         <p className="text-sm opacity-80">Fijate que nadie esté mirando tu pantalla.</p>
@@ -724,7 +724,7 @@ export function TeToco({ v, tambien = [] }: { v: VistaJuego; tambien?: string[] 
   const regla = leerRegla(v.regla)
   const toca = regla?.tipo === 'catalogo' ? loQueTeToca(regla.regla, v.id, persona) : null
   return (
-    <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-[26px] bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
+    <div id="te-toco" className="flex scroll-mt-6 flex-col items-center gap-2 rounded-gr-xl bg-gr-brand px-5 py-6 text-center text-gr-on-brand">
       <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-gr-acento-sobre-tinta"><Icon name="antifaz" size={18} />TE TOCÓ</span>
       <AvatarSticker nombre={persona.nombre} foto={persona.foto} size={84} className="ring-[3px] ring-gr-acento-sobre-tinta" />
       <p className="text-[28px] leading-tight font-semibold [overflow-wrap:anywhere]">{persona.nombre}</p>
@@ -756,7 +756,7 @@ export function Preguntas({ v, error }: { v: VistaJuego; error: boolean }) {
             <div key={p.id} className="gr-card flex flex-col gap-2 p-3.5">
               <p className="flex gap-2 text-[15px] leading-snug [overflow-wrap:anywhere]"><Icon name="antifaz" size={20} className="mt-px flex-none text-gr-muted" />{p.texto}</p>
               {p.respuesta ? (
-                <p className="rounded-2xl bg-gr-soft px-3 py-2 text-sm leading-snug [overflow-wrap:anywhere]"><b>Vos:</b> {p.respuesta}</p>
+                <p className="rounded-gr-md bg-gr-soft px-3 py-2 text-sm leading-snug [overflow-wrap:anywhere]"><b>Vos:</b> {p.respuesta}</p>
               ) : (
                 <form action={responderPreguntaAction} className="flex gap-2">
                   <input type="hidden" name="pregunta" value={p.id} />
@@ -815,7 +815,7 @@ export function QuienMeRegalo({ v }: { v: VistaJuego }) {
     )
   }
   return (
-    <div id="me-regalo" className="flex scroll-mt-6 flex-col gap-2.5 rounded-[22px] border-2 border-dashed border-gr-line-strong p-4">
+    <div id="me-regalo" className="flex scroll-mt-6 flex-col gap-2.5 rounded-gr-lg border-2 border-dashed border-gr-line-strong p-4">
       <p className="text-[15px] font-semibold">¿Quién te regaló?</p>
       <p className="-mt-1 text-[13px] leading-snug text-gr-muted">No se dice si no lo pedís. Nadie se entera de que miraste.</p>
       <form action={revelarQuienMeRegaloAction}>

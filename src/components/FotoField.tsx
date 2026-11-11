@@ -343,7 +343,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   return (
     <div ref={raiz} className="flex flex-col gap-2">
       {foto && rota !== foto ? (
-        <div className="relative overflow-hidden rounded-[18px]">
+        <div className="relative overflow-hidden rounded-gr-md">
           {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
           <img src={foto} alt="Vista previa de la foto" data-vista-previa onError={() => setRota(foto)}
                // si falló antes de que cargue la página, onError no llega
@@ -362,7 +362,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
       ) : (
         // Donde va a estar la foto del deseo: pegar el link de la tienda (trae nombre, foto y precio) o elegir una foto.
         // Mientras se trae la del link lo dice acá, y al llegar la foto queda en este lugar: no se corre nada.
-        <div className={`flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[18px] bg-gr-soft px-3 py-5 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
+        <div className={`flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-gr-md bg-gr-soft px-3 py-5 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
           <div className="grid w-full grid-cols-2 gap-2">
             <button type="button" onClick={pegarElLink} className="gr-btn gr-btn--dark h-[52px] gap-2 text-[15px]">
               <Icon name="paste" size={18} strokeWidth={2} />Pegar link

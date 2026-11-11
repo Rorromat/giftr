@@ -34,7 +34,7 @@ export function FilaRegalo({ r, pasado = false }: { r: MiRegalo; pasado?: boolea
   return (
     <li>
       <QuizasLink href={r.href} className="gr-card flex items-center gap-3 p-2.5 pr-3.5">
-        <div className="size-16 flex-none overflow-hidden rounded-2xl">
+        <div className="size-16 flex-none overflow-hidden rounded-gr-md">
           <ItemPhoto src={r.foto} titulo={r.titulo} height={64} className="w-16" dimmed={pasado} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
