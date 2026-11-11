@@ -14,7 +14,7 @@ function bytes(base64url: string): Uint8Array<ArrayBuffer> {
 
 /**
  * "Avisos": para que los codazos lleguen como notificación. En iPhone solo anda con GiftR agregado a inicio.
- * bienvenida: la pregunta de la primera vez (ver /bienvenida/avisos): un botón grande para activarlos y, ya activados,
+ * bienvenida: la pregunta de la primera vez (ver PreguntaAvisos): un botón grande para activarlos y, ya activados,
  * solo la confirmación (probarlos y desactivarlos queda para Perfil). alCambiar: el estado, cada vez que cambia.
  */
 export function ActivarAvisos({ vapidPublica, bienvenida = false, alCambiar }: {

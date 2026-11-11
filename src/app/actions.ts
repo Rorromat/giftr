@@ -30,7 +30,7 @@ import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario, guardarAliasPago } from '@/lib/users'
 import { cambiarNombre } from '@/lib/perfil'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
-import { guardarGustos } from '@/lib/bienvenida'
+import { guardarGustos, gustosPorContar, saltearBienvenida, yaAnotoUnDeseo } from '@/lib/bienvenida'
 import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { esPasoGustos, gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
@@ -292,37 +292,61 @@ export async function saveBirthdayAction(formData: FormData) {
   if (str(formData, 'conAviso')) redirect('/perfil#cumple')
 }
 
-/** Bienvenida (o editar gustos desde Perfil): guarda lo elegido, aunque se corte a mitad de camino. */
+/**
+ * La bienvenida, una sola pantalla: su cumple, o "Ahora no". De ahí va a anotar su primer deseo (o a su lista, si ya tenía
+ * alguno: lo compartió a GiftR desde una tienda antes de pasar por acá). Por los avisos se le pregunta después, cuando ya
+ * anotó algo (ver preguntarAvisos).
+ */
+export async function bienvenidaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  if (!formData.has('ahoraNo')) {
+    // los dos vacíos no es un error (lo deja para después); uno sin el otro, o un día que no existe, vuelve con el aviso
+    const ok = await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+    if (!ok) redirect('/bienvenida?cumple=invalido')
+    revalidatePath('/perfil')
+    revalidatePath('/eventos')
+  }
+  await saltearBienvenida(db, session.userId)
+  revalidatePath('/mi-lista')
+  revalidatePath('/inicio')
+  redirect(await yaAnotoUnDeseo(db, session.userId) ? '/mi-lista' : '/agregar')
+}
+
+/** De dónde se abrió un paso de los gustos, para volver ahí al guardar (ver VolverGustos en BienvenidaForm). */
+const VUELTAS_GUSTOS = ['listo', 'listo-perfil', 'lista'] as const
+
+/** Editar un paso de los gustos (desde Tus gustos, "¡Todo listo!" o la tarjeta de Mi lista): guarda lo elegido. */
 export async function saveGustosAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  await guardarGustos(db, session.userId, gustosDesdeForm(formData))
+  const gustos = gustosDesdeForm(formData)
+  await guardarGustos(db, session.userId, gustos)
   // los dos vacíos lo borran (los campos vienen con el cumple guardado); uno sin el otro, o uno que no existe, no se guarda
   const cumpleOk = !formData.has('dia') || await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
   revalidatePath('/perfil')
   revalidatePath('/perfil/gustos')
   revalidatePath('/eventos')
   revalidatePath('/mi-lista')
-  // Un paso solo, desde Tus gustos (o desde "¡Todo listo!", que vuelve ahí). Con el cumple que no se guardó, al mismo
-  // paso a avisar.
+  // Con el cumple que no se guardó, al mismo paso a avisar.
   const solo = str(formData, 'solo')
   if (esPasoGustos(solo)) {
-    const volver = str(formData, 'volver')
-    const listo = volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil' : null
-    if (!cumpleOk) redirect(`/perfil/gustos/${solo}?cumple=invalido${listo ? `&volver=${volver}` : ''}`)
-    redirect(listo ?? `/perfil/gustos?guardado=${solo}`)
+    const volver = VUELTAS_GUSTOS.find((v) => v === str(formData, 'volver')) ?? null
+    if (!cumpleOk) redirect(`/perfil/gustos/${solo}?cumple=invalido${volver ? `&volver=${volver}` : ''}`)
+    if (volver === 'lista') {
+      // Desde la tarjeta "Contá tus gustos" de Mi lista: sigue por el próximo que falta y, cuando no queda ninguno más
+      // adelante, termina en "¡Todo listo!" con todo lo que contó.
+      const { siguiente } = gustosPorContar(gustos, solo)
+      redirect(siguiente ? `/perfil/gustos/${siguiente}?volver=lista` : '/bienvenida/listo')
+    }
+    redirect(volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil' : `/perfil/gustos?guardado=${solo}`)
   }
-  // volver=perfil: la bienvenida entera desde Perfil, como era antes de Tus gustos (una pestaña que quedó abierta)
-  const desdePerfil = str(formData, 'volver') === 'perfil'
-  const corte = formData.has('corte')
-  // Lo demás ya se guardó: vuelve al primer paso a avisar, en vez de seguir como si el cumple estuviera. Con "Más tarde"
-  // quería salir: va a Perfil, que avisa al lado de su cumple, en vez de dejarlo adentro.
-  if (!cumpleOk) redirect(corte || desdePerfil ? '/perfil?cumple=invalido#cumple' : '/bienvenida?paso=0&cumple=invalido')
-  if (desdePerfil) redirect('/perfil/gustos')
-  // La primera vez, antes de terminar, le pregunta si quiere avisos (ver /bienvenida/avisos); con "Más tarde", después
-  // sigue a su lista, como antes. Con eso ya se le preguntó: el cartel de los que ya estaban no le aparece.
-  await avisosPreguntados(db, session.userId)
-  redirect(corte ? '/bienvenida/avisos?luego=lista' : '/bienvenida/avisos')
+  // Sin un paso: el formulario entero de la bienvenida de antes (los ocho pasos), de una pestaña que quedó abierta. Ya se
+  // guardó todo: sigue como la bienvenida de ahora, a su primer deseo o a su lista (volver=perfil: la había abierto desde
+  // Perfil). Con el cumple que no se guardó, a Perfil, que avisa al lado de su cumple.
+  if (!cumpleOk) redirect('/perfil?cumple=invalido#cumple')
+  if (str(formData, 'volver') === 'perfil') redirect('/perfil/gustos')
+  redirect(await yaAnotoUnDeseo(db, session.userId) ? '/mi-lista' : '/agregar')
 }
 
 export async function joinGroupAction(formData: FormData) {

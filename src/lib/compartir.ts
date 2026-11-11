@@ -71,6 +71,15 @@ export function textoDueno(i: { titulo: string }, url: string) {
   return `Esto es algo que me encantaría: ${i.titulo} 🎁\n${url}`
 }
 
+/**
+ * Texto para WhatsApp del dueño que manda su lista entera (Mi lista y "¡Anotado!"). Dice qué hay que hacer y la regla de la
+ * sorpresa en una línea: con solo "Armé mi lista" y el link, el que lo recibía no sabía que podía reservar, ni que el
+ * dueño no se entera.
+ */
+export function textoMiLista(url: string) {
+  return `Armé mi lista de deseos en GiftR 🎁 Elegí algo y reservalo: yo no me entero de quién regala qué.\n${url}`
+}
+
 // esUrlPublica vive en links.ts, sin dependencias: la usa también producto-del-link.ts, que no tiene por qué traer la base
 export { esUrlPublica }
 

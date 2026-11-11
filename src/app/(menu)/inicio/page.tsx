@@ -59,7 +59,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     sugerenciasDeAmigos(db, session.userId, 2, sacada),
     paraVos(db, session.userId), porComprar(db, session.userId),
   ])
-  // La primera vez que entra: los pasos de bienvenida con sus gustos.
+  // La primera vez que entra: la bienvenida (una pantalla, su cumple), y de ahí a su primer deseo.
   if (bienvenida) redirect('/bienvenida')
   const especiales = especialesQueVienen(hoy, juegos)
   // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su tapa (la de su lista: el verde si es de

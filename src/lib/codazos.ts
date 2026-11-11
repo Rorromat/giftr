@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
 import { parse as parseUrl } from 'node:url'
 import webpush from 'web-push'
-import { codazos, config, lists, pushSubs, users } from '@/db/schema'
+import { codazos, config, items, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { duenosDeLista, esDuenoSql, esToken } from '@/lib/groups'
@@ -77,18 +77,28 @@ async function podarSuscripciones(db: Db, userId: string) {
   await db.delete(pushSubs).where(and(eq(pushSubs.userId, userId), notInArray(pushSubs.id, masNuevas)))
 }
 
+/** Cuánto después de la bienvenida se le pregunta por los avisos a quien todavía no anotó ningún deseo (ver preguntarAvisos). */
+export const AVISOS_SIN_DESEOS_HORAS = 24
+
 /**
- * Si hay que preguntarle por los avisos con el cartel de una sola vez (a los que ya estaban antes de que la bienvenida lo
- * preguntara): ya pasó la bienvenida, nunca se le preguntó y no los tiene activados en ningún dispositivo.
+ * Si hay que preguntarle por los avisos con el cartel de una sola vez (ver PreguntaAvisos): ya pasó la bienvenida, nunca se
+ * le preguntó, no los tiene activados en ningún dispositivo y ya hizo algo. Antes la bienvenida lo preguntaba antes del
+ * primer deseo, cuando todavía no había nada de qué avisarle. Ahora, cuando hay algún deseo en una lista suya (la propia o
+ * una en común que arma: el cartel sale al cerrar "¡Anotado!") o, si entró solo a regalar, cuando vuelve otro día: a él
+ * también le puede llegar un codazo.
  */
-export async function preguntarAvisos(db: Db, userId: string): Promise<boolean> {
+export async function preguntarAvisos(db: Db, userId: string, ahora = new Date()): Promise<boolean> {
   const [u] = await db.select({ bienvenida: users.bienvenidaAt, preguntados: users.avisosPreguntadosAt }).from(users).where(eq(users.id, userId))
   if (!u?.bienvenida || u.preguntados) return false
   const [sub] = await db.select({ id: pushSubs.id }).from(pushSubs).where(eq(pushSubs.userId, userId)).limit(1)
-  return !sub
+  if (sub) return false
+  if (ahora.getTime() - u.bienvenida.getTime() >= AVISOS_SIN_DESEOS_HORAS * 3_600_000) return true
+  const [deseo] = await db.select({ id: items.id }).from(items).innerJoin(lists, eq(items.listId, lists.id))
+    .where(esDuenoSql(db, userId)).limit(1)
+  return !!deseo
 }
 
-/** Ya se le preguntó por los avisos (en la bienvenida o con el cartel): no se le vuelve a preguntar. */
+/** Ya se le preguntó por los avisos (con el cartel, o en la bienvenida de antes): no se le vuelve a preguntar. */
 export async function avisosPreguntados(db: Db, userId: string) {
   await db.update(users).set({ avisosPreguntadosAt: new Date() }).where(and(eq(users.id, userId), isNull(users.avisosPreguntadosAt)))
 }

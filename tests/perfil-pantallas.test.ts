@@ -4,9 +4,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
-import { lists, users } from '@/db/schema'
+import { items, lists, users } from '@/db/schema'
 import { guardarCumple, miCumple } from '@/lib/events'
-import { guardarGustos, misGustos } from '@/lib/bienvenida'
+import { guardarGustos, misGustos, necesitaBienvenida, saltearBienvenida } from '@/lib/bienvenida'
 import { preguntarAvisos } from '@/lib/codazos'
 import { miAliasPago } from '@/lib/users'
 import { sanitizarGustos } from '@/lib/gustos'
@@ -41,7 +41,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }))
 
-import { guardarAliasAction, saveBirthdayAction, saveGustosAction } from '@/app/actions'
+import { bienvenidaAction, guardarAliasAction, saveBirthdayAction, saveGustosAction } from '@/app/actions'
+import AvisosBienvenida from '@/app/bienvenida/avisos/page'
 import Listo from '@/app/bienvenida/listo/page'
 import Bienvenida from '@/app/bienvenida/page'
 import PerfilPublico from '@/app/l/[token]/perfil/page'
@@ -116,43 +117,87 @@ test('Tu cumple en Perfil: el formulario se vuelve a armar con lo guardado (si n
   expect(await formCumple()).toBe(await formCumple())
 })
 
-test('bienvenida: un cumple a medias no se pierde en silencio: se guardan los gustos y vuelve al primer paso con el aviso', async () => {
-  const { owner } = await preparar()
-  await guardarCumple(h.db, owner.id, 3, 4)
-  expect(await redirige(saveGustosAction(form({ deportes: 'Pádel', dia: '15', mes: '' })))).toBe('/bienvenida?paso=0&cumple=invalido')
-  expect((await misGustos(h.db, owner.id))?.deportes).toEqual(['Pádel'])
-  expect(await miCumple(h.db, owner.id)).toEqual({ dia: 3, mes: 4 })
-  // la bienvenida entera desde Perfil (como era antes de Tus gustos, en una pestaña que quedó abierta): a Perfil, al lado del cumple
-  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil' })))).toBe('/perfil?cumple=invalido#cumple')
-  // "Más tarde" quería salir: sale a Perfil, que avisa al lado de su cumple
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Cocinar', dia: '', mes: '7', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
-  expect((await misGustos(h.db, owner.id))?.hobbies).toEqual(['Cocinar'])
-  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
-  // los dos vacíos es que lo sacó (los campos vienen con el guardado)
-  expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/bienvenida/avisos')
-  // la primera vez, antes del final, la pregunta de los avisos (y con eso el cartel de los que ya estaban no le aparece);
-  // con "Más tarde", después sigue a su lista
-  expect(await preguntarAvisos(h.db, owner.id)).toBe(false)
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', corte: '1' })))).toBe('/bienvenida/avisos?luego=lista')
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil', corte: '1' })))).toBe('/perfil/gustos')
-  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/perfil/gustos')
+test('bienvenida: una sola pantalla; con el cumple o con "Ahora no" sigue a su primer deseo (o a su lista, si ya tenía alguno)', async () => {
+  const { owner, list } = await preparar()
+  // un cumple a medias o que no existe no se pierde en silencio: vuelve con el aviso, sin dar la bienvenida por pasada
+  expect(await redirige(bienvenidaAction(form({ dia: '15', mes: '' })))).toBe('/bienvenida?cumple=invalido')
+  expect(await redirige(bienvenidaAction(form({ dia: '31', mes: '4' })))).toBe('/bienvenida?cumple=invalido')
   expect(await miCumple(h.db, owner.id)).toBeNull()
+  expect(await necesitaBienvenida(h.db, owner.id)).toBe(true)
+  // con el cumple: guardado, y de ahí a anotar su primer deseo (no a los gustos, ni a los avisos, ni a un resumen)
+  expect(await redirige(bienvenidaAction(form({ dia: '12', mes: '10' })))).toBe('/agregar')
+  expect(await miCumple(h.db, owner.id)).toEqual({ dia: 12, mes: 10 })
+  expect(await necesitaBienvenida(h.db, owner.id)).toBe(false)
+  expect(await misGustos(h.db, owner.id)).toBeNull()
+  // por los avisos todavía no se le pregunta: no anotó nada
+  expect(await preguntarAvisos(h.db, owner.id)).toBe(false)
+
+  // "Ahora no": sigue igual, sin tocar el cumple (ni el guardado, ni lo que haya dejado a medias en los campos)
+  await h.db.update(users).set({ bienvenidaAt: null }).where(eq(users.id, owner.id))
+  expect(await redirige(bienvenidaAction(form({ dia: '', mes: '7', ahoraNo: '1' })))).toBe('/agregar')
+  expect(await miCumple(h.db, owner.id)).toEqual({ dia: 12, mes: 10 })
+  expect(await necesitaBienvenida(h.db, owner.id)).toBe(false)
+  // "Seguir" con los dos vacíos no es un error: lo deja para después
+  await h.db.update(users).set({ bienvenidaAt: null, cumpleDia: null, cumpleMes: null }).where(eq(users.id, owner.id))
+  expect(await redirige(bienvenidaAction(form({ dia: '', mes: '' })))).toBe('/agregar')
+  expect(await miCumple(h.db, owner.id)).toBeNull()
+
+  // con un deseo ya anotado (lo compartió a GiftR desde una tienda antes de pasar por acá), a su lista
+  await h.db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' })
+  await h.db.update(users).set({ bienvenidaAt: null }).where(eq(users.id, owner.id))
+  expect(await redirige(bienvenidaAction(form({ ahoraNo: '1' })))).toBe('/mi-lista')
+  // sin sesión, a la portada
+  h.session = null
+  expect(await redirige(bienvenidaAction(form({ ahoraNo: '1' })))).toBe('/')
 })
 
-test('bienvenida con el aviso del cumple: se arma de nuevo en el primer paso y el aviso se ve', async () => {
-  await preparar()
-  type Pagina = React.ReactElement<{ children: React.ReactElement }>
+test('la bienvenida de antes (los ocho pasos), en una pestaña que quedó abierta: guarda y sigue como la de ahora', async () => {
+  const { owner, list } = await preparar()
+  await guardarCumple(h.db, owner.id, 3, 4)
+  // el cumple a medias: lo demás se guarda, y a Perfil, que avisa al lado de su cumple
+  expect(await redirige(saveGustosAction(form({ deportes: 'Pádel', dia: '15', mes: '' })))).toBe('/perfil?cumple=invalido#cumple')
+  expect((await misGustos(h.db, owner.id))?.deportes).toEqual(['Pádel'])
+  expect(await miCumple(h.db, owner.id)).toEqual({ dia: 3, mes: 4 })
+  expect(await redirige(saveGustosAction(form({ dia: '31', mes: '4', volver: 'perfil', corte: '1' })))).toBe('/perfil?cumple=invalido#cumple')
+  // ya no pasa por los avisos ni por "¡Todo listo!": a su primer deseo, o a su lista si ya tiene alguno
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', corte: '1' })))).toBe('/agregar')
+  expect(await necesitaBienvenida(h.db, owner.id)).toBe(false)
+  expect(await redirige(saveGustosAction(form({ hobbies: 'Leer', volver: 'perfil' })))).toBe('/perfil/gustos')
+  await h.db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' })
+  // los dos vacíos es que sacó el cumple (los campos vienen con el guardado)
+  expect(await redirige(saveGustosAction(form({ dia: '', mes: '' })))).toBe('/mi-lista')
+  expect(await miCumple(h.db, owner.id)).toBeNull()
+  // las pantallas que ya no son un paso no dejan a nadie trabado: la de los avisos sigue a su lista
+  expect(await redirige((async () => AvisosBienvenida())())).toBe('/mi-lista')
+})
+
+test('bienvenida: el cumple y dos botones ("Seguir" y "Ahora no"); con el aviso del cumple se arma de nuevo y el aviso se ve', async () => {
+  const { owner } = await preparar()
+  type Pagina = React.ReactElement<{ children: React.ReactElement[] }>
   const pagina = async (sp: Record<string, string>) => await Bienvenida({ searchParams: Promise.resolve(sp) }) as Pagina
-  // Cambiar solo la dirección no vuelve a montar el formulario (el router guarda su estado: seguía en el último paso,
-  // con el aviso escondido en el primero). Con otra key, sí.
-  const [antes, despues] = [await pagina({}), await pagina({ paso: '0', cumple: 'invalido' })]
-  expect(despues.props.children.key).not.toBe(antes.props.children.key)
-  const visto = renderToStaticMarkup(despues)
-  const aviso = visto.indexOf('Tu cumple no se guardó')
-  expect(aviso).toBeGreaterThan(-1)
-  // en la sección del paso que se ve, no en una escondida
-  expect(visto.slice(visto.lastIndexOf('<section', aviso), aviso)).not.toContain('class="hidden"')
-  expect(renderToStaticMarkup(antes)).not.toContain('Tu cumple no se guardó')
+  const formulario = (p: Pagina) => p.props.children.find((c) => c.type === 'form')!
+  // Cambiar solo la dirección no vuelve a montar el formulario (los selects quedaban con lo que había elegido mal). Con
+  // otra key, sí.
+  const [antes, despues] = [await pagina({}), await pagina({ cumple: 'invalido' })]
+  expect(formulario(despues).key).not.toBe(formulario(antes).key)
+  expect(renderToStaticMarkup(despues)).toContain('Tu cumple no se guardó')
+  const visto = renderToStaticMarkup(antes)
+  expect(visto).not.toContain('Tu cumple no se guardó')
+  expect(visto).toContain('¡Hola, Euge!')
+  expect(visto).toContain('name="dia"')
+  expect(visto).toContain('name="mes"')
+  // "Ahora no" es un botón como los demás, no un texto chico
+  expect(visto).toMatch(/<button[^>]*class="gr-btn-primary[^"]*"[^>]*>Seguir</)
+  expect(visto).toMatch(/<button[^>]*class="gr-btn w-full[^"]*"[^>]*name="ahoraNo"[^>]*>Ahora no</)
+  // una sola pantalla: nada de los gustos, ni pasos
+  for (const no of ['Más tarde', 'Siguiente', 'name="deportes"', 'name="remera"', ' de 8']) expect(visto).not.toContain(no)
+  // la pantalla de las fechas se llama "Todo el año"
+  expect(visto).toContain('Todo el año')
+  expect(visto).not.toContain('Eventos')
+  // quien ya la pasó no la vuelve a ver
+  await saltearBienvenida(h.db, owner.id)
+  expect(await redirige(pagina({}))).toBe('/inicio')
+  expect(await redirige(pagina({ paso: '3', cumple: 'invalido' }))).toBe('/inicio')
 })
 
 test('los días del cumple son los del mes elegido (29 en febrero)', () => {
@@ -183,7 +228,25 @@ test('editar un paso solo: guarda y vuelve a Tus gustos (o a "¡Todo listo!"); e
   expect(await redirige(saveGustosAction(form({ solo: 'cumple', dia: '31', mes: '4' })))).toBe('/perfil/gustos/cumple?cumple=invalido')
   expect(await redirige(saveGustosAction(form({ solo: 'cumple', dia: '15', mes: '', volver: 'listo' })))).toBe('/perfil/gustos/cumple?cumple=invalido&volver=listo')
   // un paso que no existe no arma direcciones: sigue como la bienvenida
-  expect(await redirige(saveGustosAction(form({ solo: '../../afuera' })))).toBe('/bienvenida/avisos')
+  expect(await redirige(saveGustosAction(form({ solo: '../../afuera' })))).toBe('/agregar')
+})
+
+test('desde la tarjeta de Mi lista (volver=lista): guardado un paso sigue por el próximo que falta, y al final "¡Todo listo!"', async () => {
+  const { owner } = await preparar()
+  const guardar = (campos: Record<string, string>) => redirige(saveGustosAction(form({ volver: 'lista', ...campos })))
+  expect(await guardar({ solo: 'deportes', deportes: 'Pádel' })).toBe('/perfil/gustos/futbol?volver=lista')
+  // el que dejó vacío no se le vuelve a preguntar: sigue por el que viene después
+  expect(await guardar({ solo: 'futbol', deportes: 'Pádel' })).toBe('/perfil/gustos/hobbies?volver=lista')
+  // los que ya contó se saltean
+  const todoMenos = { deportes: 'Pádel', hobbies: 'Leer', marcas: 'Nike', bebidas: 'Mate' }
+  expect(await guardar({ solo: 'hobbies', ...todoMenos })).toBe('/perfil/gustos/colores?volver=lista')
+  expect(await guardar({ solo: 'colores', ...todoMenos, colores: 'Verde' })).toBe('/perfil/gustos/no-regalar?volver=lista')
+  // no queda ninguno más adelante: "¡Todo listo!", con lo que falta a la vista (el fútbol, que dejó vacío)
+  expect(await guardar({ solo: 'no-regalar', ...todoMenos, colores: 'Verde', noRegalar: 'Perfumes' })).toBe('/bienvenida/listo')
+  expect((await misGustos(h.db, owner.id))?.noRegalar).toEqual(['Perfumes'])
+  expect(await html(Listo({ searchParams: Promise.resolve({}) }))).toContain('href="/perfil/gustos/futbol?volver=listo"')
+  // el cumple que no se guardó, al mismo paso, sin perder de dónde venía
+  expect(await guardar({ solo: 'cumple', dia: '15', mes: '' })).toBe('/perfil/gustos/cumple?cumple=invalido&volver=lista')
 })
 
 test('la bienvenida desde Perfil (?editar=1, los links de antes) lleva a Tus gustos, o al paso que pedía', async () => {
@@ -193,6 +256,9 @@ test('la bienvenida desde Perfil (?editar=1, los links de antes) lleva a Tus gus
   expect(await ir({ editar: '1', paso: '5' })).toBe('/perfil/gustos/colores')
   expect(await ir({ editar: '1', paso: '99' })).toBe('/perfil/gustos')
   expect(await ir({})).toBeNull()
+  // también para quien ya pasó la bienvenida (antes de fijarse si la pasó)
+  await saltearBienvenida(h.db, h.session!.userId)
+  expect(await ir({ editar: '1', paso: '5' })).toBe('/perfil/gustos/colores')
 })
 
 test('Tus gustos: cada bloque con lo cargado y su link para editarlo solo; lo vacío, para sumar', async () => {
@@ -230,6 +296,15 @@ test('editar un paso: se ve solo ese, con Guardar y Cancelar (a Tus gustos, o a 
   expect(desdeListo).toContain('name="volver" value="listo"')
   expect(desdeListo).toContain('href="/bienvenida/listo"')
   expect(await editar('bebidas', { volver: 'https://otro.sitio' })).not.toContain('name="volver"')
+  // desde la tarjeta de Mi lista: cancelar vuelve a Mi lista y, si después falta otro, el botón dice que sigue
+  const desdeLista = await editar('deportes', { volver: 'lista' })
+  expect(desdeLista).toContain('name="volver" value="lista"')
+  expect(desdeLista).toContain('href="/mi-lista"')
+  expect(desdeLista).toContain('>Guardar y seguir<')
+  expect(await editar('no-regalar', { volver: 'lista' })).toContain('>Guardar<')
+  expect(p).not.toContain('Guardar y seguir')
+  // el cumple, con el nombre de la pantalla de las fechas
+  expect(await editar('cumple')).toContain('Tu gente lo ve en Todo el año')
   await expect(editar('nada')).rejects.toThrow('NEXT_NOT_FOUND')
 })
 

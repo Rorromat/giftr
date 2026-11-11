@@ -10,7 +10,7 @@ import { GustosGuardados } from '@/components/RecienAgregado'
 import { Icon, PageHeader, Seccion } from '@/components/ui'
 
 /**
- * Tus gustos: todo lo que cargaste en la bienvenida, a la vista y por bloques. Cada uno se edita solo (ver
+ * Tus gustos: todo lo que contaste de vos, a la vista y por bloques. Cada uno se edita solo (ver
  * /perfil/gustos/[paso]); lo que falta, punteado. Arriba, cuánto completaste y cómo te ve tu gente.
  */
 export default async function TusGustos({ searchParams }: { searchParams: Promise<{ guardado?: string }> }) {

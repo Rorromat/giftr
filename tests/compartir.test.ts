@@ -10,7 +10,7 @@ import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { archiveItem, createItem } from '@/lib/items'
 import { comprarRegalo, iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
 import { addComment } from '@/lib/comments'
-import { esFotoPublica, itemParaCompartir, listaParaCompartir, textoDueno, textoRegalador } from '@/lib/compartir'
+import { esFotoPublica, itemParaCompartir, listaParaCompartir, textoDueno, textoMiLista, textoRegalador } from '@/lib/compartir'
 import { guardarFotoDeseo } from '@/lib/fotos-deseo'
 import { imagenItem } from '@/lib/og'
 
@@ -92,6 +92,9 @@ test('textos para WhatsApp', () => {
     .toBe('Mirá este regalo para Euge: Mate ($45.000) 🎁\nhttps://g.app/l/t/item/1')
   expect(textoRegalador({ titulo: 'Copas', precio: null, para: 'Delfina y Martín' }, 'u')).toBe('Mirá este regalo para Delfina y Martín: Copas 🎁\nu')
   expect(textoDueno({ titulo: 'Mate' }, 'u')).toBe('Esto es algo que me encantaría: Mate 🎁\nu')
+  // la lista entera: dice qué hacer (elegir y reservar) y que el dueño no se entera, no solo "armé mi lista"
+  expect(textoMiLista('https://g.app/l/t'))
+    .toBe('Armé mi lista de deseos en GiftR 🎁 Elegí algo y reservalo: yo no me entero de quién regala qué.\nhttps://g.app/l/t')
 })
 
 test('la foto subida de la vista previa se lee de la base: el servidor no le pide nada a nadie, diga lo que diga x-forwarded-host', async () => {

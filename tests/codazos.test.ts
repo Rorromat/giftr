@@ -3,14 +3,14 @@ import { createECDH, randomBytes } from 'node:crypto'
 import { parse as parseUrl } from 'node:url'
 import { eq } from 'drizzle-orm'
 import { conConsultas, createTestDb } from './helpers'
-import { claims, codazos, lists, pushSubs, users } from '@/db/schema'
+import { claims, codazos, items, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { createGuest } from '@/lib/guest'
 import { crearGrupo, salirDeGrupo, unirseAGrupo } from '@/lib/groups'
 import { createItem } from '@/lib/items'
 import {
-  avisar, avisosPreguntados, borrarSuscripcion, clavesVapid, codazosSinVer, CODAZOS_DE_INVITADOS_POR_DIA, CODAZOS_POR_DIA, confirmarSuscripcion,
+  avisar, AVISOS_SIN_DESEOS_HORAS, avisosPreguntados, borrarSuscripcion, clavesVapid, codazosSinVer, CODAZOS_DE_INVITADOS_POR_DIA, CODAZOS_POR_DIA, confirmarSuscripcion,
   guardarSuscripcion, mandarCodazo, marcarCodazosVistos, preguntarAvisos, probarAviso, SUSCRIPCIONES_POR_USUARIO, tieneAvisos, type Aviso,
   type Enviar,
 } from '@/lib/codazos'
@@ -331,10 +331,11 @@ test('los invitados (cada navegador sin cookie es uno nuevo) no les sacan el lug
 test('el cartel de los avisos, una sola vez: a quien ya pasó la bienvenida, sin avisos activados y sin habérselo preguntado', async () => {
   const db = await createTestDb()
   const [nuevo, viejo, conAvisos] = [await usuario(db, 'Nuevo'), await usuario(db, 'Viejo'), await usuario(db, 'ConAvisos')]
-  await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, viejo.id))
-  await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, conAvisos.id))
+  const ayer = new Date(Date.now() - AVISOS_SIN_DESEOS_HORAS * 3_600_000)
+  await db.update(users).set({ bienvenidaAt: ayer }).where(eq(users.id, viejo.id))
+  await db.update(users).set({ bienvenidaAt: ayer }).where(eq(users.id, conAvisos.id))
   await guardarSuscripcion(db, conAvisos.id, sub('con-avisos'))
-  // el nuevo todavía no pasó la bienvenida (ahí se le pregunta); el que ya los tiene, no hace falta
+  // el nuevo todavía no pasó la bienvenida; el que ya los tiene, no hace falta
   expect(await preguntarAvisos(db, nuevo.id)).toBe(false)
   expect(await preguntarAvisos(db, conAvisos.id)).toBe(false)
   expect(await preguntarAvisos(db, viejo.id)).toBe(true)
@@ -349,4 +350,33 @@ test('el cartel de los avisos, una sola vez: a quien ya pasó la bienvenida, sin
   await db.delete(pushSubs).where(eq(pushSubs.userId, conAvisos.id))
   await avisosPreguntados(db, conAvisos.id)
   expect(await preguntarAvisos(db, conAvisos.id)).toBe(false)
+})
+
+test('por los avisos no se pregunta antes de que haga algo: recién cuando anotó un deseo, o cuando vuelve otro día', async () => {
+  const db = await createTestDb()
+  const [euge, rodri, delfi, martin] = [await usuario(db, 'Euge'), await usuario(db, 'Rodri'), await usuario(db, 'Delfi'), await usuario(db, 'Martín')]
+  const ahora = new Date()
+  for (const u of [euge, rodri, delfi, martin]) await db.update(users).set({ bienvenidaAt: ahora }).where(eq(users.id, u.id))
+  // recién pasó la bienvenida y no anotó nada: todavía no (antes se lo preguntaba la bienvenida, antes del primer deseo)
+  expect(await preguntarAvisos(db, euge.id, ahora)).toBe(false)
+  // anotó su primer deseo: ahora sí (el cartel sale al cerrar "¡Anotado!"); aunque después lo archive
+  const [lista] = await db.select().from(lists).where(eq(lists.ownerId, euge.id))
+  const [mate] = await db.insert(items).values({ listId: lista.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  expect(await preguntarAvisos(db, euge.id, ahora)).toBe(true)
+  await db.update(items).set({ estadoDueno: 'lo_tengo' }).where(eq(items.id, mate.id))
+  expect(await preguntarAvisos(db, euge.id, ahora)).toBe(true)
+  // el deseo de otro no cuenta para Rodri, que entró solo a regalar: a él, cuando vuelve otro día
+  expect(await preguntarAvisos(db, rodri.id, ahora)).toBe(false)
+  const casiUnDia = new Date(ahora.getTime() + (AVISOS_SIN_DESEOS_HORAS - 1) * 3_600_000)
+  expect(await preguntarAvisos(db, rodri.id, casiUnDia)).toBe(false)
+  expect(await preguntarAvisos(db, rodri.id, new Date(ahora.getTime() + AVISOS_SIN_DESEOS_HORAS * 3_600_000))).toBe(true)
+  // un deseo en una lista en común que arma también cuenta; para quien no la arma, no
+  const grupoId = await crearGrupo(db, delfi.id, { nombre: 'Nuestra casa' })
+  expect(await preguntarAvisos(db, delfi.id, ahora)).toBe(false)
+  await db.insert(items).values({ listId: grupoId, tipo: 'exacto', titulo: 'Copas' })
+  expect(await preguntarAvisos(db, delfi.id, ahora)).toBe(true)
+  expect(await preguntarAvisos(db, martin.id, ahora)).toBe(false)
+  // y una vez preguntado, no vuelve
+  await avisosPreguntados(db, euge.id)
+  expect(await preguntarAvisos(db, euge.id, ahora)).toBe(false)
 })

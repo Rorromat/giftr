@@ -5,32 +5,63 @@ import { db } from '@/db'
 import { avisosSinLeer } from '@/lib/bandeja'
 import { getOwnList } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
-import { necesitaBienvenida } from '@/lib/bienvenida'
+import { gustosPorContar, misGustos, necesitaBienvenida } from '@/lib/bienvenida'
+import { textoMiLista } from '@/lib/compartir'
+import { paletaGusto } from '@/lib/colores-gustos'
 import { yo } from '@/lib/perfil'
 import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/events'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
 import { ListaHero } from '@/components/ListaHero'
+import { IlustracionGusto } from '@/components/IlustracionGusto'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { TAPA_PERSONA } from '@/lib/tapas'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 
+/**
+ * "Contá tus gustos": lo que eran ocho pasos obligatorios antes del primer deseo, ahora una tarjeta que lleva al primero que
+ * falta (y de ahí sigue por los demás, ver saveGustosAction). Sin ninguno contado va entera, con para qué sirve; con
+ * algunos, en una fila; con todos, no va (se editan desde Perfil).
+ */
+function ContaTusGustos({ cargados, total, siguiente }: ReturnType<typeof gustosPorContar>) {
+  if (!siguiente) return null
+  const chica = cargados > 0
+  return (
+    <Link href={`/perfil/gustos/${siguiente}?volver=lista`} className={`gr-card flex items-center gap-3 ${chica ? 'px-3.5 py-2.5' : 'p-3.5'}`}>
+      <span aria-hidden className={`flex flex-none items-center justify-center overflow-hidden ${chica ? 'size-9 rounded-xl' : 'size-12 rounded-2xl'}`}
+            style={{ background: paletaGusto(siguiente).fondo }}>
+        <IlustracionGusto paso={siguiente} size={chica ? 44 : 58} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] leading-snug font-semibold">
+          Contá tus gustos <span className="font-medium text-gr-muted tabular-nums">· {cargados} de {total}</span>
+        </span>
+        <span className="block text-[13px] leading-snug text-gr-muted">
+          {chica ? 'Así tu gente acierta.' : 'Talles, colores, lo que no querés: así tu gente acierta.'}
+        </span>
+      </span>
+      <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+    </Link>
+  )
+}
+
 export default async function MiLista({ searchParams }: { searchParams: Promise<{ agregado?: string; eliminado?: string }> }) {
   const { agregado, eliminado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple, avisos] = await Promise.all([
+  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple, avisos, gustos] = await Promise.all([
     getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), yo(db, session.userId),
-    miCumple(db, session.userId), avisosSinLeer(db, { userId: session.userId }),
+    miCumple(db, session.userId), avisosSinLeer(db, { userId: session.userId }), misGustos(db, session.userId),
   ])
   if (!lista) redirect('/')
-  // La primera vez que entra: los pasos de bienvenida con sus gustos.
+  // La primera vez que entra: la bienvenida (una pantalla, su cumple), y de ahí a su primer deseo.
   if (bienvenida) redirect('/bienvenida')
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
-  const waText = encodeURIComponent(`Armé mi lista de deseos en GiftR 🎁 ${shareUrl}`)
+  const waHref = `https://wa.me/?text=${encodeURIComponent(textoMiLista(shareUrl))}`
+  const porContar = <ContaTusGustos {...gustosPorContar(gustos)} />
   const nombre = suNombre ?? session.user?.name ?? 'Vos'
   const hoy = hoyLocal()
   const fechaCumple = cumple ? proximaFecha(cumple.dia, cumple.mes, hoy) : null
@@ -46,11 +77,14 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         etiqueta={nombre.split(' ')[0]}
         titulo="Mi lista"
         cantidad={activos.length}
-        waHref={`https://wa.me/?text=${waText}`}
+        waHref={waHref}
         fecha={fechaCumple
           ? <>tu cumple {dias === 0 ? 'es hoy' : dias === 1 ? 'es mañana' : `es en ${dias} días`}, el {fechaLarga(fechaCumple).toLowerCase()}</>
           : <Link href="/perfil#cumple" className="underline underline-offset-4">cargá tu cumple</Link>}
-      />
+      >
+        {/* Por la regla de la sorpresa acá nunca aparece una reserva, y sin decirlo se lee como "nadie reservó nada" */}
+        <p className="gr-tapa__sub text-[13px] leading-snug">Acá no vas a ver quién reservó qué: tu gente se organiza sin que te enteres.</p>
+      </ListaHero>
 
       {/* Tus listas: la tuya y las que armás con otros (grupos) */}
       <nav aria-label="Tus listas" className="-mx-[18px] -mt-3 flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
@@ -66,15 +100,23 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
           <Link href="/agregar" className="gr-btn-primary gr-btn--sm">Agregar un deseo</Link>
         </div>
       ) : (
-        <SectionHeader title="Tus deseos" href="/agregar" linkLabel="+ Agregar" />
+        <>
+          {porContar}
+          <SectionHeader title="Tus deseos" href="/agregar" linkLabel="+ Agregar" />
+        </>
       )}
+      {/* sin deseos, primero lo primero: la tarjeta de los gustos va después de "Agregar un deseo" */}
+      {activos.length === 0 && porContar}
 
       {activos.length >= BUSCAR_DESDE && <Buscador ambito="mis-deseos" placeholder="Buscar en tu lista" vacio="No tenés ningún deseo con «%s»." />}
       <div id="mis-deseos" className="flex flex-col gap-5">
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
-      {nuevo && <RecienAgregado deseo={{ id: nuevo.id, titulo: nuevo.titulo, foto: nuevo.fotoUrl, prioridad: nuevo.prioridad, grupo: false }} />}
+      {/* "¡Anotado!", con mandar la lista a mano (lo principal, si es el primero que anota: ver Agregado) */}
+      {nuevo && (
+        <RecienAgregado deseo={{ id: nuevo.id, titulo: nuevo.titulo, foto: nuevo.fotoUrl, grupo: false, waHref, primero: lista.items.length === 1 }} />
+      )}
       {eliminado === '1' && <DeseoEliminado />}
     </Seccion>
   )

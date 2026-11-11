@@ -16,7 +16,7 @@ import {
 
 /** Uno por cada paso de PASOS_GUSTOS, en el mismo orden (cada uno con su color y su ilustración, ver IlustracionGusto). */
 const PASOS: { titulo: string; sub: string }[] = [
-  { titulo: '', sub: 'Contanos un poco de vos así tu gente acierta. Son dos minutos y lo podés cambiar cuando quieras.' },
+  { titulo: 'Tu foto y tu cumple', sub: 'Así te reconocen y saben cuándo regalarte.' },
   { titulo: '¿Qué deportes hacés o mirás?', sub: 'Elegí todos los que quieras.' },
   { titulo: '¿De qué cuadro sos?', sub: 'Para la camiseta, el buzo, la taza…' },
   { titulo: '¿Qué te gusta hacer?', sub: 'Hobbies, planes, y si hay mascota en casa.' },
@@ -79,34 +79,42 @@ function Subtitulo({ children }: { children: ReactNode }) {
   return <p className="gr-label mt-2">{children}</p>
 }
 
-/** A dónde vuelve un paso editado solo: a Tus gustos, o a "¡Todo listo!" si se completó desde ahí. */
-export type VolverGustos = 'listo' | 'listo-perfil' | null
+/**
+ * A dónde vuelve un paso al guardarlo (o al cancelar): a Tus gustos; a "¡Todo listo!" si se completó desde ahí; o, si vino
+ * de la tarjeta "Contá tus gustos" de Mi lista ('lista'), al próximo paso que falta (cancelar vuelve a Mi lista).
+ */
+export type VolverGustos = 'listo' | 'listo-perfil' | 'lista' | null
 
-export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, solo, volver = null, pasoInicial = 0, cumpleInvalido = false }: {
-  nombre: string
+/**
+ * Un paso de los gustos (los deportes, los talles…), para editarlo solo: con Guardar y Cancelar. Eran los ocho pasos de la
+ * bienvenida, uno atrás del otro antes del primer deseo; ahora la bienvenida es una pantalla (ver /bienvenida) y estos se
+ * cuentan de a uno, cuando quiere. Todos van en el mismo formulario (escondidos): guardar uno no borra los demás.
+ */
+export function BienvenidaForm({ nombreCompleto, foto, inicial, cumple, solo, volver = null, sigue = false, cumpleInvalido = false }: {
   nombreCompleto: string
   foto: string | null
   inicial: Gustos
   cumple: { dia: number; mes: number } | null
-  /** Un solo paso, para editarlo desde Tus gustos: sin barra de pasos, con Guardar y Cancelar. */
-  solo?: PasoGustos
+  /** El paso que se edita. */
+  solo: PasoGustos
   volver?: VolverGustos
-  pasoInicial?: number
+  /** Viniendo de Mi lista, si después de este falta otro: el botón dice "Guardar y seguir". */
+  sigue?: boolean
   /**
-   * Volvió porque el cumple no se pudo guardar (falta el día o el mes, o no existe): se avisa en el primer paso. La
-   * página le pone una key con esto, así se arma de nuevo en ese paso: cambiar solo la dirección no lo vuelve a montar.
+   * Volvió porque el cumple no se pudo guardar (falta el día o el mes, o no existe): se avisa ahí. La página le pone una
+   * key con esto, así se arma de nuevo con lo guardado: cambiar solo la dirección no lo vuelve a montar.
    */
   cumpleInvalido?: boolean
 }) {
-  const [paso, setPaso] = useState(solo ? PASOS_GUSTOS.indexOf(solo) : Math.min(Math.max(pasoInicial, 0), PASOS.length - 1))
+  const paso = PASOS_GUSTOS.indexOf(solo)
   const [avisoCumple, setAvisoCumple] = useState(cumpleInvalido)
   const [busqueda, setBusqueda] = useState('')
   const [buscaMarca, setBuscaMarca] = useState('')
   const clubPropio = inicial.club && ![...CLUBES, NO_FUTBOL, SOLO_SELECCION].includes(inicial.club) ? inicial.club : null
   const [club, setClub] = useState(clubPropio ? 'otro' : inicial.club ?? '')
-  const ultimo = paso === PASOS.length - 1
   const marcasPropias = inicial.marcas.filter((m) => !TODAS_LAS_MARCAS.includes(m))
-  const cancelar = volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil' : '/perfil/gustos'
+  const cancelar = volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil'
+    : volver === 'lista' ? '/mi-lista' : '/perfil/gustos'
   const talles = useRef<HTMLElement>(null)
 
   // Solo se ve el paso actual (con clase y no con el atributo hidden, que un display de Tailwind pisaría).
@@ -121,30 +129,17 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
     })
   }, [paso])
 
-  function ir(n: number) {
-    setPaso(n)
-    window.scrollTo({ top: 0 })
-  }
-  // Un cumple a medias no se guardaría: en vez de mandar, vuelve a ese paso a avisar (el aviso estaba solo en el primer
-  // paso, escondido, y el usuario se quedaba en el último sin saber por qué). "Más tarde" sale igual: el servidor guarda
-  // lo demás y lo lleva a Perfil, con el aviso al lado del cumple.
+  // Un cumple a medias no se guardaría: en vez de mandar, avisa (si no, lo demás se guardaba y el cumple no, sin decir nada).
   function alMandar(e: FormEvent<HTMLFormElement>) {
-    if ((e.nativeEvent as SubmitEvent).submitter?.getAttribute('name') === 'corte') return
     const datos = new FormData(e.currentTarget)
     if (!datos.get('dia') !== !datos.get('mes')) {
       e.preventDefault()
       setAvisoCumple(true)
-      if (!solo) ir(0)
     }
   }
-  // Enter en un campo de texto pasa al paso siguiente en vez de mandar todo el formulario. Editando un paso solo, Enter
-  // en una búsqueda no guarda (estaba buscando, no terminó).
+  // Enter en una búsqueda no guarda (estaba buscando, no terminó).
   function alApretarEnter(e: KeyboardEvent<HTMLFormElement>) {
-    if (e.key !== 'Enter' || !(e.target instanceof HTMLInputElement)) return
-    if (solo ? e.target.type === 'search' : !ultimo) {
-      e.preventDefault()
-      if (!solo) ir(paso + 1)
-    }
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement && e.target.type === 'search') e.preventDefault()
   }
 
   // Sin buscar, los grandes (y el elegido, si es otro); buscando, los que coinciden.
@@ -155,39 +150,26 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
 
   return (
     <form action={saveGustosAction} onSubmit={alMandar} onKeyDown={alApretarEnter} className="flex min-h-dvh flex-col gap-5 pb-36 pt-2">
-      {solo && <input type="hidden" name="solo" value={solo} />}
-      {solo && volver && <input type="hidden" name="volver" value={volver} />}
+      <input type="hidden" name="solo" value={solo} />
+      {volver && <input type="hidden" name="volver" value={volver} />}
 
-      {solo ? <PageHeader title="Tus gustos" titulo="p" back={cancelar} backLabel="Cancelar" /> : (
-        <div className="flex min-h-14 items-center gap-3">
-          <div className="flex flex-1 gap-1" aria-hidden>
-            {PASOS.map((_, i) => (
-              <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= paso ? 'bg-gr-brand' : 'bg-gr-dot'}`} />
-            ))}
-          </div>
-          <span className="text-sm font-medium text-gr-muted tabular-nums">{paso + 1} de {PASOS.length}</span>
-          {/* Se puede cortar en cualquier momento: se guarda lo elegido hasta ahí (y no pasa por "¡Todo listo!"). */}
-          <BotonEnviar name="corte" value="1" className="min-h-11 flex-none text-[13px] font-semibold">Más tarde</BotonEnviar>
-        </div>
-      )}
+      <PageHeader title="Tus gustos" titulo="p" back={cancelar} backLabel="Cancelar" />
 
       {/* el cartel del paso, con su color y su ilustración */}
       <div className="relative flex min-h-[148px] flex-col justify-center gap-1.5 overflow-hidden rounded-[26px] py-5 pl-5 pr-[124px] text-white shadow-card"
            style={{ background: paletaGusto(PASOS_GUSTOS[paso]).fondo }}>
         <IlustracionGusto paso={PASOS_GUSTOS[paso]} size={140} className="absolute -right-3 top-1/2 -translate-y-1/2" />
-        <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em]">
-          {paso === 0 ? (solo ? 'Tu foto y tu cumple' : `¡Hola, ${nombre}!`) : PASOS[paso].titulo}
-        </h1>
-        <p className="text-sm leading-snug text-white/85">{paso === 0 && solo ? 'Así te reconocen y saben cuándo regalarte.' : PASOS[paso].sub}</p>
+        <h1 className="text-[26px] leading-[1.08] font-semibold tracking-[-0.02em]">{PASOS[paso].titulo}</h1>
+        <p className="text-sm leading-snug text-white/85">{PASOS[paso].sub}</p>
       </div>
 
-      {/* Todos los pasos están en el mismo formulario: los ocultos también se mandan al final. */}
+      {/* Todos los pasos están en el mismo formulario: los ocultos también se mandan (ver gustosDesdeForm). */}
       <section className={ver(0, 'flex flex-col gap-3')}>
         <div className="gr-card flex items-center gap-4 p-4">
           <FotoPerfil nombre={nombreCompleto} foto={foto} size={72} propia />
           <div className="flex min-w-0 flex-col gap-0.5">
             <p className="text-base font-semibold">Tu foto</p>
-            <p className="text-[13px] leading-snug text-gr-muted">Tocala para subir una. Así te reconocen en sus listas y grupos.</p>
+            <p className="text-[13px] leading-snug text-gr-muted">Tocala para subir una. Así te reconocen en sus listas y en las listas en común.</p>
           </div>
         </div>
         <div className="gr-card flex flex-col gap-2.5 p-3.5">
@@ -198,17 +180,8 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
           {avisoCumple && (
             <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
           )}
-          <p className="text-[13px] text-gr-muted">Tu gente lo ve en Eventos, con tiempo para elegir.</p>
+          <p className="text-[13px] text-gr-muted">Tu gente lo ve en Todo el año, con tiempo para elegir.</p>
         </div>
-        {!solo && (
-          <ul className="flex flex-col gap-2 px-1 text-[15px]">
-            {['Qué deportes y qué cuadro', 'Tus hobbies y tus marcas', 'Colores y talles', 'Lo que no querés ni regalado'].map((t) => (
-              <li key={t} className="flex items-center gap-2.5">
-                <Icon name="check" size={16} className="flex-none" />{t}
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section className={ver(1)}>
@@ -332,21 +305,8 @@ export function BienvenidaForm({ nombre, nombreCompleto, foto, inicial, cumple, 
 
       <div className="fixed inset-x-0 bottom-0 z-10 bg-linear-to-t from-gr-bg from-70% to-transparent">
         <div className="mx-auto flex max-w-md items-center gap-2.5 px-[18px] pb-6 pt-5">
-          {solo ? (
-            <>
-              <Link href={cancelar} className="gr-btn flex-none px-5">Cancelar</Link>
-              <BotonEnviar pendiente="Guardando…" className="gr-btn-primary flex-1">Guardar</BotonEnviar>
-            </>
-          ) : (
-            <>
-              {paso > 0 && <button type="button" onClick={() => ir(paso - 1)} className="gr-btn flex-none px-5">Atrás</button>}
-              {/* keys distintas: si React reusara el mismo <button>, el click en "Siguiente" del anteúltimo paso
-                  lo convertiría en submit durante ese mismo click y mandaría el formulario sin mostrar el último paso */}
-              {ultimo
-                ? <BotonEnviar key="listo" pendiente="Guardando…" className="gr-btn-primary flex-1">¡Listo!</BotonEnviar>
-                : <button key="siguiente" type="button" onClick={() => ir(paso + 1)} className="gr-btn-primary flex-1">{paso === 0 ? 'Empezar' : 'Siguiente'}</button>}
-            </>
-          )}
+          <Link href={cancelar} className="gr-btn flex-none px-5">Cancelar</Link>
+          <BotonEnviar pendiente="Guardando…" className="gr-btn-primary flex-1">{volver === 'lista' && sigue ? 'Guardar y seguir' : 'Guardar'}</BotonEnviar>
         </div>
       </div>
     </form>

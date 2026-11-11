@@ -2,11 +2,11 @@ import { expect, test } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { createTestDb } from './helpers'
-import { lists, users } from '@/db/schema'
+import { items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { upsertUserFromGoogle } from '@/lib/users'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
-import { guardarGustos, gustosDeLista, misGustos, necesitaBienvenida, saltearBienvenida } from '@/lib/bienvenida'
+import { guardarGustos, gustosDeLista, gustosPorContar, misGustos, necesitaBienvenida, saltearBienvenida, yaAnotoUnDeseo } from '@/lib/bienvenida'
 import {
   GUSTOS_VACIOS, NO_FUTBOL, PASOS_GUSTOS, SOLO_SELECCION, bloquesDeGustos, esPasoGustos, gustosDesdeForm, sanitizarGustos, seccionesDeGustos,
 } from '@/lib/gustos'
@@ -53,7 +53,7 @@ test('el formulario de la bienvenida se lee completo (club "Otro" incluido)', ()
   expect(gustosDesdeForm(conClub).club).toBe('River Plate')
 })
 
-test('la bienvenida se muestra una sola vez: al completarla o al dejarla para más tarde', async () => {
+test('la bienvenida se muestra una sola vez: al pasarla (con el cumple o con "Ahora no") o al guardar los gustos', async () => {
   const db = await createTestDb()
   const euge = await usuario(db, 'Euge')
   const rodri = await usuario(db, 'Rodri')
@@ -68,6 +68,41 @@ test('la bienvenida se muestra una sola vez: al completarla o al dejarla para m�
   // volver a loguearse no la resetea
   await usuario(db, 'Euge')
   expect(await necesitaBienvenida(db, euge.id)).toBe(false)
+  // y la fecha en que la pasó no se pisa al editar los gustos ni al pasarla de nuevo: de ella sale cuándo preguntar por los avisos
+  const cuando = async (id: string) => (await db.select({ at: users.bienvenidaAt }).from(users).where(eq(users.id, id)))[0].at
+  const antes = new Date('2026-01-10T12:00:00Z')
+  await db.update(users).set({ bienvenidaAt: antes }).where(eq(users.id, euge.id))
+  await guardarGustos(db, euge.id, sanitizarGustos({ deportes: ['Running'] }))
+  await saltearBienvenida(db, euge.id)
+  expect(await cuando(euge.id)).toEqual(antes)
+  expect((await misGustos(db, euge.id))?.deportes).toEqual(['Running'])
+})
+
+test('si ya anotó un deseo en su lista: de la bienvenida va al primero, o a su lista si ya tenía', async () => {
+  const db = await createTestDb()
+  const [euge, rodri] = [await usuario(db, 'Euge'), await usuario(db, 'Rodri')]
+  expect(await yaAnotoUnDeseo(db, euge.id)).toBe(false)
+  const [lista] = await db.select().from(lists).where(eq(lists.ownerId, euge.id))
+  const [mate] = await db.insert(items).values({ listId: lista.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  expect(await yaAnotoUnDeseo(db, euge.id)).toBe(true)
+  // el de otro no cuenta; y archivarlo no lo vuelve "el primero" de nuevo
+  expect(await yaAnotoUnDeseo(db, rodri.id)).toBe(false)
+  await db.update(items).set({ estadoDueno: 'no_lo_quiero' }).where(eq(items.id, mate.id))
+  expect(await yaAnotoUnDeseo(db, euge.id)).toBe(true)
+})
+
+test('"Contá tus gustos": cuántos contó de 7 y cuál es el próximo que falta (después del que acaba de guardar)', () => {
+  expect(gustosPorContar(null)).toEqual({ cargados: 0, total: 7, siguiente: 'deportes' })
+  const g = sanitizarGustos({ deportes: ['Pádel'], hobbies: ['Leer'] })
+  expect(gustosPorContar(g)).toEqual({ cargados: 2, total: 7, siguiente: 'futbol' })
+  // guardó el fútbol vacío: sigue por el que viene después, no vuelve a ese
+  expect(gustosPorContar(g, 'futbol').siguiente).toBe('ropa')
+  expect(gustosPorContar(g, 'cumple').siguiente).toBe('futbol')
+  expect(gustosPorContar(g, 'no-regalar').siguiente).toBeNull()
+  const todo = sanitizarGustos({
+    deportes: ['Pádel'], club: NO_FUTBOL, hobbies: ['Leer'], marcas: ['Nike'], colores: ['Verde'], bebidas: ['Mate'], noRegalar: ['Perfumes'],
+  })
+  expect(gustosPorContar(todo)).toEqual({ cargados: 7, total: 7, siguiente: null })
 })
 
 test('quien regala ve los gustos de cada dueño que los cargó', async () => {

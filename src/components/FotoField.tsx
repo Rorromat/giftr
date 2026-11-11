@@ -63,6 +63,12 @@ export function entregarFoto(form: HTMLFormElement, foto: Blob) {
   form.dispatchEvent(new CustomEvent<Blob>(COMPARTIDA, { detail: foto }))
 }
 
+const SIN_LINK = 'deseo:sin-link'
+/** "Pegar un link" del agregado sin nada copiado (ver AlLlegarDelAgregado): el mismo aviso que el botón "Pegar link" de acá. */
+export function avisarSinLink(form: HTMLFormElement) {
+  form.dispatchEvent(new Event(SIN_LINK))
+}
+
 /**
  * La foto del deseo, que es lo que más ayuda a que acierten: de la galería o la cámara, pegada (con el botón
  * o pegando una imagen en cualquier campo del formulario) o con el link de una foto. Lo elegido viaja en el
@@ -271,11 +277,14 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     const texto = (e: Event) => (e instanceof CustomEvent && typeof e.detail === 'string' ? e.detail : null)
     const escuchar = (e: Event) => alProponer(texto(e))
     const aconsejar = (e: Event) => setConsejo(texto(e))
+    const sinLink = () => setAviso('sin-link')
     form?.addEventListener(PROPUESTA, escuchar)
     form?.addEventListener(CONSEJO, aconsejar)
+    form?.addEventListener(SIN_LINK, sinLink)
     return () => {
       form?.removeEventListener(PROPUESTA, escuchar)
       form?.removeEventListener(CONSEJO, aconsejar)
+      form?.removeEventListener(SIN_LINK, sinLink)
     }
   }, [])
   // la compartida desde otra app (ver entregarFoto): el mismo camino que Foto

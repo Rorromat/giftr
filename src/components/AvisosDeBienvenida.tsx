@@ -1,14 +1,16 @@
 'use client'
 
-import Link from 'next/link'
-import { useCallback, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { avisosPreguntadosAction } from '@/app/actions'
 import { ActivarAvisos } from '@/components/ActivarAvisos'
+import { useAgregado } from '@/components/Agregado'
 import { Icon, Insignia } from '@/components/ui'
 import type { EstadoAvisos } from '@/lib/avisos-del-navegador'
 
-// La pregunta de los avisos: en la bienvenida (/bienvenida/avisos) y, a los que ya estaban, en un cartel de una sola vez.
-// Es para que, cuando alguien quiera saber qué regalarte, te lo pueda pedir (un codazo) y te enteres al toque.
+// La pregunta de los avisos, en un cartel de una sola vez: explica para qué son antes de que el sistema pida el permiso. Es
+// para que, cuando alguien quiera saber qué regalarte, te lo pueda pedir (un codazo) y te enteres al toque. Sale cuando ya
+// anotaste algo (ver preguntarAvisos): antes era un paso de la bienvenida, antes del primer deseo.
 
 /** Con los avisos activados, o donde no se puede (o falta agregar GiftR a inicio), ya no hay nada que decir que no. */
 const yaEsta = (e: EstadoAvisos) => e === 'activado' || e === 'no-soportado' || e === 'ios-instalar' || e === 'bloqueado'
@@ -48,43 +50,43 @@ export function PorQueAvisos({ tituloId, Titulo = 'h1' }: { tituloId?: string; T
   )
 }
 
-/** La pregunta de los avisos en la bienvenida, y cómo seguir: "Seguir" si ya están activados (o no se puede), si no "Ahora no". */
-export function AvisosDeBienvenida({ vapidPublica, siguiente }: { vapidPublica: string; siguiente: string }) {
-  const [estado, setEstado] = useState<EstadoAvisos>('cargando')
-  return (
-    <div className="flex flex-col gap-3">
-      <ActivarAvisos vapidPublica={vapidPublica} bienvenida alCambiar={setEstado} />
-      <Link href={siguiente} className={yaEsta(estado) ? 'gr-btn-primary w-full' : 'gr-btn w-full'}>{yaEsta(estado) ? 'Seguir' : 'Ahora no'}</Link>
-    </div>
-  )
-}
+/** Lo que espera el cartel desde que puede salir (ver PreguntaAvisos). */
+const ESPERA_MS = 700
 
 /**
- * El cartel de una sola vez, para los que ya estaban antes de que la bienvenida preguntara (ver preguntarAvisos). Se abre
- * solo si en este dispositivo se pueden activar (o hay que agregar GiftR a inicio para eso), y al abrirse queda anotado:
- * no vuelve a aparecer. Si ya están activados acá, se anota sin mostrar nada; si están bloqueados o el navegador no puede,
- * no se anota: quizás en otro dispositivo.
+ * El cartel de una sola vez (ver preguntarAvisos). Se abre solo si en este dispositivo se pueden activar (o hay que agregar
+ * GiftR a inicio para eso), y al abrirse queda anotado: no vuelve a aparecer. Si ya están activados acá, se anota sin
+ * mostrar nada; si están bloqueados o el navegador no puede, no se anota: quizás en otro dispositivo.
+ * Espera su momento: recién anotado un deseo está "¡Anotado!" en pantalla, con mandar la lista por WhatsApp, y el cartel
+ * encima se lo tapaba. Sale cuando lo cierra (el ?agregado= de la dirección dura lo que "¡Anotado!", ver Agregado), y nunca
+ * mientras elige cómo agregar otro ni en el formulario de Agregar.
  */
 export function PreguntaAvisos({ vapidPublica }: { vapidPublica: string }) {
   const dialogo = useRef<HTMLDialogElement>(null)
   const decidido = useRef(false)
   const [estado, setEstado] = useState<EstadoAvisos>('cargando')
-  const alCambiar = useCallback((e: EstadoAvisos) => {
-    setEstado(e)
-    if (decidido.current || e === 'cargando') return
-    decidido.current = true
-    if (e === 'apagado' || e === 'ios-instalar') {
-      dialogo.current?.showModal()
-      void avisosPreguntadosAction()
-    } else if (e === 'activado') void avisosPreguntadosAction()
-  }, [])
+  const { paso } = useAgregado()
+  const path = usePathname()
+  useEffect(() => {
+    if (decidido.current || estado === 'cargando') return
+    if (paso !== '' || path === '/agregar' || new URLSearchParams(location.search).has('agregado')) return
+    // un momento después: al cerrar "¡Anotado!" el círculo vuelve al + y la lista va hasta el deseo nuevo
+    const reloj = setTimeout(() => {
+      decidido.current = true
+      if (estado === 'apagado' || estado === 'ios-instalar') {
+        dialogo.current?.showModal()
+        void avisosPreguntadosAction()
+      } else if (estado === 'activado') void avisosPreguntadosAction()
+    }, ESPERA_MS)
+    return () => clearTimeout(reloj)
+  }, [estado, paso, path])
   return (
     // data-sin-refrescar: tirar para abajo acá no actualiza la pantalla de atrás
     <dialog ref={dialogo} aria-labelledby="pregunta-avisos" data-sin-refrescar
             className="m-auto max-h-[calc(100dvh-24px)] w-[min(26rem,calc(100%-24px))] overflow-y-auto rounded-[28px] bg-gr-bg p-3 pb-4 text-gr-ink shadow-float backdrop:bg-gr-ink/60">
       <div className="flex flex-col gap-3">
         <PorQueAvisos tituloId="pregunta-avisos" Titulo="h2" />
-        <ActivarAvisos vapidPublica={vapidPublica} bienvenida alCambiar={alCambiar} />
+        <ActivarAvisos vapidPublica={vapidPublica} bienvenida alCambiar={setEstado} />
         <button type="button" onClick={() => dialogo.current?.close()} className={yaEsta(estado) ? 'gr-btn-primary w-full' : 'gr-btn w-full'}>
           {yaEsta(estado) ? 'Seguir' : 'Ahora no'}
         </button>
