@@ -267,6 +267,8 @@
     gap: 6px;
     height: 38px;
     min-width: 44px;
+    /* con un ancho mínimo propio, en una fila que desliza se achicaría por debajo de su texto: que no se achique */
+    flex-shrink: 0;
     justify-content: center;
     padding: 0 15px;
     border: 1px solid var(--gr-line);
