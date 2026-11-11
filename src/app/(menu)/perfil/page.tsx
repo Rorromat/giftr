@@ -3,11 +3,12 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { getOwnList } from '@/lib/lists'
-import { cambiarNombreAction, cambiarUsuarioAction, newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
+import { cambiarNombreAction, cambiarUsuarioAction, guardarAliasAction, newShareLinkAction, salirAction, saveBirthdayAction } from '@/app/actions'
 import { asegurarUsuario } from '@/lib/amigos'
 import { MESES, miCumple } from '@/lib/events'
 import { misGustos } from '@/lib/bienvenida'
 import { yo } from '@/lib/perfil'
+import { miAliasPago, tipoDeAlias } from '@/lib/users'
 import { NOMBRE_INVITADO_MAXIMO } from '@/lib/types'
 import { FotoPerfil } from '@/components/FotoPerfil'
 import { CumpleCampos } from '@/components/CumpleCampos'
@@ -26,13 +27,13 @@ import { Icon, PageHeader, Row, Seccion } from '@/components/ui'
 
 
 export default async function Perfil({ searchParams }: {
-  searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string; nombre?: string }>
+  searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string; nombre?: string; alias?: string }>
 }) {
-  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario, nombre: avisoNombre } = await searchParams
+  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario, nombre: avisoNombre, alias: avisoAlias } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, cumple, gustos] = await Promise.all([
-    getOwnList(db, session.userId), miCumple(db, session.userId), misGustos(db, session.userId),
+  const [lista, cumple, gustos, alias] = await Promise.all([
+    getOwnList(db, session.userId), miCumple(db, session.userId), misGustos(db, session.userId), miAliasPago(db, session.userId),
   ])
   const [{ nombre: suNombre, foto }, vapid, invitado, pedido, usuario] = await Promise.all([
     yo(db, session.userId), clavesVapid(db), invitadoDeEsteNavegador(), headers(), asegurarUsuario(db, session.userId),
@@ -149,6 +150,31 @@ export default async function Perfil({ searchParams }: {
         </section>
       )}
 
+      {/* Adónde le transfieren su parte de un regalo grupal que compró él. No va en "Lo que ve tu gente": lo ve solo quien
+          le debe (ver CuentaPersona.alias). La key lo vuelve a armar con lo guardado, como el cumple. */}
+      <section id="alias" className="flex scroll-mt-6 flex-col gap-2.5">
+        <h2 className="gr-heading">Para que te transfieran</h2>
+        <form key={`${alias ?? ''}-${avisoAlias ?? ''}`} action={guardarAliasAction} className="gr-card flex flex-col gap-2 p-4">
+          <label htmlFor="alias-campo" className="text-base font-semibold">Tu alias o CVU</label>
+          <div className="flex gap-2">
+            <input id="alias-campo" name="alias" defaultValue={alias ?? ''} maxLength={40} placeholder="tu.alias.mp"
+                   autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                   aria-describedby="alias-ayuda" className="gr-input min-w-0 flex-1" />
+            <BotonEnviar className="gr-btn gr-btn--sm flex-none">Guardar</BotonEnviar>
+          </div>
+          {avisoAlias === 'formato' && (
+            <p role="alert" className="text-[13px] font-semibold text-red-700">
+              No se guardó: un alias tiene de 6 a 20 letras, números, puntos o guiones; un CVU o CBU, 22 números.
+            </p>
+          )}
+          {avisoAlias === 'ok' && alias && <p role="status" className="text-[13px] font-semibold">Listo, te transfieren a tu {tipoDeAlias(alias)} {alias}.</p>}
+          {avisoAlias === 'borrado' && !alias && <p role="status" className="text-[13px] font-semibold">Listo, lo borramos.</p>}
+          <p id="alias-ayuda" className="text-[13px] text-gr-muted">
+            Lo ve solo quien te debe su parte de un regalo grupal, en Cuentas y en el aviso de la compra. No aparece en tu
+            lista ni en tu perfil. Para borrarlo, dejalo vacío y guardá.
+          </p>
+        </form>
+      </section>
 
       {/* Tu cumple: tu gente lo ve en Eventos y en la cuenta regresiva de tu lista. La key lo vuelve a armar con lo
           guardado: React deja el formulario como estaba al montarse y un <select> volvía al valor viejo. */}

@@ -100,7 +100,12 @@ export async function perfilPublico(db: Db, token: string, quien?: string, hoy =
   const duenos = await duenosDeLista(db, list)
   const elegido = (quien && duenos.find((d) => d.id === quien)) || duenos[0]
   if (!elegido) return null
-  const [u] = await db.select().from(users).where(eq(users.id, elegido.id))
+  // Solo lo que se muestra, columna por columna: el alias para transferirle (users.aliasPago) no es del perfil y por acá
+  // no pasa, ni aunque mañana alguien devuelva la fila entera.
+  const [u] = await db.select({
+    id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes,
+    gustos: users.gustos,
+  }).from(users).where(eq(users.id, elegido.id))
   const cumple = u.cumpleDia && u.cumpleMes
     ? { dia: u.cumpleDia, mes: u.cumpleMes, dias: diasEntre(hoy, proximaFecha(u.cumpleDia, u.cumpleMes, hoy)) }
     : null

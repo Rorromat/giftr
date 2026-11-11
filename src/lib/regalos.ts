@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import {
   amistades, claims, groupGiftMembers, groupGifts, groupGiftSacados, guestIdentities, items, listFollows, listMembers, lists, notifications, users,
@@ -1118,6 +1118,12 @@ export type CuentaPersona = Persona & {
   neto: number
   lineas: LineaCuenta[]
   ajustes: AjusteCuenta[]
+  /**
+   * Su alias o CVU para transferirle (ver validarAliasPago), solo mientras le debés (neto negativo) y si lo cargó. Es lo
+   * único que deja ver el alias de otro: ni el perfil ni la lista lo muestran, y con quien te debe a vos o ya está a mano,
+   * tampoco.
+   */
+  alias?: string
 }
 
 /**
@@ -1138,6 +1144,8 @@ export type PagoPorVos = { de: string; a: string; antes: string; despues: string
 
 export type RegaloEnCurso = {
   giftId: string; itemTitulo: string; para: string; href: string | null; encargado: string; soyEncargado: boolean; personas: string[]
+  /** Es una sorpresa (ver sorpresas.ts): cancelarlo la borra, no deja un deseo libre. */
+  sorpresa: boolean
   /** false si el dueño lo sacó de su lista ("Ya lo tengo"): el encargado lo compra o lo cancela desde Cuentas. */
   sigueEnLaLista: boolean
   /**
@@ -1160,7 +1168,12 @@ export type Cuentas = {
   rondas: RondaCuenta[]
   porVos: PagoPorVos[]
   enCurso: RegaloEnCurso[]
-  saldadas: (LineaCuenta & { con: string })[]
+  /**
+   * vuelve: lo que queda sin saldar si se deshace lo último que se anotó (ver marcarPagado). Positivo: el que se sumó lo
+   * vuelve a deber (toda la parte, o lo que le faltaba si venía pagando de a partes); negativo: el encargado se lo vuelve a
+   * devolver.
+   */
+  saldadas: (LineaCuenta & { con: string; vuelve: number })[]
 }
 
 const encargados = alias(users, 'encargados')
@@ -1210,17 +1223,21 @@ async function delRegalo(db: Db, giftId: string) {
  * A los dueños de la lista nunca: no pueden estar en el regalo (ver sumarseARegalo y unirseAGrupo).
  */
 async function avisarCompra(db: Db, giftId: string, encargadoId: string, enviar?: Enviar) {
-  const [r, deben, quien] = await Promise.all([
+  const [r, deben, quien, [encargado]] = await Promise.all([
     delRegalo(db, giftId),
     db.select({ userId: groupGiftMembers.userId, monto: groupGiftMembers.monto }).from(groupGiftMembers)
       .where(and(eq(groupGiftMembers.giftId, giftId), eq(groupGiftMembers.pagado, false), gt(groupGiftMembers.monto, 0))),
     primerNombreDe(db, encargadoId),
+    db.select({ aliasPago: users.aliasPago }).from(users).where(eq(users.id, encargadoId)),
   ])
   if (!r) return
+  // Con su alias, si lo cargó: les llega a los que le deben su parte (los únicos que lo ven, como en Cuentas) y transfieren
+  // sin tener que pedírselo. Es el de ese momento: si después lo cambia, el de ahora está en Cuentas.
+  const comoPagar = encargado?.aliasPago ? `Transferile a ${encargado.aliasPago} y marcalo en Cuentas.` : 'Cuando le pagues, marcalo en Cuentas.'
   await Promise.all(deben.map((d) => avisar(db, d.userId, {
     tipo: 'regalo_comprado', de: encargadoId, url: '/cuentas',
     title: `🧾 ${quien} compró "${r.titulo}"`,
-    body: `Tu parte del regalo para ${r.para}: ${plata(d.monto ?? 0, r.moneda)}. Cuando le pagues, marcalo en Cuentas.`,
+    body: `Tu parte del regalo para ${r.para}: ${plata(d.monto ?? 0, r.moneda)}. ${comoPagar}`,
   }, enviar).catch(() => 0)))
 }
 
@@ -1266,7 +1283,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
     giftId: groupGifts.id, encargadoId: groupGifts.organizerUserId, encargadoNombre: encargados.nombre,
     deudorId: groupGiftMembers.userId, deudorNombre: deudores.nombre,
     monto: groupGiftMembers.monto, pagadoMonto: groupGiftMembers.pagadoMonto, pagado: groupGiftMembers.pagado, pagadoAt: groupGiftMembers.pagadoAt,
-    compradoAt: groupGifts.compradoAt, moneda: groupGifts.moneda, ...columnasDestino(db, userId),
+    pagadoAntes: groupGiftMembers.pagadoAntes, compradoAt: groupGifts.compradoAt, moneda: groupGifts.moneda, ...columnasDestino(db, userId),
   }).from(groupGiftMembers)
     .innerJoin(groupGifts, eq(groupGiftMembers.giftId, groupGifts.id))
     .innerJoin(encargados, eq(groupGifts.organizerUserId, encargados.id))
@@ -1297,7 +1314,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       tipo: debo ? 'debes' : 'te_deben', devolucion: saldo < 0, deudorId: r.deudorId, fecha: r.compradoAt ?? new Date(0),
     }
     if (!saldo) {
-      saldadas.push({ ...linea, con: otro.nombre, fecha: r.pagadoAt ?? linea.fecha })
+      saldadas.push({ ...linea, con: otro.nombre, fecha: r.pagadoAt ?? linea.fecha, vuelve: parte - (r.pagadoAntes ?? 0) })
       continue
     }
     const clave = `${otro.id}|${r.moneda}`
@@ -1346,6 +1363,17 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
   // Los totales salen del neto con cada uno, como las tarjetas ("ya está descontado lo que se deben entre los dos"): si
   // Sofi te debe 30.000 y vos le debés 10.000, arriba no dice "Debés $10.000".
   const personas = [...porPersona.values()]
+  // Adónde transferirle: el alias de cada uno a quien le debés, y de nadie más (ver CuentaPersona.alias). También el de
+  // alguien a quien le pagás "en vez de" a otro al simplificar: es a quien le tenés que mandar la plata.
+  const lesDebo = [...new Set(personas.filter((p) => p.neto < 0).map((p) => p.id))]
+  const aliasDe = new Map<string, string | null>(lesDebo.length
+    ? (await db.select({ id: users.id, aliasPago: users.aliasPago }).from(users).where(and(inArray(users.id, lesDebo), isNotNull(users.aliasPago))))
+      .map((u) => [u.id, u.aliasPago])
+    : [])
+  for (const p of personas) {
+    const suyo = p.neto < 0 && aliasDe.get(p.id)
+    if (suyo) p.alias = suyo
+  }
   const total = (moneda: Moneda | undefined, signo: 1 | -1) =>
     personas.filter((p) => p.moneda === moneda).reduce((s, p) => s + Math.max(0, signo * p.neto), 0)
   const hayDolares = personas.some((p) => p.moneda === 'USD')
@@ -1364,7 +1392,7 @@ export async function misCuentas(db: Db, userId: string): Promise<Cuentas> {
       const desdeCuentas = a.encargadoId === userId && (!a.activo || !a.tieneElLink)
       return {
         giftId: a.giftId, itemTitulo: a.itemTitulo, ...destino(a),
-        encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo,
+        encargado: a.encargadoNombre, soyEncargado: a.encargadoId === userId, sigueEnLaLista: a.activo, sorpresa: a.tipo === 'sorpresa',
         personas: miembros.map((n) => n.nombre),
         dividirCon: desdeCuentas
           ? [...miembros.filter((m) => m.userId === userId), ...miembros.filter((m) => m.userId !== userId)]

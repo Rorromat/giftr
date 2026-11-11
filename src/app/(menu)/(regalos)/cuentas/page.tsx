@@ -1,17 +1,21 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import {
-  comprasParaCorregir, misCuentas, type AjusteCuenta, type CompraParaCorregir, type CuentaPersona, type LineaCuenta, type PagoPorVos,
-  type RegaloEnCurso, type RondaCuenta,
+  comprasParaCorregir, misCuentas, type AjusteCuenta, type CompraParaCorregir, type CuentaPersona, type Cuentas as CuentasDe, type LineaCuenta,
+  type PagoPorVos, type RegaloEnCurso, type RondaCuenta,
 } from '@/lib/regalos'
 import { plata, type Moneda } from '@/lib/pesos'
 import { juntarNombres } from '@/lib/groups'
+import { miAliasPago, tipoDeAlias } from '@/lib/users'
 import { cancelGroupGiftAction, leaveGroupGiftAction, markPaidAction, settleRoundAction, settleUpAction } from '@/app/actions'
 import { CompraGrupalForm } from '@/components/CompraGrupalForm'
 import { PagoParcial } from '@/components/PagoParcial'
 import { CartelCorreccion, SacarDelRegalo } from '@/components/RegaloGrupal'
 import { BotonEnviar } from '@/components/BotonEnviar'
+import { Confirmar } from '@/components/Confirmar'
+import { CopiarAlias } from '@/components/CopiarAlias'
 import { AvatarSticker, Icon, QuizasLink } from '@/components/ui'
 
 /** Qué es la línea: la parte que falta (o lo que falta de ella), o lo que el que compró devuelve. */
@@ -58,6 +62,24 @@ function Ajuste({ a, neto, moneda }: { a: AjusteCuenta; neto: number; moneda?: M
   )
 }
 
+/**
+ * Adónde mandarle la plata a alguien a quien le debés: su alias o CVU (ver CuentaPersona.alias), a la vista y con un botón
+ * para copiarlo. Si no cargó ninguno, se dice: que no parezca que falta algo, y que se lo pida.
+ */
+function AdondeTransferir({ nombre, alias }: { nombre: string; alias?: string }) {
+  if (!alias) return <p className="text-xs font-medium text-gr-muted">{nombre} todavía no cargó su alias para transferirle: pedíselo.</p>
+  const tipo = tipoDeAlias(alias)
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-gr-soft py-1.5 pr-1.5 pl-3">
+      <p className="min-w-0 flex-1 text-sm leading-snug">
+        <span className="block text-xs font-medium text-gr-muted">Transferile a su {tipo}</span>
+        <span className="font-semibold select-all [overflow-wrap:anywhere]">{alias}</span>
+      </p>
+      <CopiarAlias alias={alias} texto={`Copiar ${tipo}`} />
+    </div>
+  )
+}
+
 function Persona({ p }: { p: CuentaPersona }) {
   const leDebo = p.neto < 0
   const ambas = new Set(p.lineas.map((l) => l.tipo)).size > 1
@@ -71,6 +93,7 @@ function Persona({ p }: { p: CuentaPersona }) {
           {p.neto === 0 ? `Con ${p.nombre} están a mano` : leDebo ? `Le debés ${plata(-p.neto, p.moneda)} a ${p.nombre}` : `${p.nombre} te debe ${plata(p.neto, p.moneda)}`}
         </p>
       </div>
+      {leDebo && <AdondeTransferir nombre={p.nombre} alias={p.alias} />}
       {ambas && <p className="text-xs font-semibold text-gr-muted">Ya está descontado lo que se deben entre los dos.</p>}
       {simplificada && (
         <p className="text-xs font-semibold text-gr-muted">Simplificado, como en Splitwise: menos transferencias y todos quedan igual.</p>
@@ -139,12 +162,48 @@ function Total({ pesos, dolares, className = '' }: { pesos: number; dolares: num
   )
 }
 
-function CancelarRegalo({ giftId }: { giftId: string }) {
+/**
+ * Cancelarlo no se deshace y les avisa a los demás: primero dice qué pasa, como en el deseo (ver RegaloGrupal). Acá el
+ * deseo puede no estar más en la lista ("Ya lo tengo"): ahí no queda libre para nadie.
+ */
+function CancelarRegalo({ r }: { r: RegaloEnCurso }) {
+  const aLosDemas = r.personas.length > 1 ? ' y les avisamos a los que se sumaron' : ''
+  if (r.sorpresa) {
+    return (
+      <Confirmar resumen="Cancelar la sorpresa" boton="Sí, cancelarla" action={cancelGroupGiftAction} ocultos={{ giftId: r.giftId }}>
+        La sorpresa se borra{aLosDemas}. Todavía no se compró: nadie le queda debiendo nada a nadie.
+      </Confirmar>
+    )
+  }
   return (
-    <form action={cancelGroupGiftAction}>
-      <input type="hidden" name="giftId" value={giftId} />
-      <BotonEnviar className={linkSubrayado}>Cancelar el regalo</BotonEnviar>
-    </form>
+    <Confirmar resumen="Cancelar el regalo grupal" boton="Sí, cancelarlo" action={cancelGroupGiftAction} ocultos={{ giftId: r.giftId }}>
+      {r.sigueEnLaLista
+        ? `El deseo vuelve a quedar libre para cualquiera${aLosDemas}.`
+        : `El regalo grupal se termina acá${aLosDemas}: el deseo ya no está en la lista.`}{' '}
+      Todavía no se compró: nadie le queda debiendo nada a nadie.
+    </Confirmar>
+  )
+}
+
+/**
+ * "Deshacer" en una fila de Ya saldado: el "Me pagó todo" (o "Ya le pagué") que se tocó de más. Lo deshace cualquiera de los
+ * dos, como en el deseo (ver marcarPagado): vuelve a lo que había antes de lo último que se anotó. Cambia plata y al otro
+ * no le llega nada, así que primero dice cuánto vuelve a figurar y que le avise.
+ */
+function DeshacerSaldado({ l }: { l: CuentasDe['saldadas'][number] }) {
+  // nada que deshacer: lo último que se anotó no cambió lo que debía
+  if (!l.vuelve) return null
+  const monto = plata(Math.abs(l.vuelve), l.moneda)
+  // soyElQueSeSumo: la parte es la mía (ver LineaCuenta.tipo en las saldadas)
+  const soyElQueSeSumo = l.tipo === 'debes'
+  const queVuelve = l.vuelve > 0
+    ? (soyElQueSeSumo ? `le debés ${monto} a ${l.con}` : `${l.con} te debe ${monto}`)
+    : (soyElQueSeSumo ? `${l.con} te tiene que devolver ${monto}` : `le tenés que devolver ${monto} a ${l.con}`)
+  return (
+    <Confirmar resumen="Deshacer" boton="Sí, deshacer" action={markPaidAction} className="items-end"
+               ocultos={{ giftId: l.giftId, deudorId: l.deudorId, pagado: '0' }}>
+      Vuelve a figurar que {queVuelve} por {l.itemTitulo}. A {l.con} no le llega ningún aviso: contale vos.
+    </Confirmar>
   )
 }
 
@@ -180,7 +239,7 @@ function DesdeAca({ r }: { r: RegaloEnCurso }) {
           </div>
         </details>
         <SacarDelRegalo giftId={r.giftId} otros={r.dividirCon.filter((m) => !m.esYo)} sacados={r.sacados} />
-        <CancelarRegalo giftId={r.giftId} />
+        <CancelarRegalo r={r} />
       </div>
     )
   }
@@ -227,7 +286,9 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
   const { correccion } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [c, aCorregir] = await Promise.all([misCuentas(db, session.userId), comprasParaCorregir(db, session.userId)])
+  const [c, aCorregir, miAlias] = await Promise.all([
+    misCuentas(db, session.userId), comprasParaCorregir(db, session.userId), miAliasPago(db, session.userId),
+  ])
   const vacio = !c.personas.length && !c.rondas.length && !c.porVos.length && !c.enCurso.length && !c.saldadas.length && !aCorregir.length
 
   // lo de arriba (el encabezado, el título y las pestañas) está en el layout, compartido con Mis regalos
@@ -250,9 +311,22 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
       {vacio && (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
           <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="wallet" size={26} /></span>
-          <p>Cuando arman un regalo entre varios, acá ves cuánto puso cada uno y a quién le falta pagar.</p>
-          <p className="text-gr-muted">Abrí un deseo de la lista de alguien y tocá “Armar regalo grupal”.</p>
+          <p>Las cuentas salen de los regalos grupales: acá ves cuánto puso cada uno y a quién le falta pagar.</p>
+          {/* El botón está en el deseo de otro, no acá: se dice dónde y se lo lleva a su gente, de donde se llega a las listas */}
+          <p className="text-gr-muted">Para armar uno, abrí un deseo de la lista de alguien de tu gente: ahí está “Armar regalo grupal”.</p>
+          <Link href="/gente" className="gr-btn gr-btn--sm mt-1">Ir a Tu gente</Link>
         </div>
+      )}
+
+      {/* Le deben y no dijo adónde: sin alias, cada uno se lo tiene que pedir por WhatsApp antes de pagarle */}
+      {!miAlias && c.personas.some((p) => p.neto > 0) && (
+        <Link href="/perfil#alias" className="gr-card flex min-h-14 items-center gap-3 px-4 py-3">
+          <span className="min-w-0 flex-1 text-sm leading-snug">
+            <span className="font-semibold">Poné tu alias así te transfieren</span>
+            <span className="block text-xs font-medium text-gr-muted">Lo ve solo quien te debe, acá en Cuentas.</span>
+          </span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
       )}
 
       {c.personas.length === 0 && !c.rondas.length && !c.porVos.length && !vacio && (
@@ -310,12 +384,15 @@ export default async function Cuentas({ searchParams }: { searchParams: Promise<
           <h2 className="gr-heading">Ya saldado</h2>
           <ul className="flex flex-col gap-1.5">
             {c.saldadas.map((l) => (
-              <li key={`${l.giftId}-${l.deudorId}`} className="flex items-center gap-2 text-sm">
-                <Icon name="check" size={16} strokeWidth={3} className="flex-none" />
-                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                  {l.tipo === 'debes' ? `Le pagaste a ${l.con}` : `${l.con} te pagó`} · {l.itemTitulo}
-                </span>
-                <span className="font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
+              <li key={`${l.giftId}-${l.deudorId}`} className="flex flex-col text-sm">
+                <div className="flex items-center gap-2">
+                  <Icon name="check" size={16} strokeWidth={3} className="flex-none" />
+                  <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                    {l.tipo === 'debes' ? `Le pagaste a ${l.con}` : `${l.con} te pagó`} · {l.itemTitulo}
+                  </span>
+                  <span className="font-semibold tabular-nums">{plata(l.monto, l.moneda)}</span>
+                </div>
+                <DeshacerSaldado l={l} />
               </li>
             ))}
           </ul>

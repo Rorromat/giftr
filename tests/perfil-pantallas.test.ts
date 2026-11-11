@@ -8,6 +8,7 @@ import { lists, users } from '@/db/schema'
 import { guardarCumple, miCumple } from '@/lib/events'
 import { guardarGustos, misGustos } from '@/lib/bienvenida'
 import { preguntarAvisos } from '@/lib/codazos'
+import { miAliasPago } from '@/lib/users'
 import { sanitizarGustos } from '@/lib/gustos'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { CumpleCampos } from '@/components/CumpleCampos'
@@ -40,7 +41,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }))
 
-import { saveBirthdayAction, saveGustosAction } from '@/app/actions'
+import { guardarAliasAction, saveBirthdayAction, saveGustosAction } from '@/app/actions'
 import Listo from '@/app/bienvenida/listo/page'
 import Bienvenida from '@/app/bienvenida/page'
 import PerfilPublico from '@/app/l/[token]/perfil/page'
@@ -311,4 +312,47 @@ test('los talles ilustrados: cada prenda con su etiqueta y el talle; el que falt
   expect(svg).toContain('aria-label="Talles de Ana: remera 3XL, pantalón 40, calzado sin cargar"')
   const etiquetas = [...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1])
   expect(etiquetas).toEqual(['REMERA', '3XL', 'PANTALÓN', '40', 'CALZADO', '—'])
+})
+
+test('"Tu alias o CVU" en Perfil: dice quién lo ve, se guarda normalizado, uno que no vale vuelve con el aviso y vacío lo borra', async () => {
+  const { owner } = await preparar()
+  const perfil = (alias?: string) => html(Perfil({ searchParams: Promise.resolve(alias ? { alias } : {}) }))
+  let p = await perfil()
+  expect(p).toContain('Tu alias o CVU')
+  expect(p).toContain('Lo ve solo quien te debe su parte de un regalo grupal')
+  expect(p).toContain('No aparece en tu')
+  // en su sección, no en "Lo que ve tu gente"
+  expect(p.indexOf('Para que te transfieran')).toBeGreaterThan(p.indexOf('Ver cómo me ven los demás'))
+
+  expect(await redirige(guardarAliasAction(form({ alias: ' Euge.Cobra.MP ' })))).toBe('/perfil?alias=ok#alias')
+  expect(await miAliasPago(h.db, owner.id)).toBe('euge.cobra.mp')
+  p = await perfil('ok')
+  expect(p).toContain('value="euge.cobra.mp"')
+  expect(p).toContain('Listo, te transfieren a tu alias euge.cobra.mp.')
+
+  expect(await redirige(guardarAliasAction(form({ alias: 'no vale!' })))).toBe('/perfil?alias=formato#alias')
+  expect(await miAliasPago(h.db, owner.id)).toBe('euge.cobra.mp')
+  expect(await perfil('formato')).toContain('No se guardó: un alias tiene de 6 a 20 letras, números, puntos o guiones; un CVU o CBU, 22 números.')
+
+  expect(await redirige(guardarAliasAction(form({ alias: '' })))).toBe('/perfil?alias=borrado#alias')
+  expect(await miAliasPago(h.db, owner.id)).toBeNull()
+  expect(await perfil('borrado')).toContain('Listo, lo borramos.')
+
+  // sin sesión no guarda nada
+  h.session = null
+  expect(await redirige(guardarAliasAction(form({ alias: 'otro.alias' })))).toBe('/')
+  expect(await miAliasPago(h.db, owner.id)).toBeNull()
+})
+
+test('perfil público: el alias no aparece, ni para quien abre el link sin sesión ni para alguien con sesión', async () => {
+  const { owner, giver, list } = await preparar()
+  expect(await redirige(guardarAliasAction(form({ alias: 'euge.cobra.mp' })))).toBe('/perfil?alias=ok#alias')
+  const ver = () => html(PerfilPublico({ params: Promise.resolve({ token: list.shareToken }), searchParams: Promise.resolve({}) }))
+  for (const sesion of [null, { userId: giver.id, user: { name: 'Rodri' } }, { userId: owner.id, user: { name: 'Euge' } }]) {
+    h.session = sesion
+    const p = await ver()
+    expect(p).toContain('Euge')
+    expect(p).not.toContain('euge.cobra.mp')
+    expect(p).not.toContain('alias')
+  }
 })

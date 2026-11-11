@@ -55,3 +55,41 @@ export async function existeUsuario(db: Db, userId: string): Promise<boolean> {
 export function urlFoto(u: { id: string; fotoAt: Date | null; avatarUrl: string | null }): string | null {
   return u.fotoAt ? `/foto/${u.id}?v=${u.fotoAt.getTime()}` : u.avatarUrl
 }
+
+// ---------- Alias o CVU: adónde transferirle su parte de un regalo grupal ----------
+// No es parte del perfil (ni del público ni de lo que ve su gente): lo ve solo quien le debe plata, en Cuentas y en el
+// aviso de la compra (ver misCuentas y avisarCompra en regalos.ts). Por eso tiene sus propias consultas y no sale en yo().
+
+export type AliasValidado = { ok: true; alias: string | null } | { ok: false; error: 'formato' }
+
+/**
+ * Lo que escribió en "Tu alias o CVU", como se guarda: un alias (de 6 a 20 letras, números, puntos o guiones; da igual
+ * con mayúsculas, queda en minúsculas) o un CVU/CBU (22 números, sin los espacios ni guiones con que lo muestra el banco).
+ * Vacío es borrarlo. Otra cosa no se guarda: con un alias mal escrito la transferencia no sale.
+ */
+export function validarAliasPago(escrito: unknown): AliasValidado {
+  const texto = typeof escrito === 'string' ? escrito.normalize('NFKC').trim() : ''
+  if (!texto) return { ok: true, alias: null }
+  const numeros = texto.replace(/[\s.-]/g, '')
+  if (/^\d{22}$/.test(numeros)) return { ok: true, alias: numeros }
+  const alias = texto.replace(/\s+/g, '').toLowerCase()
+  return /^[a-z0-9.-]{6,20}$/.test(alias) ? { ok: true, alias } : { ok: false, error: 'formato' }
+}
+
+/** Cómo se le dice a lo que cargó: un CVU (los de las billeteras empiezan con 000), un CBU, o un alias. */
+export function tipoDeAlias(alias: string): 'alias' | 'CVU' | 'CBU' {
+  return !/^\d{22}$/.test(alias) ? 'alias' : alias.startsWith('000') ? 'CVU' : 'CBU'
+}
+
+/** "Tu alias o CVU" en Perfil: lo guarda como queda en validarAliasPago, o lo borra si lo dejó vacío. */
+export async function guardarAliasPago(db: Db, userId: string, escrito: unknown): Promise<AliasValidado> {
+  const v = validarAliasPago(escrito)
+  if (v.ok) await db.update(users).set({ aliasPago: v.alias }).where(eq(users.id, userId))
+  return v
+}
+
+/** El alias propio, para Perfil y para invitarlo a cargarlo en Cuentas. El de otro nunca sale por acá: ver misCuentas. */
+export async function miAliasPago(db: Db, userId: string): Promise<string | null> {
+  const [u] = await db.select({ alias: users.aliasPago }).from(users).where(eq(users.id, userId))
+  return u?.alias ?? null
+}

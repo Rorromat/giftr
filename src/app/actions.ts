@@ -27,7 +27,7 @@ import {
 import { invitarAGrupo } from '@/lib/invitar-a-grupo'
 import { agregarListaDeAmigo } from '@/lib/gente'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
-import { asegurarListaPropia, existeUsuario } from '@/lib/users'
+import { asegurarListaPropia, existeUsuario, guardarAliasPago } from '@/lib/users'
 import { cambiarNombre } from '@/lib/perfil'
 import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
 import { guardarGustos } from '@/lib/bienvenida'
@@ -761,7 +761,7 @@ const ERRORES_COMPRA = {
 /** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
 function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
   if (r.reason === 'de_la_lista') {
-    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${plata(r.monto, p.moneda)}.`
+    return `${r.nombre} se sumó a la lista en común después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${plata(r.monto, p.moneda)}.`
   }
   if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
   const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
@@ -1021,6 +1021,19 @@ export async function cambiarUsuarioAction(formData: FormData) {
   const r = await cambiarUsuario(db, session.userId, formData.get('usuario'))
   revalidatePath('/perfil')
   redirect(`/perfil?usuario=${r.ok ? 'ok' : r.error}#usuario`)
+}
+
+/**
+ * "Tu alias o CVU" en Perfil (ver guardarAliasPago): vacío lo borra. Cuentas se vuelve a armar: ahí deja de invitarlo a
+ * cargarlo, y los que le deben ya lo ven.
+ */
+export async function guardarAliasAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const r = await guardarAliasPago(db, session.userId, formData.get('alias'))
+  revalidatePath('/perfil')
+  revalidatePath('/cuentas')
+  redirect(`/perfil?alias=${!r.ok ? r.error : r.alias ? 'ok' : 'borrado'}#alias`)
 }
 
 // ---------------------------------------------------------------- lo nuevo de tus amigos y "Me lo robo"

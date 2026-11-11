@@ -36,6 +36,9 @@ export const users = pgTable('users', {
   nombreElegidoAt: timestamp('nombre_elegido_at', { withTimezone: true }),
   // Cuándo abrió Avisos por última vez: los de después son nuevos (la campanita los cuenta).
   avisosVistosAt: timestamp('avisos_vistos_at', { withTimezone: true }),
+  // Su alias o CVU/CBU, para que le transfieran su parte de un regalo grupal (lo carga en Perfil; ver validarAliasPago).
+  // No es parte del perfil: solo le llega a quien le debe plata en Cuentas (ver misCuentas y avisarCompra).
+  aliasPago: text('alias_pago'),
 }, (t) => [
   // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
   index('users_email_lower_idx').on(sql`lower(${t.email})`),
