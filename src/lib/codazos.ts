@@ -260,7 +260,7 @@ export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNomb
       tipo: 'codazo',
       title: `👉 ¡Codazo de ${primer}!`,
       body: list.tipo === 'grupo'
-        ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'el grupo'}".`
+        ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'la lista en común'}".`
         : 'Quiere saber qué regalarte. Cargá lo que querés en tu lista.',
       url: list.tipo === 'grupo' ? `/grupos/${list.id}` : '/mi-lista',
     }, enviar)
