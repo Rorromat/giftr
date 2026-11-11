@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { misAmigos } from '@/lib/amigos'
@@ -47,7 +47,8 @@ export async function novedadesDeAmigos(db: Db, userId: string, { despues, limit
     .innerJoin(lists, eq(items.listId, lists.id))
     .innerJoin(users, eq(lists.ownerId, users.id))
     .where(and(
-      inArray(lists.ownerId, amigos), eq(lists.tipo, 'personal'), eq(items.estadoDueno, 'activo'),
+      // un aporte en plata no va: no es algo para mirar, reservar desde acá ni robar (ver robarDeseo)
+      inArray(lists.ownerId, amigos), eq(lists.tipo, 'personal'), eq(items.estadoDueno, 'activo'), ne(items.tipo, 'aporte'),
       desde ? or(lt(enMs, desde.fecha), and(eq(enMs, desde.fecha), lt(items.id, desde.id))) : undefined,
     ))
     .orderBy(desc(enMs), desc(items.id))
@@ -91,14 +92,15 @@ export type Robo = { ok: true; itemId: string; yaLoTenias: boolean } | { ok: fal
 /**
  * "Me lo robo": copia a tu lista un deseo de la lista de otro (con su link): el nombre, la foto, el precio, el link de
  * la tienda y el video. Lo que el otro escribió para los suyos (las notas) no, ni sus reservas: es un deseo nuevo, tuyo. Si ya lo
- * tenías (mismo nombre y foto en tu lista), es ese. Al otro no le llega nada.
+ * tenías (mismo nombre y foto en tu lista), es ese. Al otro no le llega nada. Un aporte en plata no se roba: se copiaría
+ * con el alias del otro, y la plata de tus aportes le llegaría a él.
  */
 export async function robarDeseo(db: Db, userId: string, token: string, itemId: string): Promise<Robo> {
   if (!esToken(token) || !esUuid(itemId)) return { ok: false, reason: 'no_existe' }
   const [row] = await db.select({ item: items }).from(items)
     .innerJoin(lists, eq(items.listId, lists.id))
     .where(and(eq(items.id, itemId), eq(lists.shareToken, token), eq(items.estadoDueno, 'activo')))
-  if (!row) return { ok: false, reason: 'no_existe' }
+  if (!row || row.item.tipo === 'aporte') return { ok: false, reason: 'no_existe' }
   // de una lista tuya (o de un grupo tuyo), no
   const [ajena] = await db.select({ id: lists.id }).from(lists).where(and(eq(lists.id, row.item.listId), noEsNiFueDuenoSql(db, userId)))
   if (!ajena) return { ok: false, reason: 'propio' }

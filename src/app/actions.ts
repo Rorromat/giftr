@@ -12,10 +12,10 @@ import {
   leerInvitado, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarAnotado, sumarNoSoy,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
-import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
+import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, sumarDeseoSugerido, updateItem } from '@/lib/items'
 import { agradecer, cerrarPostEvento, marcarRecibidos, revelarRegalo } from '@/lib/post-evento'
-import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
-import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
+import { aporteDesdeForm, deseoDesdeForm, esFormDeAporte, montoDelAporte, paraAgregar } from '@/lib/deseo-form'
+import { aportar, deshacerAporte, desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { anotarInvitado, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
 import { abrirListaAInvitado, accesoALista, veQuienReservo } from '@/lib/acceso'
@@ -56,6 +56,7 @@ import { identificado, type Viewer } from '@/lib/types'
 import { LARGO, recortar } from '@/lib/limites'
 import { NO_SUGERIR_COOKIE, sumarNoSugerir } from '@/lib/no-sugerir'
 import { borrarCuenta } from '@/lib/cuenta'
+import { esOcasion } from '@/lib/ocasiones'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
 export type EstadoForm = { error: string } | null
@@ -102,10 +103,17 @@ const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${r
 export async function addItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const data = deseoDesdeForm(formData, true)
-  if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
+  // Un aporte en plata tiene su formulario (ver AporteForm). Si algo no vale (lo frena el navegador; llega así sin JS o
+  // armado a mano), vuelve a él diciendo qué, con el nombre que había puesto.
+  const aporte = esFormDeAporte(formData) ? aporteDesdeForm(formData) : null
+  if (aporte && !aporte.ok) {
+    const q = new URLSearchParams({ aporte: '1', error: aporte.error, ...(listaId && { lista: listaId }), ...(str(formData, 'titulo') && { titulo: str(formData, 'titulo') }) })
+    redirect(`/agregar?${q}`)
+  }
+  const data = aporte ? aporte.datos : deseoDesdeForm(formData, true)
+  if (!data) redirect('/agregar')
   const creado = await createItem(db, session.userId, paraAgregar(data), listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
@@ -120,7 +128,10 @@ export async function updateItemAction(formData: FormData) {
   const itemId = str(formData, 'itemId') ?? ''
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
-  const data = deseoDesdeForm(formData)
+  // un aporte en plata se edita con su formulario; lo que no vale (un alias mal escrito) vuelve a él diciendo qué
+  const aporte = editable.deseo.tipo === 'aporte' ? aporteDesdeForm(formData) : null
+  if (aporte && !aporte.ok) redirect(`/editar/${itemId}?error=${aporte.error}`)
+  const data = aporte ? aporte.datos : deseoDesdeForm(formData)
   if (!data) redirect(`/editar/${itemId}`)
   // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
   await updateItem(db, itemId, session.userId, data)
@@ -227,8 +238,8 @@ export async function updatePriorityAction(formData: FormData) {
  * La fecha del formulario de un grupo: la del cumple (cumple=1: día y mes, ver fechaDeCumple) o la elegida en el
  * calendario. invalida: escribió algo que no es una fecha que exista (el 31 de abril, o el día sin el mes).
  */
-function fechaDelForm(fd: FormData): { esCumple: boolean; fecha: string | null; invalida: boolean } {
-  if (fd.get('cumple') === '1') {
+function fechaDelForm(fd: FormData, esCumple = fd.get('cumple') === '1'): { esCumple: boolean; fecha: string | null; invalida: boolean } {
+  if (esCumple) {
     const fecha = fechaDeCumple(numero(fd, 'dia'), numero(fd, 'mes'))
     return { esCumple: true, fecha, invalida: !fecha && !!(str(fd, 'dia') || str(fd, 'mes')) }
   }
@@ -244,12 +255,16 @@ export async function createGroupAction(formData: FormData) {
   if (!session?.userId) redirect('/')
   const nombre = recortar(str(formData, 'nombre') ?? '', LARGO.nombreGrupo)
   if (!nombre) redirect('/grupos/nuevo')
-  const { esCumple, fecha, invalida } = fechaDelForm(formData)
+  // Para qué es (ver ocasiones.ts): lo eligió en el primer paso. Si es un cumple, la fecha es día y mes; si no, una del
+  // calendario. Sin ocasión (un formulario de antes), lo que diga "cumple", como siempre.
+  const elegida = str(formData, 'ocasion')
+  const ocasion = esOcasion(elegida) ? elegida : undefined
+  const { esCumple, fecha, invalida } = fechaDelForm(formData, ocasion ? ocasion === 'cumple' : undefined)
   // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
   // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
   const id = await crearGrupo(db, session.userId, {
     nombre, descripcion: recortar(str(formData, 'descripcion') ?? '', LARGO.descripcionGrupo) || undefined,
-    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on', esCumple, fotoUrl: str(formData, 'foto'),
+    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on', esCumple, ocasion, fotoUrl: str(formData, 'foto'),
     parentesco: parentescoDelForm(str(formData, 'parentesco'), str(formData, 'parentescoOtro')),
   })
   // a los amigos elegidos les llega el aviso; con la lista ya creada, que no llegue uno no la frena
@@ -307,6 +322,19 @@ export async function invitarAlGrupoAction(formData: FormData) {
   const invitados = await invitarAGrupo(db, id, session.userId, amigosElegidos(formData))
   revalidatePath(`/grupos/${id}`)
   if (invitados.length) redirect(`/grupos/${id}?nuevo=invitados`)
+}
+
+/**
+ * Un deseo para empezar, en una lista en común recién armada ("Vajilla", "Pañales": los de su ocasión, ver
+ * sumarDeseoSugerido): se suma con un toque y se queda en la pantalla, para seguir con el que sigue.
+ */
+export async function sumarDeseoSugeridoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  await sumarDeseoSugerido(db, session.userId, id, str(formData, 'titulo') ?? '')
+  revalidatePath(`/grupos/${id}`)
+  revalidatePath('/l', 'layout')
 }
 
 /** "Agregar" la lista en común de un amigo a tu gente (y su cumple a tus Eventos). */
@@ -679,6 +707,45 @@ export async function boughtAction(formData: FormData) {
   revalidarReserva(token, itemId)
   // la reserva había vencido y el lugar ya lo tomó otro: que se entere, en vez de que no pase nada
   if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
+}
+
+const ERRORES_APORTE = {
+  propio: 'En tu propia lista no podés anotar un aporte.',
+  archivado: 'Ese deseo ya no está en la lista.',
+  no_existe: 'Ese deseo ya no está en la lista.',
+  sin_identidad: 'Para anotarlo, decinos quién sos.',
+  monto: 'Poné cuánto aportaste en pesos, por ejemplo $20.000. Si preferís no decirlo, dejalo vacío.',
+} as const
+
+/**
+ * "Ya aporté", en un deseo de aporte en plata (ver aportar): queda anotado para él (en Tus regalos) y para los demás que
+ * regalan; al dueño no le llega nada. Con cuánto, si lo quiso decir. Sin nombre todavía, lo pide el mismo formulario y lo
+ * anota como invitado, como al reservar.
+ */
+export async function aportarAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  const listId = await listaDelItem(itemId, token)
+  if (!listId) return null
+  const monto = montoDelAporte(formData.get('monto'))
+  if (monto === undefined) return { error: ERRORES_APORTE.monto }
+  const quien = await viewerIdentificandoGuest(formData, listId)
+  if (!quien.ok) return { error: quien.error }
+  const r = await aportar(db, itemId, quien.viewer, monto)
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath('/regalos')
+  return r.ok ? null : { error: ERRORES_APORTE[r.reason] }
+}
+
+/** "Me equivoqué, no aporté": el aporte propio deja de figurar (ver deshacerAporte). */
+export async function deshacerAporteAction(formData: FormData) {
+  const viewer = await getViewer()
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  await deshacerAporte(db, str(formData, 'claimId') ?? '', viewer)
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath('/regalos')
 }
 
 /** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva (si no tiene ya el tope de reservas en la lista). */

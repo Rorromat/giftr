@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
+import { tipoDeAlias, validarAliasPago, type AliasValidado } from '@/lib/alias-pago'
 
 export function newShareToken(): string {
   return randomBytes(8).toString('base64url')
@@ -65,26 +66,9 @@ export function urlFoto(u: { id: string; fotoAt: Date | null; avatarUrl: string 
 // No es parte del perfil (ni del público ni de lo que ve su gente): lo ve solo quien le debe plata, en Cuentas y en el
 // aviso de la compra (ver misCuentas y avisarCompra en regalos.ts). Por eso tiene sus propias consultas y no sale en yo().
 
-export type AliasValidado = { ok: true; alias: string | null } | { ok: false; error: 'formato' }
-
-/**
- * Lo que escribió en "Tu alias o CVU", como se guarda: un alias (de 6 a 20 letras, números, puntos o guiones; da igual
- * con mayúsculas, queda en minúsculas) o un CVU/CBU (22 números, sin los espacios ni guiones con que lo muestra el banco).
- * Vacío es borrarlo. Otra cosa no se guarda: con un alias mal escrito la transferencia no sale.
- */
-export function validarAliasPago(escrito: unknown): AliasValidado {
-  const texto = typeof escrito === 'string' ? escrito.normalize('NFKC').trim() : ''
-  if (!texto) return { ok: true, alias: null }
-  const numeros = texto.replace(/[\s.-]/g, '')
-  if (/^\d{22}$/.test(numeros)) return { ok: true, alias: numeros }
-  const alias = texto.replace(/\s+/g, '').toLowerCase()
-  return /^[a-z0-9.-]{6,20}$/.test(alias) ? { ok: true, alias } : { ok: false, error: 'formato' }
-}
-
-/** Cómo se le dice a lo que cargó: un CVU (los de las billeteras empiezan con 000), un CBU, o un alias. */
-export function tipoDeAlias(alias: string): 'alias' | 'CVU' | 'CBU' {
-  return !/^\d{22}$/.test(alias) ? 'alias' : alias.startsWith('000') ? 'CVU' : 'CBU'
-}
+// Cómo se valida y cómo se le dice vive en alias-pago.ts, sin la base: lo usan también los campos del navegador (el
+// deseo de aporte en plata lleva su propio alias, ver items.ts).
+export { tipoDeAlias, validarAliasPago, type AliasValidado }
 
 /** "Tu alias o CVU" en Perfil: lo guarda como queda en validarAliasPago, o lo borra si lo dejó vacío. */
 export async function guardarAliasPago(db: Db, userId: string, escrito: unknown): Promise<AliasValidado> {

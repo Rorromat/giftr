@@ -12,7 +12,9 @@ import { nombresSoloConCuenta } from '@/lib/lists'
 import { AjusteSoloConCuenta } from '@/components/SoloConCuenta'
 import { ElegirAmigos } from '@/components/Dividir'
 import { FotoDeLista } from '@/components/FotoDeLista'
-import { CampoParentesco, CamposFecha } from '@/components/ListaEnComun'
+import { CampoParentesco, CamposFecha, IdeasParaEmpezar } from '@/components/ListaEnComun'
+import { sugerenciasPara, SUGERIR_HASTA, tapaDeOcasion } from '@/lib/ocasiones'
+import { textoInvitarAArmar, textoListaEnComun } from '@/lib/compartir'
 import { Confirmar } from '@/components/Confirmar'
 import { CopyLinkButton } from '@/components/CopyLinkButton'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
@@ -20,7 +22,6 @@ import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { AvatarStack, BackLink, Icon, Seccion, SectionHeader } from '@/components/ui'
-import { TAPA_EN_COMUN } from '@/lib/tapas'
 import { ListaHero } from '@/components/ListaHero'
 import { BotonEnviar } from '@/components/BotonEnviar'
 
@@ -54,13 +55,16 @@ export default async function Grupo({ params, searchParams }: {
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? ''
   const shareUrl = `${base}/l/${grupo.shareToken}`
   const inviteUrl = `${base}/grupos/unirme/${grupo.inviteToken}`
-  const waRegalar = encodeURIComponent(`Armamos la lista "${grupo.nombre}" en GiftR 🎁 ${shareUrl}`)
-  const waInvitar = encodeURIComponent(`Armemos juntos la lista "${grupo.nombre}" en GiftR: ${inviteUrl}`)
+  // lo que va por WhatsApp a los que regalan, según para qué es la lista (un casamiento, un baby shower: ver ocasiones.ts)
+  const waRegalar = encodeURIComponent(textoListaEnComun(grupo, shareUrl))
+  const waInvitar = encodeURIComponent(textoInvitarAArmar(grupo, inviteUrl))
+  // Ideas para empezar: los deseos típicos de su ocasión que todavía no tiene, mientras la lista está arrancando
+  const ideas = activos.length < SUGERIR_HASTA ? sugerenciasPara(grupo.ocasion, activos.map((i) => i.titulo)) : []
 
   return (
     <Seccion className="gr-ancha flex flex-col gap-5 pb-36">
-      {/* la tapa de las listas en común, la misma con que la ven los que regalan */}
-      <ListaHero color={TAPA_EN_COMUN} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
+      {/* la tapa de las listas en común (con el color de su ocasión), la misma con que la ven los que regalan */}
+      <ListaHero color={tapaDeOcasion(grupo.ocasion)} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
                  arriba={(
                    <header className="flex min-h-14 items-center justify-between gap-2">
                      <BackLink href="/mi-lista" label="Volver a Mi lista" vidrio />
@@ -179,17 +183,21 @@ export default async function Grupo({ params, searchParams }: {
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
           <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
-          <p>Todavía no hay nada en “{grupo.nombre}”.<br />Agreguen lo primero que necesiten.</p>
+          <p>Todavía no hay nada en “{grupo.nombre}”.<br />{ideas.length ? 'Empiecen por las ideas de abajo, o agreguen lo que quieran.' : 'Agreguen lo primero que necesiten.'}</p>
           <Link href={`/agregar?lista=${grupo.id}`} className="gr-btn-primary gr-btn--sm">Agregar un deseo</Link>
         </div>
       ) : (
         <SectionHeader title="Sus deseos" href={`/agregar?lista=${grupo.id}`} linkLabel="+ Agregar" />
       )}
 
+      {/* con la lista vacía (o recién arrancada), los deseos típicos de su ocasión, para sumar con un toque */}
+      {activos.length === 0 && <IdeasParaEmpezar grupoId={grupo.id} ideas={ideas} />}
+
       {activos.length >= BUSCAR_DESDE && <Buscador ambito="sus-deseos" placeholder="Buscar en la lista" vacio="No hay ningún deseo con «%s»." />}
       <div id="sus-deseos" className="gr-categorias flex flex-col gap-5">
         <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} agregado={agregado} />
       </div>
+      {activos.length > 0 && <IdeasParaEmpezar grupoId={grupo.id} ideas={ideas} />}
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
       {nuevoDeseo && (
         <RecienAgregado deseo={{ id: nuevoDeseo.id, titulo: nuevoDeseo.titulo, foto: nuevoDeseo.fotoUrl, grupo: true }} />

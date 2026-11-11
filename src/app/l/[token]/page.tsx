@@ -9,7 +9,7 @@ import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import { relacionCon } from '@/lib/amigos'
 import { AmigoEnLista, AvisoAmigo } from '@/components/Amigos'
 import { BotonRobar } from '@/components/Novedades'
-import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
+import { avisoDeCupo, esAporte, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
 import { linkParaVolver, nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
@@ -29,7 +29,9 @@ import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { Arte, AvatarStack, AvatarSticker, BackLink, Icon, PriorityTag, LogoSticker, Tapa } from '@/components/ui'
-import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
+import { TAPA_PERSONA } from '@/lib/tapas'
+import { tapaDeOcasion } from '@/lib/ocasiones'
+import { TarjetaAporte } from '@/components/Aporte'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 import { iconoDeCategoria } from '@/components/FichaDeseo'
 import { ChipPresupuesto, TopesPresupuesto } from '@/components/FiltroPresupuesto'
@@ -37,7 +39,7 @@ import { partirPorTope, presupuestoDeLista, topeDeLaUrl } from '@/lib/presupuest
 import { plata } from '@/lib/pesos'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
-type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
+type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null; juntado: number | null }
 
 /** sinNombres: al que mira no le toca saber quién (ver sinNombresPara): "Reservado" a secas; lo suyo, sí. */
 function estadoNoDisponible(item: Tarjeta, sinNombres: boolean) {
@@ -100,7 +102,8 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const l = await listaParaCompartir(db, token)
   if (!l) return {}
   const titulo = l.grupoNombre ?? `Lista de ${l.para.split(' ')[0]}`
-  const descripcion = `${l.cantidad} ${l.cantidad === 1 ? 'deseo' : 'deseos'}. Elegí, reservá y no te duplicás con nadie.`
+  // con un aporte en plata en la lista (un casamiento, un baby shower), la vista previa ya dice que se puede aportar
+  const descripcion = `${l.cantidad} ${l.cantidad === 1 ? 'deseo' : 'deseos'}. ${l.conAportes ? 'Elegí un regalo y reservalo, o aportá lo que quieras.' : 'Elegí, reservá y no te duplicás con nadie.'}`
   return { title: titulo, description: descripcion, openGraph: { title: titulo, description: descripcion, url: `/l/${token}` } }
 }
 
@@ -148,10 +151,16 @@ export default async function ListaAjena({
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
     : null
 
-  const tarjetas: Tarjeta[] = vista.role === 'giver'
+  const todas: Tarjeta[] = vista.role === 'giver'
     ? vista.items
-    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null }))
-  const categorias = [...new Set(tarjetas.map((i) => i.categoria).filter(Boolean))] as string[]
+    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null, juntado: null }))
+  // Los aportes en plata ("Luna de miel", "Cochecito") van aparte y arriba de todo: en un casamiento o un baby shower es
+  // lo que más se elige. No son un deseo de la grilla: no tienen foto, precio ni "Reservar", y nunca quedan ocupados. Con
+  // los filtros: siempre están "Disponibles" y entran en cualquier "Hasta $X" (cada uno pone lo que quiere); con una
+  // categoría elegida van solo si son de esa.
+  const aportes = todas.filter((i) => esAporte(i) && (!cat || i.categoria === cat))
+  const tarjetas = todas.filter((i) => !esAporte(i))
+  const categorias = [...new Set(todas.map((i) => i.categoria).filter(Boolean))] as string[]
   let mostrados = tarjetas
   if (cat) mostrados = mostrados.filter((i) => i.categoria === cat)
   if (disp === '1' && veTodo) mostrados = mostrados.filter((i) => i.disponible)
@@ -199,10 +208,13 @@ export default async function ListaAjena({
                        recuperar={linkParaVolver(viewer, vista.listId, token)} />
   )
   // Sin cuenta, "¿Y vos qué querés?" flota abajo recién cuando ya reservó algo; antes va al final, quieto (ver abajo)
-  const yaReservo = tarjetas.some((i) => i.claims.some((c) => c.esMia || c.grupal?.soyParte))
+  const yaReservo = todas.some((i) => i.claims.some((c) => c.esMia || c.grupal?.soyParte))
+  // quién puede dejar anotado un aporte: como reservar, el que ve la coordinación o el que todavía no dijo quién es
+  const anotaAportes = veTodo || (vista.role === 'anonimo' && vista.motivo === 'sin_identidad')
 
-  // su tapa: la de las personas (el verde, igual para todos) o la de las listas en común (ver lib/tapas.ts)
-  const color = vista.grupoNombre ? TAPA_EN_COMUN : TAPA_PERSONA
+  // su tapa: la de las personas (el verde, igual para todos) o la de las listas en común, con el color de su ocasión (un
+  // casamiento, un baby shower: ver ocasiones.ts; las demás, la de siempre, ver lib/tapas.ts)
+  const color = vista.grupoNombre ? tapaDeOcasion(vista.ocasion) : TAPA_PERSONA
   // En una lista en común, arriba todo es de la lista (Bauti, sus regalos); el perfil y los gustos de cada uno de los que
   // la arman van al final, abajo del historial. En la de una persona, su perfil va arriba: la lista es suya.
   const enComun = !!vista.grupoNombre
@@ -346,16 +358,27 @@ export default async function ListaAjena({
         {/* lo que acaba de reservar no está entre lo que se ve con este filtro: el cartel, igual */}
         {confirmacion && !mostrados.includes(recien!) && confirmacion}
 
-        {mostrados.length === 0 && (
+        {mostrados.length === 0 && aportes.length === 0 && (
           <p className="gr-empty mt-4 py-8 text-center">
-            {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${plural ? 'cargaron' : 'cargó'} nada.`}
+            {todas.length ? 'No hay nada con ese filtro.' : `Todavía no ${plural ? 'cargaron' : 'cargó'} nada.`}
           </p>
         )}
 
         {/* una lista larga: buscar algo puntual (en lo que se ve con el filtro elegido) */}
-        {mostrados.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
+        {mostrados.length + aportes.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
 
         <div id="su-lista" className="gr-categorias flex flex-col gap-7">
+          {/* los aportes en plata, arriba de todo y a lo ancho, cada uno con su "Aportar" */}
+          {aportes.length > 0 && (
+            <section data-buscar-grupo data-a-lo-ancho aria-label={aportes.length > 1 ? 'Aportes en plata' : 'Aporte en plata'}>
+              <ul className="flex flex-col gap-3">
+                {aportes.map((a) => (
+                  <TarjetaAporte key={a.id} item={a} token={token} anotar={anotaAportes} identified={veTodo}
+                                 para={vista.ownerNombre} plural={plural} volver={aqui} />
+                ))}
+              </ul>
+            </section>
+          )}
           {grupos.map(([categoria, deseos]) => (
             <section key={categoria} data-buscar-grupo aria-label={conTitulos ? undefined : 'Sus deseos'} className="flex flex-col gap-3">
               {conTitulos && (

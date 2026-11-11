@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql, type AnyColumn } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql, type AnyColumn } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { noEsDeRegaloGrupal } from '@/lib/claims'
@@ -16,8 +16,13 @@ import { sacarDeLaLista, seDeshaceRecibido } from '@/lib/items'
 // sugiere, le ordena ni le cuenta nada en base a reservas o compras, y de quien regaló solo le llega el nombre de quien
 // eligió contárselo (revelado_at puesto), nunca antes del día siguiente al evento.
 // Por ahora, solo en la lista personal (el evento es el cumple del dueño).
+// Un aporte en plata queda afuera de todo esto (ver noEsAporte): no es algo que "le regalaron" para tildar (la plata la ve
+// en su cuenta, y el aporte puede seguir abierto), y quien aportó no se lo cuenta por acá: la transferencia ya lo dice.
 
 const DIA = 86400_000
+
+/** Los deseos que se marcan recibidos y se revelan: todos menos los aportes en plata. */
+const noEsAporte = ne(items.tipo, 'aporte')
 
 /** Cuántos días después del cumple sigue la tarjeta "¿Cómo te fue en tu cumple?" en Mi lista (desde el día siguiente). */
 export const POST_EVENTO_DIAS = 30
@@ -92,7 +97,7 @@ export async function marcarRecibidos(
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const suyos = ids.length
-      ? await t.select({ id: items.id }).from(items).where(and(eq(items.listId, lista.id), inArray(items.id, ids), eq(items.estadoDueno, 'activo'))).orderBy(asc(items.id))
+      ? await t.select({ id: items.id }).from(items).where(and(eq(items.listId, lista.id), inArray(items.id, ids), eq(items.estadoDueno, 'activo'), noEsAporte)).orderBy(asc(items.id))
       : []
     let marcados = 0
     for (const { id } of suyos) {
@@ -226,7 +231,7 @@ export async function revelarRegalo(
 ): Promise<boolean> {
   if (!esUuid(userId) || !esUuid(id)) return false
   // solo de una lista personal ajena (ni suya ni de un grupo suyo), y de un deseo que el dueño no eliminó
-  const ajena = and(eq(lists.tipo, 'personal'), noEsNiFueDuenoSql(db, userId), isNull(items.borradoAt))
+  const ajena = and(eq(lists.tipo, 'personal'), noEsNiFueDuenoSql(db, userId), isNull(items.borradoAt), noEsAporte)
   const deseo = {
     listId: lists.id, ownerId: lists.ownerId, titulo: items.titulo, recibido: sql<boolean>`${items.estadoDueno} = 'me_lo_regalaron'`,
   }
@@ -321,7 +326,7 @@ export function textoGracias() {
 export async function faltaMarcar(db: Db, userId: string, evento: string): Promise<boolean> {
   const lista = await listaPersonal(db, userId)
   if (!lista || lista.hecho === evento) return false
-  const [deseo] = await db.select({ id: items.id }).from(items).where(and(eq(items.listId, lista.id), eq(items.estadoDueno, 'activo'))).limit(1)
+  const [deseo] = await db.select({ id: items.id }).from(items).where(and(eq(items.listId, lista.id), eq(items.estadoDueno, 'activo'), noEsAporte)).limit(1)
   return !!deseo
 }
 
@@ -337,7 +342,7 @@ export async function regalosPorContar(db: Db, ownerId: string, ahora = new Date
   // desde el día siguiente al cumple anterior: lo de antes es de otro año
   const desde = await desdeElUltimoEvento(db, lista.id, evento.empezo)
   const recibido = eq(items.estadoDueno, 'me_lo_regalaron')
-  const delDeseo = and(eq(items.listId, lista.id), isNull(items.borradoAt), gte(claims.updatedAt, desde))
+  const delDeseo = and(eq(items.listId, lista.id), isNull(items.borradoAt), gte(claims.updatedAt, desde), noEsAporte)
   const [sueltos, grupales] = await Promise.all([
     db.select({ userId: claims.claimerUserId, titulo: items.titulo }).from(claims).innerJoin(items, eq(claims.itemId, items.id))
       .where(and(

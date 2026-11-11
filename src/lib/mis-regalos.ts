@@ -47,6 +47,11 @@ export type MiRegalo = {
   revelado: boolean
   /** se lo puede contar: comprado, de una lista personal y para un evento que ya pasó. Solo en misRegalos */
   puedeRevelar: boolean
+  /**
+   * Solo en un aporte en plata (ver aportar): no lo compró, aportó, y cuánto si lo anotó. Va con lo comprado, y no se le
+   * ofrece contárselo al dueño: quién le transfirió ya lo ve en su cuenta.
+   */
+  aporte?: { monto: number | null }
 }
 
 /** Lo que hace falta para saber si se puede revelar (ver yaSeRegalo), que no sale de acá. */
@@ -58,7 +63,7 @@ const encargados = alias(users, 'encargados')
 /** Lo de la lista para el link y el "para": el link nuevo solo si no cambió desde que lo reservé o si la sigo. */
 const columnasLista = (db: Db, userId: string, desde: ReturnType<typeof sql<Date>>) => ({
   listId: lists.id, tipo: lists.tipo, listaNombre: lists.nombre, duenoNombre: duenos.nombre, shareToken: lists.shareToken,
-  itemId: items.id, titulo: items.titulo, foto: items.fotoUrl, activo: sql<boolean>`${items.estadoDueno} = 'activo'`,
+  itemId: items.id, titulo: items.titulo, foto: items.fotoUrl, activo: sql<boolean>`${items.estadoDueno} = 'activo'`, tipoDeseo: items.tipo,
   recibido: sql<boolean>`${items.estadoDueno} = 'me_lo_regalaron'`, borrado: sql<boolean>`${items.borradoAt} is not null`,
   conLink: sql<boolean>`${or(isNull(lists.shareTokenAt), sql`${desde} > ${lists.shareTokenAt}`,
     inArray(lists.id, db.select({ id: listFollows.listId }).from(listFollows).where(eq(listFollows.userId, userId))))}`,
@@ -69,7 +74,7 @@ type Fila = {
   activo: boolean; conLink: boolean
 }
 // en una sorpresa, duenoNombre es el de quien la recibe; si no usa GiftR, su nombre está en el de la lista
-const para = (r: Fila) => (r.tipo === 'grupo' ? r.listaNombre ?? 'Grupo' : r.duenoNombre ?? r.listaNombre ?? 'Alguien')
+const para = (r: Fila) => (r.tipo === 'grupo' ? r.listaNombre ?? 'Lista en común' : r.duenoNombre ?? r.listaNombre ?? 'Alguien')
 const href = (r: Fila) => (!r.conLink ? null : r.tipo === 'sorpresa' ? `/sorpresa/${r.shareToken}`
   : r.activo ? `/l/${r.shareToken}/item/${r.itemId}` : `/l/${r.shareToken}`)
 
@@ -89,7 +94,7 @@ async function deLasListasDeOtros(db: Db, userId: string, ahora: Date, soloPorCo
   const [sueltos, grupales] = await Promise.all([
     db.select({
       id: claims.id, estado: claims.estado, expiresAt: claims.expiresAt, fecha: claims.updatedAt, reservada: claims.createdAt,
-      reveladoAt: claims.reveladoAt,
+      reveladoAt: claims.reveladoAt, aporteMonto: claims.aporteMonto,
       ...columnasLista(db, userId, sql<Date>`${claims.createdAt}`),
     }).from(claims)
       .innerJoin(items, eq(claims.itemId, items.id))
@@ -123,8 +128,9 @@ async function deLasListasDeOtros(db: Db, userId: string, ahora: Date, soloPorCo
       .orderBy(desc(groupGifts.createdAt)).limit(COMPRADOS_MAX),
   ])
 
-  // contarle al dueño que fue suyo: solo en su lista personal, y de un deseo que no eliminó (ver revelarRegalo)
-  const revelable = (r: { tipo: string; borrado: boolean }) => r.tipo === 'personal' && !r.borrado
+  // contarle al dueño que fue suyo: solo en su lista personal, y de un deseo que no eliminó (ver revelarRegalo). Un aporte
+  // en plata, no: la transferencia ya dice de quién fue
+  const revelable = (r: { tipo: string; borrado: boolean; tipoDeseo: string }) => r.tipo === 'personal' && !r.borrado && r.tipoDeseo !== 'aporte'
   const todos: ConEvento[] = [
     ...sueltos.map((r): ConEvento => ({
       id: r.id, tipo: 'suelto', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,
@@ -132,6 +138,7 @@ async function deLasListasDeOtros(db: Db, userId: string, ahora: Date, soloPorCo
       venceEnDias: r.estado === 'reservado' && r.expiresAt ? Math.max(0, Math.ceil((r.expiresAt.getTime() - ahora.getTime()) / DIA)) : null,
       personas: null, encargado: null, soyEncargado: false, miParte: null, moneda: 'ARS', fecha: r.fecha, listId: r.listId,
       revelado: !!r.reveladoAt, puedeRevelar: false, reservada: r.reservada, recibido: r.recibido, revelable: revelable(r),
+      ...(r.tipoDeseo === 'aporte' && { aporte: { monto: r.aporteMonto } }),
     })),
     ...grupales.map((r): ConEvento => ({
       id: r.id, tipo: 'grupal', estado: r.estado === 'comprado' ? 'comprado' : 'reservado', titulo: r.titulo, foto: r.foto,

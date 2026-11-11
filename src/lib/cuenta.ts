@@ -59,6 +59,8 @@ export async function exportarMisDatos(db: Db, userId: string, ahora = new Date(
   const deLista = (listId: string) => deseos.filter((d) => d.listId === listId).map((d) => ({
     titulo: d.titulo, tipo: d.tipo, notas: d.notas, foto: d.fotoUrl, precio: d.precio, rangoPrecio: d.rangoPrecio, categoria: d.categoria,
     prioridad: d.prioridad, cantidad: d.cantidad, sePuedeRepetir: d.repetible, linkTienda: d.linkTienda, video: d.videoUrl,
+    // de un aporte en plata: a qué alias le transfieren y la meta. De quién aportó o cuánto, nada, como del resto
+    ...(d.tipo === 'aporte' && { aliasParaAportar: d.aporteAlias, metaDelAporte: d.aporteMeta }),
     // eliminado: lo sacó con "Eliminar" (para los que regalan quedó como "Ya no lo quiero", ver borrarDeseo)
     estado: d.borradoAt ? 'eliminado' as const : d.estadoDueno, cargado: iso(d.createdAt),
   }))
@@ -99,6 +101,7 @@ export async function exportarMisDatos(db: Db, userId: string, ahora = new Date(
   // ---- lo que regala: sus reservas y compras sueltas en listas de otros
   const sueltas = await db.select({
     deseo: items.titulo, para, estado: claims.estado, desde: claims.createdAt, cambio: claims.updatedAt, vence: claims.expiresAt, nota: claims.notaQueCompre,
+    tipoDeseo: items.tipo, aporteMonto: claims.aporteMonto,
   }).from(claims).innerJoin(items, eq(items.id, claims.itemId)).innerJoin(lists, eq(lists.id, items.listId))
     .leftJoin(dueno, eq(dueno.id, lists.ownerId)).leftJoin(paraQuien, eq(paraQuien.id, lists.paraUserId))
     .where(and(eq(claims.claimerUserId, userId), noEsDeRegaloGrupal(), ajena)).orderBy(desc(claims.createdAt))
@@ -185,6 +188,8 @@ export async function exportarMisDatos(db: Db, userId: string, ahora = new Date(
       reservasYCompras: sueltas.map((c) => ({
         deseo: c.deseo, para: c.para, estado: c.estado, desde: iso(c.desde), ultimoCambio: iso(c.cambio), vence: c.estado === 'reservado' ? iso(c.vence) : null,
         nota: c.nota,
+        // un aporte en plata: lo anotó con "Ya aporté", con cuánto si lo dijo
+        ...(c.tipoDeseo === 'aporte' && { esUnAporteEnPlata: true, cuantoAportaste: c.aporteMonto }),
       })),
       regalosGrupales: regalos.map((r) => ({
         deseo: r.deseo, para: r.para, estado: r.estado, loOrganizas: r.organizador === userId, loOrganiza: r.organiza,
@@ -381,7 +386,7 @@ async function borrarListas(t: Db, listIds: string[], conservarCuentas: boolean)
     }
     if (quedan.length) {
       await t.update(items).set({
-        notas: null, fotoUrl: null, precio: null, rangoPrecio: null, categoria: null, linkTienda: null, videoUrl: null,
+        notas: null, fotoUrl: null, precio: null, rangoPrecio: null, categoria: null, linkTienda: null, videoUrl: null, aporteAlias: null, aporteMeta: null,
         estadoDueno: 'no_lo_quiero', borradoAt: sql`coalesce(${items.borradoAt}, now())`,
       }).where(inArray(items.id, quedan))
     }
@@ -546,7 +551,10 @@ export async function borrarCuenta(db: Db, userId: string, enviar?: Enviar): Pro
     if (organiza) await t.update(groupGifts).set({ organizerUserId: await eliminada() }).where(eq(groupGifts.organizerUserId, userId))
 
     // ---- lo que reservó o compró: lo reservado se libera; lo comprado sigue comprado (nadie lo duplica), sin su nombre
-    // ni lo que escribió
+    // ni lo que escribió. Sus aportes en plata se van enteros, con lo que anotó: un aporte no ocupa nada (nadie lo
+    // "duplica"), así que no hace falta que quede a nombre de "Cuenta eliminada" como una compra.
+    const deAportes = t.select({ id: items.id }).from(items).where(eq(items.tipo, 'aporte'))
+    await t.delete(claims).where(and(eq(claims.claimerUserId, userId), inArray(claims.itemId, deAportes)))
     await t.delete(claims).where(and(eq(claims.claimerUserId, userId), ne(claims.estado, 'comprado'),
       notExists(t.select({ uno: sql`1` }).from(groupGifts).where(eq(groupGifts.claimId, claims.id)))))
     const [compro] = await t.select({ id: claims.id }).from(claims).where(eq(claims.claimerUserId, userId)).limit(1)
@@ -555,7 +563,7 @@ export async function borrarCuenta(db: Db, userId: string, enviar?: Enviar): Pro
     // ---- lo que hizo como invitado antes de unirlo a la cuenta (ver unirInvitadoACuenta): lo mismo
     const invitados = await t.select({ id: guestIdentities.id }).from(guestIdentities).where(eq(guestIdentities.promotedToUserId, userId))
     for (const g of invitados) {
-      await t.delete(claims).where(and(eq(claims.claimerGuestId, g.id), ne(claims.estado, 'comprado')))
+      await t.delete(claims).where(and(eq(claims.claimerGuestId, g.id), or(ne(claims.estado, 'comprado'), inArray(claims.itemId, deAportes))))
       await t.delete(comments).where(eq(comments.authorGuestId, g.id))
       await t.delete(notifications).where(eq(notifications.guestId, g.id))
       await t.delete(codazos).where(eq(codazos.deGuestId, g.id))

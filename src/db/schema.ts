@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, uniqueIndex, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
+import type { Ocasion } from '@/lib/ocasiones'
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -130,6 +131,10 @@ export const lists = pgTable('lists', {
   // De qué evento ya cerró "¿Qué te regalaron?" (la fecha de ese cumple): marcó lo que recibió o tocó "Ahora no", y la
   // tarjeta no vuelve hasta el evento que viene (ver post-evento.ts). Vacío: nunca la cerró.
   postEventoHecho: date('post_evento_hecho'),
+  // Solo en una lista en común: para qué es (un casamiento, un baby shower, la casa nueva…), elegida al crearla. De ahí
+  // salen el nombre que se sugiere, la tapa, los deseos para empezar y lo que se manda por WhatsApp (ver ocasiones.ts).
+  // Que es un cumple lo sigue diciendo es_cumple, que se cambia con la fecha: para leerla, siempre ocasionDeLista.
+  ocasion: text('ocasion').$type<Ocasion>().notNull().default('otra'),
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
@@ -164,7 +169,9 @@ export const listMembers = pgTable('list_members', {
 export const items = pgTable('items', {
   id: uuid('id').defaultRandom().primaryKey(),
   listId: uuid('list_id').notNull().references(() => lists.id),
-  tipo: text('tipo', { enum: ['exacto', 'idea'] }).notNull(),
+  // aporte: plata y no un objeto ("Luna de miel", "Cochecito"): no se reserva, aportan todos los que quieran, por
+  // transferencia al alias del deseo (ver aportar, en claims.ts). Se elige al cargarlo y no cambia.
+  tipo: text('tipo', { enum: ['exacto', 'idea', 'aporte'] }).notNull(),
   titulo: text('titulo').notNull(),
   notas: text('notas'),
   fotoUrl: text('foto_url'),
@@ -201,6 +208,11 @@ export const items = pgTable('items', {
   // archiveItem): con "Me equivoqué" vuelven a ser reservas.
   recibidoAt: timestamp('recibido_at', { withTimezone: true }),
   recibidoEvento: date('recibido_evento'),
+  // Solo en un aporte en plata: el alias o CVU a donde transferir y, si quiso, cuánto quiere juntar (en pesos). El alias
+  // es de este deseo y no el del perfil (users.alias_pago, que solo ve quien le debe plata): este lo ve cualquiera que
+  // tenga el link de la lista, y lo carga quien crea el deseo sabiéndolo (ver validarAliasPago).
+  aporteAlias: text('aporte_alias'),
+  aporteMeta: integer('aporte_meta'),
 }, (t) => [
   index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)),
   // los deseos de una lista, en el orden en que se cargaron: cada vista de lista, la vista previa y Eventos
@@ -248,6 +260,9 @@ export const claims = pgTable('claims', {
   reveladoAt: timestamp('revelado_at', { withTimezone: true }),
   // Cuándo el dueño le mandó las gracias por ese regalo revelado: una vez por regalo (ver agradecer).
   agradecidoAt: timestamp('agradecido_at', { withTimezone: true }),
+  // Solo en el aporte a un deseo de aporte en plata (un claim que nace comprado: "Ya aporté"): cuánto dijo que aportó, en
+  // pesos; vacío si no lo dijo. Lo ve quien lo anotó y nadie más: al dueño no le llega ni esto ni que existe.
+  aporteMonto: integer('aporte_monto'),
 }, (t) => [
   // lo reservado de un deseo (cada vista, y el conteo de reserveItem con el deseo bloqueado)
   index('claims_item_id_estado_idx').on(t.itemId, t.estado),

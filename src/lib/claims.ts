@@ -3,9 +3,9 @@ import { claims, groupGiftMembers, groupGifts, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { RESERVAS_POR_LISTA, type Viewer } from '@/lib/types'
 import { abrirListaAInvitado, accesoALista, listasAjenasSql } from '@/lib/acceso'
-import { esRepetible } from '@/lib/serialize'
+import { esAporte, esRepetible, type TipoDeseo } from '@/lib/serialize'
 import { esUuid } from '@/lib/groups'
-import { notaDeCompra } from '@/lib/limites'
+import { esMontoDeAporte, notaDeCompra } from '@/lib/limites'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 
 export const RESERVA_DIAS = 14
@@ -112,9 +112,12 @@ export function ocupaSql(desde: Date | null) {
   return or(eq(claims.estado, 'reservado'), and(eq(claims.estado, 'comprado'), desde ? gte(claims.updatedAt, desde) : undefined, despuesDeVolver))
 }
 
-type Deseo = { id: string; listId: string; tipo: 'exacto' | 'idea'; repetible: boolean }
+type Deseo = { id: string; listId: string; tipo: TipoDeseo; repetible: boolean }
 
-/** El desde de ocupaSql para un deseo: en una idea que se puede repetir, el último evento; si no, null (todo ocupa). */
+/**
+ * El desde de ocupaSql para un deseo: en una idea que se puede repetir (o un aporte en plata, ver esRepetible), el último
+ * evento; si no, null (todo ocupa).
+ */
 export async function desdeQueOcupa(db: Db, deseo: Omit<Deseo, 'id'>): Promise<Date | null> {
   return esRepetible(deseo) ? desdeElUltimoEvento(db, deseo.listId) : null
 }
@@ -154,6 +157,10 @@ export async function reserveItem(
       .where(eq(items.id, itemId))
       .for('update', { of: items })
     if (!row) return { ok: false, reason: 'no_existe' }
+    // Un aporte en plata no se reserva (no es de uno solo: aportan todos los que quieran, ver aportar). La pantalla no lo
+    // ofrece; esto es para un pedido armado a mano, y para que tampoco se arme un regalo grupal encima (ver
+    // iniciarRegaloGrupal, que reserva por acá): dividir un aporte no tiene sentido.
+    if (esAporte(row.item)) return { ok: false, reason: 'no_existe' }
     const t = tx as unknown as Db
     // Ningún dueño (tampoco un co-dueño del grupo, ni uno que salió) reserva en su propia lista. Un invitado tampoco en las
     // de una cuenta que tuvo sesión en este navegador: puede ser ese dueño sin su sesión (ver accesoALista).
@@ -294,10 +301,11 @@ export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer)
     const [c] = await t.select({ itemId: claims.itemId, createdAt: claims.createdAt }).from(claims).where(suya)
     if (!c) return no
     // lock del deseo: si a la vez lo archivan, o esto lo ve archivado, o termina antes y archivar libera la reserva (y avisa)
-    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno, linkAt: lists.shareTokenAt })
+    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno, linkAt: lists.shareTokenAt, tipo: items.tipo })
       .from(items).innerJoin(lists, eq(items.listId, lists.id))
       .where(eq(items.id, c.itemId)).for('update', { of: items })
-    if (item?.estado !== 'activo' || (await accesoALista(t, item.listId, viewer)) !== 'regalador') return no
+    // un aporte en plata no vuelve a ser una reserva (nunca lo fue): se deshace con deshacerAporte
+    if (item?.estado !== 'activo' || esAporte(item) || (await accesoALista(t, item.listId, viewer)) !== 'regalador') return no
     const deEsteEvento = and(suya, gte(claims.updatedAt, await desdeElUltimoEvento(t, item.listId)))
     if (!(await t.select({ id: claims.id }).from(claims).where(deEsteEvento)).length) return no
     if ((await tomadasEnLista(t, item.listId, viewer)) >= RESERVAS_POR_LISTA) return { ok: false, reason: 'muchas' }
@@ -312,6 +320,71 @@ export async function desmarcarComprado(db: Db, claimId: string, viewer: Viewer)
       .where(deEsteEvento)
       .returning({ id: claims.id })
     return updated.length ? { ok: true } : no
+  })
+}
+
+// ---------- Aporte en plata: "Ya aporté" ----------
+// Un deseo de aporte ("Luna de miel", "Cochecito") no se reserva: cada uno transfiere lo que quiere al alias del deseo y,
+// si quiere, lo deja anotado. Ese aporte es un claim que nace comprado: así queda en Tus regalos y lo ven los demás que
+// regalan con las reglas de nombres de siempre, sin tablas aparte. No ocupa nada (el deseo sigue disponible para todos),
+// no vence y no pasa por el tope de reservas. Al dueño no le llega nada: ni quién, ni cuánto, ni cuántos (lo ve en su banco).
+
+export type AporteResult =
+  | { ok: true; claimId: string }
+  | { ok: false; reason: 'propio' | 'archivado' | 'no_existe' | 'sin_identidad' | 'monto' }
+
+/**
+ * "Ya aporté": anota que el que mira aportó a un deseo de aporte en plata, con cuánto si lo quiso decir (pesos). Uno por
+ * persona, deseo y evento: si ya lo había anotado (un doble toque, la lista y el deseo abiertos a la vez), es ese, y un
+ * monto nuevo lo corrige. Varios a la vez no se pisan: cada uno tiene el suyo y ninguno le saca el lugar a otro.
+ * Los mismos controles que reservar: ningún dueño (ni uno que salió, ni un invitado en un navegador donde entró un dueño)
+ * anota un aporte en su propia lista, y anotarlo es decir que la lista no es suya.
+ */
+export async function aportar(db: Db, itemId: string, viewer: Viewer, monto?: number | null): Promise<AporteResult> {
+  if (!viewer.userId && !viewer.guestId) return { ok: false, reason: 'sin_identidad' }
+  if (!esUuid(itemId)) return { ok: false, reason: 'no_existe' }
+  const cuanto = monto ?? null
+  if (cuanto !== null && !esMontoDeAporte(cuanto)) return { ok: false, reason: 'monto' }
+  return db.transaction(async (tx): Promise<AporteResult> => {
+    const t = tx as unknown as Db
+    // lock del deseo, como reserveItem: dos toques de la misma persona a la vez dejan un solo aporte
+    const [item] = await t.select().from(items).where(eq(items.id, itemId)).for('update')
+    if (!item || !esAporte(item)) return { ok: false, reason: 'no_existe' }
+    const acceso = await accesoALista(t, item.listId, viewer)
+    if (acceso === 'dueno' || acceso === 'ex_dueno' || acceso === 'otra_cuenta') return { ok: false, reason: 'propio' }
+    if (viewer.guestId) await abrirListaAInvitado(t, viewer.guestId, item.listId)
+    if (item.estadoDueno !== 'activo') return { ok: false, reason: 'archivado' }
+    const ya = await loQueYaTiene(t, item, viewer)
+    if (ya) {
+      if (cuanto !== null) await t.update(claims).set({ aporteMonto: cuanto }).where(eq(claims.id, ya.claimId))
+      return { ok: true, claimId: ya.claimId }
+    }
+    const [claim] = await t.insert(claims).values({
+      itemId, claimerUserId: viewer.userId ?? null, claimerGuestId: viewer.guestId ?? null,
+      estado: 'comprado', expiresAt: null, aporteMonto: cuanto,
+    }).returning({ id: claims.id })
+    return { ok: true, claimId: claim.id }
+  })
+}
+
+/**
+ * "Me equivoqué, no aporté": el aporte propio deja de figurar (para él y para los demás que regalan), con su monto. Solo
+ * el de este evento (el de un casamiento que ya pasó es historial, como una compra: ver desmarcarComprado), mientras el
+ * deseo sigue en la lista y el que lo pide ve la coordinación. No vuelve a ser una reserva: un aporte nunca lo fue.
+ */
+export async function deshacerAporte(db: Db, claimId: string, viewer: Viewer): Promise<boolean> {
+  if (!esUuid(claimId)) return false
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    const suyo = and(eq(claims.id, claimId), eq(claims.estado, 'comprado'), claimEsDe(viewer), noEsDeRegaloGrupal())
+    const [c] = await t.select({ itemId: claims.itemId }).from(claims).where(suyo)
+    if (!c) return false
+    const [item] = await t.select({ listId: items.listId, estado: items.estadoDueno, tipo: items.tipo }).from(items)
+      .where(eq(items.id, c.itemId)).for('update')
+    if (!item || !esAporte(item) || item.estado !== 'activo' || (await accesoALista(t, item.listId, viewer)) !== 'regalador') return false
+    const deshechos = await t.update(claims).set({ estado: 'liberado', aporteMonto: null, updatedAt: new Date() })
+      .where(and(suyo, gte(claims.updatedAt, await desdeElUltimoEvento(t, item.listId)))).returning({ id: claims.id })
+    return deshechos.length > 0
   })
 }
 

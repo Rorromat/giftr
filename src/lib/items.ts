@@ -1,17 +1,19 @@
 import { and, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm'
 import { claims, groupGiftMembers, groupGifts, items, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
-import { esRepetible, pickItemFields, type OwnerItemView } from '@/lib/serialize'
+import { esAporte, esRepetible, pickItemFields, type OwnerItemView, type TipoDeseo } from '@/lib/serialize'
 import { esDuenoSql, esUuid } from '@/lib/groups'
 import { expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
 import { dejarAviso, type TipoAviso } from '@/lib/notifications'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { recienHecho } from '@/lib/repetido'
-import { acotarCantidad, CANTIDAD_MAXIMA, LARGO, recortar } from '@/lib/limites'
+import { acotarCantidad, CANTIDAD_MAXIMA, esMontoDeAporte, LARGO, recortar } from '@/lib/limites'
 import { leerPrecio } from '@/lib/pesos'
+import { validarAliasPago } from '@/lib/alias-pago'
+import { deseoSugerido, ocasionDeLista } from '@/lib/ocasiones'
 
 export type NewItemData = {
-  tipo: 'exacto' | 'idea'
+  tipo: TipoDeseo
   titulo: string
   notas?: string
   fotoUrl?: string
@@ -23,6 +25,9 @@ export type NewItemData = {
   repetible?: boolean
   linkTienda?: string
   videoUrl?: string
+  /** Solo en un aporte en plata: el alias o CVU a donde transferir (obligatorio) y la meta en pesos (opcional). */
+  aporteAlias?: string
+  aporteMeta?: number
 }
 
 /**
@@ -45,6 +50,28 @@ export function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANT
   return r as T
 }
 
+/**
+ * Lo que vale de un deseo según su tipo. Un aporte en plata es el nombre, la descripción, la foto, el alias y la meta: no
+ * tiene precio, tienda, cantidad ni "se puede repetir" (no es un objeto), y el alias tiene que ser uno de verdad (ver
+ * validarAliasPago; mal escrito no se guarda: undefined). Un deseo de otro tipo no lleva alias ni meta.
+ */
+function soloLoDeSuTipo<T extends CambiosDeseo>(data: T, tipo: TipoDeseo): T {
+  const r: CambiosDeseo = { ...data }
+  if (tipo !== 'aporte') {
+    delete r.aporteAlias
+    delete r.aporteMeta
+    return r as T
+  }
+  for (const k of ['precio', 'rangoPrecio', 'linkTienda', 'videoUrl', 'cantidad', 'repetible'] as const) delete r[k]
+  if (r.aporteAlias !== undefined) {
+    const v = validarAliasPago(r.aporteAlias)
+    // vacío no: un aporte sin alias no le sirve a nadie
+    r.aporteAlias = v.ok && v.alias ? v.alias : undefined
+  }
+  if (r.aporteMeta !== undefined && r.aporteMeta !== null && !esMontoDeAporte(r.aporteMeta)) r.aporteMeta = undefined
+  return r as T
+}
+
 /** El precio que se muestra de un deseo: el suyo o, en una idea de antes, su rango. */
 const textoDelPrecio = (d: { precio?: string | null; rangoPrecio?: string | null }) => d.precio ?? d.rangoPrecio ?? null
 
@@ -63,8 +90,10 @@ export function numerosDelPrecio(d: { precio?: string | null; rangoPrecio?: stri
 export async function createItem(db: Db, userId: string, deseo: NewItemData, listId?: string): Promise<OwnerItemView | null> {
   // un id que no es UUID no es de nadie (y la base lo rechazaría con un error)
   if (!esUuid(userId) || (listId !== undefined && !esUuid(listId))) return null
-  const data = acotarDeseo(deseo)
+  const data = soloLoDeSuTipo(acotarDeseo(deseo), deseo.tipo)
   if (!data.titulo) return null
+  // un aporte sin un alias que valga no se carga: es lo único que necesita quien quiere aportar
+  if (esAporte(data) && !data.aporteAlias) return null
   return db.transaction(async (tx) => {
     const t = tx as unknown as Db
     const [list] = await t.select().from(lists)
@@ -83,11 +112,29 @@ export async function createItem(db: Db, userId: string, deseo: NewItemData, lis
         // sin venir, lo que pone la columna
         eq(items.cantidad, nuevo.cantidad ?? 1), eq(items.prioridad, nuevo.prioridad ?? 'gustaria'), eq(items.repetible, nuevo.repetible ?? false),
         ...CAMPOS_OPCIONALES.map((k) => sql`${items[k]} is not distinct from ${nuevo[k] ?? null}`),
+        sql`${items.aporteAlias} is not distinct from ${nuevo.aporteAlias ?? null}`, sql`${items.aporteMeta} is not distinct from ${nuevo.aporteMeta ?? null}`,
       ))
     if (repetido) return pickItemFields(repetido)
     const [item] = await t.insert(items).values({ ...nuevo, ...numerosDelPrecio(nuevo), listId: list.id }).returning()
     return pickItemFields(item)
   })
+}
+
+/**
+ * Suma a una lista en común uno de los deseos para empezar de su ocasión (ver ocasiones.ts), con un toque: "Vajilla",
+ * "Pañales". Entra como una idea (sirve algo parecido), que después se edita como cualquier otro. Solo los de la ocasión
+ * de esa lista (lo que llega del formulario es el nombre, nada más), y solo un dueño. Uno que es un aporte en plata no
+ * se suma así: hay que decir a qué alias, en su formulario. Si ya está en la lista con ese nombre, es ese.
+ */
+export async function sumarDeseoSugerido(db: Db, userId: string, listId: string, titulo: string): Promise<OwnerItemView | null> {
+  if (!esUuid(userId) || !esUuid(listId)) return null
+  const [lista] = await db.select().from(lists).where(and(eq(lists.id, listId), eq(lists.tipo, 'grupo'), esDuenoSql(db, userId)))
+  const sugerido = lista && deseoSugerido(ocasionDeLista(lista), titulo)
+  if (!sugerido || sugerido.aporte) return null
+  const [ya] = await db.select().from(items)
+    .where(and(eq(items.listId, listId), eq(items.estadoDueno, 'activo'), sql`lower(${items.titulo}) = lower(${sugerido.titulo})`)).limit(1)
+  if (ya) return pickItemFields(ya)
+  return createItem(db, userId, { tipo: 'idea', titulo: sugerido.titulo, categoria: sugerido.categoria, repetible: sugerido.repetible }, listId)
 }
 
 async function itemDelDueno(db: Db, itemId: string, userId: string) {
@@ -98,9 +145,12 @@ async function itemDelDueno(db: Db, itemId: string, userId: string) {
   return !!row
 }
 
-/** "Se puede repetir" es de las ideas: en un "Quiero ESTO" no vale (si no, cualquiera lo reserva sin tope). */
-function soloIdeasSeRepiten<T extends { tipo?: 'exacto' | 'idea'; repetible?: boolean }>(data: T, tipoAntes?: 'exacto' | 'idea'): T {
-  return (data.tipo ?? tipoAntes) === 'exacto' ? { ...data, repetible: false } : data
+/**
+ * "Se puede repetir" es de las ideas: en un "Quiero ESTO" no vale (si no, cualquiera lo reserva sin tope). En un aporte
+ * la marca no se usa (se repite siempre, ver esRepetible): queda apagada.
+ */
+function soloIdeasSeRepiten<T extends { tipo?: TipoDeseo; repetible?: boolean }>(data: T, tipoAntes?: TipoDeseo): T {
+  return (data.tipo ?? tipoAntes) !== 'idea' ? { ...data, repetible: false } : data
 }
 
 /**
@@ -124,7 +174,9 @@ export async function genteDelDeseo(db: Db, itemId: string, listId: string) {
 /** Lo que se puede cambiar de un deseo; null borra un campo opcional (las notas, el precio, la foto…). */
 export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', 'categoria', 'linkTienda', 'videoUrl'] as const
 type Opcional = (typeof CAMPOS_OPCIONALES)[number]
-export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null } & {
+export type CambiosDeseo = Partial<Omit<NewItemData, Opcional | 'aporteMeta'>> & { [K in Opcional]?: string | null } & {
+  /** La meta de un aporte: null la quita. */
+  aporteMeta?: number | null
   /**
    * El dueño dijo que el precio sigue igual ("Sigue costando lo mismo" al editar, o lo volvió a traer de la tienda y no
    * cambió): la fecha del precio pasa a hoy aunque el texto no cambie. No es un cambio del deseo: no le avisa a nadie.
@@ -158,6 +210,10 @@ export async function cambiarDeseo(db: Db, itemId: string, { precioVisto, ...des
   const distinto = (d: CambiosDeseo) => Object.fromEntries(
     Object.entries(d).filter(([k, v]) => v !== undefined && antes[k as keyof typeof antes] !== v),
   ) as CambiosDeseo
+  // Un aporte en plata no pasa a ser un deseo para reservar, ni al revés: los que ya aportaron quedarían como si lo
+  // hubieran comprado, y un deseo con reservas quedaría sin dónde manejarlas. El tipo de un aporte se elige al cargarlo.
+  if (deseo.tipo !== undefined && esAporte({ tipo: deseo.tipo }) !== esAporte(antes)) deseo = { ...deseo, tipo: undefined }
+  deseo = soloLoDeSuTipo(deseo, antes.tipo)
   // Uno de antes del tope se puede bajar sin que quede en 99: el formulario deja hasta lo que tenía (ver DeseoForm).
   const cambios = distinto(soloIdeasSeRepiten(acotarDeseo(distinto(deseo), Math.max(CANTIDAD_MAXIMA, antes.cantidad)), antes.tipo))
   const despues = { ...antes, ...cambios }
@@ -169,7 +225,9 @@ export async function cambiarDeseo(db: Db, itemId: string, { precioVisto, ...des
   await db.update(items).set({ ...cambios, ...numeros }).where(eq(items.id, itemId))
   // Bajar la cantidad por debajo de lo reservado también llega así (sin nada distinto para el dueño, que no lo sabe).
   // La marca de repetible, solo si cambia de verdad: un "Quiero ESTO" de antes que la tenía no se repetía igual.
-  const avisar = AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
+  // En un aporte no se le avisa a nadie: nadie lo tiene reservado, y al que ya transfirió no le cambia nada que ahora
+  // diga otra cosa (ni siquiera otro alias).
+  const avisar = !esAporte(antes) && AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
   if (avisar) await dejarAviso(db, itemId, 'item_editado', (await genteDelDeseo(db, itemId, antes.listId)).filter((d) => d.userId !== noAvisarA))
   return true
 }
@@ -186,7 +244,7 @@ export async function deseoParaEditar(db: Db, itemId: string, userId: string) {
   if (!row || row.item.estadoDueno !== 'activo') return null
   return {
     deseo: pickItemFields(row.item),
-    grupo: row.lista.tipo === 'grupo' ? { id: row.lista.id, nombre: row.lista.nombre ?? 'Grupo' } : null,
+    grupo: row.lista.tipo === 'grupo' ? { id: row.lista.id, nombre: row.lista.nombre ?? 'Lista en común' } : null,
     shareToken: row.lista.shareToken,
   }
 }
@@ -232,7 +290,7 @@ export async function sacarDeLaLista(
   const [archivado] = await t.update(items)
     .set({ estadoDueno: estado, ...(borrar && { borradoAt: new Date() }), ...(recibido && { recibidoAt: recibido.ahora, recibidoEvento: recibido.evento }) })
     .where(and(eq(items.id, itemId), eq(items.estadoDueno, 'activo')))
-    .returning({ id: items.id, listId: items.listId })
+    .returning({ id: items.id, listId: items.listId, tipo: items.tipo })
   if (!archivado) return false
   const ahora = recibido?.ahora ?? new Date()
 
@@ -273,7 +331,8 @@ export async function sacarDeLaLista(
       estaban.map((m) => ({ userId: m.userId, guestId: null })))
   }
 
-  if (estado === 'no_lo_quiero') await dejarAviso(t, itemId, 'item_baja_comprado', await genteDelDeseo(t, itemId, archivado.listId))
+  // Al que ya aportó a un aporte en plata no se le dice que lo cambie: la plata ya está transferida, no hay qué cambiar.
+  if (estado === 'no_lo_quiero' && !esAporte(archivado)) await dejarAviso(t, itemId, 'item_baja_comprado', await genteDelDeseo(t, itemId, archivado.listId))
   return true
 }
 
@@ -354,7 +413,8 @@ export async function restoreItem(db: Db, itemId: string, userId: string, ahora 
     await dejarAviso(t, itemId, 'regalo_cancelado', await t.delete(notifications).where(sinLeer('regalo_baja')).returning(para))
     await t.update(notifications).set({ leida: true }).where(or(sinLeer('item_baja_comprado'), sinLeer('regalo_lo_tiene')))
 
-    if (antes.estadoDueno === 'no_lo_quiero') {
+    // de un aporte en plata no se había avisado nada al sacarlo (ver sacarDeLaLista): tampoco que volvió
+    if (antes.estadoDueno === 'no_lo_quiero' && !esAporte(antes)) {
       const compras = await t.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId, giftId: groupGifts.id }).from(claims)
         .leftJoin(groupGifts, eq(groupGifts.claimId, claims.id))
         .where(and(eq(claims.itemId, itemId), eq(claims.estado, 'comprado'), gte(claims.updatedAt, desde)))

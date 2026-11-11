@@ -9,6 +9,7 @@ import { recienHecho } from '@/lib/repetido'
 import { desdeQueOcupa, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
 import { esUrlFotoDeseo } from '@/lib/links'
 import { LARGO, recortar } from '@/lib/limites'
+import { esOcasion, ocasionDeLista, type Ocasion } from '@/lib/ocasiones'
 
 // Un grupo es una lista en común ("Nuestra casa"): varios dueños, una sola lista para los que regalan.
 // La regla de la sorpresa vale para todos los dueños por igual.
@@ -209,14 +210,18 @@ const fotoDeGrupo = (fotoUrl: string | null | undefined) => (fotoUrl && esUrlFot
 /**
  * Crea el grupo con el usuario de dueño. La fecha, la foto, si es un cumple (todos los años) y qué es para él van en el
  * mismo alta (una fecha que no existe o una foto que no es una subida no se guardan).
+ * ocasion: para qué es (ver ocasiones.ts). Un cumple es un cumple por las dos puertas: con ocasion 'cumple' queda
+ * es_cumple, y con esCumple (los que la crean sin decir la ocasión) queda la ocasión. Sin ninguna de las dos, "otra".
  */
 export async function crearGrupo(
   db: Db, userId: string,
   p: {
     nombre: string; descripcion?: string; eventoFecha?: string | null; eventoAnual?: boolean
-    esCumple?: boolean; fotoUrl?: string | null; parentesco?: string | null
+    esCumple?: boolean; fotoUrl?: string | null; parentesco?: string | null; ocasion?: Ocasion
   },
 ): Promise<string> {
+  const esCumple = p.ocasion ? p.ocasion === 'cumple' : p.esCumple ?? false
+  const ocasion: Ocasion = esCumple ? 'cumple' : esOcasion(p.ocasion) ? p.ocasion : 'otra'
   return db.transaction(async (tx) => {
     // Un doble toque en "Crear grupo" no arma dos: el mismo grupo recién creado es ese (lock del usuario, por dos a la vez).
     await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update')
@@ -227,8 +232,8 @@ export async function crearGrupo(
       tipo: 'grupo', nombre: p.nombre, descripcion: p.descripcion ?? null,
       shareToken: newShareToken(), inviteToken: newInviteToken(),
       eventoFecha: p.eventoFecha && fechaDeGrupoValida(p.eventoFecha) ? p.eventoFecha : null,
-      eventoAnual: p.esCumple || (p.eventoAnual ?? true),
-      esCumple: p.esCumple ?? false, fotoUrl: fotoDeGrupo(p.fotoUrl),
+      eventoAnual: esCumple || (p.eventoAnual ?? true),
+      esCumple, ocasion, fotoUrl: fotoDeGrupo(p.fotoUrl),
       // las listas nuevas nacen mostrando quién reservó solo a los que entran con cuenta (ver sinNombresPara)
       nombresSoloConCuenta: true,
     }).returning({ id: lists.id })
@@ -243,7 +248,7 @@ export async function nombresDeMisGrupos(db: Db, userId: string) {
     .from(lists).innerJoin(listMembers, eq(listMembers.listId, lists.id))
     .where(and(eq(listMembers.userId, userId), isNull(listMembers.salioAt), eq(lists.tipo, 'grupo')))
     .orderBy(desc(lists.createdAt))
-  return rows.map((r) => ({ id: r.id, nombre: r.nombre ?? 'Grupo' }))
+  return rows.map((r) => ({ id: r.id, nombre: r.nombre ?? 'Lista en común' }))
 }
 
 /** El grupo visto por uno de sus dueños (nunca incluye reservas ni comentarios). Null si no es dueño. */
@@ -268,11 +273,13 @@ export async function grupoParaDueno(db: Db, listId: string, userId: string) {
   ])
   return {
     id: list.id,
-    nombre: list.nombre ?? 'Grupo',
+    nombre: list.nombre ?? 'Lista en común',
     descripcion: list.descripcion,
     eventoFecha: list.eventoFecha,
     eventoAnual: list.eventoAnual,
     esCumple: list.esCumple,
+    /** Para qué es la lista (ver ocasionDeLista): un cumple, un casamiento, un baby shower… */
+    ocasion: ocasionDeLista(list) ?? 'otra',
     fotoUrl: list.fotoUrl,
     /** Qué es para el que mira (ver guardarParentesco). */
     miParentesco: yo?.parentesco ?? null,
@@ -291,7 +298,7 @@ export async function grupoPorInvitacion(db: Db, inviteToken: string) {
     .where(and(eq(lists.inviteToken, inviteToken), eq(lists.tipo, 'grupo')))
   if (!list) return null
   return {
-    id: list.id, nombre: list.nombre ?? 'Grupo', descripcion: list.descripcion, esCumple: list.esCumple, fotoUrl: list.fotoUrl,
+    id: list.id, nombre: list.nombre ?? 'Lista en común', descripcion: list.descripcion, esCumple: list.esCumple, fotoUrl: list.fotoUrl,
     duenos: await duenosDeLista(db, list),
   }
 }

@@ -7,6 +7,9 @@ import { nombresDeMisGrupos } from '@/lib/groups'
 import { yaAnotoUnDeseo } from '@/lib/bienvenida'
 import { compartidoAutomatico, ID_COMPARTIDO, loCompartido, rutaAgregar, VUELTA_MAX } from '@/lib/recibir-compartido'
 import { DeseoForm } from '@/components/DeseoForm'
+import { AporteForm } from '@/components/AporteForm'
+import { miAliasPago } from '@/lib/users'
+import { LARGO, recortar } from '@/lib/limites'
 import { PageHeader } from '@/components/ui'
 
 type Valor = string | string[] | undefined
@@ -14,7 +17,7 @@ type Valor = string | string[] | undefined
 const uno = (v: Valor) => (typeof v === 'string' ? v : undefined)
 
 export default async function Agregar({ searchParams }: {
-  searchParams: Promise<{ lista?: Valor; compartido?: Valor; link?: Valor; texto?: Valor; foto?: Valor; auto?: Valor }>
+  searchParams: Promise<{ lista?: Valor; compartido?: Valor; link?: Valor; texto?: Valor; foto?: Valor; auto?: Valor; aporte?: Valor; titulo?: Valor; error?: Valor }>
 }) {
   const [session, q, pedido] = await Promise.all([auth(), searchParams, headers()])
   // Lo compartido desde otra app (ver src/app/compartir/route.ts y public/sw.js): el id de lo que guardó el service worker,
@@ -38,10 +41,24 @@ export default async function Agregar({ searchParams }: {
   // El primero de su lista (acá llega derecho desde la bienvenida): se lo invita, y se le dice qué sigue. Si ya trae algo
   // compartido desde una tienda, no hace falta: el formulario llega con eso puesto.
   const primero = !yaAnoto && !desdeGrupo && !hayCompartido
+  const volver = desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'
+
+  // Un aporte en plata ("Luna de miel", "Cochecito") tiene su formulario: no es un objeto con link, precio y foto. Llega
+  // con el nombre puesto desde las ideas para empezar de una lista en común (?titulo=), y con el alias del perfil ya
+  // escrito, para que lo confirme sabiendo que ahí lo va a ver cualquiera con el link.
+  if (uno(q.aporte) === '1') {
+    return (
+      <main className="gr-hoja flex flex-col gap-1 pt-2">
+        <PageHeader title="Aporte en plata" back={volver} backLabel={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
+        <AporteForm action={addItemAction} grupos={grupos} grupoElegido={desdeGrupo?.id} boton="Agregar a la lista"
+                    alias={await miAliasPago(db, session.userId)} titulo={recortar(uno(q.titulo) ?? '', LARGO.titulo) || undefined} error={uno(q.error)} />
+      </main>
+    )
+  }
 
   return (
     <main className="gr-hoja flex flex-col gap-1 pt-2">
-      <PageHeader title={primero ? 'Tu primer deseo' : 'Nuevo deseo'} back={desdeGrupo ? `/grupos/${desdeGrupo.id}` : '/mi-lista'}
+      <PageHeader title={primero ? 'Tu primer deseo' : 'Nuevo deseo'} back={volver}
                   backLabel={`Volver a ${desdeGrupo?.nombre ?? 'Mi lista'}`} />
       {primero && (
         <div className="flex flex-col gap-1 px-1 pb-1 text-center">
@@ -51,6 +68,7 @@ export default async function Agregar({ searchParams }: {
       )}
 
       <DeseoForm action={addItemAction} grupos={grupos} grupoElegido={desdeGrupo?.id} boton="Agregar a mi lista"
+                 aporte={hayCompartido ? undefined : `/agregar?aporte=1${desdeGrupo ? `&lista=${desdeGrupo.id}` : ''}`}
                  compartido={hayCompartido ? { buzon, link: enUrl?.link, titulo: enUrl?.titulo, notas: enUrl?.notas, automatico, sinFoto } : undefined} />
     </main>
   )

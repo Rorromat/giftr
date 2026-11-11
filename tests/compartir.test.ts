@@ -41,7 +41,7 @@ test('EL TEST DE ORO, compartir: la vista previa de un deseo nunca dice si está
   await comprarRegalo(db, g.giftId, rodri.id, { total: 300000 })
 
   const i = await itemParaCompartir(db, lista.shareToken, mate.id)
-  expect(i).toEqual({ titulo: 'Mate imperial', fotoUrl: 'https://x.com/mate.jpg', precio: '$45.000', prioridad: 'mucho', para: 'Euge Mateus', grupoNombre: null })
+  expect(i).toEqual({ titulo: 'Mate imperial', fotoUrl: 'https://x.com/mate.jpg', precio: '$45.000', prioridad: 'mucho', para: 'Euge Mateus', grupoNombre: null, aporte: false })
   expect((await itemParaCompartir(db, lista.shareToken, bici.id))?.precio).toBe('$300k')
   const l = await listaParaCompartir(db, lista.shareToken)
   for (const json of [i, await itemParaCompartir(db, lista.shareToken, bici.id), l].map((v) => JSON.stringify(v).toLowerCase())) {
@@ -71,7 +71,7 @@ test('la lista compartida: de quién es, cuántos deseos y hasta 3 fotos de lo q
     await createItem(db, delfina.id, { tipo: 'exacto', titulo, prioridad, fotoUrl: foto ?? undefined }, grupoId)
   }
   expect(await listaParaCompartir(db, grupo.shareToken)).toEqual({
-    para: 'Delfina y Martín', grupoNombre: 'Nuestra casa', fotos: ['b.jpg', 'e.jpg', 'd.jpg'], cantidad: 5,
+    para: 'Delfina y Martín', grupoNombre: 'Nuestra casa', ocasion: 'otra', fotos: ['b.jpg', 'e.jpg', 'd.jpg'], cantidad: 5, conAportes: false,
   })
 })
 
@@ -114,7 +114,7 @@ test('la foto subida de la vista previa se lee de la base: el servidor no le pid
   const espiaHttps = vi.spyOn(https, 'get').mockImplementation(() => { throw new Error('sin red') })
   /** Si el medio de la foto sale rojo (sin foto, ahí va el starburst: verde y tinta). */
   const conLaFoto = async (fotoUrl: string) => {
-    const r = await imagenItem({ titulo: 'Mate', fotoUrl, precio: null, prioridad: 'gustaria', para: 'Euge', grupoNombre: null })
+    const r = await imagenItem({ titulo: 'Mate', fotoUrl, precio: null, prioridad: 'gustaria', para: 'Euge', grupoNombre: null, aporte: false })
     const data = await sharp(Buffer.from(await r.arrayBuffer())).extract({ left: 301, top: 310, width: 1, height: 1 }).raw().toBuffer()
     return data[0] > 200 && data[1] < 80 && data[2] < 80
   }

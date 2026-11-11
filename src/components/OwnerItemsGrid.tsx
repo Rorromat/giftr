@@ -3,12 +3,15 @@ import { archiveItemAction, restoreItemAction } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { PrioritySelect } from '@/components/PrioritySelect'
 import { Arte, Icon } from '@/components/ui'
-import type { OwnerItemView } from '@/lib/serialize'
+import { esAporte, type OwnerItemView } from '@/lib/serialize'
+import { pesos } from '@/lib/pesos'
 import { textoDueno } from '@/lib/compartir'
 import { paraBuscar } from '@/lib/buscar'
 import { antiguedadDelPrecio } from '@/lib/presupuesto'
 
 export const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
+/** Un aporte en plata no "se tiene": sale de la lista de una sola manera (los que ya aportaron no reciben ningún aviso). */
+export const ARCHIVAR_APORTE = [['no_lo_quiero', 'Sacarlo de la lista']] as const
 
 /**
  * Confirmar que sale de la lista (un toque sin querer lo hacía desaparecer). El texto es siempre el mismo: no dice nada
@@ -33,8 +36,39 @@ export function ConfirmarSacar({ itemId, estado, volver }: { itemId: string; est
 export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerItemView[]; shareToken: string; agregado?: string }) {
   // el recién agregado primero, y su categoría arriba (groupBy deja las categorías en el orden en que aparecen)
   const ordenados = agregado ? [...items].sort((a, b) => Number(b.id === agregado) - Number(a.id === agregado)) : items
-  const porCategoria = Object.groupBy(ordenados, (i) => i.categoria ?? 'Sin categoría')
-  return Object.entries(porCategoria).map(([cat, catItems]) => (
+  // Los aportes en plata van primero y aparte, a lo ancho: no tienen foto, precio ni cuánto se quiere, y así se ven como
+  // los ve quien regala (arriba de todo). Como todo acá, sin nada de quién aportó ni cuánto.
+  const aportes = ordenados.filter(esAporte)
+  const porCategoria = Object.groupBy(ordenados.filter((i) => !esAporte(i)), (i) => i.categoria ?? 'Sin categoría')
+  const deAportes = aportes.length > 0 && (
+    <section key="aportes-en-plata" data-buscar-grupo className="flex flex-col gap-2.5">
+      <h3 className="gr-label">{aportes.length > 1 ? 'Aportes en plata' : 'Aporte en plata'}</h3>
+      <ul className="flex flex-col gap-2.5">
+        {aportes.map((item) => (
+          <li key={item.id} id={`d-${item.id}`} data-buscar={paraBuscar(`${item.titulo} aporte plata ${item.notas ?? ''}`)}
+              className="gr-card relative flex scroll-mt-24 items-center gap-3 p-3.5">
+            <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
+              <Icon name="wallet" size={22} strokeWidth={2.2} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <Link href={`/deseo/${item.id}`}
+                    className="text-[16px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere] after:absolute after:inset-0">
+                {item.titulo}
+              </Link>
+              <span className="text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">
+                {item.aporteMeta ? `Meta: ${pesos(item.aporteMeta)} · ` : ''}A {item.aporteAlias}
+              </span>
+            </span>
+            {item.id === agregado && (
+              <span className="pointer-events-none flex-none rounded-full bg-gr-acento px-2 py-0.5 text-[11px] font-extrabold text-gr-on-acento">Nuevo</span>
+            )}
+            <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+  const deDeseos = Object.entries(porCategoria).map(([cat, catItems]) => (
     <section key={cat} data-buscar-grupo className="flex flex-col gap-2.5">
       <h3 className="gr-label">{cat}</h3>
       <ul className="grid gr-columnas items-start gap-x-3 gap-y-[18px]">
@@ -99,6 +133,7 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
       </ul>
     </section>
   ))
+  return deAportes ? [deAportes, ...deDeseos] : deDeseos
 }
 
 /**
@@ -119,7 +154,8 @@ export function Archivados({ items, grupo = false }: { items: OwnerItemView[]; g
             <span className="min-w-0 flex-1 text-sm leading-snug">
               <span className="font-semibold [overflow-wrap:anywhere]">{item.titulo}</span>
               <span className="block text-xs font-medium text-gr-muted">
-                {item.estadoDueno === 'me_lo_regalaron' ? (grupo ? 'Se lo regalaron' : 'Te lo regalaron')
+                {esAporte(item) ? 'Aporte en plata: ya no se pide'
+                  : item.estadoDueno === 'me_lo_regalaron' ? (grupo ? 'Se lo regalaron' : 'Te lo regalaron')
                   : item.estadoDueno === 'lo_tengo' ? (grupo ? 'Ya lo tienen' : 'Ya lo tenés') : grupo ? 'Ya no lo quieren' : 'Ya no lo querés'}
               </span>
             </span>

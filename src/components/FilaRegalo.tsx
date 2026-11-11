@@ -16,6 +16,8 @@ function estado(r: MiRegalo): { texto: string; urgente?: boolean } {
     const quien = r.soyEncargado ? 'lo organizás vos' : `organiza ${r.encargado?.split(' ')[0] ?? 'alguien'}`
     return { texto: `${que} · ${r.personas} ${r.personas === 1 ? 'persona' : 'personas'} · ${quien}` }
   }
+  // un aporte en plata no se compró: se aportó (y cuánto, si lo anotó)
+  if (r.aporte) return { texto: r.aporte.monto ? `Aportaste ${plata(r.aporte.monto)}` : 'Ya aportaste' }
   if (r.estado === 'comprado') return { texto: 'Comprado' }
   if (r.venceEnDias == null) return { texto: 'Reservado' }
   const d = r.venceEnDias

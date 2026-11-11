@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComponentProps } from 'react'
-import { avisoDelLink, avisoDelTitulo, normalizarPrecio } from '@/lib/deseo-form'
+import { avisoDeLaMeta, avisoDelAlias, avisoDelLink, avisoDelTitulo, normalizarPrecio } from '@/lib/deseo-form'
 import { linkHttp } from '@/lib/links'
 
 type Props = Omit<ComponentProps<'input'>, 'onChange' | 'maxLength'>
@@ -49,6 +49,20 @@ export const CampoLink = (props: Props) => (
 
 /** El link de un video: entero y que sea un link, como "Link a la tienda" (no tiene que ver con el título). */
 export const CampoVideo = (props: Props) => <CampoConAviso {...props} aviso={avisoDelLink} />
+
+/**
+ * El alias o CVU de un aporte en plata: uno mal escrito (o vacío) el servidor no lo guarda, y la transferencia no saldría.
+ * Lo que vino cargado se mira igual al cambiarlo: acá no hay datos de antes de la regla.
+ */
+export const CampoAlias = (props: Props) => <CampoConAviso {...props} aviso={avisoDelAlias} />
+
+/** La meta de un aporte: pesos, y al dejarla, "300000" pasa a "$300.000" (como el precio). Vacía vale: es opcional. */
+export const CampoMeta = (props: Omit<Props, 'onBlur'>) => (
+  <CampoConAviso {...props} aviso={avisoDeLaMeta} onBlur={(e) => {
+    const v = normalizarPrecio(e.currentTarget.value.trim() || null)
+    if (v && v !== e.currentTarget.value) e.currentTarget.value = v
+  }} />
+)
 
 /**
  * Escribir un campo desde el código (lo que completó la lectura del link, ver CompletarDesdeLink). Los campos no son

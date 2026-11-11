@@ -21,7 +21,8 @@ export default async function QueTeRegalaron({ searchParams }: { searchParams: P
   const [{ listo }, lista, despues] = await Promise.all([searchParams, getOwnList(db, session.userId), postEvento(db, session.userId)])
   // sin un cumple que ya pasó no hay qué marcar
   if (!lista || !despues) redirect('/mi-lista')
-  const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
+  // un aporte en plata no se tilda como recibido (ver post-evento.ts): sigue en la lista
+  const activos = lista.items.filter((i) => i.estadoDueno === 'activo' && i.tipo !== 'aporte')
 
   if (listo !== undefined) {
     const marcados = Math.min(500, Math.max(0, Math.trunc(Number(listo)) || 0))

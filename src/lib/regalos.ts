@@ -1566,7 +1566,8 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
     .innerJoin(items, eq(claims.itemId, items.id))
     .leftJoin(users, eq(claims.claimerUserId, users.id))
     .leftJoin(guestIdentities, eq(claims.claimerGuestId, guestIdentities.id))
-    .where(and(inArray(items.listId, listIds), eq(claims.estado, 'comprado'),
+    // un aporte en plata no es una compra ("Lo compró Sofi"): quiénes aportaron se ve en el aporte (ver aportar)
+    .where(and(inArray(items.listId, listIds), eq(claims.estado, 'comprado'), ne(items.tipo, 'aporte'),
       noEsDeRegaloGrupal()))
 
   const grupales = await db.select({

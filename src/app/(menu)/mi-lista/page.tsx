@@ -64,6 +64,8 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const soloConCuenta = await nombresSoloConCuenta(db, lista.id)
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
+  // lo que se puede marcar como recibido después del cumple: un aporte en plata no (ver post-evento.ts)
+  const hayParaMarcar = activos.some((i) => i.tipo !== 'aporte')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
   const waHref = `https://wa.me/?text=${encodeURIComponent(textoMiLista(shareUrl))}`
   const porContar = <ContaTusGustos {...gustosPorContar(gustos)} />
@@ -99,7 +101,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
       </nav>
 
       {/* Después del cumple (ver post-evento.ts): marcar lo que le regalaron. Sale por la fecha, haya o no reservas */}
-      {despues?.pendiente && activos.length > 0 && <TarjetaPostEvento />}
+      {despues?.pendiente && hayParaMarcar && <TarjetaPostEvento />}
 
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
@@ -121,7 +123,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
       {/* Lo que le regalaron va aparte de lo que sacó: con quién le contó que fue suyo, y agradecer */}
-      <Recibidos recibidos={recibidos} contados={contados} marcarMas={!!despues?.enVentana && activos.length > 0}
+      <Recibidos recibidos={recibidos} contados={contados} marcarMas={!!despues?.enVentana && hayParaMarcar}
                  abierto={!!despues?.enVentana || contados.length > 0 || recibidos.some((r) => r.dePartede.some((d) => !d.agradecido))} />
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo' && i.estadoDueno !== 'me_lo_regalaron')} />
       {/* un ajuste de la lista: quién ve los nombres de los que reservan (nunca vos) */}

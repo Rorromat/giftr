@@ -40,6 +40,7 @@ export default function Privacidad() {
         <li><b>Quien tiene el link de tu lista</b> ve tus deseos y tu perfil: nombre, foto, cumple (día y mes), gustos y talles. No hace falta que sea tu amigo ni que tenga cuenta. Tus amigos la ven sin el link.</li>
         <li><b>Los que regalan en una lista</b> con su cuenta ven entre ellos quién reservó qué, con su nombre, para no comprar lo mismo. Quien entra sin cuenta ve qué está ocupado; por quién, solo en las listas que no lo reservan a los que tienen cuenta.</li>
         <li><b>Tu alias o CVU</b> lo ve solo quien te debe su parte de un regalo grupal.</li>
+        <li><b>Si pedís un aporte en plata,</b> el alias o CVU que pongas en ese deseo lo ve cualquiera que tenga el link de la lista. Quién aportó no lo ves en GiftR (lo ven los demás que regalan), y cuánto puso cada uno lo ve solo quien lo anotó.</li>
         <li><b>Tu @usuario</b> lo puede buscar cualquiera con cuenta para sumarte como amigo: ve tu nombre y tu foto.</li>
         <li><b>Tu mail</b> no aparece en tu lista ni en tu perfil.</li>
         <li><b>En un amigo invisible,</b> a quién le regalás lo sabés solo vos.</li>

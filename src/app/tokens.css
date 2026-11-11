@@ -1564,6 +1564,8 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-categorias > section:has(> ul > li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden])) { grid-column: span 3; --gr-columnas: 3; }
   .gr-categorias > section:has(> ul > li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden])),
   .gr-categorias > section:has(> ul > .col-span-full) { grid-column: 1 / -1; --gr-columnas: inherit; }
+  /* los aportes en plata van arriba y a lo ancho, haya uno o varios */
+  .gr-categorias > section[data-a-lo-ancho] { grid-column: 1 / -1; }
 }
 
 /* Como .gr-sheet, fuera de las capas: en pantallas anchas la hoja ya no sube pegada abajo, se centra como un diálogo
