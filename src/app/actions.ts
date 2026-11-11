@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
+import { redirect, RedirectType } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -17,7 +17,7 @@ import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
-import { abrirListaAInvitado } from '@/lib/acceso'
+import { abrirListaAInvitado, accesoALista } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
 import { limpiarParaVos, marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
 import {
@@ -425,10 +425,13 @@ export async function unfollowAction(formData: FormData) {
  * El que mira. Si no se sabe quién es y el formulario trae un nombre, lo anota como invitado
  * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
  * Anotarse con su nombre en una lista es decir que no es suya: ve lo que reservaron los demás ahí (y solo ahí).
+ * nuevo: se anotó recién, con este mismo envío (hasta ahora no veía qué estaba reservado).
  */
-async function viewerIdentificandoGuest(formData: FormData, listId: string): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
+async function viewerIdentificandoGuest(
+  formData: FormData, listId: string,
+): Promise<{ ok: true; viewer: Viewer; nuevo: boolean } | Extract<NombreValidado, { ok: false }>> {
   const viewer = await getViewer()
-  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer }
+  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer, nuevo: false }
   const v = validarNombre(formData.get('nombre'))
   if (!v.ok) return v
   const guest = await createGuest(db, v.nombre)
@@ -439,7 +442,7 @@ async function viewerIdentificandoGuest(formData: FormData, listId: string): Pro
   // ver como regaladora la lista que este invitado abrió
   renovarCuentas(jar)
   // con las cuentas que tuvieron sesión acá: en sus listas, este invitado nuevo tampoco ve nada
-  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value) }
+  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value), nuevo: true }
 }
 
 export async function reserveAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
@@ -449,21 +452,31 @@ export async function reserveAction(_: EstadoForm, formData: FormData): Promise<
   if (!listId) return null
   const quien = await viewerIdentificandoGuest(formData, listId)
   if (!quien.ok) return { error: quien.error }
+  // ¿Veía qué estaba reservado cuando tocó "Reservar"? La abuela abre el link sin anotarse y ve todos los deseos como
+  // libres (puede ser la dueña sin su sesión); elige el Termo, que Rodri reservó la semana pasada, y pone su nombre. Lo
+  // mismo un invitado que todavía no dijo que esta lista no es suya. Se mira antes de reservar: reservar ya le abre la lista.
+  const veia = !!quien.viewer.userId || (!quien.nuevo && (await accesoALista(db, listId, quien.viewer)) === 'regalador')
   const r = await reserveItem(db, itemId, quien.viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
   const volver = volverALista(formData, token)
   // Un doble toque manda el segundo envío con la reserva del primero ya hecha: reserveItem le devuelve esa.
   if (r.ok) {
+    // Desde la lista (avisar): vuelve parado en ese deseo, con el cartel de hasta cuándo es suyo y qué sigue (y sin el de
+    // una reserva anterior que no salió). Sin sumar una página al historial: reservar no es ir a otro lado.
+    if (str(formData, 'avisar')) redirect(`${conParametro(volver, 'reservado', itemId)}#deseo-${itemId}`, RedirectType.replace)
     // si arriba quedó el cartel de una reserva anterior que no salió (?reserva=), se va
     if (str(formData, 'conCartel')) redirect(volver)
     return null
   }
   // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
   // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
+  // Sin lugar: si no veía los estados, no se lo ganó nadie de mano (decirle "recién lo reservó otra persona" sería mentirle):
+  // ya estaba elegido y recién ahora lo ve. Si los veía, sí: se lo reservaron mientras miraba.
+  const motivo = r.reason === 'sin_stock' && !veia ? 'ya_elegido' : r.reason
   // Se vuelve a la misma página, con sus filtros; del detalle, a la lista si el deseo ya no está.
   const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad' || r.reason === 'muchas'
-  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', r.reason))
+  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', motivo))
 }
 
 /** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */

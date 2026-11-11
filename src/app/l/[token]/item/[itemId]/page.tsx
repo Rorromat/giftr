@@ -14,7 +14,7 @@ import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
 import { nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
-import { hoyLocal, MESES, seguirLista } from '@/lib/events'
+import { seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
 import { sitioDeLaTienda } from '@/lib/links'
 import { AvatarStack, AvatarSticker, Icon } from '@/components/ui'
@@ -22,16 +22,11 @@ import { BarraDeLaFicha, BotonTienda, FichasDeseo, FotoDeLaFicha, NombreDeLaFich
 import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
+import { ReservaConfirmada, ultimoDia } from '@/components/ReservaConfirmada'
 import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { LARGO } from '@/lib/limites'
 import { esSorpresa } from '@/lib/sorpresas'
-
-/** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
-function ultimoDia(hasta: Date) {
-  const d = hoyLocal(new Date(hasta.getTime() - 1))
-  return `${d.getUTCDate()} de ${MESES[d.getUTCMonth()]}`
-}
 
 /**
  * Para quien ve la coordinación de un deseo de varias unidades, en su ficha de cuántos pide: cuántos quedan o cuántas
@@ -55,9 +50,9 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function DetalleItem({ params, searchParams }: {
   params: Promise<{ token: string; itemId: string }>
-  searchParams: Promise<{ reserva?: string; correccion?: string; reservar?: string; regalo?: string }>
+  searchParams: Promise<{ reserva?: string; correccion?: string; regalo?: string }>
 }) {
-  const [{ token, itemId }, { reserva, correccion, reservar, regalo: deRegalo }] = await Promise.all([params, searchParams])
+  const [{ token, itemId }, { reserva, correccion, regalo: deRegalo }] = await Promise.all([params, searchParams])
   const viewer = await getViewer()
   const detalle = await getItemForViewer(db, token, itemId, viewer)
   if (!detalle) {
@@ -100,7 +95,7 @@ export default async function DetalleItem({ params, searchParams }: {
     : 'Lo reservaste vos solo. Si preferís sumarte a este regalo, primero liberá tu reserva.')
     : enUnRegalo ? 'Ya estás en otro regalo grupal de este deseo.' : null
   const tienda = item.linkTienda && sitioDeLaTienda(item.linkTienda)
-  // "Lo dividimos": sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
+  // El regalo grupal: sus amigos (nunca los del cumple), para proponérselo al armarlo o después, desde el regalo que organiza
   // (también ya comprado: el que se suma después entra y se vuelve a dividir), con a quiénes se lo propuso y qué contestaron
   const amigos = viewer.userId && giver ? await amigosParaDividir(db, viewer.userId, item.id) : []
   const mio = regalos.find((r) => r.soyEncargado)
@@ -163,7 +158,6 @@ export default async function DetalleItem({ params, searchParams }: {
               {c.esMia
                 ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
                 : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
-              {c.vence && <span className="text-gr-muted"> · hasta el {ultimoDia(c.vence)}</span>}
               {c.notaQueCompre && <span className="text-gr-muted"> — compró: {c.notaQueCompre}</span>}
             </span>
           </p>
@@ -195,9 +189,10 @@ export default async function DetalleItem({ params, searchParams }: {
                   <input name="nota" maxLength={LARGO.notaCompra} placeholder="¿Qué compraste? (opcional)" className="gr-input shadow-none" />
                   <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Ya lo compré</BotonEnviar>
                 </form>
-                <GuestGate token={token} itemId={item.id} identified={identified} volver={aqui} conCartel={!!reserva} texto="Reservar de nuevo" />
-                {/* el de abajo no sale mientras se ve esto: que también pueda armar uno */}
-                <ArmarRegaloGrupal token={token} itemId={item.id} logueado={logueado} />
+                <GuestGate token={token} itemId={item.id} identified={identified} volver={aqui} conCartel={!!reserva} texto="Reservar de nuevo"
+                           para={ownerNombre} plural={plural} />
+                {/* el de abajo no sale mientras se ve esto: que también pueda armar uno (con su cuenta: sin ella no puede) */}
+                {logueado && <ArmarRegaloGrupal token={token} itemId={item.id} logueado />}
               </>
             )}
           </div>
@@ -228,19 +223,20 @@ export default async function DetalleItem({ params, searchParams }: {
           </div>
         )}
 
-        {/* "Reservar", en la barra de abajo con la tienda, abre las dos formas: lo compra él, o lo dividen (con sus amigos,
-            ver ComoLoRegalas). Si no puede reservar, en la barra queda la tienda sola. */}
+        {/* "Reservar" (para él), en la barra de abajo con la tienda: de un toque. "Armar regalo grupal", acá en el deseo, como
+            acción secundaria y solo con su cuenta (ver ComoLoRegalas). Si no puede reservar, en la barra queda la tienda sola. */}
         {reservable ? (
-          <ComoLoRegalas abierto={reservar === '1'} secundaria={verEnTienda}
-                         compro={<GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva}
-                                            texto="Reservarlo para mí" />}
-                         dividimos={giver && (logueado
-                           ? <FormDividir token={token} itemId={item.id} amigos={amigos} />
-                           : <ArmarRegaloGrupal token={token} itemId={item.id} logueado={false} />)} />
+          <ComoLoRegalas secundaria={verEnTienda}
+                         reservar={<GuestGate token={token} itemId={item.id} identified={identified} variant="primary" volver={aqui} conCartel={!!reserva}
+                                              para={ownerNombre} plural={plural} />}
+                         grupal={giver && logueado && <FormDividir token={token} itemId={item.id} amigos={amigos} />} />
         ) : <BarraDeLaFicha secundaria={verEnTienda} />}
 
         {miClaim && (
           <div className="gr-card flex flex-col gap-3 p-3.5">
+            {/* qué sigue: hasta cuándo es suyo (antes iba al lado de "Vos lo reservaste") y que lo marque; sin cuenta, que con
+                Google le avisamos antes de que venza */}
+            <ReservaConfirmada vence={miClaim.vence} entrar={logueado ? undefined : aqui} />
             <form action={boughtAction} className="flex flex-col gap-2.5">
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />

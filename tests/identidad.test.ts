@@ -34,6 +34,7 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error('NEXT_REDIRECT'), { url }) },
   notFound: () => { throw new Error('NEXT_NOT_FOUND') },
+  RedirectType: { push: 'push', replace: 'replace' },
 }))
 
 import {
@@ -43,6 +44,7 @@ import {
 import { getViewer, invitadoDeEsteNavegador, invitadoParaPreguntar } from '@/lib/viewer'
 import { getItemForViewer, getListForViewer } from '@/lib/lists'
 import { ConfirmarLista, NoSoyYo, OtraCuenta } from '@/components/Identidad'
+import { CartelReserva } from '@/components/GuestGate'
 import ListaAjena from '@/app/l/[token]/page'
 import DetalleItem from '@/app/l/[token]/item/[itemId]/page'
 
@@ -201,17 +203,19 @@ test('"¿No sos X? Salir de este dispositivo" borra la cookie de invitado y "Cer
 
 test('si la reserva no sale, vuelve a la página con el motivo (el nombre ya quedó anotado)', async () => {
   const { giver, item: termo, list } = await preparar()
-  // Rodri ya compró el Termo; la abuela abre el link sin identificarse y lo ve como cualquier otro deseo
+  // Rodri ya compró el Termo; la abuela abre el link sin identificarse y lo ve como cualquier otro deseo. Nadie se lo
+  // ganó de mano: ya estaba elegido y recién ahora, con su nombre, lo ve
   const r = await reserveItem(h.db, termo.id, { userId: giver.id })
   if (!r.ok) throw new Error(r.reason)
   await h.db.update(claims).set({ estado: 'comprado' })
   expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: termo.id, nombre: 'Abuela' }))))
-    .toBe('/l/tok-euge?reserva=sin_stock')
+    .toBe('/l/tok-euge?reserva=ya_elegido')
   const [abuela] = await h.db.select().from(guestIdentities)
   expect(await getViewer()).toEqual({ guestId: abuela.id })
   expect(await h.db.select().from(claims)).toHaveLength(1)
 
-  // vuelve a la página de donde vino, con sus filtros; desde el detalle, al detalle (si el deseo ya no está, a la lista)
+  // ya anotada ve qué está reservado: si igual lo toca (la lista abierta de antes), se lo reservaron mientras miraba.
+  // Vuelve a la página de donde vino, con sus filtros; desde el detalle, al detalle (si el deseo ya no está, a la lista)
   expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: termo.id, volver: '/l/tok-euge?cat=Casa&disp=1' }))))
     .toBe('/l/tok-euge?cat=Casa&disp=1&reserva=sin_stock')
   expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: termo.id, volver: `/l/tok-euge/item/${termo.id}` }))))
@@ -231,6 +235,48 @@ test('si la reserva no sale, vuelve a la página con el motivo (el nombre ya que
   expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: taza.id, volver: '/l/tok-euge?cat=Casa', conCartel: '1' }))))
     .toBe('/l/tok-euge?cat=Casa')
   expect(await h.db.select().from(claims).where(eq(claims.claimerGuestId, abuela.id))).toHaveLength(2)
+})
+
+test('"Ese ya lo había elegido alguien" para el que no veía los estados; "Recién lo reservó otra persona", solo si los veía', async () => {
+  const { giver, item: termo, list } = await preparar()
+  const [mate] = await h.db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  await reserveItem(h.db, termo.id, { userId: giver.id })
+  await reserveItem(h.db, mate.id, { userId: giver.id })
+  // el Abuelo se anotó en la lista de Rodri; en la de Euge todavía no dijo que no es suya, así que la ve sin estados. Con
+  // la lista abierta de antes toca "Reservar" en el Termo (reservar es decir que no es suya): ya estaba elegido
+  await h.db.insert(lists).values({ ownerId: giver.id, shareToken: 'tok-rodri' })
+  await identificarseAction(null, form({ token: 'tok-rodri', nombre: 'Abuelo' }))
+  expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'confirmar' })
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: termo.id })))).toBe('/l/tok-euge?reserva=ya_elegido')
+  // desde ahora ve la coordinación: el Mate, que también tomó Rodri, ya se le muestra reservado
+  expect((await getListForViewer(h.db, 'tok-euge', await getViewer()))?.role).toBe('giver')
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: mate.id })))).toBe('/l/tok-euge?reserva=sin_stock')
+  // con su cuenta siempre los ve
+  h.jar.clear()
+  const [sofi] = await h.db.insert(users).values({ googleId: 'g-sofi', nombre: 'Sofi', email: 'sofi@test.com' }).returning()
+  h.session = { userId: sofi.id }
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: termo.id })))).toBe('/l/tok-euge?reserva=sin_stock')
+  // la dueña sin su sesión no se entera de nada: el cartel habla de otros, así que solo sale para el que ve la coordinación
+  const cartel = (veTodo: boolean) => renderToStaticMarkup(createElement(CartelReserva, { motivo: 'ya_elegido', veTodo, conNombre: veTodo }))
+  expect(cartel(true)).toContain('Ese ya lo había elegido alguien. Ahora ves qué queda libre.')
+  expect(cartel(false)).toBe('')
+})
+
+test('desde la lista, la reserva que sale vuelve parada en ese deseo, con el cartel de hasta cuándo es suyo', async () => {
+  const { item, list } = await preparar()
+  const [mate] = await h.db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  expect(await redirigeA(reserveAction(null, form({ token: 'tok-euge', itemId: item.id, nombre: 'Abuela', volver: '/l/tok-euge', avisar: '1' }))))
+    .toBe(`/l/tok-euge?reservado=${item.id}#deseo-${item.id}`)
+  // con sus filtros, y sin el cartel de una anterior que no salió; el doble toque vuelve al mismo lugar
+  const datos = { token: 'tok-euge', itemId: mate.id, volver: '/l/tok-euge?cat=Casa', avisar: '1', conCartel: '1' }
+  for (let toque = 0; toque < 2; toque++) {
+    expect(await redirigeA(reserveAction(null, form(datos)))).toBe(`/l/tok-euge?cat=Casa&reservado=${mate.id}#deseo-${mate.id}`)
+  }
+  expect(await h.db.select().from(claims)).toHaveLength(2)
+  // si no sale, el motivo, como siempre
+  const otra = { token: 'tok-euge', itemId: item.id, volver: '/l/tok-euge', avisar: '1' }
+  h.jar.clear()
+  expect(await redirigeA(reserveAction(null, form({ ...otra, nombre: 'Tía' })))).toBe('/l/tok-euge?reserva=ya_elegido')
 })
 
 test('un doble toque en "Reservar" no le dice al que reservó que lo agarró otro', async () => {

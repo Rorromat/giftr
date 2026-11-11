@@ -10,26 +10,47 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 /**
  * "¿Quién sos?" para el que abre una lista sin sesión ni nombre: hasta que diga quién es no ve nada de la
  * coordinación (puede ser el dueño sin su sesión). Con el nombre pasa a verla; el dueño entra con Google.
+ * Es una franja de un renglón que se abre, no una tarjeta: el que llegó por WhatsApp tiene que ver los deseos sin
+ * scrollear, y el nombre se le pide de verdad cuando toca "Reservar" (ver GuestGate). Abierta, antes de que escriba
+ * nada, va "¿Es tu lista?". Un <details>: anda también antes de que cargue la página.
  */
 export function QuienSos({ token, volver }: { token: string; volver: string }) {
   const [estado, identificarse] = useActionState(identificarseAction, null)
   return (
-    <section aria-labelledby="quien-sos" className="gr-card flex flex-col gap-2.5 p-3.5">
-      <div>
-        <h2 id="quien-sos" className="text-lg leading-tight font-semibold">¿Quién sos?</h2>
-        <p className="text-[13px] font-medium leading-snug">
-          Decinos tu nombre para ver qué ya reservaron los demás. ¿Es tu lista? Entrá con Google: así no te enterás de nada.
-        </p>
+    <details id="quien-sos" className="gr-card group scroll-mt-6">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3.5 py-2 text-[13px] leading-snug font-medium [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">Decinos quién sos para ver qué ya reservaron</span>
+        <span className="flex-none font-semibold underline underline-offset-4 group-open:hidden">Anotarme</span>
+      </summary>
+      <div className="flex flex-col gap-1.5 px-3.5 pb-1.5">
+        <form action={identificarse} className="flex gap-2">
+          <input type="hidden" name="token" value={token} />
+          <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre" autoComplete="name"
+                 className="gr-input min-w-0 flex-1 shadow-none" />
+          <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Listo</BotonEnviar>
+        </form>
+        {estado?.error && <p role="alert" className="text-sm font-semibold">{estado.error}</p>}
+        <EsTuLista volver={volver} />
       </div>
-      <form action={identificarse} className="flex gap-2">
-        <input type="hidden" name="token" value={token} />
-        <input name="nombre" required maxLength={NOMBRE_INVITADO_MAXIMO} placeholder="Tu nombre" aria-label="Tu nombre"
-               className="gr-input min-w-0 flex-1 shadow-none" />
-        <BotonEnviar className="gr-btn-primary gr-btn--sm flex-none rounded-[14px]">Listo</BotonEnviar>
-      </form>
-      {estado?.error && <p role="alert" className="text-sm font-semibold">{estado.error}</p>}
-      <EntrarConGoogle volver={volver} />
-    </section>
+    </details>
+  )
+}
+
+/**
+ * "¿Es tu lista? Entrá con Google", en un renglón: va donde el que mira sin sesión está por decir su nombre. Si es la
+ * dueña (abrió su propio link en el navegador de WhatsApp, sin su sesión) y se anota, ve quién le reservó qué.
+ */
+export function EsTuLista({ volver, className = '' }: { volver: string; className?: string }) {
+  return (
+    <form action={entrarConGoogleAction} className={`py-2 text-[13px] leading-snug font-medium ${className}`}>
+      <input type="hidden" name="volver" value={volver} />
+      ¿Es tu lista?{' '}
+      {/* adentro del renglón: no lo agranda, pero se toca en 44 px */}
+      <button className="relative font-semibold underline underline-offset-4 after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
+        Entrá con Google
+      </button>
+      : así no te enterás de nada.
+    </form>
   )
 }
 
@@ -101,7 +122,7 @@ export function OtraCuenta({ volver }: { volver: string }) {
 export function ExDueno() {
   return (
     <section aria-labelledby="ex-dueno" className="gr-card flex flex-col gap-1 p-3.5">
-      <h2 id="ex-dueno" className="text-lg leading-tight font-semibold">Ya no sos parte de este grupo</h2>
+      <h2 id="ex-dueno" className="text-lg leading-tight font-semibold">Ya no sos parte de esta lista en común</h2>
       <p className="text-[13px] font-medium leading-snug">
         Como la armabas vos también, acá no se muestra qué reservaron los demás y no podés reservar. Si tenías algo
         reservado de esta lista, se liberó.
