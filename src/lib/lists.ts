@@ -9,7 +9,7 @@ import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, relacionDeLi
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
 import { asegurarListaPropia, newShareToken } from '@/lib/users'
 import { volverASeguirAmigos } from '@/lib/amigos'
-import { accesoALista, type MotivoAnonimo } from '@/lib/acceso'
+import { accesoALista, sinNombresPara, type MotivoAnonimo } from '@/lib/acceso'
 
 type ListaDueno = { listId: string; tipo: 'personal' | 'grupo' }
 // Para el regalador: ownerNombre junta a todos los dueños ("Delfina y Martín"); grupoNombre solo en grupos.
@@ -22,15 +22,21 @@ type ListaRegalador = {
 
 // anonimo: no sabemos si el que mira es el dueño sin su sesión (ver Acceso en src/lib/acceso.ts), así que ve los deseos
 // como los ve el dueño: sin nada de la capa oculta. motivo: qué le falta para verla.
+// sinNombres: ve qué está ocupado pero no por quién (un invitado sin cuenta, ver sinNombresPara): lo que no le toca ver no
+// viene en la vista.
 export type ListView =
   | ({ role: 'owner'; shareToken: string; items: OwnerItemView[] } & ListaDueno)
-  | ({ role: 'giver'; shareToken: string; items: GiverItemView[] } & ListaRegalador)
+  | ({ role: 'giver'; sinNombres: boolean; shareToken: string; items: GiverItemView[] } & ListaRegalador)
   | ({ role: 'anonimo'; motivo: MotivoAnonimo; shareToken: string; items: OwnerItemView[] } & ListaRegalador)
 
 export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
 
-/** Las reservas de unos deseos de una lista, como las ve quien regala. */
-export async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer) {
+/**
+ * Las reservas de unos deseos de una lista, como las ve quien regala. sinNombres: qué está ocupado y nada más (ver
+ * sinNombresPara): de las reservas de otros no van el nombre, lo que anotó que compró ni quiénes están en un regalo grupal
+ * (sí cuántos); de la suya, todo.
+ */
+export async function loadClaimViews(db: Db, listId: string, deseos: (typeof items.$inferSelect)[], viewer: Viewer, sinNombres = false) {
   if (!deseos.length) return new Map<string, ClaimView[]>()
   // Lo de este evento: en una idea que se puede repetir (o en un deseo que volvió a la lista), lo comprado para uno
   // anterior ya no se cuenta (ver ocupaSql), y una compra se deshace solo si es de este (ver desmarcarComprado).
@@ -73,15 +79,17 @@ export async function loadClaimViews(db: Db, listId: string, deseos: (typeof ite
     const view: ClaimView = {
       id: r.id,
       estado: r.estado as 'reservado' | 'comprado',
-      claimerNombre: r.userNombre ?? r.guestNombre ?? 'Alguien',
+      claimerNombre: sinNombres && !esMia ? null : r.userNombre ?? r.guestNombre ?? 'Alguien',
       esMia,
       // cuándo vence una reserva es cosa de quien la hizo
       vence: esMia && r.estado === 'reservado' ? r.expiresAt : null,
       deshacer: esMia && r.estado === 'comprado' && !gente.length && r.updatedAt >= desde,
-      notaQueCompre: r.notaQueCompre,
+      // texto libre de quien lo compró ("lo compramos con Sofi"), como el hilo
+      notaQueCompre: sinNombres && !esMia ? null : r.notaQueCompre,
       grupal: gente.length
         ? {
-          giftId: gente[0].giftId, personas: gente.map((g) => g.nombre), soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId),
+          giftId: gente[0].giftId, cuantos: gente.length, personas: sinNombres ? [] : gente.map((g) => g.nombre),
+          soyParte: !!viewer.userId && gente.some((g) => g.userId === viewer.userId),
           // también ya comprado: no se vuelve a sumar solo (como en regalosDeItem)
           meSacaron: sacados.some((s) => s.giftId === gente[0].giftId),
         }
@@ -128,9 +136,10 @@ export async function getListForViewer(db: Db, shareToken: string, viewer: Viewe
   }
 
   await expireStaleClaims(db)
-  const claimMap = await loadClaimViews(db, list.id, activos, viewer)
+  const sinNombres = sinNombresPara(list, viewer)
+  const claimMap = await loadClaimViews(db, list.id, activos, viewer, sinNombres)
   return {
-    role: 'giver', shareToken, ...paraRegalador(list, duenos),
+    role: 'giver', sinNombres, shareToken, ...paraRegalador(list, duenos),
     items: activos.map((i) => toGiverView(pickItemFields(i), claimMap.get(i.id) ?? [])),
   }
 }
@@ -157,6 +166,23 @@ export async function cambiarLinkParaRegalar(db: Db, listId: string, userId: str
   })
 }
 
+/**
+ * "Solo con cuenta se ve quién reservó", de la lista personal o de una en común (cualquiera de sus dueños): prendida,
+ * quien entra sin cuenta ve qué está ocupado pero no por quién (ver sinNombresPara). Devuelve si se guardó.
+ */
+export async function guardarNombresSoloConCuenta(db: Db, listId: string, userId: string, prendida: boolean): Promise<boolean> {
+  if (!esUuid(listId)) return false
+  const cambiadas = await db.update(lists).set({ nombresSoloConCuenta: prendida })
+    .where(and(eq(lists.id, listId), esDuenoSql(db, userId))).returning({ id: lists.id })
+  return cambiadas.length > 0
+}
+
+/** Si la lista muestra quién reservó solo a los que entran con cuenta (para el ajuste, en Mi lista y en la lista en común). */
+export async function nombresSoloConCuenta(db: Db, listId: string): Promise<boolean> {
+  const [lista] = await db.select({ prendida: lists.nombresSoloConCuenta }).from(lists).where(eq(lists.id, listId))
+  return lista?.prendida ?? false
+}
+
 /** La lista personal (si le faltaba, se crea). Null solo si el usuario no existe. */
 export async function getOwnList(db: Db, userId: string) {
   const list = await asegurarListaPropia(db, userId)
@@ -169,7 +195,8 @@ export async function getOwnList(db: Db, userId: string) {
 export type ItemDetail =
   | ({ role: 'owner'; item: OwnerItemView } & ListaDueno)
   | ({
-    role: 'giver'; item: GiverItemView; comments: CommentView[]; regalos: RegaloView[]
+    /** sinNombres: ve qué está ocupado pero no por quién (ver sinNombresPara): sin el hilo ni los regalos grupales. */
+    role: 'giver'; sinNombres: boolean; item: GiverItemView; comments: CommentView[]; regalos: RegaloView[]
     /** Su reserva de este deseo venció hace poco y no tiene otra: para marcarlo comprado o reservarlo de nuevo. */
     miVencida: { claimId: string; vencio: Date } | null
   } & ListaRegalador)
@@ -194,16 +221,18 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
   if (acceso !== 'regalador') return { role: 'anonimo', motivo: acceso, ...paraRegalador(row.list, duenos), item: pickItemFields(row.item) }
 
   await expireStaleClaims(db, itemId)
+  const sinNombres = sinNombresPara(row.list, viewer)
   const [claimMap, regalos, vencida] = await Promise.all([
-    loadClaimViews(db, row.list.id, [row.item], viewer), regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
+    loadClaimViews(db, row.list.id, [row.item], viewer, sinNombres),
+    sinNombres ? [] : regalosDeItem(db, itemId, viewer), miReservaVencida(db, itemId, viewer),
   ])
   const itemClaims = claimMap.get(itemId) ?? []
   return {
-    role: 'giver', ...paraRegalador(row.list, duenos),
+    role: 'giver', sinNombres, ...paraRegalador(row.list, duenos),
     item: toGiverView(pickItemFields(row.item), itemClaims),
     regalos,
     miVencida: itemClaims.some((c) => c.esMia) || regalos.some((r) => r.soyParte) ? null : vencida,
-    comments: await comentariosDe(db, itemId),
+    comments: sinNombres ? [] : await comentariosDe(db, itemId),
   }
 }
 

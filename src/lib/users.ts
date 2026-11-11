@@ -25,8 +25,9 @@ export async function upsertUserFromGoogle(
       },
     })
     .returning()
+  // las listas nuevas nacen mostrando quién reservó solo a los que entran con cuenta (ver sinNombresPara)
   await db.insert(lists)
-    .values({ ownerId: user.id, shareToken: newShareToken() })
+    .values({ ownerId: user.id, shareToken: newShareToken(), nombresSoloConCuenta: true })
     .onConflictDoNothing({ target: lists.ownerId })
   return user
 }
@@ -40,7 +41,8 @@ export async function asegurarListaPropia(db: Db, userId: string) {
   const [lista] = await buscar()
   if (lista) return lista
   if (!await existeUsuario(db, userId)) return null
-  await db.insert(lists).values({ ownerId: userId, shareToken: newShareToken() }).onConflictDoNothing({ target: lists.ownerId })
+  await db.insert(lists).values({ ownerId: userId, shareToken: newShareToken(), nombresSoloConCuenta: true })
+    .onConflictDoNothing({ target: lists.ownerId })
   const [creada] = await buscar()
   return creada ?? null
 }

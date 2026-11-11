@@ -13,7 +13,7 @@ import { esOFueDuenoDeLista, esUuid, juntarNombres, noEsNiFueDuenoSql } from '@/
 import { dividir, plata, type Moneda } from '@/lib/pesos'
 import { simplificar, type Tramo } from '@/lib/simplificar'
 import { notaDeCompra } from '@/lib/limites'
-import { accesoALista } from '@/lib/acceso'
+import { veQuienReservo } from '@/lib/acceso'
 import { dejarAviso } from '@/lib/notifications'
 import { avisar, type Enviar } from '@/lib/codazos'
 
@@ -1016,10 +1016,13 @@ export async function saldarRonda(db: Db, userId: string, clave: string, visto: 
   return true
 }
 
-/** Los regalos grupales vigentes de un deseo, para quien regala. Al dueño y a quien no ve la capa oculta (ver accesoALista) les devuelve []. */
+/**
+ * Los regalos grupales vigentes de un deseo, para quien regala. Al dueño, a quien no ve la capa oculta (ver accesoALista) y
+ * al invitado sin cuenta que no ve nombres (ver veQuienReservo) les devuelve [].
+ */
 export async function regalosDeItem(db: Db, itemId: string, viewer: Viewer): Promise<RegaloView[]> {
   const [item] = await db.select({ listId: items.listId, tipo: items.tipo, repetible: items.repetible }).from(items).where(eq(items.id, itemId))
-  if (!item || (await accesoALista(db, item.listId, viewer)) !== 'regalador') return []
+  if (!item || !(await veQuienReservo(db, item.listId, viewer))) return []
   // En una idea que se puede repetir (o en un deseo que volvió a la lista), uno comprado para un evento anterior ya se
   // regaló: no se muestra, como en la lista y al reservar (ver ocupaSql). Lo comprado se anota en su reserva.
   const desde = await desdeQueOcupa(db, item)
@@ -1602,9 +1605,12 @@ async function comprasDeListas(db: Db, listIds: string[]): Promise<Compra[]> {
   ].sort((a, b) => b.entrada.fecha.getTime() - a.entrada.fecha.getTime())
 }
 
-/** Historial de regalos comprados de una lista, para quien regala con nombre. Null para sus dueños y para quien no ve la capa oculta. */
+/**
+ * Historial de regalos comprados de una lista, para quien regala con nombre. Null para sus dueños, para quien no ve la capa
+ * oculta y para el invitado sin cuenta que no ve nombres (ver veQuienReservo).
+ */
 export async function historialDeLista(db: Db, listId: string, viewer: Viewer): Promise<Historial | null> {
-  if ((await accesoALista(db, listId, viewer)) !== 'regalador') return null
+  if (!(await veQuienReservo(db, listId, viewer))) return null
   const compras = await comprasDeListas(db, [listId])
   const yo = viewer.userId ? `u:${viewer.userId}` : `g:${viewer.guestId}`
   const conteo = new Map<string, Historial['ranking'][number]>()

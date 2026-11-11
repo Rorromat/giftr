@@ -118,6 +118,11 @@ export const lists = pgTable('lists', {
   esCumple: boolean('es_cumple').notNull().default(false),
   // La foto de un grupo (la cara de Juancito), subida como la de un deseo: /foto/deseo/:id (ver guardarFotoDeseo).
   fotoUrl: text('foto_url'),
+  // "Solo con cuenta se ve quién reservó": quien entra sin cuenta (un invitado, con el nombre que quiera) ve qué está
+  // ocupado pero no por quién (ver veQuienReservo). Sin esto, la dueña abría su link en una ventana privada, se anotaba como
+  // "Tía" y veía todo. Apagada por defecto en la columna (las listas de antes siguen como estaban); las nuevas nacen con
+  // ella prendida, puesta a mano donde se crean (upsertUser, asegurarListaPropia, crearGrupo).
+  nombresSoloConCuenta: boolean('nombres_solo_con_cuenta').notNull().default(false),
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
@@ -186,7 +191,14 @@ export const guestIdentities = pgTable('guest_identities', {
   // De antes: ya no se pide ni se usa para unirlo a una cuenta (nadie lo verificaba).
   email: text('email'),
   promotedToUserId: uuid('promoted_to_user_id').references(() => users.id),
-})
+  // En qué lista se anotó con su nombre y cuándo: para el tope de invitados nuevos por lista y por día (ver
+  // anotarInvitado). Vacío en los de antes de que hubiera tope (no cuentan).
+  anotadoEn: uuid('anotado_en').references(() => lists.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // contar los que se anotaron hoy en una lista, antes de anotar a otro
+  index('guest_identities_anotado_en_idx').on(t.anotadoEn, t.createdAt).where(sql`${t.anotadoEn} is not null`),
+])
 
 // Listas donde un invitado dijo que no son suyas (se anotó ahí, reservó o tocó "Ver lo reservado"): solo en esas ve
 // la capa oculta. Su nombre vale para todo el navegador, y en otra lista puede ser el dueño sin su sesión.

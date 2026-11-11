@@ -8,16 +8,16 @@ import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
 import {
-  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, NO_SOY_COOKIE,
-  OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarNoSoy,
+  ANOTADOS_COOKIE, anotadosHoy, anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, INVITADOS_POR_NAVEGADOR,
+  leerInvitado, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarAnotado, sumarNoSoy,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
 import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
-import { abrirListaAInvitado, accesoALista } from '@/lib/acceso'
+import { anotarInvitado, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
+import { abrirListaAInvitado, accesoALista, veQuienReservo } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
 import { limpiarParaVos, marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
 import {
@@ -26,10 +26,10 @@ import {
 } from '@/lib/groups'
 import { invitarAGrupo } from '@/lib/invitar-a-grupo'
 import { agregarListaDeAmigo } from '@/lib/gente'
-import { cambiarLinkParaRegalar } from '@/lib/lists'
+import { cambiarLinkParaRegalar, guardarNombresSoloConCuenta } from '@/lib/lists'
 import { asegurarListaPropia, existeUsuario, guardarAliasPago } from '@/lib/users'
 import { cambiarNombre } from '@/lib/perfil'
-import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
+import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, hoyLocal } from '@/lib/events'
 import { guardarGustos, gustosPorContar, saltearBienvenida, yaAnotoUnDeseo } from '@/lib/bienvenida'
 import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { esPasoGustos, gustosDesdeForm } from '@/lib/gustos'
@@ -413,6 +413,20 @@ export async function newShareLinkAction(formData: FormData) {
   if (nuevo) redirect(grupoId ? `/grupos/${grupoId}?nuevo=regalar` : '/perfil?nuevo=regalar')
 }
 
+/**
+ * "Solo con cuenta se ve quién reservó", de la lista personal (desde Mi lista) o de una en común (con grupoId): prendida
+ * (prendida=1), quien entra sin cuenta ve qué está ocupado pero no por quién.
+ */
+export async function nombresSoloConCuentaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const listId = str(formData, 'grupoId') ?? (await asegurarListaPropia(db, session.userId))?.id
+  if (listId) await guardarNombresSoloConCuenta(db, listId, session.userId, str(formData, 'prendida') === '1')
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+}
+
 /** Saca una lista de Tu gente (y su cumple o fecha de Eventos). */
 export async function unfollowAction(formData: FormData) {
   const session = await auth()
@@ -427,18 +441,26 @@ export async function unfollowAction(formData: FormData) {
  * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
  * Anotarse con su nombre en una lista es decir que no es suya: ve lo que reservaron los demás ahí (y solo ahí).
  * nuevo: se anotó recién, con este mismo envío (hasta ahora no veía qué estaba reservado).
+ * Un navegador que ya tiene su invitado sigue con ese (no se anota otro), y los nuevos tienen tope: por navegador
+ * (INVITADOS_POR_NAVEGADOR) y por lista (ver anotarInvitado). Si no, cada nombre inventado eran 10 reservas más.
  */
 async function viewerIdentificandoGuest(
   formData: FormData, listId: string,
-): Promise<{ ok: true; viewer: Viewer; nuevo: boolean } | Extract<NombreValidado, { ok: false }>> {
+): Promise<{ ok: true; viewer: Viewer; nuevo: boolean } | { ok: false; motivo: 'vacio' | 'largo' | 'tope'; error: string }> {
   const viewer = await getViewer()
   if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer, nuevo: false }
-  const v = validarNombre(formData.get('nombre'))
+  const v: NombreValidado = validarNombre(formData.get('nombre'))
   if (!v.ok) return v
-  const guest = await createGuest(db, v.nombre)
-  await abrirListaAInvitado(db, guest.id, listId)
   const jar = await cookies()
+  // el día de acá: a la medianoche de Argentina la cuenta del navegador empieza de nuevo
+  const hoy = hoyLocal().toISOString().slice(0, 10)
+  if (anotadosHoy(jar.get(ANOTADOS_COOKIE)?.value, hoy) >= INVITADOS_POR_NAVEGADOR) {
+    return { ok: false, motivo: 'tope', error: 'Hoy ya se anotó mucha gente desde este dispositivo: entrá con Google para reservar.' }
+  }
+  const guest = await anotarInvitado(db, v.nombre, listId)
+  if (!guest) return { ok: false, motivo: 'tope', error: 'Hoy ya se anotó mucha gente en esta lista: entrá con Google para reservar.' }
   jar.set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  jar.set(ANOTADOS_COOKIE, sumarAnotado(jar.get(ANOTADOS_COOKIE)?.value, hoy), OPCIONES_COOKIE_INVITADO)
   // las cuentas anotadas duran desde ahora, como la cookie nueva: si vencieran antes, la dueña sin su sesión volvería a
   // ver como regaladora la lista que este invitado abrió
   renovarCuentas(jar)
@@ -610,7 +632,10 @@ export async function commentAction(formData: FormData) {
   const viewer = await getViewer()
   const token = str(formData, 'token')!
   const itemId = str(formData, 'itemId')!
-  if (!(await listaDelItem(itemId, token))) return
+  const listId = await listaDelItem(itemId, token)
+  // el hilo es de los que lo ven: un invitado sin cuenta en una lista que muestra los nombres solo con cuenta no lo lee,
+  // así que tampoco escribe en él (la sorpresa, siempre con cuenta, tiene su propio control en addComment)
+  if (!listId || !(viewer.userId || (await veQuienReservo(db, listId, viewer)))) return
   await addComment(db, itemId, viewer, str(formData, 'texto') ?? '')
   revalidatePath(`/l/${token}/item/${itemId}`)
   revalidatePath(`/sorpresa/${token}`)

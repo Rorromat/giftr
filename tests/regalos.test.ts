@@ -72,7 +72,7 @@ test('armar un regalo grupal reserva el deseo sin vencimiento y los demás se su
 
   const vista = await getItemForViewer(db, lista.shareToken, bici.id, { userId: sofi.id })
   if (vista?.role !== 'giver') throw new Error('esperaba giver')
-  expect(vista.item.claims[0].grupal).toEqual({ giftId, personas: ['Rodri', 'Sofi', 'Ana'], soyParte: true, meSacaron: false })
+  expect(vista.item.claims[0].grupal).toEqual({ giftId, cuantos: 3, personas: ['Rodri', 'Sofi', 'Ana'], soyParte: true, meSacaron: false })
   expect(vista.regalos[0]).toMatchObject({ estado: 'abierto', encargado: { nombre: 'Rodri' }, soyParte: true, soyEncargado: false })
   expect(vista.regalos[0].miembros.map((m) => m.nombre)).toEqual(['Rodri', 'Sofi', 'Ana'])
 

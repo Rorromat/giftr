@@ -6,7 +6,9 @@ import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver } from './helpers'
 import type { Db } from '@/db/types'
 import { claims, guestIdentities, items, lists, users } from '@/db/schema'
-import { CUENTAS_COOKIE, dijoQueNoEs, firmarInvitado, GUEST_COOKIE, NO_SOY_COOKIE, sumarCuenta, sumarNoSoy } from '@/lib/cookie-invitado'
+import {
+  ANOTADOS_COOKIE, CUENTAS_COOKIE, dijoQueNoEs, firmarInvitado, GUEST_COOKIE, NO_SOY_COOKIE, sumarCuenta, sumarNoSoy,
+} from '@/lib/cookie-invitado'
 import { markBought, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
 import { crearGrupo } from '@/lib/groups'
@@ -153,7 +155,8 @@ test('la cookie de las cuentas se renueva al anotar un invitado: nunca vence ant
   h.escritas.length = 0
   // la abuela se anota en la lista de Euge desde la tablet: las cuentas se vuelven a escribir, iguales, junto con su cookie
   await identificarseAction(null, form({ token: 'tok-euge', nombre: 'Abuela' }))
-  expect(h.escritas).toEqual([GUEST_COOKIE, CUENTAS_COOKIE])
+  // (y la cuenta de cuántos se anotaron hoy desde este navegador, ver INVITADOS_POR_NAVEGADOR)
+  expect(h.escritas).toEqual([GUEST_COOKIE, ANOTADOS_COOKIE, CUENTAS_COOKIE])
   expect(h.jar.get(CUENTAS_COOKIE)).toBe(cuentas)
   expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
 
@@ -163,7 +166,7 @@ test('la cookie de las cuentas se renueva al anotar un invitado: nunca vence ant
     if (antes) h.jar.set(CUENTAS_COOKIE, antes)
     h.escritas.length = 0
     await identificarseAction(null, form({ token: 'tok-euge', nombre: 'Tía' }))
-    expect(h.escritas).toEqual([GUEST_COOKIE])
+    expect(h.escritas).toEqual([GUEST_COOKIE, ANOTADOS_COOKIE])
   }
 })
 
@@ -345,7 +348,8 @@ test('"No soy yo": lo del invitado queda como estaba, no se le pregunta más a e
   expect(await reserveItem(h.db, item.id, await getViewer())).toEqual({ ok: false, reason: 'propio' })
   // y "¿No sos Mamá? Salir de este dispositivo" borra al invitado; lo que usó el navegador queda anotado
   await redirigeA(salirAction(form({ volver: '/' })))
-  expect([...h.jar.keys()]).toEqual([CUENTAS_COOKIE])
+  // (y cuántos se anotaron hoy desde acá: salir no la pone en cero, ver INVITADOS_POR_NAVEGADOR)
+  expect([...h.jar.keys()].sort()).toEqual([ANOTADOS_COOKIE, CUENTAS_COOKIE])
   expect(await getListForViewer(h.db, 'tok-euge', await getViewer())).toMatchObject({ role: 'anonimo', motivo: 'otra_cuenta' })
 })
 
@@ -497,8 +501,8 @@ test('con la sesión de un usuario que ya no está en la base, "Salir igual" tam
   expect(await getViewer()).toMatchObject({ guestId: abuelo.id })
   await salirAction(form({ volver: '/l/tok-euge' }))
   expect(h.signOut).toHaveBeenCalledWith({ redirectTo: '/l/tok-euge' })
-  // y no anota en el navegador una cuenta que no existe
-  expect([...h.jar.keys()]).toEqual([])
+  // y no anota en el navegador una cuenta que no existe (queda solo cuántos se anotaron hoy desde acá)
+  expect([...h.jar.keys()].filter((k) => k !== ANOTADOS_COOKIE)).toEqual([])
   h.session = null
   expect(await getViewer()).toEqual({})
 })

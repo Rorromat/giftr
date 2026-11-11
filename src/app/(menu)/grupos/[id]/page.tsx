@@ -8,6 +8,8 @@ import {
 } from '@/app/actions'
 import { fechaParaEditar, hoyLocal, rotuloFechaGrupo } from '@/lib/events'
 import { amigosParaInvitar } from '@/lib/invitar-a-grupo'
+import { nombresSoloConCuenta } from '@/lib/lists'
+import { AjusteSoloConCuenta } from '@/components/SoloConCuenta'
 import { ElegirAmigos } from '@/components/Dividir'
 import { FotoDeLista } from '@/components/FotoDeLista'
 import { CampoParentesco, CamposFecha } from '@/components/ListaEnComun'
@@ -40,6 +42,7 @@ export default async function Grupo({ params, searchParams }: {
   const grupo = await grupoParaDueno(db, id, session.userId)
   if (!grupo) notFound()
   const paraInvitar = await amigosParaInvitar(db, grupo.id, session.userId)
+  const soloConCuenta = await nombresSoloConCuenta(db, grupo.id)
 
   const activos = grupo.items.filter((i) => i.estadoDueno === 'activo')
   const nuevoDeseo = agregado ? activos.find((i) => i.id === agregado) : undefined
@@ -186,6 +189,9 @@ export default async function Grupo({ params, searchParams }: {
         <RecienAgregado deseo={{ id: nuevoDeseo.id, titulo: nuevoDeseo.titulo, foto: nuevoDeseo.fotoUrl, prioridad: nuevoDeseo.prioridad, grupo: true }} />
       )}
       {eliminado === '1' && <DeseoEliminado />}
+
+      {/* un ajuste de la lista: quién ve los nombres de los que reservan (nunca los que la arman) */}
+      <AjusteSoloConCuenta prendida={soloConCuenta} grupoId={grupo.id} />
 
       <div className="flex flex-col gap-1">
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}

@@ -11,7 +11,7 @@ import { AmigoEnLista, AvisoAmigo } from '@/components/Amigos'
 import { BotonRobar } from '@/components/Novedades'
 import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
-import { nombreDeViewer } from '@/lib/guest'
+import { linkParaVolver, nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
@@ -23,6 +23,7 @@ import { BUSCAR_DESDE, paraBuscar } from '@/lib/buscar'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
 import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
 import { ReservaConfirmada, ultimoDia } from '@/components/ReservaConfirmada'
+import { SoloConCuenta } from '@/components/SoloConCuenta'
 import { Banners } from '@/components/Banners'
 import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
@@ -35,17 +36,22 @@ import { iconoDeCategoria } from '@/components/FichaDeseo'
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
 
-function estadoNoDisponible(item: Tarjeta) {
+/** sinNombres: al que mira no le toca saber quién (ver sinNombresPara): "Reservado" a secas; lo suyo, sí. */
+function estadoNoDisponible(item: Tarjeta, sinNombres: boolean) {
   // comprado solo si ya se compró todo; si no, quién se ocupa (sin esconder a los demás detrás del primero)
   if (item.claims.length && item.claims.every((c) => c.estado === 'comprado')) return '✓ Comprado'
   const grupal = item.claims.find((c) => c.grupal && c.estado === 'reservado')?.grupal
   if (grupal && item.claims.length === 1) {
     if (grupal.soyParte) return 'Estás en el regalo grupal'
-    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo)
-    return `Regalo grupal de ${grupal.personas.length}${grupal.meSacaron ? '' : ' · sumate'}`
+    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo); sin cuenta, tampoco
+    return `Regalo grupal de ${grupal.cuantos}${grupal.meSacaron || sinNombres ? '' : ' · sumate'}`
   }
   const primero = item.claims.find((c) => c.esMia) ?? item.claims[0]
   const otros = item.claims.length - 1
+  if (sinNombres) {
+    if (primero?.esMia) return `Lo reservaste vos${otros > 0 ? ` y ${otros} más` : ''}`
+    return otros > 0 ? `Reservado por ${otros + 1} personas` : 'Reservado'
+  }
   return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`
 }
 
@@ -115,6 +121,8 @@ export default async function ListaAjena({
   // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en Todo el año.
   // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
   const veTodo = vista.role === 'giver'
+  // ve qué está ocupado pero no por quién: sin cuenta, en una lista que lo muestra solo con cuenta (ver sinNombresPara)
+  const sinNombres = vista.role === 'giver' && vista.sinNombres
   const identified = identificado(viewer)
   // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista). En la de una persona y en una
   // en común: regalarle algo que no está en la lista (las sorpresas, solo para los que ven la coordinación con sesión)
@@ -122,7 +130,7 @@ export default async function ListaAjena({
   const [evento, historial, gustos, quien, sorpresas, invitado] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
-    veTodo ? historialDeLista(db, vista.listId, viewer) : null,
+    veTodo && !sinNombres ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
     veTodo && viewer.userId && (dueno || vista.grupoNombre)
@@ -171,7 +179,8 @@ export default async function ListaAjena({
   const miReserva = (item?: Tarjeta) => item?.claims.find((c) => c.esMia && !c.grupal && c.estado === 'reservado')
   const recien = reservado ? tarjetas.find((i) => i.id === reservado) : undefined
   const confirmacion = recien && miReserva(recien) && (
-    <ReservaConfirmada cartel vence={miReserva(recien)!.vence} deseo={`/l/${token}/item/${recien.id}`} entrar={viewer.userId ? undefined : aqui} />
+    <ReservaConfirmada cartel vence={miReserva(recien)!.vence} deseo={`/l/${token}/item/${recien.id}`} entrar={viewer.userId ? undefined : aqui}
+                       recuperar={linkParaVolver(viewer, vista.listId, token)} />
   )
   // Sin cuenta, "¿Y vos qué querés?" flota abajo recién cuando ya reservó algo; antes va al final, quieto (ver abajo)
   const yaReservo = tarjetas.some((i) => i.claims.some((c) => c.esMia || c.grupal?.soyParte))
@@ -216,7 +225,7 @@ export default async function ListaAjena({
             {/* lo que ya no está libre, con el puntito del acento */}
             {!item.disponible && (
               <p className="flex items-start gap-1.5 text-xs leading-snug font-bold [overflow-wrap:anywhere]">
-                <i aria-hidden className="mt-[5px] size-[7px] flex-none rounded-full bg-gr-acento" />{estadoNoDisponible(item)}
+                <i aria-hidden className="mt-[5px] size-[7px] flex-none rounded-full bg-gr-acento" />{estadoNoDisponible(item, sinNombres)}
               </p>
             )}
             {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
@@ -292,6 +301,9 @@ export default async function ListaAjena({
           : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
             : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
               : <QuienSos token={token} volver={aqui} />)}
+
+        {/* por qué ve "Reservado" a secas, y cómo ver quién */}
+        {sinNombres && <SoloConCuenta volver={aqui} />}
 
         <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 

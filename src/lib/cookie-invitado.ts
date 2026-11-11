@@ -48,6 +48,55 @@ export function leerInvitado(valor: string | undefined): string | null {
   return igualesSinFiltrarTiempo(valor.slice(punto + 1), firma(id)) ? id : null
 }
 
+// El link para volver a su reserva (/l/<token>/volver/<clave>): la abuela reservó el Termo desde el navegador de WhatsApp
+// y a la semana abre la lista en Chrome, o cambió de teléfono: sin su cookie no podía liberarlo ni marcarlo comprado.
+// La clave es su id (sin guiones) y una firma de (invitado, lista): es una credencial de ESE invitado y solo para ESA
+// lista. No es la firma de la cookie: la clave va en un link que se copia y se manda, y si se filtra no tiene que servir
+// para armar la cookie a mano ni para entrar por otra lista.
+const firmaVuelta = (guestId: string, listId: string) => hmac(`giftr_volver:${guestId}:${listId}`)
+const FORMA_DE_CLAVE = /^([0-9a-f]{32})([A-Za-z0-9_-]{43})$/
+const conGuiones = (hex: string) => `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+
+export function claveParaVolver(guestId: string, listId: string): string {
+  return `${guestId.toLowerCase().replaceAll('-', '')}${firmaVuelta(guestId.toLowerCase(), listId)}`
+}
+
+/** Si tiene la forma de una clave para volver (sin mirar la firma): para no armar links con cualquier cosa. */
+export const pareceClaveParaVolver = (clave: string) => FORMA_DE_CLAVE.test(clave)
+
+/** El id del invitado si la clave es la suya para esa lista. Si no (otra lista, tocada a mano, cortada al copiarla): null. */
+export function leerClaveParaVolver(clave: string | undefined, listId: string): string | null {
+  const partes = clave ? FORMA_DE_CLAVE.exec(clave) : null
+  if (!partes) return null
+  const id = conGuiones(partes[1])
+  return esUuid(id) && igualesSinFiltrarTiempo(partes[2], firmaVuelta(id, listId)) ? id : null
+}
+
+// Cuántos invitados se anotaron hoy desde este navegador (`<día>~<cuántos>.<firma>`). Con "¿No sos X? Salir de este
+// dispositivo" y otro nombre, cada invitado nuevo puede tomar 10 reservas más: un primo en broma dejaba la lista entera
+// tomada sin moverse de la página. En la tablet de la familia se anotan la abuela, la tía y dos primos: por eso no es uno.
+// Borrando las cookies se saltea (para eso está el tope por lista, ver anotarInvitado): esto frena al que insiste desde la
+// página.
+export const ANOTADOS_COOKIE = 'giftr_anotados'
+export const INVITADOS_POR_NAVEGADOR = 5
+
+const firmaAnotados = (cuenta: string) => hmac(`giftr_anotados:${cuenta}`)
+
+/** Cuántos se anotaron ese día desde este navegador; 0 si la cookie es de otro día, no está o no está bien firmada. */
+export function anotadosHoy(valor: string | undefined, dia: string): number {
+  const punto = valor?.lastIndexOf('.') ?? -1
+  if (!valor || punto < 0) return 0
+  const cuenta = valor.slice(0, punto)
+  if (!igualesSinFiltrarTiempo(valor.slice(punto + 1), firmaAnotados(cuenta))) return 0
+  const [suDia, cuantos] = cuenta.split('~')
+  return suDia === dia && /^\d{1,3}$/.test(cuantos ?? '') ? Number(cuantos) : 0
+}
+
+export function sumarAnotado(valor: string | undefined, dia: string): string {
+  const cuenta = `${dia}~${anotadosHoy(valor, dia) + 1}`
+  return `${cuenta}.${firmaAnotados(cuenta)}`
+}
+
 // "No soy yo": la cuenta que entró en este navegador dijo que no es el invitado que estaba anotado.
 // No se le vuelve a preguntar, y la cookie del invitado sigue ahí para cuando vuelva a usarlo esa persona.
 // Lleva una marca por cuenta (`<marca>~<marca>…`): en la tablet de la familia, que Rodri diga que no, no le vuelve a

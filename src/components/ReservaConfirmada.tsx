@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { entrarConGoogleAction } from '@/app/actions'
 import { hoyLocal, MESES } from '@/lib/events'
 import { Icon } from '@/components/ui'
+import { LinkParaVolver } from '@/components/LinkParaVolver'
 
 /** El último día (en Argentina) de una reserva que dura hasta ese momento: "22 de agosto". Si termina a las 0 h, el anterior. */
 export function ultimoDia(hasta: Date) {
@@ -15,9 +16,10 @@ export function ultimoDia(hasta: Date) {
  * no volvía a abrir el link y a las dos semanas quedaba libre de nuevo sin que se enterara.
  * deseo: en la lista, el link al deseo, que es donde se marca. entrar: un invitado sin cuenta (adónde vuelve después de
  * entrar): solo con su cuenta le aparece en Inicio que está por vencer. cartel: recién reservado, en la lista.
+ * recuperar: también de un invitado sin cuenta, su link para volver a esta reserva desde otro teléfono (ver LinkParaVolver).
  */
-export function ReservaConfirmada({ vence, deseo, entrar, cartel = false }: {
-  vence: Date | null; deseo?: string; entrar?: string; cartel?: boolean
+export function ReservaConfirmada({ vence, deseo, entrar, recuperar, cartel = false }: {
+  vence: Date | null; deseo?: string; entrar?: string; recuperar?: string; cartel?: boolean
 }) {
   const subrayado = 'font-semibold underline underline-offset-4'
   // adentro de un renglón: no lo agranda, pero se toca en 44 px
@@ -34,11 +36,12 @@ export function ReservaConfirmada({ vence, deseo, entrar, cartel = false }: {
       <button className={`${subrayado} ${tocable}`}>Entrá con Google</button> y te avisamos antes de que venza.
     </form>
   )
-  if (!cartel) return <div className="text-sm leading-snug font-medium"><p>{texto}</p>{conGoogle}</div>
+  const paraVolver = recuperar && <LinkParaVolver url={recuperar} />
+  if (!cartel) return <div className="text-sm leading-snug font-medium"><p>{texto}</p>{conGoogle}{paraVolver}</div>
   return (
     <div role="status" className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm leading-snug font-medium text-gr-on-brand">
       <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
-      <div className="min-w-0 flex-1"><p>{texto}</p>{conGoogle}</div>
+      <div className="min-w-0 flex-1"><p>{texto}</p>{conGoogle}{paraVolver}</div>
     </div>
   )
 }

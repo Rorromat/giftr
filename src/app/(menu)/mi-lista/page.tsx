@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { avisosSinLeer } from '@/lib/bandeja'
-import { getOwnList } from '@/lib/lists'
+import { getOwnList, nombresSoloConCuenta } from '@/lib/lists'
 import { nombresDeMisGrupos } from '@/lib/groups'
 import { gustosPorContar, misGustos, necesitaBienvenida } from '@/lib/bienvenida'
 import { textoMiLista } from '@/lib/compartir'
@@ -15,6 +15,7 @@ import { ListaHero } from '@/components/ListaHero'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
 import { Buscador } from '@/components/Buscador'
+import { AjusteSoloConCuenta } from '@/components/SoloConCuenta'
 import { BUSCAR_DESDE } from '@/lib/buscar'
 import { TAPA_PERSONA } from '@/lib/tapas'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
@@ -57,6 +58,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   if (!lista) redirect('/')
   // La primera vez que entra: la bienvenida (una pantalla, su cumple), y de ahí a su primer deseo.
   if (bienvenida) redirect('/bienvenida')
+  const soloConCuenta = await nombresSoloConCuenta(db, lista.id)
 
   const activos = lista.items.filter((i) => i.estadoDueno === 'activo')
   const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${lista.shareToken}`
@@ -113,6 +115,8 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
       <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
+      {/* un ajuste de la lista: quién ve los nombres de los que reservan (nunca vos) */}
+      <AjusteSoloConCuenta prendida={soloConCuenta} />
       {/* "¡Anotado!", con mandar la lista a mano (lo principal, si es el primero que anota: ver Agregado) */}
       {nuevo && (
         <RecienAgregado deseo={{ id: nuevo.id, titulo: nuevo.titulo, foto: nuevo.fotoUrl, grupo: false, waHref, primero: lista.items.length === 1 }} />

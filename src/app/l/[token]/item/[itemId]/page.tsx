@@ -12,7 +12,7 @@ import { ArmarRegaloGrupal, CartelCorreccion, RegaloGrupal } from '@/components/
 import { enDolares, parseDolares, parsePesos } from '@/lib/pesos'
 import { esUuid } from '@/lib/groups'
 import { itemParaCompartir, textoRegalador } from '@/lib/compartir'
-import { nombreDeViewer } from '@/lib/guest'
+import { linkParaVolver, nombreDeViewer } from '@/lib/guest'
 import { identificado } from '@/lib/types'
 import { seguirLista } from '@/lib/events'
 import { avisoDeCupo, type GiverItemView } from '@/lib/serialize'
@@ -23,6 +23,7 @@ import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
 import { ReservaConfirmada, ultimoDia } from '@/components/ReservaConfirmada'
+import { SoloConCuenta } from '@/components/SoloConCuenta'
 import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { LARGO } from '@/lib/limites'
@@ -68,6 +69,9 @@ export default async function DetalleItem({ params, searchParams }: {
   // accesoALista) no se ve nada: ni reservas, ni regalos, ni comentarios.
   const identified = identificado(viewer)
   const giver = detalle.role === 'giver' ? detalle : null
+  // ve qué está ocupado pero no por quién (sin cuenta, en una lista que lo muestra solo con cuenta): sin nombres, sin el
+  // hilo y sin los regalos grupales, que no vienen en el detalle (ver getItemForViewer)
+  const sinNombres = !!giver?.sinNombres
   const aqui = `/l/${token}/item/${item.id}`
   const claims = giver?.item.claims ?? []
   const regalos = giver?.regalos ?? []
@@ -148,16 +152,19 @@ export default async function DetalleItem({ params, searchParams }: {
               : <QuienSos token={token} volver={aqui} />)}
         <CartelReserva motivo={reserva} veTodo={!!giver} conNombre={identified} />
         {giver && <CartelCorreccion motivo={correccion} cerrar={aqui} />}
+        {sinNombres && <SoloConCuenta volver={aqui} />}
 
-        {claims.filter((c) => !c.grupal).map((c) => (
+        {/* el regalo grupal tiene su tarjeta más abajo; sin nombres no viene, y acá va cuántos son */}
+        {claims.filter((c) => sinNombres || !c.grupal).map((c) => (
           <p key={c.id} className="flex items-start gap-2 text-sm font-medium">
             <span className={`mt-px flex size-5 flex-none items-center justify-center rounded-full ${c.estado === 'comprado' ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-acento text-gr-on-acento'}`}>
               <Icon name={c.estado === 'comprado' ? 'check' : 'lock'} size={11} strokeWidth={3} />
             </span>
             <span className="min-w-0 [overflow-wrap:anywhere]">
-              {c.esMia
-                ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
-                : `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`}
+              {c.grupal ? `Regalo grupal de ${c.grupal.cuantos}${c.estado === 'comprado' ? ': ya lo compraron' : ''}`
+                : c.esMia ? (c.estado === 'comprado' ? 'Vos lo compraste' : 'Vos lo reservaste')
+                  : c.claimerNombre ? `${c.claimerNombre} lo ${c.estado === 'comprado' ? 'compró' : 'reservó'}`
+                    : c.estado === 'comprado' ? 'Ya lo compraron' : 'Reservado'}
               {c.notaQueCompre && <span className="text-gr-muted"> — compró: {c.notaQueCompre}</span>}
             </span>
           </p>
@@ -236,7 +243,8 @@ export default async function DetalleItem({ params, searchParams }: {
           <div className="gr-card flex flex-col gap-3 p-3.5">
             {/* qué sigue: hasta cuándo es suyo (antes iba al lado de "Vos lo reservaste") y que lo marque; sin cuenta, que con
                 Google le avisamos antes de que venza */}
-            <ReservaConfirmada vence={miClaim.vence} entrar={logueado ? undefined : aqui} />
+            <ReservaConfirmada vence={miClaim.vence} entrar={logueado ? undefined : aqui}
+                               recuperar={linkParaVolver(viewer, detalle.listId, token)} />
             <form action={boughtAction} className="flex flex-col gap-2.5">
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="itemId" value={item.id} />
@@ -255,7 +263,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
       </section>
 
-      {giver && (
+      {giver && !sinNombres && (
         <section className="mt-2 flex flex-col gap-3">
           <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
             <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />

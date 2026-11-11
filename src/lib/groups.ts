@@ -229,6 +229,8 @@ export async function crearGrupo(
       eventoFecha: p.eventoFecha && fechaDeGrupoValida(p.eventoFecha) ? p.eventoFecha : null,
       eventoAnual: p.esCumple || (p.eventoAnual ?? true),
       esCumple: p.esCumple ?? false, fotoUrl: fotoDeGrupo(p.fotoUrl),
+      // las listas nuevas nacen mostrando quién reservó solo a los que entran con cuenta (ver sinNombresPara)
+      nombresSoloConCuenta: true,
     }).returning({ id: lists.id })
     await tx.insert(listMembers).values({ listId: list.id, userId, parentesco: p.parentesco ?? null })
     return list.id

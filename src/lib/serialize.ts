@@ -24,7 +24,8 @@ export type OwnerItemView = {
 export type ClaimView = {
   id: string
   estado: 'reservado' | 'comprado'
-  claimerNombre: string
+  /** Null: al que mira no le toca saber quién (un invitado sin cuenta en una lista que lo muestra solo con cuenta). */
+  claimerNombre: string | null
   esMia: boolean
   /** Solo en la reserva propia sin comprar: hasta cuándo dura. */
   vence: Date | null
@@ -32,10 +33,11 @@ export type ClaimView = {
   deshacer: boolean
   notaQueCompre: string | null
   /**
-   * Si esta reserva es de un regalo grupal: quiénes están (el encargado primero) y si el que mira es parte. meSacaron: lo
-   * sacó el encargado del regalo, que sigue abierto, y no se puede sumar (ver sacarDeRegalo).
+   * Si esta reserva es de un regalo grupal: cuántos y quiénes están (el encargado primero; sin nombres para quien no le
+   * toca verlos) y si el que mira es parte. meSacaron: lo sacó el encargado del regalo, que sigue abierto, y no se puede
+   * sumar (ver sacarDeRegalo).
    */
-  grupal: { giftId: string; personas: string[]; soyParte: boolean; meSacaron: boolean } | null
+  grupal: { giftId: string; cuantos: number; personas: string[]; soyParte: boolean; meSacaron: boolean } | null
 }
 
 export type GiverItemView = OwnerItemView & {
