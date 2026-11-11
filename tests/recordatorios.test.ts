@@ -16,6 +16,7 @@ import { createItem } from '@/lib/items'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
 import { comprarRegalo, iniciarRegaloGrupal, marcarPagado, sumarseARegalo } from '@/lib/regalos'
 import { mandarRecordatorios } from '@/lib/recordatorios'
+import { borrarCuenta } from '@/lib/cuenta'
 
 // El route del cron usa la base de siempre: acá, la del test.
 const h = vi.hoisted(() => ({ db: null as unknown }))
@@ -268,6 +269,21 @@ test('cuentas pendientes: a quien debe su parte de un regalo grupal comprado hac
   expect(await mandarRecordatorios(db, en(14), push.enviar)).toMatchObject({ cuentas: 0 })
   expect(push.enviados).toEqual([])
   expect([...push.de('Caro')]).toEqual([])
+})
+
+test('cuentas pendientes: si la encargada borró su cuenta, a nadie se le recuerda que le debe a "Cuenta eliminada"', async () => {
+  const { db, rodri, sofi, mate, push } = await armar()
+  const g = await iniciarRegaloGrupal(db, mate.id, sofi.id)
+  if (!g.ok) throw new Error(g.reason)
+  expect(await sumarseARegalo(db, g.giftId, rodri.id)).toBe(true)
+  expect(await comprarRegalo(db, g.giftId, sofi.id, { total: 30000 }, push.enviar)).toMatchObject({ ok: true })
+  await db.update(groupGifts).set({ compradoAt: en(-8) }).where(eq(groupGifts.id, g.giftId))
+  // Sofi se va de GiftR: el regalo ya comprado queda a nombre de "Cuenta eliminada" para que Rodri siga viendo su cuenta
+  expect(await borrarCuenta(db, sofi.id, push.enviar)).toBe(true)
+  push.enviados.length = 0
+
+  expect(await mandarRecordatorios(db, AHORA, push.enviar)).toMatchObject({ cuentas: 0, fallaron: [] })
+  expect(push.enviados).toEqual([])
 })
 
 /**

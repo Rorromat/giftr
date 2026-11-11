@@ -310,14 +310,20 @@ async function recordarCuentas(db: Db, ahora: Date, hoy: Date, mandar: Mandar): 
       eq(groupGifts.estado, 'comprado'), eq(groupGiftMembers.pagado, false), ne(groupGiftMembers.userId, groupGifts.organizerUserId),
       lte(groupGifts.compradoAt, mas(ahora, -CUENTAS_CADA_DIAS)), gte(groupGifts.compradoAt, mas(ahora, -CUENTAS_HASTA_DIAS)), ne(saldo, 0),
     ))
-  const deben = [...new Set(partes.map((p) => (Number(p.saldo) > 0 ? p.userId : p.encargadoId)))]
+  const todos = [...new Set(partes.flatMap((p) => [p.userId, p.encargadoId]))]
+  if (!todos.length) return 0
+  // Las cuentas de alguien que borró su cuenta quedan a nombre de "Cuenta eliminada" (ver borrarCuenta): a esa fila no se le
+  // recuerda nada, y a nadie se le dice "le debés a Cuenta": no hay a quién pagarle.
+  const eliminadas = new Set((await db.select({ id: users.id }).from(users)
+    .where(and(inArray(users.id, todos), isNotNull(users.eliminadaAt)))).map((u) => u.id))
+  const deben = [...new Set(partes.map((p) => (Number(p.saldo) > 0 ? p.userId : p.encargadoId)))].filter((id) => !eliminadas.has(id))
   if (!deben.length) return 0
   const hace = dia(mas(hoy, -CUENTAS_CADA_DIAS))
   const yaAvisados = new Set((await db.select({ userId: recordatoriosEnviados.userId }).from(recordatoriosEnviados)
     .where(and(inArray(recordatoriosEnviados.userId, deben), eq(recordatoriosEnviados.tipo, 'cuentas'), gt(recordatoriosEnviados.clave, hace))))
     .map((x) => x.userId))
   return deAPocos(deben.filter((id) => !yaAvisados.has(id)), async (userId) => {
-    const aQuienes = (await misCuentas(db, userId)).personas.filter((p) => p.neto < 0)
+    const aQuienes = (await misCuentas(db, userId)).personas.filter((p) => p.neto < 0 && !eliminadas.has(p.id))
     if (!aQuienes.length) return 0
     const [uno] = aQuienes
     return mandar(userId, 'cuentas', dia(hoy), {
