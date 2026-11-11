@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
@@ -7,8 +8,8 @@ import { asegurarListaPropia } from '@/lib/users'
 import { LogoSticker } from '@/components/ui'
 import { Portada } from '@/components/Portada'
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ volver?: string | string[] }> }) {
-  const [session, { volver: v }] = await Promise.all([auth(), searchParams])
+export default async function Home({ searchParams }: { searchParams: Promise<{ volver?: string | string[]; cuenta?: string | string[] }> }) {
+  const [session, { volver: v, cuenta }] = await Promise.all([auth(), searchParams])
   // Lo compartido desde otra app sin sesión (ver /agregar): después de entrar, vuelve ahí. Solo a una ruta de agregar, y
   // una que entre en la cookie de Auth.js.
   const volver = typeof v === 'string' && v.length <= VUELTA_MAX && esRutaAgregar(v) ? v : null
@@ -18,6 +19,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
   return (
     <main className="flex min-h-screen flex-col gap-6 pb-10 pt-2">
       <header className="flex min-h-14 items-center justify-center"><LogoSticker /></header>
+
+      {/* recién borró su cuenta (ver borrarCuentaAction): que sepa que ya está */}
+      {cuenta === 'borrada' && !session?.userId && (
+        <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-center text-sm font-medium">
+          Listo: borramos tu cuenta y todo lo tuyo. Si algún día querés volver, entrás de nuevo y empezás de cero.
+        </p>
+      )}
 
       <Portada />
 
@@ -35,6 +43,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
           </button>
         </form>
       </div>
+
+      {/* al pie, sin competir con "Entrar": qué se guarda y quién lo ve, antes de dar el mail */}
+      <footer className="flex justify-center">
+        <Link href="/privacidad" className="flex min-h-11 items-center px-3 text-[13px] font-semibold text-gr-muted underline underline-offset-4">Privacidad</Link>
+      </footer>
     </main>
   )
 }

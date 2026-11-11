@@ -316,6 +316,13 @@
       "when": 1794377445588,
       "tag": "0044_precio_en_numero",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794377674377,
+      "tag": "0045_cuenta_eliminada",
+      "breakpoints": true
     }
   ]
 }

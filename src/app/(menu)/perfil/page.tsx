@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
@@ -96,7 +97,7 @@ export default async function Perfil({ searchParams }: {
           : <p id="usuario-ayuda" className="text-[13px] text-gr-muted">Con esto te encuentran para sumarte como amigo.</p>}
       </form>
 
-      <div className="flex flex-col gap-1.5">
+      <div id="link" className="flex scroll-mt-6 flex-col gap-1.5">
         <section className="gr-hero flex items-center gap-3 p-4 pl-5">
           <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-on-hero/10 text-gr-hero-detail"><Icon name="link" size={20} /></span>
           <div className="min-w-0 flex-1">
@@ -214,11 +215,58 @@ export default async function Perfil({ searchParams }: {
 
       {invitado && <UnirInvitado nombre={invitado} />}
 
+      <TuPrivacidad />
+
       {/* Para dejar este dispositivo (el de la familia, la tablet) o entrar con otra cuenta */}
       <form action={salirAction} className="self-center">
         <input type="hidden" name="volver" value="/" />
         <button className="min-h-11 px-3 text-sm font-semibold text-red-700">Cerrar sesión</button>
       </form>
+
+      <ZonaBorrarCuenta />
     </Seccion>
+  )
+}
+
+/**
+ * Quién ve tu perfil y cómo cortarlo, llevarte tus datos y leer qué se guarda. El perfil (foto, cumple, gustos, talles) lo
+ * ve cualquiera con el link de la lista (ver perfilPublico), y dejar de ser amigos no le saca el link a quien ya lo vio:
+ * lo único que corta ese acceso es cambiar el link, y hay que decirlo donde se habla de privacidad.
+ */
+function TuPrivacidad() {
+  return (
+    <section id="privacidad" className="flex scroll-mt-6 flex-col gap-2.5">
+      <h2 className="gr-heading">Tu privacidad</h2>
+      <div className="gr-card gr-rows">
+        <p className="flex items-start gap-3 p-4 text-[13px] leading-snug text-gr-muted">
+          <span className="gr-row__icon text-gr-ink"><Icon name="eye" size={20} /></span>
+          <span className="pt-0.5">
+            Tu perfil (foto, cumple, gustos y talles) lo ve cualquiera que tenga el link de tu lista, sea o no tu amigo. Si
+            el link llegó a quien no querías, o dejaste de ser amigo de alguien que ya lo tenía,{' '}
+            <a href="#link" className="font-semibold text-gr-ink underline underline-offset-2">cambiá el link</a>: el de antes deja de andar.
+          </span>
+        </p>
+        {/* un <a> con download y no un Link: baja un archivo (ver /api/perfil/datos), no es una pantalla */}
+        <a href="/api/perfil/datos" download className="gr-row">
+          <span className="gr-row__icon"><Icon name="note" size={20} /></span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px] font-semibold">Descargar mis datos</span>
+            <span className="truncate text-[13px] text-gr-muted">Un archivo con todo lo tuyo en GiftR</span>
+          </span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </a>
+        <Row href="/privacidad" icon="shield" title="Qué guardamos y quién lo ve" sub="Tu privacidad en GiftR, cortito" />
+      </div>
+    </section>
+  )
+}
+
+/** Al final de todo y aparte: borrar la cuenta no se deshace. Lo que pasa y la confirmación están en /perfil/borrar. */
+function ZonaBorrarCuenta() {
+  return (
+    <section id="borrar" className="mt-6 flex scroll-mt-6 flex-col items-center gap-1 border-t border-gr-line pt-5 text-center">
+      <p className="text-[13px] leading-snug text-gr-muted">¿No querés usar más GiftR? Podés borrar tu cuenta y todo lo tuyo.</p>
+      <Link href="/perfil/borrar" className="flex min-h-11 items-center px-3 text-sm font-semibold text-red-700 underline underline-offset-4">Borrar mi cuenta</Link>
+    </section>
   )
 }

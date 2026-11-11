@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 
@@ -47,9 +47,12 @@ export async function asegurarListaPropia(db: Db, userId: string) {
   return creada ?? null
 }
 
-/** Si el usuario existe: una sesión puede ser de una base vieja (la restauraron o cambiaron de branch en Neon). */
+/**
+ * Si el usuario existe: una sesión puede ser de una base vieja (la restauraron o cambiaron de branch en Neon) o de una
+ * cuenta que se borró desde otro dispositivo (ver borrarCuenta). La fila "Cuenta eliminada" no es de nadie: no cuenta.
+ */
 export async function existeUsuario(db: Db, userId: string): Promise<boolean> {
-  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId))
+  const [user] = await db.select({ id: users.id }).from(users).where(and(eq(users.id, userId), isNull(users.eliminadaAt)))
   return !!user
 }
 

@@ -39,6 +39,10 @@ export const users = pgTable('users', {
   // Su alias o CVU/CBU, para que le transfieran su parte de un regalo grupal (lo carga en Perfil; ver validarAliasPago).
   // No es parte del perfil: solo le llega a quien le debe plata en Cuentas (ver misCuentas y avisarCompra).
   aliasPago: text('alias_pago'),
+  // Solo en la fila que queda en lugar de una cuenta borrada ("Cuenta eliminada", ver borrarCuenta): la que sostiene lo
+  // que esa persona compartía con otros (un regalo grupal ya comprado, un amigo invisible sorteado). No es de nadie: sin
+  // mail ni foto, con un google_id que Google no da, y no aparece en búsquedas ni se le manda nada.
+  eliminadaAt: timestamp('eliminada_at', { withTimezone: true }),
 }, (t) => [
   // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
   index('users_email_lower_idx').on(sql`lower(${t.email})`),

@@ -55,6 +55,7 @@ import { esMoneda, parsePesos, partePesos, plata } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
 import { LARGO, recortar } from '@/lib/limites'
 import { NO_SUGERIR_COOKIE, sumarNoSugerir } from '@/lib/no-sugerir'
+import { borrarCuenta } from '@/lib/cuenta'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
 export type EstadoForm = { error: string } | null
@@ -598,6 +599,28 @@ export async function salirAction(formData: FormData) {
   jar.delete(NO_SOY_COOKIE)
   revalidatePath(volver, 'layout')
   redirect(volver)
+}
+
+/**
+ * "Borrar mi cuenta" (Perfil → /perfil/borrar): con la palabra escrita (no alcanza un toque de más), borra todo lo suyo
+ * (ver borrarCuenta), cierra la sesión y lo deja en la portada. No se anota la cuenta en este navegador como al cerrar
+ * sesión (ver salirAction): ya no hay listas suyas que cuidar, y su id no queda en ningún lado.
+ */
+export async function borrarCuentaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  if ((str(formData, 'confirmar') ?? '').toUpperCase() !== 'BORRAR') redirect('/perfil/borrar?aviso=palabra#confirmar')
+  let borrada = false
+  try {
+    borrada = await borrarCuenta(db, session.userId)
+  } catch (e) {
+    console.error('No se pudo borrar la cuenta:', e)
+  }
+  // no se borró nada (va todo junto o nada): que lo sepa y pueda probar de nuevo. Si ya no existía (la borró recién
+  // desde otro dispositivo), solo queda cerrar esta sesión.
+  if (!borrada && await existeUsuario(db, session.userId)) redirect('/perfil/borrar?aviso=error#confirmar')
+  revalidatePath('/', 'layout')
+  await signOut({ redirectTo: '/?cuenta=borrada' })
 }
 
 /**

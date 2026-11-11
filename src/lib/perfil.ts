@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import sharp from 'sharp'
 import { fotosPerfil, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
@@ -105,7 +105,9 @@ export async function perfilPublico(db: Db, token: string, quien?: string, hoy =
   const [u] = await db.select({
     id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes,
     gustos: users.gustos,
-  }).from(users).where(eq(users.id, elegido.id))
+    // de una cuenta borrada no hay perfil (su lista, si queda algo de ella, tampoco se abre: ver borrarCuenta)
+  }).from(users).where(and(eq(users.id, elegido.id), isNull(users.eliminadaAt)))
+  if (!u) return null
   const cumple = u.cumpleDia && u.cumpleMes
     ? { dia: u.cumpleDia, mes: u.cumpleMes, dias: diasEntre(hoy, proximaFecha(u.cumpleDia, u.cumpleMes, hoy)) }
     : null
