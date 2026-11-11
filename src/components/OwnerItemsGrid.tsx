@@ -37,7 +37,7 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
   return Object.entries(porCategoria).map(([cat, catItems]) => (
     <section key={cat} data-buscar-grupo className="flex flex-col gap-2.5">
       <h3 className="gr-label">{cat}</h3>
-      <ul className="grid grid-cols-2 items-start gap-x-3 gap-y-[18px]">
+      <ul className="grid gr-columnas items-start gap-x-3 gap-y-[18px]">
         {catItems!.map((item) => {
           const precio = item.precio ?? item.rangoPrecio
           return (

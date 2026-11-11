@@ -76,7 +76,7 @@ export default async function Inicio() {
   const aComprar = [...pendientes].sort((a, b) => (a.venceEnDias ?? Infinity) - (b.venceEnDias ?? Infinity)).slice(0, POR_COMPRAR)
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-48 pt-2">
+    <Seccion className="gr-ancha flex flex-col gap-5 pb-48 pt-2">
       <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} desde={ACA}
                  accion={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={19} /></Link>} />
       <div className="flex flex-col gap-1">

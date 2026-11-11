@@ -116,7 +116,7 @@ export default async function DetalleItem({ params, searchParams }: {
   const verEnTienda = item.linkTienda && <BotonTienda link={item.linkTienda} tienda={tienda} />
 
   return (
-    <main className="flex flex-col gap-5 pb-36">
+    <main className="gr-ficha flex flex-col gap-5 pb-36">
       <article className="flex flex-col gap-5">
         {/* volver a la lista; arriba a la derecha, "Me lo robo" (con tu cuenta, sumarlo a tu lista) y mandárselo a alguien
             (WhatsApp arma la vista previa con la foto, ver opengraph-image). El sello, si te toca a vos. */}

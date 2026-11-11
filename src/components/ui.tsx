@@ -216,10 +216,13 @@ export function Faltan({ dias, className = '' }: { dias: number; className?: str
   )
 }
 
-/** El logo: "GiftR" en 900 con el moño al final, un poco torcido. */
+/**
+ * El logo: "GiftR" en 900 con el moño al final, un poco torcido. gr-logo: en escritorio, donde hay barra al costado (que
+ * ya lo lleva), el de la pantalla no se ve (ver "Pantallas anchas" en tokens.css).
+ */
 export function LogoSticker({ sobreTapa = false, className = '' }: { sobreTapa?: boolean; className?: string }) {
   return (
-    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${sobreTapa ? 'text-white' : ''} ${className}`}>
+    <span className={`gr-logo inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${sobreTapa ? 'text-white' : ''} ${className}`}>
       GiftR
       {/* sobre una tapa (que puede ser verde), el moño con borde blanco, como pegado */}
       <Mono borde={sobreTapa ? '#FFFFFF' : undefined} className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />

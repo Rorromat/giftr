@@ -252,13 +252,13 @@ export default async function ListaAjena({
             {boton && <div className="relative z-[2] mt-auto pt-1.5">{boton}</div>}
           </div>
         </li>
-        {confirmacion && recien?.id === item.id && <li className="col-span-2">{confirmacion}</li>}
+        {confirmacion && recien?.id === item.id && <li className="col-span-full">{confirmacion}</li>}
       </Fragment>
     )
   }
 
   return (
-    <main className={`flex flex-col ${viewer.userId || yaReservo ? 'pb-36' : 'pb-10'}`}>
+    <main className={`gr-ancha flex flex-col ${viewer.userId || yaReservo ? 'pb-36' : 'pb-10'}`}>
       {/* Su tapa, compacta: de quién es y cuándo, en dos renglones. El que abre el link en el teléfono tiene que ver los
           primeros deseos (y "Reservar") sin scrollear; su perfil y sus gustos quedan a un toque, en un chip. */}
       <Tapa color={color}>
@@ -355,7 +355,7 @@ export default async function ListaAjena({
         {/* una lista larga: buscar algo puntual (en lo que se ve con el filtro elegido) */}
         {mostrados.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
 
-        <div id="su-lista" className="flex flex-col gap-7">
+        <div id="su-lista" className="gr-categorias flex flex-col gap-7">
           {grupos.map(([categoria, deseos]) => (
             <section key={categoria} data-buscar-grupo aria-label={conTitulos ? undefined : 'Sus deseos'} className="flex flex-col gap-3">
               {conTitulos && (
@@ -368,7 +368,7 @@ export default async function ListaAjena({
                 </h2>
               )}
               {/* dense: el cartel de lo recién reservado ocupa las dos columnas y no deja un hueco al lado de su tarjeta */}
-              <ul className="grid grid-flow-row-dense grid-cols-2 items-stretch gap-x-3 gap-y-[18px]">
+              <ul className="grid grid-flow-row-dense gr-columnas items-stretch gap-x-3 gap-y-[18px]">
                 {deseos.map(tarjeta)}
               </ul>
             </section>
@@ -388,7 +388,7 @@ export default async function ListaAjena({
                     : `No hay nada con precio hasta ${plata(tope, presupuesto.moneda)}. De estos no sabemos si entran.`}
                 </p>
               </div>
-              <ul className="grid grid-flow-row-dense grid-cols-2 items-stretch gap-x-3 gap-y-[18px]">
+              <ul className="grid grid-flow-row-dense gr-columnas items-stretch gap-x-3 gap-y-[18px]">
                 {sinPrecio.map(tarjeta)}
               </ul>
             </section>

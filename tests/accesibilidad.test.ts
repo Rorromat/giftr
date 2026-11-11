@@ -195,7 +195,7 @@ test('el cumple que no se guardó: los dos campos quedan marcados y leen el mens
 
 test('las pantallas de carga copian la que viene: la tapa de su color, el logo a la izquierda en Inicio, el formulario', () => {
   const tapa = renderToStaticMarkup(createElement(SkeletonTapa, { color: TAPA_EN_COMUN, barra: 'volver' }))
-  expect(tapa).toMatch(/^<main aria-busy="true" class="flex flex-col gap-5 pb-36"><span class="sr-only" role="status">Cargando…<\/span><section aria-hidden="true" class="gr-tapa" style="--c:#5B3FB5">/)
+  expect(tapa).toMatch(/^<main aria-busy="true" class="gr-ancha flex flex-col gap-5 pb-36"><span class="sr-only" role="status">Cargando…<\/span><section aria-hidden="true" class="gr-tapa" style="--c:#5B3FB5">/)
   expect(tapa.match(/class="gr-arte /g)).toHaveLength(4)
   const inicio = renderToStaticMarkup(createElement(SkeletonInicio))
   // la barra del menú: el logo a la izquierda y tres redondos a la derecha; la tarjeta grande, del alto de la de verdad

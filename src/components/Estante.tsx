@@ -41,7 +41,7 @@ export function Destacada({ e, color, hoy, deseos }: { e: Evento; color: string;
         <span className="gr-label text-white/90">{e.tipo === 'cumple' ? 'Cumple' : 'Es'} {cuando.replace(/^es /, '')}</span>
         <h2 className="max-w-[8ch] text-[32px] leading-[0.95] font-black tracking-[-0.045em]">{conMayuscula(fechaLarga(e.fecha, hoy))}</h2>
       </div>
-      <span className="gr-btn gr-btn--blanco relative w-full justify-between">
+      <span className="gr-btn gr-btn--blanco relative w-full justify-between md:w-[340px] md:justify-self-start">
         <span>{verLista}</span>
         <span className="flex items-center gap-1 text-[#6C6C75]">
           {deseos > 0 && <span className="text-sm font-semibold">{deseos} {deseos === 1 ? 'deseo' : 'deseos'}</span>}

@@ -55,8 +55,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />
       </head>
       <body className="min-h-screen font-sans">
-        {/* una columna angosta: con el teléfono de costado se usa igual (antes un cartel la tapaba y pedía girarlo) */}
-        <div className="mx-auto max-w-md px-[18px]">{children}</div>
+        {/* una columna angosta: con el teléfono de costado se usa igual (antes un cartel la tapaba y pedía girarlo). En
+            tablet y escritorio el marco se ensancha (.gr-marco, ver "Pantallas anchas" en tokens.css) */}
+        <div className="gr-marco">{children}</div>
         <Arranque />
         <Refrescar />
         {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}

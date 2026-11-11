@@ -58,7 +58,7 @@ export default async function Grupo({ params, searchParams }: {
   const waInvitar = encodeURIComponent(`Armemos juntos la lista "${grupo.nombre}" en GiftR: ${inviteUrl}`)
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36">
+    <Seccion className="gr-ancha flex flex-col gap-5 pb-36">
       {/* la tapa de las listas en común, la misma con que la ven los que regalan */}
       <ListaHero color={TAPA_EN_COMUN} etiqueta={grupo.descripcion ?? 'Lista en común'} titulo={grupo.nombre} cantidad={activos.length}
                  arriba={(
@@ -187,7 +187,7 @@ export default async function Grupo({ params, searchParams }: {
       )}
 
       {activos.length >= BUSCAR_DESDE && <Buscador ambito="sus-deseos" placeholder="Buscar en la lista" vacio="No hay ningún deseo con «%s»." />}
-      <div id="sus-deseos" className="flex flex-col gap-5">
+      <div id="sus-deseos" className="gr-categorias flex flex-col gap-5">
         <OwnerItemsGrid items={activos} shareToken={grupo.shareToken} agregado={agregado} />
       </div>
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />

@@ -303,10 +303,13 @@ export function BienvenidaForm({ nombreCompleto, foto, inicial, cumple, solo, vo
                   placeholder="Soy alérgica a la lana, ya tengo mil tazas…" className="gr-input py-3" />
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 bg-linear-to-t from-gr-bg from-70% to-transparent">
-        <div className="mx-auto flex max-w-md items-center gap-2.5 px-[18px] pb-6 pt-5">
-          <Link href={cancelar} className="gr-btn flex-none px-5">Cancelar</Link>
-          <BotonEnviar pendiente="Guardando…" className="gr-btn-primary flex-1">{volver === 'lista' && sigue ? 'Guardar y seguir' : 'Guardar'}</BotonEnviar>
+      {/* el mismo marco y la misma columna que la página (ver tokens.css), al lado de la barra del costado si la hay */}
+      <div className="fixed right-0 bottom-0 left-(--gr-lateral) z-10 bg-linear-to-t from-gr-bg from-70% to-transparent">
+        <div className="gr-marco">
+          <div className="gr-lectura flex items-center gap-2.5 pb-6 pt-5">
+            <Link href={cancelar} className="gr-btn flex-none px-5">Cancelar</Link>
+            <BotonEnviar pendiente="Guardando…" className="gr-btn-primary flex-1">{volver === 'lista' && sigue ? 'Guardar y seguir' : 'Guardar'}</BotonEnviar>
+          </div>
         </div>
       </div>
     </form>

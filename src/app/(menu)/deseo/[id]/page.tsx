@@ -32,7 +32,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
   const tienda = deseo.linkTienda && sitioDeLaTienda(deseo.linkTienda)
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-36">
+    <Seccion className="gr-ficha flex flex-col gap-5 pb-36">
       {/* como lo ve quien regala (ver /l/[token]/item), con sus palabras: "Lo quiero mucho", "Tu nota" */}
       <article className="flex flex-col gap-5">
         <FotoDeLaFicha foto={deseo.fotoUrl} titulo={deseo.titulo} volver={lista} volverLabel={`Volver a ${grupo?.nombre ?? 'Mi lista'}`}

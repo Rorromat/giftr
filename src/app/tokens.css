@@ -68,6 +68,24 @@
 
   /* Espaciado */
   --gr-gutter: 18px;
+
+  /* Anchos. GiftR se arma para el teléfono, pero el link de una lista se abre también desde WhatsApp Web o una tablet, y
+     ahí una columna de teléfono en el medio de la pantalla dejaba todo lo demás vacío. Tres escalones (los cortes están
+     abajo, en "Pantallas anchas"): teléfono, tablet (desde 768) y escritorio (desde 1024).
+     --gr-ancho: el marco de la página (.gr-marco), con sus márgenes. --gr-ancho-lectura: lo que mide, sin los márgenes,
+     una pantalla que se lee o se llena (un formulario de 1000 px de ancho es peor que uno angosto); las que muestran
+     grillas piden el marco entero con .gr-ancha. --gr-ancho-barra: lo que flota abajo (la barra, el cartelito), que no se estira.
+     --gr-columnas: cuántos deseos entran por fila (gr-columnas, en globals.css).
+     --gr-lateral: lo que ocupa la barra del costado en escritorio (0 si no hay barra) y --gr-centro: el medio de lo que
+     queda, donde se centra lo fijo (--gr-centro-lectura: lo fijo de una pantalla de lectura). */
+  --gr-ancho: 28rem;
+  --gr-ancho-lectura: calc(28rem - 2 * var(--gr-gutter));
+  --gr-ancho-barra: 448px;
+  --gr-columnas: 2;
+  --gr-lateral: 0px;
+  --gr-centro: calc(50% + var(--gr-lateral) / 2);
+  /* el medio de la columna de lectura: el de la página, salvo al lado de la barra del costado, donde va a la izquierda */
+  --gr-centro-lectura: var(--gr-centro);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -112,6 +130,13 @@
 }
 
 @layer components {
+  /* El marco de todas las páginas (layout.tsx): una columna al medio, del ancho del escalón (ver --gr-ancho) */
+  .gr-marco {
+    margin-inline: auto;
+    max-width: var(--gr-ancho);
+    padding-inline: var(--gr-gutter);
+  }
+
   /* Tipografía: títulos en 900, grandes y apretados; las secciones en 800 */
   .gr-title {
     font-family: var(--gr-font-display);
@@ -392,8 +417,8 @@
   /* Barra fija de abajo en la lista compartida ("¿Y vos qué querés?") */
   .gr-floatbar {
     position: fixed;
-    left: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
-    right: max(var(--gr-gutter), calc(50% - 224px + var(--gr-gutter)));
+    left: max(var(--gr-gutter), calc(var(--gr-centro) - var(--gr-ancho-barra) / 2 + var(--gr-gutter)));
+    right: max(var(--gr-gutter), calc(100% - var(--gr-centro) - var(--gr-ancho-barra) / 2 + var(--gr-gutter)));
     bottom: max(16px, env(safe-area-inset-bottom));
     z-index: 20;
     min-height: 64px;
@@ -414,8 +439,8 @@
      ícono da un saltito. El + abre el agregado (<Agregado>): gira y queda como ×, mientras la píldora se esconde. */
   .gr-nav {
     position: fixed;
-    left: max(14px, calc(50% - 224px + 14px));
-    right: max(14px, calc(50% - 224px + 14px));
+    left: max(14px, calc(50% - var(--gr-ancho-barra) / 2 + 14px));
+    right: max(14px, calc(50% - var(--gr-ancho-barra) / 2 + 14px));
     /* Arriba de la barra de gestos del iPhone (el inset vale desde que el viewport va con viewport-fit=cover, ver
        layout.tsx). --anclaje: en iOS instalado, cuánto hay que correrla para que quede abajo de lo que se ve (ver BottomNav) */
     bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) - var(--anclaje, 0px));
@@ -427,6 +452,8 @@
     transition: transform 300ms cubic-bezier(0.3, 0, 0.2, 1);
   }
   .gr-nav > * { pointer-events: auto; }
+  /* el logo y el texto del + son de la barra del costado (escritorio, ver "Pantallas anchas") */
+  .gr-nav > .gr-nav__logo, .gr-mas__texto { display: none; }
   .gr-nav__tabs {
     position: relative;
     flex: 1;
@@ -751,8 +778,8 @@
   .gr-ficha__barra {
     position: fixed;
     z-index: 20;
-    left: max(0px, calc(50% - 224px));
-    right: max(0px, calc(50% - 224px));
+    left: max(0px, calc(var(--gr-centro) - var(--gr-ancho-lectura) / 2 - var(--gr-gutter)));
+    right: max(0px, calc(100% - var(--gr-centro) - var(--gr-ancho-lectura) / 2 - var(--gr-gutter)));
     bottom: 0;
     display: flex;
     gap: 10px;
@@ -1042,7 +1069,7 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   --avance: 0;
   position: fixed;
   top: env(safe-area-inset-top, 0px);
-  left: 50%;
+  left: var(--gr-centro);
   z-index: 60;
   display: flex;
   align-items: center;
@@ -1080,7 +1107,7 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
 /* El cartelito de abajo ("¡Robado! Ya está en tu lista"): sube, se queda un rato y se va solo. Arriba de la barra. */
 .gr-toast {
   position: fixed;
-  left: 50%;
+  left: var(--gr-centro);
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 84px);
   z-index: 70;
   display: flex;
@@ -1313,6 +1340,239 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   30% { transform: scale(0.97) rotate(0deg); }
   45% { transform: scale(1.06) rotate(3deg); }
 }
+
+/* ───────────── Pantallas anchas ─────────────
+   Abajo de 768 px no cambia nada: el teléfono es lo de arriba. Los dos cortes son los de Tailwind (md: 768, lg: 1024), así
+   lo que una pantalla pide con md: o lg: en sus clases cae en el mismo escalón que lo de acá.
+   · Tablet (768+): el marco se ensancha, los deseos van de a tres, la tapa es una tarjeta del ancho del marco y las hojas
+     se centran. La barra sigue abajo: se usa con el dedo.
+   · Escritorio (1024+): el marco llega a 1000 px, los deseos van de a cuatro, la barra pasa al costado (el mismo <nav>, con
+     otro CSS) y la ficha de un deseo va en dos columnas. */
+@media (min-width: 768px) {
+  :root {
+    --gr-ancho: 720px;
+    --gr-ancho-lectura: 560px;
+    --gr-columnas: 3;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --gr-ancho: 1000px;
+    --gr-columnas: 4;
+  }
+  /* la barra del costado solo donde hay barra: la portada, la bienvenida y la lista que abre alguien sin cuenta no tienen */
+  :root:has(.gr-nav) {
+    --gr-lateral: 232px;
+    --gr-centro-lectura: calc(var(--gr-lateral) + max(0px, (100% - var(--gr-lateral) - var(--gr-ancho)) / 2) + var(--gr-gutter) + var(--gr-ancho-lectura) / 2);
+  }
+  body { padding-left: var(--gr-lateral); }
+}
+
+@layer components {
+  @media (min-width: 768px) {
+    /* Las pantallas que se leen o se llenan quedan en una columna cómoda, al medio del marco; las de grillas (.gr-ancha:
+       Inicio, una lista) lo usan entero. El <form> suelto es un paso de los gustos, que no trae <main>. .gr-lectura: lo
+       mismo para lo que va fijo abajo de una de esas pantallas. */
+    .gr-marco main:not(.gr-ancha), .gr-marco > form, .gr-lectura { max-width: var(--gr-ancho-lectura); margin-inline: auto; }
+
+    /* La tapa: una tarjeta del ancho del marco, con las puntas de arriba redondeadas y un poco de aire arriba. A sangre,
+       en una pantalla ancha era un rectángulo cortado a los costados; lo de adentro sigue alineado con lo de abajo. */
+    .gr-tapa { margin-top: calc(12px + env(safe-area-inset-top, 0px)); padding-top: 14px; border-radius: 28px 28px 0 0; }
+    .gr-tapa::before { border-radius: inherit; }
+
+    /* La foto de la ficha, igual: con las puntas de arriba redondeadas (abajo se funde con el fondo) */
+    .gr-ficha__portada { margin-top: calc(12px + env(safe-area-inset-top, 0px)); overflow: hidden; border-radius: 28px 28px 0 0; }
+    .gr-ficha__arriba { top: 12px; }
+
+    /* El agregado: en una pantalla alta, el título, las cartas y el pie van juntos al medio (repartidos de arriba a
+       abajo, el título quedaba lejos de las cartas) */
+    .gr-agr__elegir { grid-template-rows: auto auto auto; align-content: center; }
+  }
+
+  @media (min-width: 1024px) {
+    /* La barra, al costado: el mismo <nav> de abajo (ver BottomNav), en una columna fija a la izquierda con el logo, las
+       cuatro secciones y el + como botón con su texto. Abajo, en una pantalla de 1280, flotaba en el medio tapando lo
+       que había atrás; arriba chocaba con el encabezado de cada sección (su campanita, su foto) y con las tapas, que
+       llegan al borde. Queda siempre a la vista, también donde en el teléfono se esconde (Agregar, un deseo): acá no
+       le saca lugar a nada. */
+    .gr-nav {
+      inset: 0 auto 0 0;
+      width: var(--gr-lateral);
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 24px;
+      border-right: 1px solid var(--gr-line);
+      background: var(--gr-bg);
+      pointer-events: auto;
+      transition: background-color 300ms ease, border-color 300ms ease;
+    }
+    .gr-nav[data-oculta] { transform: none; }
+    .gr-nav[data-teclado] { visibility: visible; }
+    .gr-nav > .gr-nav__logo { display: flex; align-items: center; min-height: 56px; padding-left: 14px; margin-bottom: 14px; transition: opacity 200ms ease; }
+    /* Al lado de la barra, la columna de lectura va a la izquierda del marco y no al medio: así el título de cada sección
+       arranca siempre en el mismo lugar, sea ancha (Inicio) o angosta (Regalos), en vez de saltar al cambiar de una a otra. */
+    :root:has(.gr-nav) :is(.gr-marco main:not(.gr-ancha), .gr-marco > form, .gr-lectura) { margin-inline: 0; }
+    /* el logo ya está en la barra: el de cada pantalla no se repite al lado (queda su lugar, así nada se corre) */
+    :root:has(.gr-nav) main .gr-logo { visibility: hidden; }
+    .gr-nav__tabs,
+    .gr-nav__tabs[data-columna] {
+      flex: none;
+      height: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: none;
+      touch-action: auto;
+    }
+    .gr-nav__tabs a {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      padding: 0 14px;
+      font-size: 15px;
+      opacity: 0.72;
+    }
+    /* la marcada, con un velo del acento y el ícono en verde: el relleno entero queda para el +, que es lo que se destaca */
+    .gr-nav__tabs a[data-marcado] { color: var(--gr-ink); opacity: 1; }
+    .gr-nav__tabs a[data-marcado] svg { color: var(--gr-acento-texto); }
+    .gr-nav__tabs a::before { background: color-mix(in oklch, var(--gr-acento) 16%, transparent); }
+    /* el selector que sigue al dedo es de la barra de abajo (ver useDedoEnLaBarra, que acá no arrastra) */
+    .gr-nav__dedo { display: none; }
+    .gr-mas {
+      width: 100%;
+      height: 52px;
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: var(--gr-radius-pill);
+      font-family: var(--gr-font-body);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .gr-mas svg { flex: none; transition: rotate 500ms var(--gr-barre); }
+    .gr-mas__texto { display: inline; }
+    /* con el agregado abierto (llena la pantalla, también atrás de la barra): quedan el × y "Cerrar"; gira solo la cruz */
+    .gr-nav[data-abierto] { border-color: transparent; background: transparent; }
+    .gr-nav[data-abierto] > .gr-nav__logo { opacity: 0; }
+    .gr-nav[data-abierto] .gr-nav__tabs { transform: none; }
+    .gr-nav[data-abierto] .gr-mas { transform: none; }
+    .gr-nav[data-abierto] .gr-mas svg { rotate: 135deg; }
+
+    /* La ficha de un deseo (main.gr-ficha), en dos columnas: la foto a la izquierda, entera y en su tarjeta, y a la
+       derecha el nombre, el precio, lo que hay que saber y, ahí mismo, los botones (que en el teléfono van fijos abajo).
+       Lo que sigue (quién lo reservó, el hilo) baja por la columna de la derecha. --foto: el ancho de la foto, 5 de las 11
+       partes de la pantalla sin la separación; sale del ancho de la ventana porque la foto va suelta (position: absolute). */
+    .gr-marco main.gr-ficha {
+      --hueco: 44px;
+      --foto: calc((min(920px, 100vw - var(--gr-lateral) - 2 * var(--gr-gutter)) - var(--hueco)) * 5 / 11);
+      position: relative;
+      max-width: 920px;
+      /* la foto va suelta: que la pantalla le guarde el alto aunque lo de la derecha sea corto */
+      min-height: calc(var(--foto) * 1.25 + 24px);
+      padding-top: 24px;
+    }
+    main.gr-ficha > * { margin-left: calc(var(--foto) + var(--hueco)); }
+    /* el artículo (lo que trae la foto adentro; en la pantalla de carga, su silueta) va primero, y atrás los botones */
+    main.gr-ficha > :has(> .gr-ficha__portada) { order: -2; }
+    main.gr-ficha .gr-ficha__portada,
+    main.gr-ficha .gr-ficha__portada:has(.gr-arte__sin-foto) {
+      position: absolute;
+      left: 0;
+      top: 24px;
+      width: var(--foto);
+      height: calc(var(--foto) * 1.25);
+      margin: 0;
+      border-radius: 28px;
+    }
+    /* entera, sin fundirse con el fondo: el nombre ya no se apoya en ella */
+    main.gr-ficha .gr-ficha__foto::after { background: none; box-shadow: inset 0 0 0 1px rgb(18 18 22 / 0.07); border-radius: 28px; }
+    main.gr-ficha .gr-ficha__arriba { top: 12px; inset-inline: 12px; }
+    main.gr-ficha .gr-ficha__pastilla { bottom: 16px; }
+    main.gr-ficha .gr-ficha__nombre { margin-top: 0; }
+    /* los botones, en su lugar y primeros en lo que sigue al artículo */
+    main.gr-ficha .gr-ficha__barra { position: static; order: -1; padding: 0; background: none; }
+
+    /* Los estantes de Inicio (lo nuevo de tus amigos): en vez de una fila que se desliza (con el mouse no hay cómo), una
+       grilla con todo a la vista */
+    .gr-estante {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+      gap: 14px;
+      margin-inline: 0;
+      padding-inline: 0;
+      overflow: visible;
+    }
+    .gr-estante > * { width: auto; }
+  }
+
+  /* Con mouse (o trackpad): lo que se puede apretar lo dice al pasarle por encima, apenas. En táctil no existe: ahí un
+     :hover queda pegado después del toque. */
+  @media (hover: hover) and (pointer: fine) {
+    button:not(:disabled), summary, select, label:has(input:is([type="radio"], [type="checkbox"])) { cursor: pointer; }
+    :is(.gr-btn, .gr-btn-primary, .gr-chip, .gr-icon-btn) { transition: transform 80ms ease, filter 150ms ease; }
+    :is(.gr-btn, .gr-btn-primary, .gr-chip, .gr-icon-btn, .gr-mas, .gr-carta):hover { filter: brightness(0.95); }
+    .gr-segmented > :not([aria-pressed="true"], [aria-checked="true"], [aria-current="page"], [data-marcado], :has(:checked)):hover {
+      background: color-mix(in oklch, var(--gr-ink) 6%, transparent);
+    }
+    a.gr-row:hover, .gr-rows > details > summary:hover { background: color-mix(in oklch, var(--gr-ink) 4%, transparent); }
+    /* una tarjeta que es un link: el borde se marca y se despega apenas */
+    :is(a.gr-card, a.gr-regalo, .gr-regla) { transition: border-color 150ms ease, box-shadow 150ms ease, transform 80ms ease; }
+    :is(a.gr-card, a.gr-regalo, .gr-regla):hover {
+      border-color: color-mix(in oklch, var(--gr-ink) 22%, transparent);
+      box-shadow: 0 8px 20px -12px rgb(18 18 22 / 0.28);
+    }
+    .gr-destacada { transition: filter 150ms ease; }
+    .gr-destacada:hover { filter: brightness(1.06); }
+    /* un deseo en una grilla o en un estante: la foto se acerca un poquito */
+    .gr-arte__foto { transition: scale 250ms ease; }
+    .gr-columnas > li:hover .gr-arte__foto, a.gr-regalo:hover .gr-arte__foto { scale: 1.03; }
+    .gr-nav__tabs a:not([data-marcado]):hover { opacity: 1; background: color-mix(in oklch, var(--gr-ink) 6%, transparent); }
+  }
+  @media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
+    :is(.gr-btn, .gr-chip, .gr-icon-btn):hover { filter: brightness(1.25); }
+    :is(.gr-btn-primary, .gr-btn--accent, .gr-btn--blanco, .gr-btn--dark):hover { filter: brightness(0.95); }
+  }
+}
+
+/* Fuera de las capas (le tienen que ganar a las utilidades de cada pantalla): los deseos por categoría. En el teléfono cada
+   categoría es un bloque a lo ancho, con su título y sus deseos de a dos. En una pantalla ancha, una categoría con un solo
+   deseo dejaba una tarjeta sola y tres lugares vacíos al lado, una abajo de la otra: acá las categorías se acomodan una al
+   lado de la otra, cada una del ancho de los deseos que tiene (los que se ven: el buscador esconde con hidden); con
+   cuatro o más (o con el cartel de lo recién reservado, que va a lo ancho), toda la fila. */
+@media (min-width: 768px) {
+  .gr-categorias {
+    display: grid;
+    grid-template-columns: repeat(var(--gr-columnas), minmax(0, 1fr));
+    column-gap: 12px;
+    align-items: start;
+  }
+  .gr-categorias > * { grid-column: 1 / -1; }
+  .gr-categorias > section { grid-column: span 1; --gr-columnas: 1; }
+  .gr-categorias > section:has(> ul > li:not([hidden]) ~ li:not([hidden])) { grid-column: span 2; --gr-columnas: 2; }
+  .gr-categorias > section:has(> ul > li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden])) { grid-column: span 3; --gr-columnas: 3; }
+  .gr-categorias > section:has(> ul > li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden]) ~ li:not([hidden])),
+  .gr-categorias > section:has(> ul > .col-span-full) { grid-column: 1 / -1; --gr-columnas: inherit; }
+}
+
+/* Como .gr-sheet, fuera de las capas: en pantallas anchas la hoja ya no sube pegada abajo, se centra como un diálogo
+   (pegada al borde de una pantalla de 1280 quedaba como una pestaña suelta) */
+@media (min-width: 768px) {
+  .gr-sheet { max-width: 520px; max-height: min(80svh, 720px); margin: auto; border-radius: 28px; box-shadow: var(--gr-shadow-float); }
+  .gr-sheet[open] { animation: gr-sheet-aparece 200ms ease-out; }
+}
+@keyframes gr-sheet-aparece { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
 
 @media (prefers-reduced-motion: reduce) {
   .gr-btn, .gr-btn-primary, .gr-nav, .gr-nav__tabs, .gr-nav__tabs a { transition: none; }

@@ -74,7 +74,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const nuevo = agregado ? activos.find((i) => i.id === agregado) : undefined
 
   return (
-    <Seccion className="flex flex-col gap-5 pb-48">
+    <Seccion className="gr-ancha flex flex-col gap-5 pb-48">
       {/* Vos: tu lista con la tapa de las personas (la misma que ven tus amigos) y, tocando tu foto, tu perfil */}
       <ListaHero
         color={TAPA_PERSONA}
@@ -117,7 +117,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
       {activos.length === 0 && porContar}
 
       {activos.length >= BUSCAR_DESDE && <Buscador ambito="mis-deseos" placeholder="Buscar en tu lista" vacio="No tenés ningún deseo con «%s»." />}
-      <div id="mis-deseos" className="flex flex-col gap-5">
+      <div id="mis-deseos" className="gr-categorias flex flex-col gap-5">
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
       {/* Lo que le regalaron va aparte de lo que sacó: con quién le contó que fue suyo, y agradecer */}

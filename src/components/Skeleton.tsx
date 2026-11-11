@@ -45,7 +45,7 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
   color?: string; barra?: 'menu' | 'volver'; chips?: boolean; cards?: number; clase?: string
 }) {
   return (
-    <main aria-busy="true" className={`flex flex-col ${clase}`}>
+    <main aria-busy="true" className={`gr-ancha flex flex-col ${clase}`}>
       <Cargando />
       <section aria-hidden="true" className="gr-tapa" style={{ '--c': color } as React.CSSProperties}>
         <div className="motion-safe:animate-pulse">
@@ -59,7 +59,7 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
             <div className="h-4 w-20 rounded-full bg-white/25" />
             <div className="h-[46px] w-3/5 rounded-2xl bg-white/25" />
             <div className="h-5 w-4/5 rounded-full bg-white/25" />
-            <div className="h-[50px] rounded-full bg-white/25" />
+            <div className="h-[50px] rounded-full bg-white/25 md:w-[320px]" />
           </div>
         </div>
       </section>
@@ -70,7 +70,7 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
           </div>
         )}
         <div className="h-[25px] w-2/5 rounded-full bg-gr-dot" />
-        <ul className="grid grid-cols-2 gap-x-3 gap-y-[18px]">
+        <ul className="grid gr-columnas gap-x-3 gap-y-[18px]">
           {Array.from({ length: cards }, (_, i) => (
             <li key={i} className="flex flex-col gap-2">
               <div className="gr-arte bg-gr-dot" />
@@ -92,7 +92,7 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
  */
 export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?: string; cards?: number }) {
   return (
-    <main aria-busy="true" className="flex flex-col pb-36">
+    <main aria-busy="true" className="gr-ancha flex flex-col pb-36">
       <Cargando />
       <section aria-hidden="true" className="gr-tapa" style={{ '--c': color } as React.CSSProperties}>
         <div className="motion-safe:animate-pulse">
@@ -113,7 +113,7 @@ export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?
           {['w-[76px]', 'w-[118px]', 'w-[84px]'].map((w) => <div key={w} className={`h-[38px] flex-none rounded-full bg-gr-dot ${w}`} />)}
         </div>
         <div className="h-12 rounded-full bg-gr-dot" />
-        <ul className="grid grid-cols-2 gap-x-3 gap-y-[18px]">
+        <ul className="grid gr-columnas gap-x-3 gap-y-[18px]">
           {Array.from({ length: cards }, (_, i) => (
             <li key={i} className="flex flex-col gap-2">
               <div className="gr-arte bg-gr-dot" />
@@ -134,7 +134,7 @@ export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?
  */
 export function SkeletonInicio({ botones = 3, filas = 0 }: { botones?: number; filas?: number }) {
   return (
-    <main aria-busy="true" className={`flex flex-col gap-5 pt-2 ${filas ? 'pb-36' : 'pb-48'}`}>
+    <main aria-busy="true" className={`flex flex-col gap-5 pt-2 ${filas ? 'pb-36' : 'gr-ancha pb-48'}`}>
       <Cargando />
       <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
         <BarraApp botones={botones} />
@@ -243,7 +243,7 @@ export function SkeletonInvitacion() {
 /** La ficha de un deseo mientras llega: la foto a sangre, el nombre, el precio y las fichas (ver FichaDeseo). */
 export function SkeletonFicha() {
   return (
-    <main aria-busy="true" className="flex flex-col gap-5 pb-36">
+    <main aria-busy="true" className="gr-ficha flex flex-col gap-5 pb-36">
       <Cargando />
       <div aria-hidden="true" className="flex flex-col gap-5 motion-safe:animate-pulse">
         <div className="gr-ficha__portada bg-gr-dot" />

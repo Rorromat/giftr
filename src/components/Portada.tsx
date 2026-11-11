@@ -162,7 +162,8 @@ const useSinMovimiento = () => useSyncExternalStore(
 /** Cuánto hay que arrastrar la carta para pasar a la otra. */
 const UMBRAL = 60
 
-export function Portada() {
+/** className: dónde va en la pantalla (en escritorio, la columna de la derecha de la portada). */
+export function Portada({ className = '' }: { className?: string }) {
   const [actual, setActual] = useState(0)
   // pasan solas hasta que la mueven a mano o hasta dar la vuelta (para siempre, no dejan leer la que querían y en el
   // teléfono no hay cómo frenarlas); mientras el mouse o el foco están encima, esperan
@@ -190,7 +191,7 @@ export function Portada() {
   }
 
   return (
-    <section aria-label="Lo que hace GiftR" className="flex w-full flex-col items-center gap-2"
+    <section aria-label="Lo que hace GiftR" className={`flex w-full flex-col items-center gap-2 ${className}`}
              onMouseEnter={() => setEncima(true)} onMouseLeave={() => setEncima(false)}
              onFocus={() => setEncima(true)} onBlur={() => setEncima(false)}>
       {/* en cuál vas, y para pasar a mano. Cada puntito se toca en 44 × 44 (antes, en 11 × 40: con el dedo se le erraba) */}

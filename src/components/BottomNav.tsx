@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { Agregado, abrirAgregado, cerrarAgregado, useAgregado } from '@/components/Agregado'
-import { Icon, type IconName } from '@/components/ui'
+import { Icon, LogoSticker, type IconName } from '@/components/ui'
 import { instalada } from '@/lib/app-instalable'
 
 const DESTINOS: { href: string; label: string; nombre: string; icon: IconName }[] = [
@@ -26,6 +26,21 @@ function seccionDe(path: string) {
   if (path.startsWith('/grupos/') || path.startsWith('/deseo/') || path === '/perfil' || path.startsWith('/perfil/')) return '/mi-lista'
   return path
 }
+
+/**
+ * En escritorio la barra va al costado (el mismo corte que "Pantallas anchas" en tokens.css): ahí no se esconde ni se
+ * arrastra. En el servidor no se sabe: arranca como la de abajo y se acomoda al llegar al navegador.
+ */
+const AL_COSTADO = '(min-width: 1024px)'
+const useAlCostado = () => useSyncExternalStore(
+  (avisar) => {
+    const m = matchMedia(AL_COSTADO)
+    m.addEventListener('change', avisar)
+    return () => m.removeEventListener('change', avisar)
+  },
+  () => matchMedia(AL_COSTADO).matches,
+  () => false,
+)
 
 /** Cuánto achica el teclado lo que se ve: con más que esto, está abierto. */
 const TECLADO_PX = 150
@@ -115,6 +130,9 @@ function useDedoEnLaBarra(tabs: RefObject<HTMLDivElement | null>, alSoltar: (i: 
     }
     const apoya = (e: PointerEvent) => {
       if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+      // al costado las secciones van una abajo de la otra: de costado no hay nada que arrastrar (un clic con el mouse
+      // moviéndose apenas elegía siempre la primera, Inicio)
+      if (matchMedia(AL_COSTADO).matches) return
       inicio = { x: e.clientX, y: e.clientY, id: e.pointerId }
       arrastrando = false
     }
@@ -171,6 +189,8 @@ function useDedoEnLaBarra(tabs: RefObject<HTMLDivElement | null>, alSoltar: (i: 
  * desde el toque mismo, y su columna se estira con un rebote (las columnas se animan con CSS). El + abre el agregado (ver Agregado): gira y queda como × mientras la píldora se esconde. En
  * Agregar la barra se esconde entera (al editar un deseo o tus gustos, armar una sorpresa o un amigo invisible también), y
  * en un deseo, que tiene una sola acción principal, tampoco va.
+ * En escritorio es la barra del costado (el mismo <nav>, con otro CSS: ver "Pantallas anchas" en tokens.css): suma el logo
+ * arriba y el texto del +, y no se esconde nunca.
  */
 export function BottomNav() {
   const path = usePathname()
@@ -201,13 +221,17 @@ export function BottomNav() {
     setToque({ href: d.href, desde: path })
     router.push(d.href)
   })
+  // al costado queda siempre a la vista: que no quede a la vista y sin poder usarse
+  const alCostado = useAlCostado()
   const estirada = dedo.fase === 'arrastrando' && dedo.bajo !== null ? dedo.bajo : columna >= 0 ? columna : ultima
 
   return (
     <>
       <Agregado />
       <nav ref={ref} aria-label="Navegación principal" className="gr-nav" data-oculta={oculta || undefined} data-abierto={abierto || undefined}
-           inert={oculta}>
+           inert={oculta && !alCostado}>
+        {/* solo en la barra del costado (en la de abajo, el logo va en el encabezado de cada pantalla) */}
+        <span className="gr-nav__logo"><LogoSticker /></span>
         {/* prefetch: las secciones del menú se precargan completas (con datos) y el toque es instantáneo. */}
         <div ref={tabs} className="gr-nav__tabs" data-columna={estirada} data-dedo={dedo.fase === 'quieto' ? undefined : dedo.fase} inert={abierto}>
           {/* el selector que sigue al dedo (ver useDedoEnLaBarra) */}
@@ -220,6 +244,8 @@ export function BottomNav() {
         <button type="button" className="gr-mas" aria-label={abierto ? 'Cerrar' : 'Agregar un deseo'} aria-expanded={abierto}
                 onClick={() => (abierto ? cerrarAgregado() : abrirAgregado())}>
           <Icon name="plus" size={24} strokeWidth={2.4} />
+          {/* solo en la barra del costado, donde el + es un botón con su texto */}
+          <span className="gr-mas__texto">{abierto ? 'Cerrar' : 'Agregar un deseo'}</span>
         </button>
       </nav>
     </>
