@@ -8,25 +8,96 @@ import { esUuid } from '@/lib/groups'
 import { notaDeCompra } from '@/lib/limites'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 
-export async function expireStaleClaims(db: Db, itemId?: string) {
-  const vencida = and(eq(claims.estado, 'reservado'), lt(claims.expiresAt, new Date()))
-  await db.update(claims)
-    .set({ estado: 'expirado', updatedAt: new Date() })
-    .where(itemId ? and(vencida, eq(claims.itemId, itemId)) : vencida)
-}
-
 export const RESERVA_DIAS = 14
+/** Desde cuántos días antes del evento de la lista una reserva ya no vence sola (ver vencimientoDeReserva). */
+export const FIRME_DIAS_ANTES = 3
 const DIA = 86400_000
 
+const firmeDesde = (evento: Date) => inicioDelDia(evento).getTime() - FIRME_DIAS_ANTES * DIA
+/** El final del día siguiente al evento: hasta ahí llega una reserva que quedó firme para ese evento. */
+const finDelDiaSiguiente = (evento: Date) => inicioDelDia(new Date(evento.getTime() + 2 * DIA)).getTime()
+
 /**
- * Hasta cuándo dura una reserva suelta: 14 días, o hasta 3 días antes del próximo evento de la lista (el cumple del dueño
- * o la fecha del grupo) si cae antes, así otro llega a comprarlo a tiempo. Nunca menos de 24 horas: el que reserva
- * tiene que poder ir a comprarlo.
+ * Hasta cuándo dura una reserva suelta: 14 días. Pero cerca del próximo evento de la lista (el cumple del dueño o la
+ * fecha del grupo) no vence sola: si a los 14 días ya estaría en los 3 días previos (o pasado el evento), dura hasta el
+ * final del día siguiente al evento. Antes vencía 3 días antes "para que otro llegue a comprarlo": Rodri reservó, compró
+ * y no tocó "Ya lo compré", el deseo quedó libre en la víspera del cumple y Caro lo compró de nuevo. Ahora cerca del
+ * evento no se libera nada solo: se le pregunta a quien lo reservó (ver recordatorios.ts). Nunca menos de 24 horas: quien
+ * reserva tiene que poder ir a comprarlo.
  */
 export async function vencimientoDeReserva(db: Db, listId: string, ahora = new Date()): Promise<Date> {
   const evento = await eventoDeLista(db, listId, hoyLocal(ahora))
-  const antesDelEvento = evento ? inicioDelDia(evento.fecha).getTime() - 3 * DIA : Infinity
-  return new Date(Math.max(ahora.getTime() + DIA, Math.min(ahora.getTime() + RESERVA_DIAS * DIA, antesDelEvento)))
+  const aLos14 = ahora.getTime() + RESERVA_DIAS * DIA
+  const vence = evento && aLos14 >= firmeDesde(evento.fecha) ? finDelDiaSiguiente(evento.fecha) : aLos14
+  return new Date(Math.max(ahora.getTime() + DIA, vence))
+}
+
+/**
+ * Cuándo preguntarle por algo que tiene tomado y no vence (un regalo grupal al que no se sumó nadie, ver cuandoRecordar): a
+ * los 14 días, o 3 días antes del próximo evento de la lista si cae antes, para que llegue a resolverlo; nunca antes de
+ * 24 horas. Era también el vencimiento de una reserva suelta, hasta que cerca del evento quedó firme.
+ */
+export async function cuandoPreguntar(db: Db, listId: string, desde = new Date()): Promise<Date> {
+  const evento = await eventoDeLista(db, listId, hoyLocal(desde))
+  const antesDelEvento = evento ? firmeDesde(evento.fecha) : Infinity
+  return new Date(Math.max(desde.getTime() + DIA, Math.min(desde.getTime() + RESERVA_DIAS * DIA, antesDelEvento)))
+}
+
+type PorVencer = { id: string; listId: string; vence: Date }
+
+/**
+ * De unas reservas, las que vencen en los días firmes del evento de su lista (desde 3 días antes hasta el día siguiente),
+ * con hasta cuándo se estiran. Con la regla de ahora ninguna nace así (ver vencimientoDeReserva): son las de antes, que
+ * vencían justo 3 días antes del evento, y las de una lista a la que le pusieron o le cambiaron la fecha después de la
+ * reserva.
+ */
+async function vencimientosFirmes(db: Db, reservas: PorVencer[]): Promise<Map<string, Date>> {
+  const firmes = new Map<string, Date>()
+  const eventos = new Map<string, ReturnType<typeof eventoDeLista>>()
+  for (const r of reservas) {
+    // visto desde el día anterior: la que vence el mismo día del cumple, o el siguiente, todavía es de ese
+    const desde = new Date(hoyLocal(r.vence).getTime() - DIA)
+    const k = `${r.listId}|${desde.getTime()}`
+    if (!eventos.has(k)) eventos.set(k, eventoDeLista(db, r.listId, desde))
+    const evento = await eventos.get(k)!
+    if (evento && r.vence.getTime() >= firmeDesde(evento.fecha) && r.vence.getTime() < finDelDiaSiguiente(evento.fecha)) {
+      firmes.set(r.id, new Date(finDelDiaSiguiente(evento.fecha)))
+    }
+  }
+  return firmes
+}
+
+const estirar = (db: Db, id: string, hasta: Date) =>
+  db.update(claims).set({ expiresAt: hasta }).where(and(eq(claims.id, id), eq(claims.estado, 'reservado'), lt(claims.expiresAt, hasta)))
+
+/**
+ * Pasa a vencidas las reservas a las que se les terminó el plazo. Antes, las que vencieron en los días firmes del evento
+ * de su lista se estiran hasta el día siguiente al evento (ver vencimientosFirmes): las reservas de antes de la regla
+ * nueva no se caen en la víspera del cumple aunque el cron del día no haya pasado todavía, o no esté configurado (ver
+ * afirmarReservas).
+ */
+export async function expireStaleClaims(db: Db, itemId?: string, ahora = new Date()) {
+  const vencida = and(eq(claims.estado, 'reservado'), lt(claims.expiresAt, ahora), itemId ? eq(claims.itemId, itemId) : undefined)
+  const filas = await db.select({ id: claims.id, listId: items.listId, vence: claims.expiresAt }).from(claims)
+    .innerJoin(items, eq(claims.itemId, items.id)).where(vencida)
+  if (!filas.length) return
+  const firmes = await vencimientosFirmes(db, filas.flatMap((f) => (f.vence ? [{ ...f, vence: f.vence }] : [])))
+  for (const [id, hasta] of firmes) if (hasta > ahora) await estirar(db, id, hasta)
+  // las estiradas ya no entran: su vencimiento es de después de ahora
+  await db.update(claims).set({ estado: 'expirado', updatedAt: new Date() }).where(vencida)
+}
+
+/**
+ * Lo mismo antes de que venzan, una vez por día (ver recordatorios.ts): toda reserva suelta que vencería en los días
+ * firmes del evento de su lista se estira ya, así "vence en 2 días" no le miente a quien la tiene. Devuelve cuántas.
+ */
+export async function afirmarReservas(db: Db, ahora = new Date()): Promise<number> {
+  await expireStaleClaims(db, undefined, ahora)
+  const filas = await db.select({ id: claims.id, listId: items.listId, vence: claims.expiresAt }).from(claims)
+    .innerJoin(items, eq(claims.itemId, items.id)).where(and(eq(claims.estado, 'reservado'), gte(claims.expiresAt, ahora)))
+  const firmes = await vencimientosFirmes(db, filas.flatMap((f) => (f.vence ? [{ ...f, vence: f.vence }] : [])))
+  for (const [id, hasta] of firmes) await estirar(db, id, hasta)
+  return firmes.size
 }
 
 /**

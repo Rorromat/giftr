@@ -6,7 +6,7 @@ import {
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import {
-  desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql, RESERVA_DIAS, reserveItem, vencimientoDeReserva, type ReserveResult,
+  cuandoPreguntar, desdeQueOcupa, expireStaleClaims, loQueYaTiene, noEsDeRegaloGrupal, ocupaSql, RESERVA_DIAS, reserveItem, type ReserveResult,
 } from '@/lib/claims'
 import { desdeElUltimoEvento, eventoDeLista, hoyLocal, inicioDelDia } from '@/lib/events'
 import { esOFueDuenoDeLista, esUuid, juntarNombres, noEsNiFueDuenoSql } from '@/lib/groups'
@@ -1463,8 +1463,8 @@ const ESPERA_MAXIMA_DIAS = 6 * 7
 
 /**
  * Cuándo recordarle al encargado que cierre un regalo abierto. Si dijo "Sigue en pie", a las 2 semanas de eso.
- * - Si no se sumó nadie, cuando una reserva suelta habría vencido (ver vencimientoDeReserva): es una reserva con otro
- *   nombre, y si no tendría el deseo meses sin que nadie le pregunte.
+ * - Si no se sumó nadie, a los 14 días o 3 días antes del evento (ver cuandoPreguntar): es una reserva con otro nombre, y
+ *   si no tendría el deseo meses sin que nadie le pregunte.
  * - Con gente, cerca del evento que viene después de armarlo (3 días antes, o ya, si pasó), pero no más de 6 semanas: uno
  *   armado en octubre para un casamiento en enero no lo molesta enseguida, y uno armado en marzo para el cumple de
  *   febrero no espera un año.
@@ -1473,7 +1473,7 @@ const ESPERA_MAXIMA_DIAS = 6 * 7
  */
 async function cuandoRecordar(db: Db, listId: string, armado: Date, sigueEnPie: Date | null, conGente: boolean): Promise<Date> {
   if (sigueEnPie) return new Date(sigueEnPie.getTime() + RESERVA_DIAS * DIA)
-  if (!conGente) return vencimientoDeReserva(db, listId, armado)
+  if (!conGente) return cuandoPreguntar(db, listId, armado)
   const atrasado = armado.getTime() - (await desdeElUltimoEvento(db, listId, armado)).getTime() < RESERVA_DIAS * DIA
   const evento = atrasado ? null : await eventoDeLista(db, listId, hoyLocal(armado))
   const cuando = evento
