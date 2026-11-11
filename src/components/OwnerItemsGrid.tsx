@@ -6,6 +6,7 @@ import { Arte, Icon } from '@/components/ui'
 import type { OwnerItemView } from '@/lib/serialize'
 import { textoDueno } from '@/lib/compartir'
 import { paraBuscar } from '@/lib/buscar'
+import { antiguedadDelPrecio } from '@/lib/presupuesto'
 
 export const ARCHIVAR = [['lo_tengo', 'Ya lo tengo'], ['no_lo_quiero', 'Ya no lo quiero']] as const
 
@@ -79,7 +80,15 @@ export function OwnerItemsGrid({ items, shareToken, agregado }: { items: OwnerIt
                       className="text-[15px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere] after:absolute after:inset-0 after:z-[1]">
                   {item.titulo}
                 </Link>
-                {precio && <p className="text-[13px] text-gr-muted tabular-nums">{precio}</p>}
+                {/* un precio de hace más de dos meses: en vez del precio solo, la pregunta, que lleva a ponerlo al día */}
+                {precio && (antiguedadDelPrecio(item.precioAt)
+                  ? (
+                    <Link href={`/editar/${item.id}`}
+                          className="relative z-[2] self-start py-1 text-[13px] text-gr-muted tabular-nums underline underline-offset-4 [overflow-wrap:anywhere]">
+                      ¿Sigue costando {precio}?
+                    </Link>
+                  )
+                  : <p className="text-[13px] text-gr-muted tabular-nums">{precio}</p>)}
                 <div className="relative z-[2] self-start">
                   <PrioritySelect itemId={item.id} prioridad={item.prioridad} />
                 </div>

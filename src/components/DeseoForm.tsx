@@ -8,6 +8,8 @@ import { QueQueres } from '@/components/QueQueres'
 import { RecibirCompartido, type CompartidoAlForm } from '@/components/RecibirCompartido'
 import { Hearts, PRIORIDADES, PriorityTag, type Prioridad } from '@/components/ui'
 import { LARGO } from '@/lib/limites'
+import { PrecioAlDia } from '@/components/PrecioAlDia'
+import { antiguedadDelPrecio } from '@/lib/presupuesto'
 import type { OwnerItemView } from '@/lib/serialize'
 
 /** Las tres etiquetas de "¿Cuánto lo querés?" sobre la foto: se ve la elegida (con CSS, sin esperar a que cargue nada). */
@@ -32,6 +34,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
   /** Solo al agregar: lo compartido a GiftR desde otra app (ver RecibirCompartido). */
   compartido?: CompartidoAlForm
 }) {
+  // un precio de hace más de dos meses (ver antiguedadDelPrecio): al editar se le pregunta si sigue igual
+  const precioDe = deseo && (deseo.precio ?? deseo.rangoPrecio) ? antiguedadDelPrecio(deseo.precioAt) : null
   return (
     <form action={action} className="group/deseo mt-1 flex flex-col gap-4">
       {deseo && <input type="hidden" name="itemId" value={deseo.id} />}
@@ -67,6 +71,8 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
                aria-label="Precio" className="min-h-11 w-full rounded-xl bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
         {/* un rango de antes ("$10–30k") queda como estaba: ya no se carga aparte, alcanza con el precio */}
         <input type="hidden" name="rangoPrecio" value={deseo?.rangoPrecio ?? ''} />
+        {/* al editar: decir que el precio sigue igual (si es de hace rato) o traerlo de nuevo de la tienda */}
+        {deseo && (deseo.linkTienda || precioDe) && <PrecioAlDia conLink={!!deseo.linkTienda} viejo={precioDe} />}
       </div>
       {compartido && !deseo && <RecibirCompartido {...compartido} />}
 

@@ -28,6 +28,7 @@ import { FormDividir, InvitadosDelRegalo } from '@/components/Dividir'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { LARGO } from '@/lib/limites'
 import { esSorpresa } from '@/lib/sorpresas'
+import { antiguedadDelPrecio } from '@/lib/presupuesto'
 
 /**
  * Para quien ve la coordinación de un deseo de varias unidades, en su ficha de cuántos pide: cuántos quedan o cuántas
@@ -108,6 +109,8 @@ export default async function DetalleItem({ params, searchParams }: {
   const yaEstan = new Set([...(mio?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const logueado = !!viewer.userId
   const precio = item.precio ?? item.rangoPrecio
+  // un precio cargado hace más de dos meses ya no es el de hoy: quien regala lo tiene que saber antes de ir a comprarlo
+  const precioDe = precio ? antiguedadDelPrecio(item.precioAt) : null
   // como en la lista: un invitado que no dijo que no es suya, o donde entró alguien de la lista, no reserva acá
   const reservable = disponible && !mia && !vencida && !enUnRegalo && !(detalle.role === 'anonimo' && detalle.motivo !== 'sin_identidad')
   const verEnTienda = item.linkTienda && <BotonTienda link={item.linkTienda} tienda={tienda} />
@@ -133,6 +136,7 @@ export default async function DetalleItem({ params, searchParams }: {
         {/* qué es, de quién (para el que llega directo al deseo, un link por WhatsApp) y cuánto sale */}
         <NombreDeLaFicha titulo={item.titulo} categoria={item.categoria} precio={precio}
                          lista={detalle.grupoNombre ?? `Lista de ${ownerNombre.split(' ')[0]}`} />
+        {precioDe && <p className="-mt-3 text-[13px] leading-snug text-gr-muted">Precio de {precioDe}: puede haber cambiado.</p>}
         {invitado && <PreguntaInvitado nombre={invitado} />}
         {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
         <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />

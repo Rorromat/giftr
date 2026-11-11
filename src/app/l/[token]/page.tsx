@@ -32,6 +32,9 @@ import { Arte, AvatarStack, AvatarSticker, BackLink, Icon, PriorityTag, LogoStic
 import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 import { iconoDeCategoria } from '@/components/FichaDeseo'
+import { ChipPresupuesto, TopesPresupuesto } from '@/components/FiltroPresupuesto'
+import { partirPorTope, presupuestoDeLista, topeDeLaUrl } from '@/lib/presupuesto'
+import { plata } from '@/lib/pesos'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
 type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
@@ -105,10 +108,10 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string; reservado?: string; amigo?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; hasta?: string; codazo?: string; reserva?: string; reservado?: string; amigo?: string }>
 }) {
   const { token } = await params
-  const { cat, disp, codazo, reserva, reservado, amigo } = await searchParams
+  const { cat, disp, hasta, codazo, reserva, reservado, amigo } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) {
@@ -154,17 +157,30 @@ export default async function ListaAjena({
   if (disp === '1' && veTodo) mostrados = mostrados.filter((i) => i.disponible)
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
+  // "Hasta $X": el que llega con un presupuesto ve lo que entra. Los topes salen de los precios de toda la lista (no de lo
+  // filtrado, así no cambian al elegir una categoría). Lo que no tiene un precio que se pueda comparar no desaparece: va
+  // al final, aparte (ver partirPorTope). Sin filtro para ofrecer (pocos precios), un ?hasta= de un link viejo no hace nada.
+  const presupuesto = presupuestoDeLista(tarjetas)
+  const tope = presupuesto ? topeDeLaUrl(hasta) : null
+  const porTope = presupuesto && tope ? partirPorTope(mostrados, tope, presupuesto.moneda) : null
+  const sinPrecio = porTope?.sinPrecio ?? []
+  const enPresupuesto = porTope?.dentro ?? mostrados
+  if (porTope) mostrados = [...enPresupuesto, ...sinPrecio]
   // Todos iguales, en la grilla. Agrupados por categoría (en el orden en que aparecen, y lo que no tiene, al final) solo
   // si alguna junta 3 o más: con uno o dos por categoría, cada título quedaba con una tarjeta sola al lado de un hueco, y
   // para ir a una categoría ya están los chips. Con una categoría elegida, o si ninguno tiene, sin títulos.
-  const porCategoria = Object.entries(Object.groupBy(mostrados, (i) => i.categoria ?? ''))
+  const porCategoria = Object.entries(Object.groupBy(enPresupuesto, (i) => i.categoria ?? ''))
     .sort(([a], [b]) => Number(a === '') - Number(b === '')) as [string, Tarjeta[]][]
   const conTitulos = !cat && porCategoria.some(([c, deseos]) => c !== '' && deseos.length >= 3)
-  const grupos: [string, Tarjeta[]][] = conTitulos ? porCategoria : mostrados.length ? [['', mostrados]] : []
+  const grupos: [string, Tarjeta[]][] = conTitulos ? porCategoria : enPresupuesto.length ? [['', enPresupuesto]] : []
 
   // Si una reserva no sale, se vuelve acá con los mismos filtros (y sin el cartel cuando la próxima sale bien).
-  const filtros = new URLSearchParams({ ...(cat && { cat }), ...(disp === '1' && { disp }) }).toString()
-  const aqui = `/l/${token}${filtros ? `?${filtros}` : ''}`
+  // El tope se combina con los otros filtros: elegir una categoría o "Disponibles" no lo saca, y al revés.
+  const conFiltros = (f: { cat?: string; disp?: string; hasta?: number | null }) => {
+    const q = new URLSearchParams({ ...(f.cat && { cat: f.cat }), ...(f.disp === '1' && { disp: '1' }), ...(f.hasta && { hasta: String(f.hasta) }) }).toString()
+    return `/l/${token}${q ? `?${q}` : ''}`
+  }
+  const aqui = conFiltros({ cat, disp, hasta: tope })
   const plural = vista.duenos.length > 1
   // "Reservar" reserva acá mismo, para él, de un toque: es lo que vino a hacer (el regalo grupal se arma desde el deseo).
   // Sin nombre, se lo pide ahí (ver GuestGate). Un invitado que todavía no dijo que esta lista no es suya, primero lo dice
@@ -311,16 +327,21 @@ export default async function ListaAjena({
             vence, lo que reservó y ya no está) los ve acá */}
         {!viewer.userId && <Banners />}
 
+        {/* group/presupuesto: "Hasta $…" (un casillero en la fila) abre los topes de abajo con CSS, sin JS */}
+        <div className="group/presupuesto flex flex-col gap-1">
         <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
-          <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
-          {veTodo && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
+          <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' && !tope ? 'page' : undefined} className="gr-chip">Todos</Link>
+          {veTodo && <Link href={conFiltros({ disp: '1', hasta: tope })} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
+          {presupuesto && <ChipPresupuesto presupuesto={presupuesto} tope={tope} sinTope={conFiltros({ cat, disp })} />}
           {categorias.map((c) => (
-            <Link key={c} href={`/l/${token}?cat=${encodeURIComponent(c)}`} aria-current={cat === c ? 'page' : undefined}
+            <Link key={c} href={conFiltros({ cat: c, hasta: tope })} aria-current={cat === c ? 'page' : undefined}
                   className="gr-chip">
               {c}
             </Link>
           ))}
         </nav>
+        {presupuesto && <TopesPresupuesto presupuesto={presupuesto} tope={tope} href={(t) => conFiltros({ cat, disp, hasta: t })} />}
+        </div>
 
         {/* lo que acaba de reservar no está entre lo que se ve con este filtro: el cartel, igual */}
         {confirmacion && !mostrados.includes(recien!) && confirmacion}
@@ -352,6 +373,26 @@ export default async function ListaAjena({
               </ul>
             </section>
           ))}
+          {/* con un tope elegido, lo que no se puede comparar: sin precio, en otra moneda o escrito de otra forma. No se
+              esconde (capaz entra justo), pero va aparte y al final */}
+          {presupuesto && tope && sinPrecio.length > 0 && (
+            <section data-buscar-grupo aria-labelledby="sin-precio" className="flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <h2 id="sin-precio" className="text-[18px] font-extrabold tracking-[-0.02em]">
+                  {sinPrecio.some((i) => i.precio ?? i.rangoPrecio) ? 'Sin precio para comparar' : 'Sin precio'}
+                  <span className="ml-2 font-semibold text-gr-muted tabular-nums">{sinPrecio.length}</span>
+                </h2>
+                <p className="text-[13px] leading-snug text-gr-muted">
+                  {enPresupuesto.length
+                    ? 'No sabemos si entran en lo que querés gastar: fijate en cada uno.'
+                    : `No hay nada con precio hasta ${plata(tope, presupuesto.moneda)}. De estos no sabemos si entran.`}
+                </p>
+              </div>
+              <ul className="grid grid-flow-row-dense grid-cols-2 items-stretch gap-x-3 gap-y-[18px]">
+                {sinPrecio.map(tarjeta)}
+              </ul>
+            </section>
+          )}
         </div>
 
         {/* sumarlo como amigo, su perfil y sus gustos: después de los deseos (arriba ya está el chip de la tapa). "Sumar",

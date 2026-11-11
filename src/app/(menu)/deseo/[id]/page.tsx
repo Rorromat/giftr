@@ -11,6 +11,7 @@ import { Icon, Seccion } from '@/components/ui'
 import { BarraDeLaFicha, BotonTienda, FichasDeseo, FotoDeLaFicha, NombreDeLaFicha, NotaDeseo } from '@/components/FichaDeseo'
 import { sitioDeLaTienda } from '@/lib/links'
 import { VideoDeseo } from '@/components/VideoDeseo'
+import { antiguedadDelPrecio } from '@/lib/presupuesto'
 
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
 // regalos, ni comentarios (la regla de la sorpresa). La ficha (ver FichaDeseo): la foto a sangre con compartir por WhatsApp
@@ -26,6 +27,8 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
   const deParte = grupo ? [] : await dePartede(db, deseo.id, session.userId)
   const lista = grupo ? `/grupos/${grupo.id}` : '/mi-lista'
   const precio = deseo.precio ?? deseo.rangoPrecio
+  // un precio de hace más de dos meses: se lo decimos al dueño, que es el único que lo puede poner al día
+  const precioDe = precio ? antiguedadDelPrecio(deseo.precioAt) : null
   const tienda = deseo.linkTienda && sitioDeLaTienda(deseo.linkTienda)
 
   return (
@@ -41,6 +44,14 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
                          </a>
                        } />
         <NombreDeLaFicha titulo={deseo.titulo} categoria={deseo.categoria} lista={grupo?.nombre ?? 'Mi lista'} precio={precio} />
+        {precioDe && (
+          <p className="-mt-3 text-[13px] leading-snug text-gr-muted">
+            Precio de {precioDe}.{' '}
+            <Link href={`/editar/${deseo.id}`} className="gr-toque font-semibold text-gr-ink underline underline-offset-4 [overflow-wrap:anywhere]">
+              ¿Sigue costando {precio}?
+            </Link>
+          </p>
+        )}
         <FichasDeseo deseo={deseo} voz="propia" />
         {deseo.notas && <NotaDeseo notas={deseo.notas} quien={grupo ? 'La nota' : 'Tu nota'} />}
         {deseo.videoUrl && <VideoDeseo url={deseo.videoUrl} titulo={deseo.titulo} />}
