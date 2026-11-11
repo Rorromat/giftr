@@ -7,7 +7,7 @@ import { dejarPendiente, loCopiadoParaAgregar } from '@/components/AlLlegarDelAg
 import { leerCopiado } from '@/components/QueQueres'
 import { IlustracionAgregado } from '@/components/IlustracionAgregado'
 import { ArmandoRegalo } from '@/components/ArmandoRegalo'
-import { Arte, Icon, type Prioridad } from '@/components/ui'
+import { Arte, Icon } from '@/components/ui'
 import { sitioDeLaTienda } from '@/lib/links'
 
 // El agregado: el + de la barra de abajo se abre en un círculo del acento que llena la pantalla, y las cuatro maneras de
@@ -26,8 +26,6 @@ export type Anotado = {
   waHref?: string
   /** El primero que anota: lo que sigue es mandar la lista, y va como lo principal. */
   primero?: boolean
-  /** Ya no se usa: cuánto lo querés se elige en el formulario, y acá era elegirlo dos veces. */
-  prioridad?: Prioridad
 }
 
 type Estado = {

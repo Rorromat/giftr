@@ -938,25 +938,6 @@
   .gr-agr[data-paso="listo"] .gr-listo > * { opacity: 1; transform: none; transition-delay: calc(var(--i) * 80ms + 150ms); }
   .gr-listo h2 { margin: 0; font-family: var(--gr-font-display); font-weight: 900; font-size: 46px; line-height: 0.92; letter-spacing: -0.05em; }
   .gr-listo .gr-arte { width: 168px; border-radius: 20px; box-shadow: 0 24px 44px -16px rgb(0 0 0 / 0.5); }
-  .gr-cuanto { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-  /* se ven de 36 de alto; el área de toque llega a 44 */
-  .gr-cuanto button::after { content: ''; position: absolute; inset: -4px 0; }
-  .gr-cuanto button {
-    position: relative;
-    min-width: 44px;
-    min-height: 36px;
-    padding: 0 13px;
-    border: 1px solid color-mix(in oklch, var(--gr-on-acento) 22%, transparent);
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.22);
-    color: var(--gr-on-acento);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .gr-cuanto button[aria-pressed="true"] { background: var(--gr-on-acento); color: #FFFFFF; }
   .gr-agr__listo .gr-btn--vidrio { border-color: color-mix(in oklch, var(--gr-on-acento) 22%, transparent); background: rgb(255 255 255 / 0.22); color: var(--gr-on-acento); }
 
   /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
@@ -1117,8 +1098,10 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   animation: gr-toast 3.6s ease both;
 }
 /* Dos fotos que se alternan con un fundido (los estilos de la bienvenida): la de abajo queda y la de arriba aparece y se
-   va. Cada una con su animation-delay, así no cambian todas juntas. Sin animaciones, se queda la de abajo. */
-.gr-alternar { opacity: 0; animation: gr-alternar 8s ease-in-out infinite; }
+   va. Cada una con su animation-delay, así no cambian todas juntas. Dos vueltas y queda quieta en la de abajo, como los
+   íconos de los avisos: nueve tarjetas cambiando para siempre, al lado de lo que hay que elegir, molestan y no hay cómo
+   pararlas. Sin animaciones, se queda la de abajo. */
+.gr-alternar { opacity: 0; animation: gr-alternar 8s ease-in-out 2; }
 @keyframes gr-alternar { 0%, 42% { opacity: 0; } 50%, 92% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gr-alternar { animation: none; } }
 

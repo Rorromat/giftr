@@ -4,7 +4,7 @@ import { Icon, Tapa } from '@/components/ui'
  * La tapa de una lista propia (Mi lista y la de un grupo): su color de arriba a abajo, el nombre enorme con cuántos deseos
  * hay al lado, la próxima fecha y el botón blanco para mandarla por WhatsApp. Nunca dice nada de reservas.
  */
-export function ListaHero({ color, arriba, etiqueta, titulo, cantidad, fecha, waHref, foto, children }: {
+export function ListaHero({ color, arriba, etiqueta, titulo, cantidad, fecha, waHref, waTexto = 'Mandala por WhatsApp', waAyuda, foto, children }: {
   /** La tapa: la tuya en Mi lista, la de la lista en un grupo (ver lib/tapas.ts). */
   color: string
   /** La barra de arriba, sobre la tapa (el logo y la campanita, o volver). */
@@ -15,6 +15,12 @@ export function ListaHero({ color, arriba, etiqueta, titulo, cantidad, fecha, wa
   /** "tu cumple es en 23 días, el lunes 2 de noviembre", o null si no hay fecha. */
   fecha: React.ReactNode
   waHref: string
+  /**
+   * En una lista en común, a quién va este link ("Mandar a quienes regalan") y qué puede hacer quien lo recibe: más abajo
+   * está el otro, el que invita a armarla, y mandar el equivocado sale caro (quien se suma a armarla ya no puede reservar).
+   */
+  waTexto?: string
+  waAyuda?: string
   /** La foto de una lista en común, arriba del nombre (ver FotoDeLista). */
   foto?: React.ReactNode
   children?: React.ReactNode
@@ -37,8 +43,9 @@ export function ListaHero({ color, arriba, etiqueta, titulo, cantidad, fecha, wa
         {/* blanco: sobre la tapa (verde en Mi lista), el verde del botón principal no se vería */}
         <a href={waHref} target="_blank" className="gr-btn gr-btn--blanco min-h-[50px] w-full gap-2">
           <Icon name="chat" size={19} />
-          Mandala por WhatsApp
+          {waTexto}
         </a>
+        {waAyuda && <p className="gr-tapa__sub -mt-1.5 text-center text-[13px] leading-snug">{waAyuda}</p>}
       </div>
     </Tapa>
   )

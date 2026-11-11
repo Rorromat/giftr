@@ -46,10 +46,10 @@ export default async function Bienvenida({ searchParams }: { searchParams: Promi
         <div role="group" aria-labelledby="tu-cumple" className="gr-card flex flex-col gap-2.5 p-3.5">
           <p id="tu-cumple" className="text-base font-semibold">¿Cuándo es tu cumple?</p>
           <div className="flex gap-2">
-            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" />
+            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" error={errorCumple === 'invalido' ? 'cumple-error' : undefined} />
           </div>
           {errorCumple === 'invalido' && (
-            <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o tocá «Ahora no».</p>
+            <p id="cumple-error" role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o tocá «Ahora no».</p>
           )}
           <p className="text-[13px] leading-snug text-gr-muted">Tu gente lo ve en Todo el año, con tiempo para elegir.</p>
         </div>

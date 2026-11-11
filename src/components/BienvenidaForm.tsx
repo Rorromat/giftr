@@ -175,10 +175,10 @@ export function BienvenidaForm({ nombreCompleto, foto, inicial, cumple, solo, vo
         <div className="gr-card flex flex-col gap-2.5 p-3.5">
           <p className="text-base font-semibold">¿Cuándo es tu cumple?</p>
           <div className="flex gap-2">
-            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" />
+            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} claseDia="w-[34%]" error={avisoCumple ? 'cumple-error' : undefined} />
           </div>
           {avisoCumple && (
-            <p role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
+            <p id="cumple-error" role="alert" className="text-[13px] font-semibold">Tu cumple no se guardó: elegí el día y el mes, o dejá los dos vacíos.</p>
           )}
           <p className="text-[13px] text-gr-muted">Tu gente lo ve en Todo el año, con tiempo para elegir.</p>
         </div>

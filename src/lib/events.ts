@@ -261,7 +261,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
         href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
         personas: sorpresa || conFoto ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
         caras: sorpresa ? [null] : conFoto ? [list.fotoUrl] : delGrupo.map(urlFoto),
-        contexto: sorpresa ? 'No usa GiftR' : relacion || (propio ? 'Tu grupo' : 'Grupo'),
+        contexto: sorpresa ? 'No usa GiftR' : relacion || (propio ? 'Tu lista en común' : 'Lista en común'),
       })
     }
   }

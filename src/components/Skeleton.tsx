@@ -35,27 +35,25 @@ function BarraPagina() {
 }
 
 /**
- * Una lista con su tapa (Mi lista, una lista en común, la lista compartida): la tapa de su color de lado a lado (la de
- * verdad, .gr-tapa, así no cambia de color al llegar) con la barra, el nombre grande y el botón, y abajo la grilla de
- * deseos de a dos, cada uno con su foto más alta que ancha.
- * barra: la del menú (el logo y los botones), la de una lista en común (volver y agregar) o la de la lista compartida (el
- * logo al medio). chips: la fila de "Tus listas" de Mi lista. clase: la separación y el aire de abajo de esa pantalla.
+ * Una lista propia con su tapa (Mi lista, una lista en común): la tapa de su color de lado a lado (la de verdad, .gr-tapa,
+ * así no cambia de color al llegar) con la barra, el nombre grande y el botón, y abajo la grilla de deseos de a dos, cada
+ * uno con su foto más alta que ancha. La de alguien más, que es compacta, tiene la suya (ver SkeletonListaAjena).
+ * barra: la del menú (el logo y los botones) o la de una lista en común (volver y agregar).
+ * chips: la fila de "Tus listas" de Mi lista. clase: la separación y el aire de abajo de esa pantalla.
  */
 export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = false, cards = 4, clase = 'gap-5 pb-36' }: {
-  color?: string; barra?: 'menu' | 'volver' | 'logo'; chips?: boolean; cards?: number; clase?: string
+  color?: string; barra?: 'menu' | 'volver'; chips?: boolean; cards?: number; clase?: string
 }) {
   return (
     <main aria-busy="true" className={`flex flex-col ${clase}`}>
       <Cargando />
       <section aria-hidden="true" className="gr-tapa" style={{ '--c': color } as React.CSSProperties}>
         <div className="motion-safe:animate-pulse">
-          {barra === 'menu' ? <BarraApp botones={2} sobreTapa /> : barra === 'volver' ? (
+          {barra === 'menu' ? <BarraApp botones={2} sobreTapa /> : (
             <div className="flex min-h-14 items-center justify-between gap-2">
               <div className="size-10 rounded-full bg-white/25" />
               <div className="size-10 rounded-full bg-white/25" />
             </div>
-          ) : (
-            <div className="flex min-h-14 items-center justify-center"><div className="h-6 w-[78px] rounded-full bg-white/25" /></div>
           )}
           <div className="mt-5 flex flex-col gap-3.5">
             <div className="h-4 w-20 rounded-full bg-white/25" />
@@ -72,6 +70,49 @@ export function SkeletonTapa({ color = TAPA_PERSONA, barra = 'menu', chips = fal
           </div>
         )}
         <div className="h-[25px] w-2/5 rounded-full bg-gr-dot" />
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-[18px]">
+          {Array.from({ length: cards }, (_, i) => (
+            <li key={i} className="flex flex-col gap-2">
+              <div className="gr-arte bg-gr-dot" />
+              <div className="h-4 w-4/5 rounded-full bg-gr-dot" />
+              <div className="h-3 w-1/2 rounded-full bg-gr-dot" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </main>
+  )
+}
+
+/**
+ * La lista de alguien, como la ve quien regala (/l/[token]): su tapa compacta (el logo al medio, la foto de 56 con el nombre
+ * y la cuenta regresiva al lado, y el chip de su perfil) y, montado sobre el fundido de la tapa, la franja de "Decinos quién
+ * sos", los chips de los filtros, el buscador y la grilla de deseos. Copiaba la tapa grande de antes (el nombre enorme y el
+ * botón de WhatsApp), y al llegar la lista todo subía 150 px de golpe.
+ */
+export function SkeletonListaAjena({ color = TAPA_PERSONA, cards = 4 }: { color?: string; cards?: number }) {
+  return (
+    <main aria-busy="true" className="flex flex-col pb-36">
+      <Cargando />
+      <section aria-hidden="true" className="gr-tapa" style={{ '--c': color } as React.CSSProperties}>
+        <div className="motion-safe:animate-pulse">
+          <div className="flex min-h-11 items-center justify-center"><div className="h-6 w-[78px] rounded-full bg-white/25" /></div>
+          <div className="mt-1 flex items-center gap-3">
+            <div className="size-14 flex-none rounded-full bg-white/25" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="h-[26px] w-3/5 rounded-xl bg-white/25" />
+              <div className="flex h-[18px] items-center"><div className="h-3 w-4/5 rounded-full bg-white/25" /></div>
+            </div>
+          </div>
+          <div className="mt-2.5 h-9 w-[178px] rounded-full bg-white/25" />
+        </div>
+      </section>
+      <div aria-hidden="true" className="relative -mt-14 flex flex-col gap-4 motion-safe:animate-pulse">
+        <div className="h-12 rounded-[22px] bg-gr-dot" />
+        <div className="flex gap-2 py-1">
+          {['w-[76px]', 'w-[118px]', 'w-[84px]'].map((w) => <div key={w} className={`h-[38px] flex-none rounded-full bg-gr-dot ${w}`} />)}
+        </div>
+        <div className="h-12 rounded-full bg-gr-dot" />
         <ul className="grid grid-cols-2 gap-x-3 gap-y-[18px]">
           {Array.from({ length: cards }, (_, i) => (
             <li key={i} className="flex flex-col gap-2">

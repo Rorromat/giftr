@@ -27,9 +27,9 @@ import { Icon, PageHeader, Row, Seccion } from '@/components/ui'
 
 
 export default async function Perfil({ searchParams }: {
-  searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string; nombre?: string; alias?: string }>
+  searchParams: Promise<{ nuevo?: string; cumple?: string; usuario?: string; nombre?: string; alias?: string; volver?: string | string[] }>
 }) {
-  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario, nombre: avisoNombre, alias: avisoAlias } = await searchParams
+  const { nuevo, cumple: avisoCumple, usuario: avisoUsuario, nombre: avisoNombre, alias: avisoAlias, volver } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
   const [lista, cumple, gustos, alias] = await Promise.all([
@@ -50,7 +50,8 @@ export default async function Perfil({ searchParams }: {
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" />
+      {/* se llega desde tu foto, que está en las cuatro secciones: vuelve a la que estaba (ver lib/volver.ts) */}
+      <PageHeader title="Tu perfil" back="/mi-lista" backLabel="Volver a tu lista" origen={{ pantalla: '/perfil', volver }} />
 
       <div className="gr-card flex items-center gap-4 p-4">
         <FotoPerfil nombre={nombre} foto={foto} size={72} propia />
@@ -64,14 +65,16 @@ export default async function Perfil({ searchParams }: {
       <form id="nombre" action={cambiarNombreAction} className="gr-card flex scroll-mt-6 flex-col gap-2 p-4">
         <label htmlFor="nombre-campo" className="text-base font-semibold">Tu nombre</label>
         <div className="flex gap-2">
+          {/* el mensaje de abajo (la ayuda, o por qué no se guardó) se lee con el campo; con error, queda marcado */}
           <input id="nombre-campo" name="nombre" defaultValue={nombre} required maxLength={NOMBRE_INVITADO_MAXIMO} autoComplete="name"
+                 aria-describedby="nombre-ayuda" aria-invalid={avisoNombre === 'vacio' || avisoNombre === 'largo' || undefined}
                  className="gr-input min-w-0 flex-1" />
           <BotonEnviar className="gr-btn gr-btn--sm flex-none">Guardar</BotonEnviar>
         </div>
-        {avisoNombre === 'ok' ? <p role="status" className="text-[13px] font-semibold">Listo, ahora te ven como {nombre}.</p>
-          : avisoNombre === 'vacio' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Poné tu nombre así los demás saben quién sos.</p>
-          : avisoNombre === 'largo' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Hasta {NOMBRE_INVITADO_MAXIMO} letras.</p>
-          : <p className="text-[13px] text-gr-muted">Así te ven tus amigos y los que abren tu lista.</p>}
+        {avisoNombre === 'ok' ? <p id="nombre-ayuda" role="status" className="text-[13px] font-semibold">Listo, ahora te ven como {nombre}.</p>
+          : avisoNombre === 'vacio' ? <p id="nombre-ayuda" role="alert" className="text-[13px] font-semibold text-red-700">Poné tu nombre así los demás saben quién sos.</p>
+          : avisoNombre === 'largo' ? <p id="nombre-ayuda" role="alert" className="text-[13px] font-semibold text-red-700">Hasta {NOMBRE_INVITADO_MAXIMO} letras.</p>
+          : <p id="nombre-ayuda" className="text-[13px] text-gr-muted">Así te ven tus amigos y los que abren tu lista.</p>}
       </form>
 
       {/* el @usuario: con esto te encuentran para sumarte como amigo (ver amigos.ts) */}
@@ -81,14 +84,16 @@ export default async function Perfil({ searchParams }: {
           <div className="relative min-w-0 flex-1">
             <span aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-gr-muted">@</span>
             <input id="usuario-campo" name="usuario" defaultValue={usuario ?? ''} required minLength={3} maxLength={21}
-                   autoComplete="off" autoCapitalize="none" spellCheck={false} className="gr-input w-full pl-8" />
+                   autoComplete="off" autoCapitalize="none" spellCheck={false}
+                   aria-describedby="usuario-ayuda" aria-invalid={avisoUsuario === 'ocupado' || avisoUsuario === 'formato' || undefined}
+                   className="gr-input w-full pl-8" />
           </div>
           <BotonEnviar className="gr-btn gr-btn--sm flex-none">Guardar</BotonEnviar>
         </div>
-        {avisoUsuario === 'ok' ? <p role="status" className="text-[13px] font-semibold">Listo, ahora sos @{usuario}.</p>
-          : avisoUsuario === 'ocupado' ? <p role="alert" className="text-[13px] font-semibold text-red-700">Ese usuario ya lo tiene alguien. Probá con otro.</p>
-          : avisoUsuario === 'formato' ? <p role="alert" className="text-[13px] font-semibold text-red-700">De 3 a 20 letras, números, punto o guión bajo, sin espacios.</p>
-          : <p className="text-[13px] text-gr-muted">Con esto te encuentran para sumarte como amigo.</p>}
+        {avisoUsuario === 'ok' ? <p id="usuario-ayuda" role="status" className="text-[13px] font-semibold">Listo, ahora sos @{usuario}.</p>
+          : avisoUsuario === 'ocupado' ? <p id="usuario-ayuda" role="alert" className="text-[13px] font-semibold text-red-700">Ese usuario ya lo tiene alguien. Probá con otro.</p>
+          : avisoUsuario === 'formato' ? <p id="usuario-ayuda" role="alert" className="text-[13px] font-semibold text-red-700">De 3 a 20 letras, números, punto o guión bajo, sin espacios.</p>
+          : <p id="usuario-ayuda" className="text-[13px] text-gr-muted">Con esto te encuentran para sumarte como amigo.</p>}
       </form>
 
       <div className="flex flex-col gap-1.5">
@@ -109,7 +114,7 @@ export default async function Perfil({ searchParams }: {
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction} ocultos={{}}
                    className="items-end">
           El link de ahora deja de andar: los que lo tienen no van a poder abrir tu lista hasta que les mandes el nuevo, y
-          tu lista sale de su gente y de sus eventos (tus amigos la siguen viendo). Lo que ya reservaron no se pierde.
+          tu lista sale de su gente y de Todo el año (tus amigos la siguen viendo). Lo que ya reservaron no se pierde.
         </Confirmar>
       </div>
 
@@ -186,17 +191,17 @@ export default async function Perfil({ searchParams }: {
             <span className="gr-row__icon text-gr-ink"><Icon name="cake" size={20} /></span>
             <span className="pt-0.5">
               {cumple && <span className="block text-[15px] font-semibold text-gr-ink">El {cumple.dia} de {MESES[cumple.mes - 1]}.</span>}
-              Tu gente lo ve en Eventos, con tiempo para elegir.
+              Tu gente lo ve en Todo el año, con tiempo para elegir.
             </span>
           </p>
           {avisoCumple === 'invalido' && (
             <>
               <input type="hidden" name="conAviso" value="1" />
-              <p role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
+              <p id="cumple-error" role="alert" className="text-[13px] font-semibold">No se guardó: elegí un día y un mes que existan.</p>
             </>
           )}
           <div className="flex gap-2">
-            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" />
+            <CumpleCampos dia={cumple?.dia} mes={cumple?.mes} exigir claseDia="w-[30%]" error={avisoCumple === 'invalido' ? 'cumple-error' : undefined} />
             <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-[50px] flex-none">Guardar</BotonEnviar>
           </div>
           {cumple && (

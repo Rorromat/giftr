@@ -120,7 +120,7 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
   )
 }
 
-/** Reservar desde el feed: lleva al deseo, que pregunta cómo (lo comprás vos o lo dividen con amigos, ver ComoLoRegalas). */
+/** Reservar desde el feed: lleva al deseo, que tiene "Reservar" en su barra, de un toque (ver ComoLoRegalas). */
 function Reservar({ n }: { n: NovedadVista }) {
   const mia = n.item.claims.some((c) => c.esMia || c.grupal?.soyParte)
   const href = `/l/${n.token}/item/${n.item.id}`
@@ -132,7 +132,7 @@ function Reservar({ n }: { n: NovedadVista }) {
     )
   }
   if (!n.item.disponible) return <span className="gr-btn gr-btn--sm w-full cursor-default text-gr-muted">Ya lo reservaron</span>
-  return <Link href={`${href}?reservar=1#reservar`} className="gr-btn-primary gr-btn--sm w-full">Reservar</Link>
+  return <Link href={href} className="gr-btn-primary gr-btn--sm w-full">Reservar</Link>
 }
 
 /**

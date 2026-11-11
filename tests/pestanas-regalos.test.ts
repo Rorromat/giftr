@@ -39,7 +39,7 @@ test('lo de arriba va en el layout: el título y la pestaña marcada salen de la
   const enRegalos = await arriba('/regalos')
   expect(enRegalos).toContain('<h1 class="gr-title">Tus regalos</h1>')
   expect(enRegalos).toContain('data-columna="0"')
-  expect(enRegalos).toMatch(/<a [^>]*aria-current="page"[^>]*>Mis regalos<\/a>/)
+  expect(enRegalos).toMatch(/<a [^>]*aria-current="page"[^>]*>Tus regalos<\/a>/)
 
   // si las páginas trajeran su encabezado o las pestañas, saldrían dos veces
   for (const html of [renderToStaticMarkup(await MisRegalos()), renderToStaticMarkup(await Cuentas({ searchParams: Promise.resolve({}) }))]) {

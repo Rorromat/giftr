@@ -60,7 +60,7 @@ export default async function NuevoGrupo() {
 
         <p className="gr-empty text-sm text-gr-muted">
           Los que regalan la ven como una sola lista, y ninguno de ustedes ve quién reserva qué. Tus amigos la ven en su gente y,
-          si la agregan, su cumple les aparece en Eventos.
+          si la agregan, su cumple les aparece en Todo el año.
         </p>
         <BotonEnviar pendiente="Creando…" className="gr-btn-primary mt-1 h-14 w-full text-[17px]">Crear lista en común</BotonEnviar>
       </form>

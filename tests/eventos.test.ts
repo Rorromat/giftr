@@ -71,7 +71,7 @@ test('el regalador ve el cumple de su gente con los 3 que más quiere sin reserv
   })
   expect(cumple.fecha).toEqual(dia('2026-08-22'))
   expect(cumple.href).toMatch(/^\/l\//)
-  expect(grupo).toMatchObject({ tipo: 'grupo', titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Grupo', fotos: [] })
+  expect(grupo).toMatchObject({ tipo: 'grupo', titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Lista en común', fotos: [] })
   // quien reservó se ve a sí mismo
   const [deRodri] = await misEventos(db, rodri.id, HOY)
   expect(deRodri.misReservas).toBe(1)
@@ -98,7 +98,7 @@ test('REGLA DE LA SORPRESA: en sus propios eventos el dueño no recibe nada de r
   const json = JSON.stringify(await misEventos(db, euge.id, HOY)).toLowerCase()
   for (const palabra of ['rodri', 'sofi', 'caro', 'reserv', 'claim', 'comprado', 'grupal']) expect(json).not.toContain(palabra)
   const [mellizos] = await misEventos(db, caro.id, HOY)
-  expect(mellizos).toMatchObject({ titulo: 'Cumple de los mellizos', propio: true, contexto: 'Tu grupo' })
+  expect(mellizos).toMatchObject({ titulo: 'Cumple de los mellizos', propio: true, contexto: 'Tu lista en común' })
   expect(mellizos).not.toHaveProperty('misReservas')
 })
 

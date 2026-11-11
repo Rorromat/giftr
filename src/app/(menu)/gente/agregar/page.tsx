@@ -4,13 +4,24 @@ import { auth } from '@/auth'
 import { db } from '@/db'
 import { pedirAmistadAction } from '@/app/actions'
 import { asegurarUsuario, buscarPorUsuario, miAmigoToken, normalizarEmail, normalizarUsuario, relacionCon } from '@/lib/amigos'
-import { AvisoAmigo, InvitarAmigos, PersonaFila } from '@/components/Amigos'
+import { AvisoAmigo, InvitarAmigos, mensajeDeInvitacion, PersonaFila } from '@/components/Amigos'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { Icon, PageHeader, Seccion } from '@/components/ui'
 
+/** Avisarle por WhatsApp con el link de amigo (qué es GiftR y cómo entrar): al abrirlo ya quedan amigos, sin solicitud. */
+function AvisarPorWhatsApp({ link }: { link: string }) {
+  return (
+    <a href={`https://wa.me/?text=${encodeURIComponent(mensajeDeInvitacion(link))}`} target="_blank" className="gr-btn gr-btn--sm w-full gap-2">
+      <Icon name="chat" size={18} strokeWidth={2} />Avisarle por WhatsApp
+    </a>
+  )
+}
+
 /**
  * Agregar un amigo: se busca por su @usuario (se ve quién es antes de mandarle la solicitud) o se escribe su mail (no
- * se dice si tiene cuenta: le llega ahora o cuando entre con ese mail). Abajo, el link de amigo para mandar por WhatsApp.
+ * se dice si tiene cuenta). Por mail no sale ningún mail: la solicitud queda en GiftR y la ve cuando entre con ese mail
+ * (ver pedirAmistadPorMail). Decía "le llega ahora", y quien la mandaba se quedaba esperando una respuesta a un mail que
+ * nunca salió: ahora dice lo que pasa y ofrece avisarle por WhatsApp. Abajo, el mismo link de amigo para invitar.
  */
 export default async function AgregarAmigo({ searchParams }: { searchParams: Promise<{ q?: string; amigo?: string }> }) {
   const { q: escrito = '', amigo } = await searchParams
@@ -25,6 +36,9 @@ export default async function AgregarAmigo({ searchParams }: { searchParams: Pro
   ])
   const relacion = encontrado ? await relacionCon(db, yo, encontrado.id) : null
   const volver = `/gente/agregar?q=${encodeURIComponent(q)}`
+  const linkAmigo = token ? `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/amigo/${token}` : null
+  // la mandó por mail: se le dice lo que pasa de verdad (no le llega un mail), igual tenga o no cuenta
+  const porMail = !!email && amigo === 'enviada'
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
@@ -40,21 +54,36 @@ export default async function AgregarAmigo({ searchParams }: { searchParams: Pro
         <p className="text-[13px] text-gr-muted">Si acepta, se ven las listas y los cumples.</p>
       </form>
 
-      <AvisoAmigo amigo={amigo} />
+      {porMail ? (
+        <section role="status" className="gr-card flex flex-col gap-3 p-4">
+          <p className="flex items-start gap-2.5 text-sm font-semibold">
+            <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />Listo, la solicitud quedó esperando en GiftR.
+          </p>
+          <p className="text-[13px] leading-snug text-gr-muted [overflow-wrap:anywhere]">
+            No le mandamos ningún mail: la va a ver cuando entre a GiftR con {email}. Si todavía no la usa, o para que se
+            entere ya, avisale vos.
+          </p>
+          {linkAmigo && <AvisarPorWhatsApp link={linkAmigo} />}
+        </section>
+      ) : <AvisoAmigo amigo={amigo} />}
 
       {q && !amigo && (
         email ? (
           <section className="gr-card flex flex-col gap-3 p-4">
             <div className="flex items-center gap-3">
-              <span className="gr-row__icon"><Icon name="chat" size={20} /></span>
+              <span className="gr-row__icon"><Icon name="users" size={20} /></span>
               <p className="min-w-0 flex-1 text-base font-semibold [overflow-wrap:anywhere]">{email}</p>
             </div>
-            <p className="text-[13px] leading-snug text-gr-muted">Si ya usa GiftR con ese mail, le llega ahora. Si no, la ve cuando entre.</p>
+            <p className="text-[13px] leading-snug text-gr-muted">
+              No le llega ningún mail: la solicitud le aparece en GiftR cuando entre con ese mail. Si todavía no usa GiftR,
+              mandale el link por WhatsApp: al entrar ya quedan amigos.
+            </p>
             <form action={pedirAmistadAction}>
               <input type="hidden" name="quien" value={email} />
               <input type="hidden" name="volver" value={volver} />
-              <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Mandar solicitud</BotonEnviar>
+              <BotonEnviar className="gr-btn-primary gr-btn--sm w-full">Dejarle la solicitud en GiftR</BotonEnviar>
             </form>
+            {linkAmigo && <AvisarPorWhatsApp link={linkAmigo} />}
           </section>
         ) : encontrado && relacion ? (
           <section className="gr-card flex flex-col gap-3 p-4">
@@ -83,7 +112,7 @@ export default async function AgregarAmigo({ searchParams }: { searchParams: Pro
           Tu usuario es <span className="font-semibold text-gr-ink">@{miUsuario}</span> · <Link href="/perfil#usuario" className="font-semibold underline underline-offset-4">Cambiarlo</Link>
         </p>
       )}
-      {token && <InvitarAmigos link={`${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/amigo/${token}`} usuario={null} />}
+      {linkAmigo && <InvitarAmigos link={linkAmigo} usuario={null} />}
     </Seccion>
   )
 }

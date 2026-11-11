@@ -28,7 +28,7 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 const AVISOS: Record<string, string> = {
   invitacion: 'Listo: el link de invitación es nuevo. El de antes ya no sirve para sumarse.',
   regalar: 'Listo: el link para regalar es nuevo. El de antes ya no anda: volvé a mandarlo por WhatsApp.',
-  sacado: 'Listo: ya no es parte del grupo. El link de invitación cambió para que no vuelva a sumarse: si falta alguien, mandale el nuevo.',
+  sacado: 'Listo: ya no es parte de la lista en común. El link de invitación cambió para que no vuelva a sumarse: si falta alguien, mandale el nuevo.',
   invitados: 'Listo: les avisamos. Cuando se sumen, van a aparecer acá.',
 }
 
@@ -65,14 +65,15 @@ export default async function Grupo({ params, searchParams }: {
                    <header className="flex min-h-14 items-center justify-between gap-2">
                      <BackLink href="/mi-lista" label="Volver a Mi lista" vidrio />
                      <p className="text-[15px] font-bold">Lista en común</p>
-                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar deseo al grupo" className="gr-icon-btn gr-vidrio">
+                     <Link href={`/agregar?lista=${grupo.id}`} aria-label="Agregar un deseo a la lista" className="gr-icon-btn gr-vidrio">
                        <Icon name="plus" size={20} strokeWidth={2.4} />
                      </Link>
                    </header>
                  )}
                  waHref={`https://wa.me/?text=${waRegalar}`} fecha={null}
+                 waTexto="Mandar a quienes regalan" waAyuda="Con este link ven la lista y reservan. No deja editar."
                  foto={<FotoDeLista key={grupo.fotoUrl ?? ''} foto={grupo.fotoUrl} grupoId={grupo.id} size={56} />}>
-        {/* Fecha del grupo (o su cumple): aparece en Eventos de los dueños y de quienes siguen la lista */}
+        {/* La fecha de la lista (o su cumple): aparece en Todo el año de los dueños y de quienes siguen la lista */}
         {/* key: al cambiar la fecha se vuelve a montar cerrado (si no, queda abierto tras guardar) */}
         <details key={`${grupo.eventoFecha}-${grupo.eventoAnual}-${grupo.esCumple}-${fechaInvalida}`} open={fechaInvalida} className="group flex flex-col">
           <summary className="gr-vidrio flex min-h-10 cursor-pointer list-none items-center gap-2 self-start rounded-full py-1.5 pl-2.5 pr-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
@@ -98,7 +99,9 @@ export default async function Grupo({ params, searchParams }: {
         <p role="status" className="rounded-2xl bg-gr-soft px-3.5 py-3 text-sm font-medium">{aviso}</p>
       )}
 
-      {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. */}
+      {/* Dueños e invitación. Este link da permiso para editar: es solo para quien arma la lista. En la misma pantalla
+          están los dos links de WhatsApp, y mandar el equivocado sale caro: la tía que se suma a armarla por error ya no
+          puede reservar. Por eso cada botón dice a quién va, con una línea abajo que dice qué puede hacer quien lo recibe. */}
       <section className="gr-card flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
           <AvatarStack nombres={grupo.duenos.map((d) => d.nombre)} fotos={grupo.duenos.map((d) => d.foto)} />
@@ -143,9 +146,12 @@ export default async function Grupo({ params, searchParams }: {
         <a href={`https://wa.me/?text=${waInvitar}`} target="_blank"
            className="gr-btn gr-btn--sm justify-center gap-2">
           <Icon name="users" size={18} />
-          Invitar por WhatsApp
+          Invitar a armarla (puede editar)
         </a>
-        <p className="text-xs text-gr-muted">Para los que regalan usá “Mandala por WhatsApp”: ese link no deja editar.</p>
+        <p className="text-xs leading-snug text-gr-muted">
+          Solo para quien arma la lista con vos: va a poder agregar y editar, y ya no va a poder reservar. Para los que regalan
+          usá “Mandar a quienes regalan”, arriba.
+        </p>
         {/* por si la invitación llegó a quien no tenía que llegar */}
         <Confirmar resumen="Generar un link de invitación nuevo" boton="Sí, generar uno nuevo" action={newInviteAction}
                    ocultos={{ grupoId: grupo.id }}>
@@ -162,7 +168,7 @@ export default async function Grupo({ params, searchParams }: {
               <Confirmar key={m.id} resumen={`Sacar a ${m.nombre}`} boton={`Sí, sacar a ${m.nombre}`}
                          action={removeMemberAction} ocultos={{ grupoId: grupo.id, userId: m.id }}>
                 {m.nombre} deja de agregar y editar esta lista, y el link de invitación cambia para que no vuelva a sumarse con el
-                de antes. Igual que alguien que sale del grupo, sigue sin ver qué reservaron y sin poder reservar en ella: pudo
+                de antes. Igual que alguien que sale de la lista, sigue sin ver qué reservaron y sin poder reservar en ella: pudo
                 haber cargado deseos.
               </Confirmar>
             ))}
@@ -186,7 +192,7 @@ export default async function Grupo({ params, searchParams }: {
       </div>
       <Archivados items={grupo.items.filter((i) => i.estadoDueno !== 'activo')} grupo />
       {nuevoDeseo && (
-        <RecienAgregado deseo={{ id: nuevoDeseo.id, titulo: nuevoDeseo.titulo, foto: nuevoDeseo.fotoUrl, prioridad: nuevoDeseo.prioridad, grupo: true }} />
+        <RecienAgregado deseo={{ id: nuevoDeseo.id, titulo: nuevoDeseo.titulo, foto: nuevoDeseo.fotoUrl, grupo: true }} />
       )}
       {eliminado === '1' && <DeseoEliminado />}
 
@@ -197,10 +203,10 @@ export default async function Grupo({ params, searchParams }: {
         <Confirmar resumen="Cambiar el link para regalar" boton="Sí, cambiar el link" action={newShareLinkAction}
                    ocultos={{ grupoId: grupo.id }} className="items-center">
           El link de ahora deja de andar: los que lo tienen no van a poder abrir la lista hasta que les mandes el nuevo, y
-          la lista sale de su gente y de sus eventos. Lo que ya reservaron no se pierde.
+          la lista sale de su gente y de Todo el año. Lo que ya reservaron no se pierde.
         </Confirmar>
         {grupo.duenos.length > 1 && (
-          <Confirmar resumen="Salir del grupo" boton="Salir del grupo" action={leaveGroupAction} ocultos={{ grupoId: grupo.id }}
+          <Confirmar resumen="Salir de la lista en común" boton="Salir de la lista en común" action={leaveGroupAction} ocultos={{ grupoId: grupo.id }}
                      className="items-center">
             Vas a dejar de agregar y editar esta lista. Como la armaste vos también, aunque salgas no vas a ver qué
             reservaron los demás ni vas a poder reservar en ella.

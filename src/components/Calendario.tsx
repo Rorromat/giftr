@@ -136,7 +136,7 @@ function VistaAnio({ meses, dias, cosas, orden, vacio }: Datos & { orden: string
   return (
     <>
       <p className="-mt-3 text-center text-sm text-gr-muted">Los cumples y fechas de tu gente, y las fechas especiales. Tocá un mes para verlo día por día.</p>
-      {vacio && <p className="gr-empty py-7 text-center">Acá aparecen los cumples de la gente cuyas listas abrís y las fechas de tus grupos.</p>}
+      {vacio && <p className="gr-empty py-7 text-center">Acá aparecen los cumples de la gente cuyas listas abrís y las fechas de tus listas en común.</p>}
       <div className="gr-card flex flex-col gap-3 p-2">
         <ul className="grid grid-cols-3 gap-y-1">
           {meses.map((m, i) => {

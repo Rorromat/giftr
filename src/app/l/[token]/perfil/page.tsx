@@ -35,7 +35,7 @@ export default async function Perfil({ params, searchParams }: Props) {
   const nadaCargado = p.secciones.length === 0
   // Al dueño, "Ver mi lista como la ven" lo llevaba a su propia lista de siempre (no hay vista previa: la de quien
   // regala tiene las reservas). Vuelve a su lista o a su grupo, y la flecha a donde vino.
-  const suLista = p.tipo === 'grupo' ? { href: `/grupos/${p.listId}`, texto: 'Volver al grupo' } : { href: '/mi-lista', texto: 'Volver a mi lista' }
+  const suLista = p.tipo === 'grupo' ? { href: `/grupos/${p.listId}`, texto: 'Volver a la lista en común' } : { href: '/mi-lista', texto: 'Volver a mi lista' }
   const atras = !dueno ? { href: `/l/${token}`, texto: 'Volver a la lista' }
     : p.tipo === 'grupo' ? suLista : { href: '/perfil', texto: 'Volver a Perfil' }
 

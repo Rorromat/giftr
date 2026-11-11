@@ -340,7 +340,7 @@ test('perfil público visto por su dueño: no promete "ver mi lista como la ven"
   h.session = { userId: giver.id }
   p = await ver(grupo.shareToken, owner.id)
   expect(p).toContain(`href="/grupos/${grupoId}"`)
-  expect(p).toContain('Volver al grupo')
+  expect(p).toContain('Volver a la lista en común')
 
   // el que regala, a la lista
   h.session = null
