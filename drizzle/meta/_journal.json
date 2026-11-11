@@ -302,6 +302,13 @@
       "when": 1794376357347,
       "tag": "0042_solo_con_cuenta_y_tope_de_invitados",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794377408404,
+      "tag": "0043_post_evento",
+      "breakpoints": true
     }
   ]
 }

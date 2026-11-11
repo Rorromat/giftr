@@ -10,7 +10,9 @@ import { textoMiLista } from '@/lib/compartir'
 import { paletaGusto } from '@/lib/colores-gustos'
 import { yo } from '@/lib/perfil'
 import { diasEntre, fechaLarga, hoyLocal, miCumple, proximaFecha } from '@/lib/events'
+import { postEvento, recibidosDe } from '@/lib/post-evento'
 import { Archivados, OwnerItemsGrid } from '@/components/OwnerItemsGrid'
+import { Recibidos, TarjetaPostEvento } from '@/components/PostEvento'
 import { ListaHero } from '@/components/ListaHero'
 import { IlustracionGusto } from '@/components/IlustracionGusto'
 import { DeseoEliminado, RecienAgregado } from '@/components/RecienAgregado'
@@ -51,9 +53,10 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
   const { agregado, eliminado } = await searchParams
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple, avisos, gustos] = await Promise.all([
+  const [lista, bienvenida, grupos, { nombre: suNombre, foto }, cumple, avisos, gustos, despues, { recibidos, contados }] = await Promise.all([
     getOwnList(db, session.userId), necesitaBienvenida(db, session.userId), nombresDeMisGrupos(db, session.userId), yo(db, session.userId),
     miCumple(db, session.userId), avisosSinLeer(db, { userId: session.userId }), misGustos(db, session.userId),
+    postEvento(db, session.userId), recibidosDe(db, session.userId),
   ])
   if (!lista) redirect('/')
   // La primera vez que entra: la bienvenida (una pantalla, su cumple), y de ahí a su primer deseo.
@@ -95,6 +98,9 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
         <Link href="/grupos/nuevo" className="gr-chip">+ Lista en común</Link>
       </nav>
 
+      {/* Después del cumple (ver post-evento.ts): marcar lo que le regalaron. Sale por la fecha, haya o no reservas */}
+      {despues?.pendiente && activos.length > 0 && <TarjetaPostEvento />}
+
       {activos.length === 0 ? (
         <div className="gr-empty flex flex-col items-center gap-3 py-8 text-center">
           <span className="flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="gift" size={26} /></span>
@@ -114,7 +120,10 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
       <div id="mis-deseos" className="flex flex-col gap-5">
         <OwnerItemsGrid items={activos} shareToken={lista.shareToken} agregado={agregado} />
       </div>
-      <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo')} />
+      {/* Lo que le regalaron va aparte de lo que sacó: con quién le contó que fue suyo, y agradecer */}
+      <Recibidos recibidos={recibidos} contados={contados} marcarMas={!!despues?.enVentana && activos.length > 0}
+                 abierto={!!despues?.enVentana || contados.length > 0 || recibidos.some((r) => r.dePartede.some((d) => !d.agradecido))} />
+      <Archivados items={lista.items.filter((i) => i.estadoDueno !== 'activo' && i.estadoDueno !== 'me_lo_regalaron')} />
       {/* un ajuste de la lista: quién ve los nombres de los que reservan (nunca vos) */}
       <AjusteSoloConCuenta prendida={soloConCuenta} />
       {/* "¡Anotado!", con mandar la lista a mano (lo principal, si es el primero que anota: ver Agregado) */}

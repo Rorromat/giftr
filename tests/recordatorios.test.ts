@@ -92,9 +92,10 @@ test('"¿Ya compraste…?" 3 días antes del cumple y otra vez la víspera, con 
   expect(await mandarRecordatorios(db, en(4), push.enviar)).toMatchObject({ loCompraste: 0, venceManana: 1 })
   expect(push.de('Rodri')[2].title).toBe('⏳ Tu reserva de "Termo" vence mañana')
   expect((await db.select().from(claims).where(eq(claims.id, r.claimId)))[0].estado).toBe('reservado')
-  // a Euge, nada en ningún momento
-  expect(push.de('Euge')).toEqual([])
-  expect(await enBandeja(db, euge.id)).toEqual([])
+  // a Euge, nada de todo esto en ningún momento: solo, al día siguiente de su cumple, lo que le llega a cualquiera que cumplió
+  const paraEuge = { title: '🎁 ¿Qué te regalaron?', body: 'Marcalo y dejá tu lista al día para el año que viene.', url: '/mi-lista/recibidos' }
+  expect(push.de('Euge')).toEqual([paraEuge])
+  expect(await enBandeja(db, euge.id)).toEqual([{ titulo: '¿Qué te regalaron?', cuerpo: paraEuge.body, href: paraEuge.url }])
 })
 
 test('reservó 2 días antes: le llega igual ("es en 2 días") y otra vez la víspera; en la fecha de una lista en común, con su nombre', async () => {
@@ -298,10 +299,13 @@ test('EL TEST DE ORO, recordatorios: al dueño le llega lo mismo con la lista ll
   const [con, sin] = [await loQueLeLlegaAlDueno(true), await loQueLeLlegaAlDueno(false)]
   // a los que regalan sí les fueron llegando cosas
   expect(con.aLosDemas).toBeGreaterThan(0)
-  // al dueño, exactamente lo mismo: solo "Tu cumple es en 30 días"
+  // al dueño, exactamente lo mismo: "Tu cumple es en 30 días" y, al día siguiente del cumple, "¿Qué te regalaron?"
   expect(con.push).toEqual(sin.push)
   expect(con.bandeja).toEqual(sin.bandeja)
-  expect(con.push).toEqual([expect.objectContaining({ title: '🎂 Tu cumple es en 30 días', url: '/mi-lista' })])
+  expect(con.push).toEqual([
+    expect.objectContaining({ title: '🎂 Tu cumple es en 30 días', url: '/mi-lista' }),
+    { title: '🎁 ¿Qué te regalaron?', body: 'Marcalo y dejá tu lista al día para el año que viene.', url: '/mi-lista/recibidos' },
+  ])
   const texto = JSON.stringify([con.push, con.bandeja]).toLowerCase()
   for (const p of ['reserv', 'compr', 'termo', 'mate', 'bici', 'rodri', 'caro', 'sofi', 'cuenta', 'debés']) expect(texto).not.toContain(p)
 }, 120_000)
@@ -335,7 +339,9 @@ test('el cron: con el secreto de Vercel manda los recordatorios y contesta cuán
   const r = await GET(pedido('Bearer secreto'))
   expect(r.status).toBe(200)
   expect(r.headers.get('cache-control')).toBe('no-store')
-  expect(await r.json()).toEqual({ reservasFirmes: 0, loCompraste: 0, venceManana: 0, cumpleCerca: 0, tuCumple: 1, cuentas: 0, fallaron: [] })
+  expect(await r.json()).toEqual({
+    reservasFirmes: 0, loCompraste: 0, venceManana: 0, cumpleCerca: 0, tuCumple: 1, cuentas: 0, queTeRegalaron: 0, contale: 0, fallaron: [],
+  })
   expect((await db.select().from(avisos)).map((a) => a.titulo)).toEqual(['🎂 Tu cumple es en 30 días'])
   // Vercel lo llama de nuevo: no repite
   expect(await (await GET(pedido('Bearer secreto'))).json()).toMatchObject({ tuCumple: 0 })

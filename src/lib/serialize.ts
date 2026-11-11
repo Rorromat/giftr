@@ -16,7 +16,7 @@ export type OwnerItemView = {
   prioridad: 'mucho' | 'gustaria' | 'suelta'
   cantidad: number
   repetible: boolean
-  estadoDueno: 'activo' | 'lo_tengo' | 'no_lo_quiero'
+  estadoDueno: 'activo' | 'lo_tengo' | 'no_lo_quiero' | 'me_lo_regalaron'
   linkTienda: string | null
   videoUrl: string | null
 }

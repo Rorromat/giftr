@@ -110,7 +110,8 @@ export function Archivados({ items, grupo = false }: { items: OwnerItemView[]; g
             <span className="min-w-0 flex-1 text-sm leading-snug">
               <span className="font-semibold [overflow-wrap:anywhere]">{item.titulo}</span>
               <span className="block text-xs font-medium text-gr-muted">
-                {item.estadoDueno === 'lo_tengo' ? (grupo ? 'Ya lo tienen' : 'Ya lo tenés') : grupo ? 'Ya no lo quieren' : 'Ya no lo querés'}
+                {item.estadoDueno === 'me_lo_regalaron' ? (grupo ? 'Se lo regalaron' : 'Te lo regalaron')
+                  : item.estadoDueno === 'lo_tengo' ? (grupo ? 'Ya lo tienen' : 'Ya lo tenés') : grupo ? 'Ya no lo quieren' : 'Ya no lo querés'}
               </span>
             </span>
             <form action={restoreItemAction}>

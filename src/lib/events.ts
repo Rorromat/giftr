@@ -380,6 +380,18 @@ export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
 }
 
 /**
+ * El último evento de una lista que ya pasó (el cumple del dueño o la fecha del grupo), con hace cuántos días fue: para lo
+ * de después del evento (ver post-evento.ts). El día del evento todavía no pasó: hace es 1 desde el día siguiente. Null
+ * si la lista no tiene fecha o todavía no cayó nunca.
+ */
+export async function eventoAnteriorDeLista(db: Db, listId: string, hoy = hoyLocal()) {
+  const { f } = await fechaDeLista(db, listId)
+  const fecha = f && vezAnterior(f, hoy)
+  if (!f || !fecha) return null
+  return { esCumple: f.esCumple, fecha, hace: diasEntre(fecha, hoy) }
+}
+
+/**
  * desdeElUltimoEvento con la fecha (null: la lista no tiene) y el corteEvento ya leídos. El corte es del momento en que
  * cambiaron la fecha: mirado desde antes (ver cuandoRecordar), todavía no valía.
  */

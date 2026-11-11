@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
 import { deseoParaEditar } from '@/lib/items'
+import { dePartede } from '@/lib/post-evento'
+import { DeParteDe } from '@/components/PostEvento'
 import { textoDueno } from '@/lib/compartir'
 import { ARCHIVAR, ConfirmarSacar } from '@/components/OwnerItemsGrid'
 import { Icon, Seccion } from '@/components/ui'
@@ -13,6 +15,7 @@ import { VideoDeseo } from '@/components/VideoDeseo'
 // Un deseo propio (o de un grupo propio), como lo abre quien regala pero sin nada de la coordinación: ni reservas, ni
 // regalos, ni comentarios (la regla de la sorpresa). La ficha (ver FichaDeseo): la foto a sangre con compartir por WhatsApp
 // arriba, y en la barra de abajo la tienda y Editar, la acción principal. Al final, sacarlo de la lista.
+// Lo único de quien regala que puede aparecer: "De parte de…", si alguien eligió contarle que se lo regaló (ver revelarRegalo).
 export default async function Deseo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await auth()
@@ -20,6 +23,7 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
   const editable = await deseoParaEditar(db, id, session.userId)
   if (!editable) notFound()
   const { deseo, grupo, shareToken } = editable
+  const deParte = grupo ? [] : await dePartede(db, deseo.id, session.userId)
   const lista = grupo ? `/grupos/${grupo.id}` : '/mi-lista'
   const precio = deseo.precio ?? deseo.rangoPrecio
   const tienda = deseo.linkTienda && sitioDeLaTienda(deseo.linkTienda)
@@ -41,6 +45,13 @@ export default async function Deseo({ params }: { params: Promise<{ id: string }
         {deseo.notas && <NotaDeseo notas={deseo.notas} quien={grupo ? 'La nota' : 'Tu nota'} />}
         {deseo.videoUrl && <VideoDeseo url={deseo.videoUrl} titulo={deseo.titulo} />}
       </article>
+
+      {deParte.length > 0 && (
+        <section aria-label="Te lo regalaron" className="flex flex-col gap-2">
+          {deParte.map((d) => <DeParteDe key={`${d.tipo}-${d.id}-${d.de}`} d={d} />)}
+          <p className="px-1 text-[13px] leading-snug text-gr-muted">Te contaron que te lo regalaron. Para sacarlo de tu lista, marcalo en Recibidos, abajo en Mi lista.</p>
+        </section>
+      )}
 
       <BarraDeLaFicha secundaria={deseo.linkTienda && <BotonTienda link={deseo.linkTienda} tienda={tienda} />}>
         <Link href={`/editar/${deseo.id}`} className="gr-btn-primary">Editar</Link>

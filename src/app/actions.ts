@@ -13,6 +13,7 @@ import {
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
 import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
+import { agradecer, cerrarPostEvento, marcarRecibidos, revelarRegalo } from '@/lib/post-evento'
 import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
 import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
@@ -164,6 +165,51 @@ export async function restoreItemAction(formData: FormData) {
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
   revalidatePath('/l', 'layout')
+}
+
+const uno = (v: string | undefined) => (v === 'grupal' ? 'grupal' : 'suelto')
+
+/**
+ * "¿Qué te regalaron?": los deseos que tildó pasan a Recibidos, todos de una vez (ver marcarRecibidos), y va a "Listo" con
+ * cuántos marcó. Con aca (uno solo, desde Recibidos en Mi lista), se queda donde está y la tarjeta del cumple no se cierra.
+ */
+export async function marcarRecibidosAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const aca = !!str(formData, 'aca')
+  const ids = formData.getAll('itemId').filter((v): v is string => typeof v === 'string')
+  const marcados = await marcarRecibidos(db, session.userId, ids, new Date(), { cerrar: !aca })
+  revalidatePath('/mi-lista')
+  revalidatePath('/l', 'layout')
+  revalidatePath('/regalos')
+  revalidatePath('/inicio')
+  if (!aca) redirect(marcados === null ? '/mi-lista' : `/mi-lista/recibidos?listo=${marcados}`)
+}
+
+/** "Ahora no" en la tarjeta de después del cumple: no vuelve para ese cumple (ver cerrarPostEvento). */
+export async function cerrarPostEventoAction() {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await cerrarPostEvento(db, session.userId)
+  revalidatePath('/mi-lista')
+}
+
+/** "Contarle a Euge que fue tuyo", en Tus regalos (ver revelarRegalo): tipo e id, el claim suelto o el regalo grupal. */
+export async function revelarRegaloAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await revelarRegalo(db, session.userId, uno(str(formData, 'tipo')), str(formData, 'id') ?? '')
+  revalidatePath('/regalos')
+  revalidatePath('/mi-lista')
+}
+
+/** "Mandarle gracias" a quien le contó que un regalo fue suyo (ver agradecer): una vez por regalo. */
+export async function agradecerAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await agradecer(db, session.userId, uno(str(formData, 'tipo')), str(formData, 'id') ?? '', str(formData, 'de') ?? '')
+  revalidatePath('/mi-lista')
+  revalidatePath('/deseo', 'layout')
 }
 
 export async function updatePriorityAction(formData: FormData) {

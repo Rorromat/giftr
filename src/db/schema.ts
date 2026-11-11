@@ -123,6 +123,9 @@ export const lists = pgTable('lists', {
   // "Tía" y veía todo. Apagada por defecto en la columna (las listas de antes siguen como estaban); las nuevas nacen con
   // ella prendida, puesta a mano donde se crean (upsertUser, asegurarListaPropia, crearGrupo).
   nombresSoloConCuenta: boolean('nombres_solo_con_cuenta').notNull().default(false),
+  // De qué evento ya cerró "¿Qué te regalaron?" (la fecha de ese cumple): marcó lo que recibió o tocó "Ahora no", y la
+  // tarjeta no vuelve hasta el evento que viene (ver post-evento.ts). Vacío: nunca la cerró.
+  postEventoHecho: date('post_evento_hecho'),
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
@@ -167,7 +170,9 @@ export const items = pgTable('items', {
   prioridad: text('prioridad', { enum: ['mucho', 'gustaria', 'suelta'] }).notNull().default('gustaria'),
   cantidad: integer('cantidad').notNull().default(1),
   repetible: boolean('repetible').notNull().default(false),
-  estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
+  // me_lo_regalaron: lo marcó recibido después del evento (ver post-evento.ts). Sale de la lista como los otros dos, pero
+  // va a "Recibidos" y a los que regalan no les libera nada: lo reservado queda como comprado.
+  estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero', 'me_lo_regalaron'] }).notNull().default('activo'),
   // "Eliminar" (ver borrarDeseo): para los que regalan es "Ya no lo quiero" (estadoDueno), así nadie pierde lo que ya
   // compró ni el dueño se entera de si alguien lo había reservado; para el dueño desaparece, también de los archivados.
   borradoAt: timestamp('borrado_at', { withTimezone: true }),
@@ -178,6 +183,11 @@ export const items = pgTable('items', {
   // Al volverlo a poner (ver restoreItem), lo comprado para un evento anterior ya se regaló: lo de antes de esta fecha no
   // ocupa (ver ocupaSql). Null: nunca volvió, ocupa todo lo comprado (salvo en una idea que se puede repetir).
   ocupaDesde: timestamp('ocupa_desde', { withTimezone: true }),
+  // Solo en uno que le regalaron (estado_dueno me_lo_regalaron): cuándo lo marcó y para qué evento fue (la fecha de ese
+  // cumple: "Recibidos · cumple 2026"). Las reservas que ese toque dejó como compradas llevan esa misma hora (ver
+  // archiveItem): con "Me equivoqué" vuelven a ser reservas.
+  recibidoAt: timestamp('recibido_at', { withTimezone: true }),
+  recibidoEvento: date('recibido_evento'),
 }, (t) => [
   index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)),
   // los deseos de una lista, en el orden en que se cargaron: cada vista de lista, la vista previa y Eventos
@@ -219,6 +229,12 @@ export const claims = pgTable('claims', {
   notaQueCompre: text('nota_que_compre'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // Cuándo quien lo compró eligió contarle al dueño que fue suyo (ver revelarRegalo): solo después del evento, solo si lo
+  // elige y regalo por regalo. Es lo único de una reserva que le llega al dueño, y solo con esto puesto. En un regalo
+  // grupal no se usa: cada uno se revela por su cuenta (ver group_gift_members).
+  reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  // Cuándo el dueño le mandó las gracias por ese regalo revelado: una vez por regalo (ver agradecer).
+  agradecidoAt: timestamp('agradecido_at', { withTimezone: true }),
 }, (t) => [
   // lo reservado de un deseo (cada vista, y el conteo de reserveItem con el deseo bloqueado)
   index('claims_item_id_estado_idx').on(t.itemId, t.estado),
@@ -300,6 +316,9 @@ export const groupGiftMembers = pgTable('group_gift_members', {
   pagado: boolean('pagado').notNull().default(false),
   pagadoAt: timestamp('pagado_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Como en claims, pero de cada uno: en un regalo grupal el dueño ve solo el nombre de quien eligió contárselo.
+  reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  agradecidoAt: timestamp('agradecido_at', { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.giftId, t.userId] }), index('group_gift_members_user_id_idx').on(t.userId)])
 
 // A quién sacó el encargado de un regalo grupal: no se vuelve a sumar con un toque (ver sacarDeRegalo), salvo que el

@@ -3,9 +3,10 @@ import { claims, groupGiftMembers, groupGifts, items, listFollows, listMembers, 
 import type { Db } from '@/db/types'
 import { afirmarReservas, FIRME_DIAS_ANTES, noEsDeRegaloGrupal, ocupaSql } from '@/lib/claims'
 import { avisar, type Aviso, type Enviar } from '@/lib/codazos'
-import { desdeElUltimoEvento, diasEntre, eventoDeLista, hoyLocal, proximaDeGrupo, proximaFecha } from '@/lib/events'
+import { desdeElUltimoEvento, diasEntre, eventoDeLista, hoyLocal, proximaDeGrupo, proximaFecha, vezAnterior } from '@/lib/events'
 import { juntarNombres, relacionConLista, tituloDelGrupo } from '@/lib/groups'
 import { plata } from '@/lib/pesos'
+import { faltaMarcar, regalosPorContar } from '@/lib/post-evento'
 import { misCuentas } from '@/lib/regalos'
 import { cupoDe } from '@/lib/serialize'
 
@@ -14,8 +15,9 @@ import { cupoDe } from '@/lib/serialize'
 // abría la app. Cada uno queda en la bandeja y llega al celular (ver avisar), una sola vez por persona y motivo (ver
 // recordatorios_enviados).
 // La regla de la sorpresa: al dueño de una lista ningún recordatorio le dice nada de lo que pasa con sus deseos. Los de
-// reservas van solo a quien reservó, el del cumple que se acerca a quienes regalan, y el del dueño ("poné tu lista al
-// día") sale igual haya o no reservas. Los invitados sin cuenta no tienen bandeja ni dispositivo: no se les avisa.
+// reservas van solo a quien reservó, el del cumple que se acerca a quienes regalan, y los del dueño ("poné tu lista al
+// día" antes del cumple, "¿qué te regalaron?" al día siguiente) salen igual haya o no reservas. Los invitados sin cuenta
+// no tienen bandeja ni dispositivo: no se les avisa.
 
 const DIA = 86400_000
 
@@ -25,6 +27,8 @@ export const CUMPLE_CERCA_DIAS = 7
 export const TU_CUMPLE_DIAS = 30
 /** Si el cron no pasó justo ese día, sale al siguiente o al otro: después ya no es el mismo aviso. */
 const MARGEN_DIAS = 2
+/** Lo de después del cumple ("¿Qué te regalaron?", "¿Le contás que fue tuyo?") sale al día siguiente. */
+export const DESPUES_DEL_CUMPLE_DIAS = 1
 /** Las cuentas de un regalo grupal se recuerdan desde una semana después de la compra, cada una semana… */
 export const CUENTAS_CADA_DIAS = 7
 /** …y hasta los dos meses: después el recordatorio ya es ruido (la deuda sigue en Cuentas). */
@@ -45,11 +49,15 @@ export type Recordatorios = {
   tuCumple: number
   /** "Tenés cuentas pendientes": a quien debe su parte de un regalo grupal. */
   cuentas: number
+  /** "¿Qué te regalaron?": al que cumplió ayer, para que marque lo que recibió. */
+  queTeRegalaron: number
+  /** "¿Le contás a Euge que fue tuyo?": a quien le compró algo para ese cumple. */
+  contale: number
   /** Los pasos que fallaron (los demás salieron igual). */
   fallaron: string[]
 }
 
-type Tipo = 'lo_compraste' | 'vence_manana' | 'cumple_cerca' | 'tu_cumple' | 'cuentas'
+type Tipo = 'lo_compraste' | 'vence_manana' | 'cumple_cerca' | 'tu_cumple' | 'cuentas' | 'que_te_regalaron' | 'contale'
 type Mandar = (userId: string, tipo: Tipo, clave: string, aviso: Aviso & { de?: string | null }) => Promise<number>
 
 const dia = (d: Date) => d.toISOString().slice(0, 10)
@@ -71,7 +79,7 @@ async function deAPocos<T>(cosas: T[], hacer: (c: T) => Promise<number>): Promis
  */
 export async function mandarRecordatorios(db: Db, ahora = new Date(), enviar?: Enviar): Promise<Recordatorios> {
   const hoy = hoyLocal(ahora)
-  const r: Recordatorios = { reservasFirmes: 0, loCompraste: 0, venceManana: 0, cumpleCerca: 0, tuCumple: 0, cuentas: 0, fallaron: [] }
+  const r: Recordatorios = { reservasFirmes: 0, loCompraste: 0, venceManana: 0, cumpleCerca: 0, tuCumple: 0, cuentas: 0, queTeRegalaron: 0, contale: 0, fallaron: [] }
   /**
    * Primero se anota y después se manda: si dos corridas se cruzan, o la de hoy se repite, la clave única deja pasar una
    * sola. Si el aviso no se pudo guardar, se desanota para que salga en la próxima.
@@ -107,6 +115,11 @@ export async function mandarRecordatorios(db: Db, ahora = new Date(), enviar?: E
   await paso('cumpleCerca', async () => { r.cumpleCerca = await recordarFechasCerca(db, ahora, hoy, mandar) })
   await paso('tuCumple', async () => { r.tuCumple = await recordarTuCumple(db, hoy, mandar) })
   await paso('cuentas', async () => { r.cuentas = await recordarCuentas(db, ahora, hoy, mandar) })
+  await paso('despuesDelCumple', async () => {
+    const { queTeRegalaron, contale } = await recordarDespuesDelCumple(db, ahora, hoy, mandar)
+    r.queTeRegalaron = queTeRegalaron
+    r.contale = contale
+  })
   await paso('limpieza', async () => {
     await db.delete(recordatoriosEnviados).where(lt(recordatoriosEnviados.createdAt, mas(ahora, -GUARDAR_DIAS)))
   })
@@ -175,17 +188,31 @@ async function recordarReservas(db: Db, ahora: Date, hoy: Date, mandar: Mandar):
   return { loCompraste, venceManana }
 }
 
-/** Los que cumplen dentro de entre desde y hasta días, con la fecha. El 29/2 cae el 28 en los años que no son bisiestos. */
-async function quienesCumplen(db: Db, hoy: Date, desde: number, hasta: number) {
-  const dias = Array.from({ length: hasta - desde + 1 }, (_, i) => mas(hoy, desde + i))
+/** Los que tienen el cumple en alguno de esos días. El 29/2 cae el 28 en los años que no son bisiestos. */
+async function conCumpleEn(db: Db, dias: Date[]) {
   const pares = dias.map((d) => ({ dia: d.getUTCDate(), mes: d.getUTCMonth() + 1 }))
   if (pares.some((p) => p.mes === 2 && p.dia === 28)) pares.push({ dia: 29, mes: 2 })
-  const filas = await db.select({ id: users.id, nombre: users.nombre, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes }).from(users)
+  return db.select({ id: users.id, nombre: users.nombre, cumpleDia: users.cumpleDia, cumpleMes: users.cumpleMes }).from(users)
     .where(or(...pares.map((p) => and(eq(users.cumpleMes, p.mes), eq(users.cumpleDia, p.dia)))))
+}
+
+/** Los que cumplen dentro de entre desde y hasta días, con la fecha. */
+async function quienesCumplen(db: Db, hoy: Date, desde: number, hasta: number) {
+  const filas = await conCumpleEn(db, Array.from({ length: hasta - desde + 1 }, (_, i) => mas(hoy, desde + i)))
   return filas.flatMap((u) => {
     const fecha = proximaFecha(u.cumpleDia!, u.cumpleMes!, hoy)
     const faltan = diasEntre(hoy, fecha)
     return faltan >= desde && faltan <= hasta ? [{ id: u.id, nombre: u.nombre, fecha, dias: faltan }] : []
+  })
+}
+
+/** Los que cumplieron hace entre desde y hasta días (1: ayer), con la fecha. */
+async function quienesCumplieron(db: Db, hoy: Date, desde: number, hasta: number) {
+  const filas = await conCumpleEn(db, Array.from({ length: hasta - desde + 1 }, (_, i) => mas(hoy, -(desde + i))))
+  return filas.flatMap((u) => {
+    const fecha = vezAnterior({ dia: u.cumpleDia!, mes: u.cumpleMes!, anio: null, anual: true }, hoy)
+    const hace = fecha ? diasEntre(fecha, hoy) : -1
+    return fecha && hace >= desde && hace <= hasta ? [{ id: u.id, nombre: u.nombre, fecha }] : []
   })
 }
 
@@ -301,4 +328,39 @@ async function recordarCuentas(db: Db, ahora: Date, hoy: Date, mandar: Mandar): 
       url: '/cuentas',
     })
   })
+}
+
+/**
+ * El día después del cumple (ver post-evento.ts), una vez por cumple:
+ * - Al que cumplió, "¿Qué te regalaron?", para que marque lo que recibió y su lista quede al día. Sale si tiene deseos
+ *   para marcar y todavía no lo hizo: cosas suyas, lo mismo con la lista llena de reservas que sin ninguna, y sin un dato
+ *   de ellas.
+ * - A quien le compró algo para ese cumple y tiene cuenta, "¿Le contás a Euge que fue tuyo?": un aviso por persona aunque
+ *   le haya regalado varias cosas. El dueño solo se entera si esa persona lo elige (ver revelarRegalo).
+ */
+async function recordarDespuesDelCumple(db: Db, ahora: Date, hoy: Date, mandar: Mandar): Promise<{ queTeRegalaron: number; contale: number }> {
+  const cumplieron = await quienesCumplieron(db, hoy, DESPUES_DEL_CUMPLE_DIAS, DESPUES_DEL_CUMPLE_DIAS + MARGEN_DIAS)
+  let queTeRegalaron = 0
+  let contale = 0
+  for (const u of cumplieron) {
+    const cumple = dia(u.fecha)
+    if (await faltaMarcar(db, u.id, cumple)) {
+      queTeRegalaron += await mandar(u.id, 'que_te_regalaron', cumple, {
+        title: '🎁 ¿Qué te regalaron?',
+        body: 'Marcalo y dejá tu lista al día para el año que viene.',
+        url: '/mi-lista/recibidos',
+      })
+    }
+    const porContar = await regalosPorContar(db, u.id, ahora)
+    if (!porContar || porContar.evento.iso !== cumple) continue
+    const porPersona = new Map<string, string[]>()
+    for (const r of porContar.regalos) porPersona.set(r.userId, [...(porPersona.get(r.userId) ?? []), r.titulo])
+    contale += await deAPocos([...porPersona], ([userId, titulos]) => mandar(userId, 'contale', `${porContar.listId}:${cumple}`, {
+      de: u.id,
+      title: `🎁 ¿Le contás a ${primer(u.nombre)} que fue tuyo?`,
+      body: `Ya pasó su cumple. Si querés, puede ver ${titulos.length === 1 ? `que "${titulos[0]}" fue` : 'cuáles de sus regalos fueron'} de tu parte: solo se entera si vos lo elegís.`,
+      url: '/regalos',
+    }))
+  }
+  return { queTeRegalaron, contale }
 }
