@@ -37,8 +37,9 @@ import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedad
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import { crearSorpresa, editarSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
-  borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego, marcarYaLoTengo, preguntar,
-  responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo, type DatosJuego,
+  borrarAmigoInvisible, cambiarExcluidos, cambiarLinkDelJuego, cerrarAltas, crearAmigoInvisible, dejarVolverAlJuego, editarAmigoInvisible,
+  invitarAlJuego, marcarYaLoTengo, preguntar, responderJuego, responderPregunta, revelarQuienMeRegalo, sacarDelJuego, sortear, unirsePorLink,
+  verAQuienLeRegalo, type DatosJuego,
 } from '@/lib/amigo-invisible'
 import { esFechaEspecial } from '@/lib/fechas-especiales'
 import {
@@ -1127,7 +1128,7 @@ function revalidarJuego(id: string) {
   revalidatePath('/fechas', 'layout')
 }
 
-/** "Armarlo e invitarlos": el juego, con los amigos que eligió (ver crearAmigoInvisible). Va al juego. */
+/** "Armarlo": el juego, con los amigos que eligió si eligió alguno (ver crearAmigoInvisible). Va al juego, donde está el link para invitar. */
 export async function crearAmigoInvisibleAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const datos = datosJuego(formData)
@@ -1170,6 +1171,57 @@ export async function invitarAlJuegoAction(formData: FormData) {
   revalidarJuego(id)
 }
 
+/**
+ * "Sumarme", en la pantalla del link del juego (ver unirsePorLink). Pide un toque (POST): WhatsApp abre los links solo
+ * para armar la vista previa, y eso no tiene que sumar a nadie. Si no entra (cambió el link, cerraron las altas, se
+ * llenó), vuelve a la invitación, que dice por qué.
+ */
+export async function unirseAlJuegoAction(formData: FormData) {
+  const token = str(formData, 'token') ?? ''
+  if (!esToken(token)) redirect('/regalos')
+  const session = await auth()
+  if (!session?.userId || !(await existeUsuario(db, session.userId))) redirect(`/invisible/unirme/${token}`)
+  const r = await unirsePorLink(db, token, session.userId)
+  if (!r.ok) redirect(`/invisible/unirme/${token}`)
+  revalidarJuego(r.id)
+  redirect(rutaJuego(r.id))
+}
+
+/** "Cambiar el link": el de antes deja de servir (ver cambiarLinkDelJuego). */
+export async function cambiarLinkDelJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await cambiarLinkDelJuego(db, id, userId)
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}#invitar`)
+}
+
+/** "Cerrar las altas" (cerrar=1) o abrirlas de nuevo: si el link suma gente o no. */
+export async function cerrarAltasAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await cerrarAltas(db, id, userId, str(formData, 'cerrar') === '1')
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}#invitar`)
+}
+
+/** El que organiza saca a alguien del juego (ver sacarDelJuego). */
+export async function sacarDelJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await sacarDelJuego(db, id, userId, str(formData, 'userId') ?? '')
+  revalidarJuego(id)
+  redirect(rutaJuego(id))
+}
+
+/** "Dejar que vuelva": el que había sacado puede sumarse otra vez. */
+export async function dejarVolverAlJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await dejarVolverAlJuego(db, id, userId, str(formData, 'userId') ?? '')
+  revalidatePath(rutaJuego(id))
+}
+
 /** "Que no se toquen" (excluir=1) o volver a dejar que se toquen. */
 export async function cambiarExcluidosAction(formData: FormData) {
   const userId = await usuarioRegalador()
@@ -1179,7 +1231,7 @@ export async function cambiarExcluidosAction(formData: FormData) {
   if (!ok) redirect(`${rutaJuego(id)}?excluir=error#no-se-tocan`)
 }
 
-/** "Sortear": si no alcanza o no hay forma, vuelve diciendo por qué. */
+/** "Sortear" (o "Volver a sortear", si después alguien se bajó o se sumó): si no alcanza o no hay forma, vuelve diciendo por qué. */
 export async function sortearAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const id = str(formData, 'id') ?? ''

@@ -11,7 +11,7 @@ import { Icon } from '@/components/ui'
 
 /**
  * Mis regalos: lo que reservé y los regalos grupales en los que estoy, de todas las listas, en un solo lugar. Arriba mis
- * amigos invisibles (cada uno con lo que me toca hacer), después lo que falta comprar, lo comprado para lo que viene, y
+ * amigos invisibles (cada uno con lo que me toca hacer) o, si no estoy en ninguno, armar uno; después lo que falta comprar, lo comprado para lo que viene, y
  * aparte el historial: lo de un cumple o una fecha que ya pasó. Cada regalo lleva a su deseo, donde se marca comprado o
  * se libera.
  */
@@ -30,7 +30,9 @@ export default async function MisRegalos() {
   return (
     <div className="gr-fundido flex flex-col gap-5">
 
-      {juegos.length > 0 && (
+      {/* armar un amigo invisible va arriba (antes estaba al final, donde nadie lo encontraba): la tarjeta que lo explica
+          si todavía no estás en ninguno; si estás, tus juegos con "+ Armar uno" */}
+      {juegos.length > 0 ? (
         <section aria-labelledby="invisibles" className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between gap-3">
             <h2 id="invisibles" className="gr-heading">Amigos invisibles<span className="text-gr-muted"> · {juegos.length}</span></h2>
@@ -38,7 +40,7 @@ export default async function MisRegalos() {
           </div>
           {juegos.map((j) => <FilaJuego key={j.id} j={j} tambien={tambien.get(j.id)} />)}
         </section>
-      )}
+      ) : <ArmarJuego />}
 
       {!porComprar.length && !comprados.length && !historial.length ? (
         <div className="gr-empty flex flex-col items-center gap-2 py-7 text-center">
@@ -77,7 +79,6 @@ export default async function MisRegalos() {
       )}
 
       <ArmarSorpresa />
-      {!juegos.length && <ArmarJuego />}
     </div>
   )
 }

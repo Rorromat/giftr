@@ -281,6 +281,13 @@
       "when": 1794360228752,
       "tag": "0039_alias_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794361617493,
+      "tag": "0040_amigo_invisible_por_link",
+      "breakpoints": true
     }
   ]
 }

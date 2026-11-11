@@ -414,16 +414,27 @@ export const amigosInvisibles = pgTable('amigos_invisibles', {
   fecha: date('fecha').notNull(),
   // de qué fecha especial es (navidad, amigo, padre, madre, ninos); vacío: de ninguna
   fechaEspecial: text('fecha_especial'),
+  // el último sorteo (se puede volver a sortear si después alguien se bajó o se sumó)
   sorteadoAt: timestamp('sorteado_at', { withTimezone: true }),
+  // el link para sumarse (/invisible/unirme/…): lo manda el que organiza por WhatsApp y entra cualquiera con cuenta, sin
+  // ser su amigo. Lo puede cambiar (el anterior deja de servir). Vacío en los juegos de antes, hasta que lo pide.
+  inviteToken: text('invite_token').unique(),
+  // el que organiza cerró las altas: el link no suma a nadie más (hasta que las abra de nuevo)
+  altasCerradasAt: timestamp('altas_cerradas_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('amigos_invisibles_organizador_id_idx').on(t.organizadorId)])
 
 // Los que juegan (o los invitados que todavía no contestaron). regalaA: a quién le regala, desde el sorteo; solo lo ve él.
+// sacado: lo sacó el que organiza; no ve el juego ni vuelve a entrar con el link.
 export const amigoInvisibleGente = pgTable('amigo_invisible_gente', {
   amigoInvisibleId: uuid('amigo_invisible_id').notNull().references(() => amigosInvisibles.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id),
-  estado: text('estado', { enum: ['invitado', 'juega', 'no_juega'] }).notNull().default('invitado'),
+  estado: text('estado', { enum: ['invitado', 'juega', 'no_juega', 'sacado'] }).notNull().default('invitado'),
   regalaA: uuid('regala_a').references(() => users.id),
+  // se sumó con el sorteo ya hecho: juega, pero no le toca nadie (ni él a nadie) hasta que se sortee de nuevo
+  esperaSorteo: boolean('espera_sorteo').notNull().default(false),
+  // se bajó (o lo sacaron) con el sorteo ya hecho: para decírselo al que organiza. Se limpia al sortear de nuevo
+  salioAt: timestamp('salio_at', { withTimezone: true }),
   // cuándo vio a quién le regala (para que el que organiza sepa si falta alguien)
   vioAt: timestamp('vio_at', { withTimezone: true }),
   // cuándo pidió saber quién le regaló (solo después de la fecha, y solo si lo pide)

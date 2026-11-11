@@ -38,6 +38,7 @@ test('Próximos: todas las fechas especiales en orden (falte lo que falte), con 
   const juego = (id: string, dias: number, fechaEspecial: 'navidad' | 'amigo' | null) => ({
     id, nombre: id, regla: null, fecha: '', fechaEspecial, presupuesto: null, dias, miEstado: 'juega' as const, sorteado: false, vi: false, revelado: false,
     organizador: 'Euge', soyOrganizador: false, invitados: 3, contestaron: 3, meToca: null, yaLoTengo: false, preguntasSinContestar: 0,
+    faltaSortearDeNuevo: false,
   })
   const hoy = new Date(Date.UTC(2026, 9, 26)) // Navidad, a 60 días; el Día de la Madre de este año ya pasó
   const t = especialesQueVienen(hoy, [juego('nav', 59, 'navidad'), juego('oficina', 10, null), juego('viejo', -3, null)])
@@ -151,7 +152,8 @@ test('EL TEST DE ORO del amigo invisible: a quién le regala cada uno lo sabe so
   expect(await sortear(s.db, s.id, s.euge.id, enviar)).toEqual({ ok: true })
   expect(enviados.map((e) => e.para).sort()).toEqual([s.euge.id, s.sofi.id, s.rodri.id, s.juan.id].sort())
   expect(enviados[0].aviso.title).toBe('🎁 Ya se sorteó "Navidad con los chicos"')
-  expect(await sortear(s.db, s.id, s.euge.id, enviar)).toEqual({ ok: false, reason: 'no_permitido' }) // una sola vez
+  // sin que nadie se haya bajado ni sumado después, no se sortea de nuevo (ver amigo-invisible-link.test.ts)
+  expect(await sortear(s.db, s.id, s.euge.id, enviar)).toEqual({ ok: false, reason: 'no_permitido' })
 
   const todos = [s.euge, s.sofi, s.rodri, s.juan]
   // antes de tocar "Ver", nadie sabe nada; el que organiza tampoco
@@ -189,8 +191,7 @@ test('EL TEST DE ORO del amigo invisible: a quién le regala cada uno lo sabe so
   const org = (await amigoInvisibleParaViewer(s.db, s.id, s.euge.id))!
   expect(org.gente.every((g) => g.vio)).toBe(true)
   expect(JSON.stringify(org.gente)).not.toContain('regala')
-  // después del sorteo ya no se suma nadie, ni se baja, ni se cambia quién no se toca
-  expect(await responderJuego(s.db, s.id, s.sofi.id, false)).toBe(false)
+  // mientras nadie se baje ni se sume después del sorteo, no se cambia quién no se toca; y al que ya juega no se lo invita
   expect(await invitarAlJuego(s.db, s.id, s.euge.id, [s.juan.id])).toBe(0)
   expect(await cambiarExcluidos(s.db, s.id, s.euge.id, s.sofi.id, s.rodri.id, true)).toBe(false)
 })
