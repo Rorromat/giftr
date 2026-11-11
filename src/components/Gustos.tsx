@@ -22,7 +22,7 @@ function Etiqueta({ texto, oscuro = false }: { texto: string; oscuro?: boolean }
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium [overflow-wrap:anywhere] ${foto ? 'pl-1' : ''} ${oscuro ? 'bg-gr-bg/12' : 'bg-gr-soft'}`}>
       {muestra && <span aria-hidden className="size-3.5 flex-none rounded-full border border-gr-ink/20" style={{ background: muestra }} />}
       {/* eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/ */}
-      {foto && <img src={foto} alt="" className="size-6 flex-none rounded-full object-cover" />}
+      {foto && <img loading="lazy" decoding="async" src={foto} alt="" className="size-6 flex-none rounded-full object-cover" />}
       {texto}
     </span>
   )
@@ -77,7 +77,7 @@ export function ResumenGustos({ secciones }: { secciones: SeccionGustos[] }) {
               <span aria-hidden className="mb-1.5 flex">
                 {s.items.slice(0, 3).map((e) => (
                   // eslint-disable-next-line @next/next/no-img-element -- fotos propias de public/
-                  <img key={e} src={fotoDeEstilo(e) ?? ''} alt="" className="-mr-2 h-10 w-[30px] rounded-lg border-2 border-gr-surface object-cover" />
+                  <img key={e} loading="lazy" decoding="async" src={fotoDeEstilo(e) ?? ''} alt="" className="-mr-2 h-10 w-[30px] rounded-lg border-2 border-gr-surface object-cover" />
                 ))}
               </span>
             )}

@@ -205,7 +205,7 @@ test('la portada: una carta por función, arriba la primera, con las flechas y u
   for (const titulo of ['Armá tu lista', 'Te lo regalan en secreto', 'Lo pagan entre todos', 'Amigo invisible sin papelitos', 'Cumples con tiempo']) {
     expect(html).toContain(`>${titulo}</p>`)
   }
-  for (const nombre of ['Anterior', 'Siguiente', 'Tu lista', 'En secreto', 'Entre todos', 'Amigo invisible', 'Cumples']) {
+  for (const nombre of ['Anterior', 'Siguiente', 'Tu lista', 'En secreto', 'Regalo grupal', 'Amigo invisible', 'Cumples']) {
     expect(html).toContain(`aria-label="${nombre}"`)
   }
   expect(html.match(/aria-current="true"/g)).toHaveLength(1)

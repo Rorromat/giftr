@@ -9,7 +9,11 @@ type Aviso = (v: string, form: HTMLFormElement | null) => string
 
 /** Lo que vino cargado no se mira hasta que lo cambien: un deseo de antes de los topes se sigue pudiendo editar. */
 function revisar(campo: HTMLInputElement, aviso: Aviso) {
-  campo.setCustomValidity(campo.value === campo.defaultValue ? '' : aviso(campo.value, campo.form))
+  const motivo = campo.value === campo.defaultValue ? '' : aviso(campo.value, campo.form)
+  campo.setCustomValidity(motivo)
+  // el motivo lo muestra el navegador al mandar; hasta ahí, que el campo ya se anuncie como mal cargado
+  if (motivo) campo.setAttribute('aria-invalid', 'true')
+  else campo.removeAttribute('aria-invalid')
 }
 
 /**

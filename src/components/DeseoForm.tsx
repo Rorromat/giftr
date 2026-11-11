@@ -36,7 +36,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
     <form action={action} className="group/deseo mt-1 flex flex-col gap-4">
       {deseo && <input type="hidden" name="itemId" value={deseo.id} />}
       {grupos.length > 0 && (
-        <label className="flex items-center gap-1.5 self-center rounded-full border border-gr-line bg-gr-surface py-1 pl-3.5 pr-2 text-sm font-semibold">
+        <label className="flex items-center gap-1.5 self-center rounded-full border border-gr-line bg-gr-surface py-1 pl-3.5 pr-2 text-base font-semibold">
           En
           <select name="listaId" defaultValue={grupoElegido ?? ''} aria-label="¿En qué lista?"
                   className="cursor-pointer rounded-lg bg-transparent py-1 pr-1 font-semibold underline underline-offset-4">

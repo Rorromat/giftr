@@ -9,10 +9,11 @@ import { BotonEnviar } from '@/components/BotonEnviar'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
 import { TarjetaRegalo } from '@/components/TarjetaRegalo'
 import { AvatarSticker, Icon, ItemPhoto, Mono, PriorityTag } from '@/components/ui'
+import { siguienteDelCarrusel } from '@/lib/carrusel'
 
-// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas que pasan solas de a una, dos segundos en cada una, y se
-// pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll infinito, y el
-// botón "Me lo robo".
+// Lo nuevo de tus amigos: el carrusel de Inicio (tarjetas que pasan solas de a una, dos segundos en cada una, una sola
+// vuelta, y se pueden deslizar con el dedo), la tarjeta del feed (/novedades, como una foto de Instagram) con el scroll
+// infinito, y el botón "Me lo robo".
 
 export type MiniNovedad = {
   id: string; titulo: string; foto: string | null; precio: string | null; hace: string; nombre: string; duenoFoto: string | null
@@ -20,14 +21,13 @@ export type MiniNovedad = {
 
 /** Cada cuánto pasa sola a la tarjeta siguiente: dos segundos quieta en cada una, más lo que tarda en deslizarse. */
 const CADA_MS = 2700
-/** Después de soltarlo (o de moverlo con la ruedita), cuánto espera para volver a pasar solo. */
-const PAUSA_MS = 2500
 
 /**
  * El estante de Inicio: los últimos deseos de tus amigos, cada uno en su cuadrado de color, uno al lado del otro.
- * Pasa solo de a una tarjeta, dos segundos en cada una, y al llegar a la última vuelve a la primera. Mientras lo tenés
- * apretado (o recorrés las tarjetas con el teclado) no se mueve, y al soltarlo espera un poco. Con movimiento reducido no
- * se mueve solo. Cada una abre el feed en ese deseo.
+ * Pasa solo de a una tarjeta, dos segundos en cada una, da una vuelta (al llegar a la última vuelve a la primera) y se
+ * queda quieto: moviéndose para siempre no deja leer lo de al lado, y no había cómo pararlo. Apenas lo tocan (con el dedo,
+ * la ruedita o el teclado) deja de pasar solo y no vuelve a arrancar: ya lo maneja quien lo tocó. Con movimiento reducido
+ * no se mueve solo. Cada una abre el feed en ese deseo.
  */
 export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
   const ref = useRef<HTMLUListElement>(null)
@@ -35,45 +35,25 @@ export function CarruselNovedades({ items }: { items: MiniNovedad[] }) {
   useEffect(() => {
     const el = ref.current
     if (!el || items.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let tocando = false
-    let conTeclado = false
-    let quietoHasta = 0
-    const frenar = () => { quietoHasta = Date.now() + PAUSA_MS }
-    const tocar = () => { tocando = true }
-    // el dedo se puede soltar afuera del carrusel (o el navegador cancelarlo al hacer scroll): se escucha en toda la página
-    const soltar = () => {
-      if (!tocando) return
-      tocando = false
-      frenar()
-    }
-    const entra = (e: FocusEvent) => { conTeclado = (e.target as Element).matches(':focus-visible') }
-    const sale = () => { conTeclado = false }
     const t = setInterval(() => {
-      if (tocando || conTeclado || Date.now() < quietoHasta || document.hidden) return
-      const tarjetas = [...el.children] as HTMLElement[]
-      // la que está en el medio ahora, y la que sigue (después de la última, la primera)
-      const centro = el.scrollLeft + el.clientWidth / 2
-      const ahora = tarjetas.findIndex((c) => c.offsetLeft + c.offsetWidth > centro)
-      const alFinal = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4
-      const sig = tarjetas[alFinal || ahora < 0 ? 0 : (ahora + 1) % tarjetas.length]
-      el.scrollTo({ left: sig.offsetLeft - (el.clientWidth - sig.offsetWidth) / 2, behavior: 'smooth' })
+      // con la pestaña en segundo plano espera: la vuelta la da cuando se ve
+      if (document.hidden) return
+      const sig = siguienteDelCarrusel(el)
+      el.scrollTo({ left: sig.izquierda, behavior: 'smooth' })
+      // volvió a la primera: ya dio la vuelta
+      if (sig.volvio) parar()
     }, CADA_MS)
-    el.addEventListener('pointerdown', tocar)
-    el.addEventListener('touchstart', tocar, { passive: true })
-    el.addEventListener('wheel', frenar, { passive: true })
-    el.addEventListener('focusin', entra)
-    el.addEventListener('focusout', sale)
-    const finales = ['pointerup', 'pointercancel', 'touchend', 'touchcancel'] as const
-    for (const ev of finales) window.addEventListener(ev, soltar)
-    return () => {
+    // el foco solo cuenta si viene del teclado: el del toque ya lo frena pointerdown
+    const conTeclado = (e: FocusEvent) => { if ((e.target as Element).matches(':focus-visible')) parar() }
+    const toques = ['pointerdown', 'touchstart', 'wheel'] as const
+    function parar() {
       clearInterval(t)
-      el.removeEventListener('pointerdown', tocar)
-      el.removeEventListener('touchstart', tocar)
-      el.removeEventListener('wheel', frenar)
-      el.removeEventListener('focusin', entra)
-      el.removeEventListener('focusout', sale)
-      for (const ev of finales) window.removeEventListener(ev, soltar)
+      for (const ev of toques) el!.removeEventListener(ev, parar)
+      el!.removeEventListener('focusin', conTeclado)
     }
+    for (const ev of toques) el.addEventListener(ev, parar, { passive: true })
+    el.addEventListener('focusin', conTeclado)
+    return parar
   }, [items.length])
 
   return (
@@ -116,7 +96,7 @@ export function BotonRobar({ token, itemId, variante = 'boton', className = '' }
           </BotonEnviar>
         ) : variante === 'icono' ? (
           <BotonEnviar aria-label="Me lo robo: sumarlo a tu lista"
-                       className="flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
+                       className="gr-toque flex size-9 items-center justify-center rounded-full bg-white/95 text-[#121216] shadow-[0_1px_4px_rgb(20_20_20/0.18)]">
             <Icon name="copiar" size={17} strokeWidth={2.2} />
           </BotonEnviar>
         ) : (

@@ -18,7 +18,7 @@ export function AvatarDeLista({ nombre, foto, duenos, size = 48 }: { nombre: str
       <span className="flex size-full items-center justify-center overflow-hidden rounded-full bg-gr-comun font-semibold text-gr-comun-ink ring-2 ring-gr-comun-line"
             style={{ fontSize: size * 0.4 }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- foto subida de la lista */}
-        {foto ? <img src={foto} alt="" className="size-full object-cover" /> : inicial}
+        {foto ? <img loading="lazy" decoding="async" src={foto} alt="" className="size-full object-cover" /> : inicial}
       </span>
       {chicos.length > 0 && (
         <AvatarStack nombres={chicos.map((d) => d.nombre)} fotos={chicos.map((d) => d.foto)} size={Math.round(size * 0.44)}

@@ -60,7 +60,7 @@ export function FotoDeLista({ foto, grupoId, size = 72 }: { foto: string | null;
         <span className={`flex items-center justify-center overflow-hidden rounded-full ${actual ? '' : 'border-2 border-dashed border-gr-comun-line bg-gr-comun text-gr-comun-ink'}`}
               style={{ width: size, height: size }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto subida, ya achicada */}
-          {actual ? <img src={actual} alt="" className="size-full object-cover" /> : <Icon name="camera" size={size * 0.38} />}
+          {actual ? <img decoding="async" src={actual} alt="" className="size-full object-cover" /> : <Icon name="camera" size={size * 0.38} />}
         </span>
         {actual && (
           <span className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border border-gr-line bg-gr-surface text-gr-ink">

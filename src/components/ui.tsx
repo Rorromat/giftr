@@ -79,11 +79,13 @@ export function PriorityTag({ prioridad, children, className = '' }: {
 }
 
 /** Foto del deseo a sangre; sin foto (o si no carga), un regalito gris sobre la superficie suave (como en Arte). */
-export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' }: {
+export function ItemPhoto({ src, titulo, height, dimmed = false, pronto = false, className = '' }: {
   src: string | null
   titulo: string
   height: number
   dimmed?: boolean
+  /** está en lo primero que se ve: que cargue ya, sin esperar a que se acerque (ver FotoConRespaldo) */
+  pronto?: boolean
   className?: string
 }) {
   const placeholder = (
@@ -93,14 +95,18 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
   if (!src) return placeholder
   return (
-    <FotoConRespaldo src={src} alt={titulo} respaldo={placeholder}
+    <FotoConRespaldo src={src} alt={titulo} respaldo={placeholder} pronto={pronto}
                      className={`gr-sticker__img ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }} />
   )
 }
 
-/** Avatar redondo: la foto si hay, si no las iniciales sobre la superficie suave (o sobre color, si lo pide: en una tapa). */
-export function AvatarSticker({ nombre, foto, size = 56, color, className = '' }: {
-  nombre: string; foto?: string | null; size?: number; color?: string; className?: string
+/**
+ * Avatar redondo: la foto si hay, si no las iniciales sobre la superficie suave (o sobre color, si lo pide: en una tapa).
+ * La foto se pide recién cuando se acerca a la pantalla (en Tu gente hay decenas); pronto: la del encabezado, que se ve
+ * apenas abre.
+ */
+export function AvatarSticker({ nombre, foto, size = 56, color, pronto = false, className = '' }: {
+  nombre: string; foto?: string | null; size?: number; color?: string; pronto?: boolean; className?: string
 }) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
@@ -108,7 +114,7 @@ export function AvatarSticker({ nombre, foto, size = 56, color, className = '' }
          className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-bold tracking-[-0.02em] ${color ? 'text-white' : 'bg-gr-soft text-gr-ink'} ${className}`}
          style={{ width: size, height: size, fontSize: size * 0.36, background: color }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
-      {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
+      {foto ? <img loading={pronto ? undefined : 'lazy'} decoding="async" src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
   )
 }
@@ -124,7 +130,7 @@ export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: 
               className="flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface bg-gr-soft font-bold"
               style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
-          {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
+          {fotos[i] ? <img loading="lazy" decoding="async" src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
         </span>
       ))}
     </div>
@@ -138,7 +144,7 @@ export function QuizasLink({ href, className, children }: { href: string | null;
 
 export function BackLink({ href, label, vidrio = false }: {
   href: string; label: string
-  /** de vidrio: claro sobre una tapa o un color; oscuro sobre una foto (se ve sobre cualquiera) */
+  /** de vidrio: ahumado sobre una tapa o un color; oscuro, más cerrado, sobre una foto (se ve sobre cualquiera) */
   vidrio?: boolean | 'oscuro'
 }) {
   return (
@@ -242,7 +248,7 @@ export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false }: {
         {accion}
         {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
         <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
-          <AvatarSticker nombre={nombre} foto={foto} size={40} className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
+          <AvatarSticker nombre={nombre} foto={foto} size={40} pronto className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
         </Link>
       </div>
     </header>
@@ -265,11 +271,13 @@ export function Tapa({ color, className = '', children }: { color: string; class
  * La foto de un deseo, a sangre y más alta que ancha (ver .gr-arte); sin foto (o si no carga), un regalito gris sobre la
  * superficie suave. Ocupa el ancho de su lugar; el alto, con style={{ aspectRatio }} si va otra proporción.
  */
-export function Arte({ src, titulo, apagado = false, className = '', style }: {
+export function Arte({ src, titulo, apagado = false, pronto = false, className = '', style }: {
   src: string | null
   titulo: string
   /** lo que ya no se puede reservar */
   apagado?: boolean
+  /** está en lo primero que se ve (la foto grande de la ficha): que cargue ya (ver FotoConRespaldo) */
+  pronto?: boolean
   className?: string
   style?: React.CSSProperties
 }) {
@@ -280,7 +288,7 @@ export function Arte({ src, titulo, apagado = false, className = '', style }: {
   )
   return (
     <div className={`gr-arte${apagado ? ' gr-arte--apagado' : ''} ${className}`} style={style}>
-      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={sinFoto} className="gr-arte__foto" /> : sinFoto}
+      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={sinFoto} pronto={pronto} className="gr-arte__foto" /> : sinFoto}
     </div>
   )
 }
@@ -305,12 +313,12 @@ export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: 
   )
 }
 
-/** Título de sección con su "Ver más" a la derecha. */
+/** Título de sección con su "Ver más" a la derecha (gr-toque: se ve chico, pero se toca en 44 × 44). */
 export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { title: React.ReactNode; href?: string; linkLabel?: string; id?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h2 id={id} className="gr-heading">{title}</h2>
-      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
+      {href && <Link href={href} className="gr-toque flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
     </div>
   )
 }

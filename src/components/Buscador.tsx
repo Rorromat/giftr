@@ -46,9 +46,9 @@ export function Buscador({ ambito, placeholder, vacio, masAlla }: {
         </svg>
         <input type="search" value={q} onChange={(e) => buscar(e.target.value)} placeholder={placeholder} aria-label={placeholder}
                autoComplete="off" autoCapitalize="none" spellCheck={false} enterKeyHint="search"
-               className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-gr-muted [&::-webkit-search-cancel-button]:hidden" />
+               className="min-w-0 flex-1 bg-transparent text-base font-medium outline-none placeholder:text-gr-muted [&::-webkit-search-cancel-button]:hidden" />
         {q && (
-          <button type="button" onClick={() => buscar('')} aria-label="Borrar la búsqueda" className="-mr-2 flex size-9 flex-none items-center justify-center rounded-full">
+          <button type="button" onClick={() => buscar('')} aria-label="Borrar la búsqueda" className="gr-toque -mr-2 flex size-9 flex-none items-center justify-center rounded-full">
             <Icon name="close" size={14} strokeWidth={2.6} />
           </button>
         )}

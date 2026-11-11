@@ -37,7 +37,7 @@ export function FotoDeLaFicha({ foto, titulo, apagado = false, volver, volverLab
   return (
     <div className="gr-ficha__portada">
       <FotoAmpliable src={foto} titulo={titulo} pastilla className="h-full">
-        <Arte src={foto} titulo={titulo} apagado={apagado} className="gr-ficha__foto" />
+        <Arte src={foto} titulo={titulo} apagado={apagado} pronto className="gr-ficha__foto" />
       </FotoAmpliable>
       <div className="gr-ficha__arriba">
         <BackLink href={volver} label={volverLabel} vidrio="oscuro" />

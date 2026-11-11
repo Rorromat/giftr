@@ -42,12 +42,10 @@
   --gr-comun: #EAF0FF;
   --gr-comun-line: #C5D3FF;
   --gr-comun-ink: #1F45C4;
-  /* La tarjeta destacada (.gr-hero): tinta, con los detalles en el acento y su botón blanco. */
+  /* La tarjeta destacada (.gr-hero): tinta, con los detalles en el acento. */
   --gr-hero: #121216;
   --gr-on-hero: #FFFFFF;
   --gr-hero-detail: var(--gr-acento);
-  --gr-hero-btn: #FFFFFF;
-  --gr-on-hero-btn: #121216;
 
   /* Vidrio esmerilado: la barra de abajo y el + */
   --gr-glass: rgb(255 255 255 / 0.72);
@@ -60,7 +58,6 @@
   /* Forma */
   --gr-border: 1px solid var(--gr-line-strong);
   --gr-radius-lg: 20px;
-  --gr-radius-md: 16px;
   --gr-radius-pill: 999px;
   --gr-shadow: 0 1px 2px rgb(18 18 22 / 0.04);
   --gr-shadow-float: 0 10px 30px -10px rgb(18 18 22 / 0.3);
@@ -71,7 +68,6 @@
 
   /* Espaciado */
   --gr-gutter: 18px;
-  --gr-gap: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -100,8 +96,10 @@
 }
 
 @layer base {
-  /* sin zoom, como una app: deja deslizar para cualquier lado, no pellizcar ni el doble toque (ver viewport en layout) */
-  html { touch-action: pan-x pan-y; }
+  /* El zoom queda libre (hay quien agranda la pantalla con dos dedos para leer un precio). Lo único que se evita es el que
+     hace solo el iPhone al tocar un campo con letra de menos de 16 px, que deja la pantalla corrida: ningún campo baja de
+     ahí. Los que llevan su tamaño con una utilidad, que sea text-base o más (lo fija tests/accesibilidad.test.ts). */
+  input, select, textarea { font-size: 16px; }
   body {
     margin: 0;
     /* sin el tirón del sistema (en el navegador recargaba todo): donde tiene sentido va el nuestro (<Refrescar>) */
@@ -150,7 +148,6 @@
   }
 
   /* Tarjeta: la superficie con un borde fino, sin sombra; la foto va de lado a lado */
-  .gr-sticker,
   .gr-card {
     background: var(--gr-surface);
     border: 1px solid var(--gr-line);
@@ -158,7 +155,6 @@
     box-shadow: var(--gr-shadow);
     overflow: hidden;
   }
-  .gr-sticker--dark { background: var(--gr-brand); color: var(--gr-on-brand); border-color: var(--gr-brand); }
   .gr-sticker__img {
     display: block;
     width: 100%;
@@ -180,21 +176,6 @@
     font-weight: 500;
     line-height: 1.4;
   }
-
-  /* Etiquetas sobre fotos: chicas, blancas y con una sombrita, para que mande la foto (blancas también de noche) */
-  .gr-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: var(--gr-radius-pill);
-    background: rgb(255 255 255 / 0.95);
-    color: #121216;
-    padding: 4px 10px;
-    font-weight: 700;
-    font-size: 12px;
-    box-shadow: 0 1px 4px rgb(18 18 22 / 0.12);
-  }
-  .gr-tag--dark { background: var(--gr-brand); color: var(--gr-on-brand); }
 
   /* Botones: píldoras. La principal en tinta; las demás, la superficie con un borde fino. */
   .gr-btn,
@@ -228,12 +209,12 @@
   .gr-btn--sm { min-height: 44px; font-size: 14px; padding: 0 16px; }
   .gr-btn--dark { border-color: var(--gr-brand); background: var(--gr-brand); color: var(--gr-on-brand); }
   .gr-btn--accent { border-color: transparent; background: var(--gr-acento-degrade); color: var(--gr-on-acento); }
-  .gr-btn--hero { border-color: var(--gr-hero-btn); background: var(--gr-hero-btn); color: var(--gr-on-hero-btn); }
-  /* Sobre una tapa o un color: blanco, y de vidrio */
+  /* Sobre una tapa o un color: blanco, y de vidrio. El vidrio es ahumado (oscurece lo de atrás en vez de aclararlo): con
+     el claro, el texto y los íconos blancos quedaban sobre un verde lavado y no llegaban a leerse (2:1). */
   .gr-btn--blanco { border-color: #FFFFFF; background: #FFFFFF; color: #121216; }
   .gr-btn--vidrio, .gr-vidrio {
-    border: 1px solid rgb(255 255 255 / 0.22);
-    background: rgb(255 255 255 / 0.18);
+    border: 1px solid rgb(255 255 255 / 0.3);
+    background: rgb(0 0 0 / 0.24);
     color: #FFFFFF;
     -webkit-backdrop-filter: blur(16px) saturate(1.6);
     backdrop-filter: blur(16px) saturate(1.6);
@@ -253,7 +234,7 @@
   }
   /* el área de toque llega a 44 aunque el círculo mida 40 */
   .gr-icon-btn::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; }
-  .gr-icon-btn.gr-vidrio { border-color: rgb(255 255 255 / 0.22); background: rgb(255 255 255 / 0.18); color: #FFFFFF; }
+  .gr-icon-btn.gr-vidrio { border-color: rgb(255 255 255 / 0.3); background: rgb(0 0 0 / 0.24); color: #FFFFFF; }
   .gr-link {
     display: inline-flex;
     align-items: center;
@@ -265,12 +246,28 @@
     text-underline-offset: 4px;
   }
 
-  /* Chips */
+  /* Un link o un botón chico (un "Ver más", el × de un campo): se dibuja igual y el área de toque llega a 44 × 44 con un
+     ::after invisible y centrado. Con el dedo, a un "Ver más" de 20 px de alto se le erraba. */
+  .gr-toque { position: relative; }
+  .gr-toque::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+
+  /* Chips: se ven de 38 de alto; el área de toque llega a 44 (::after), sin separar más las filas */
   .gr-chip {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     height: 38px;
+    min-width: 44px;
+    justify-content: center;
     padding: 0 15px;
     border: 1px solid var(--gr-line);
     border-radius: var(--gr-radius-pill);
@@ -283,6 +280,7 @@
     text-decoration: none;
     cursor: pointer;
   }
+  .gr-chip::after { content: ''; position: absolute; inset: -3px 0; }
   .gr-chip[aria-pressed="true"],
   .gr-chip[aria-current="page"],
   .gr-chip:has(:checked) { background: var(--gr-acento); border-color: var(--gr-acento); color: var(--gr-on-acento); font-weight: 700; }
@@ -297,6 +295,7 @@
     background: var(--gr-soft);
   }
   .gr-segmented > * {
+    position: relative;
     flex: 1;
     display: flex;
     align-items: center;
@@ -311,6 +310,8 @@
     text-decoration: none;
     cursor: pointer;
   }
+  /* cada opción se ve de 38 de alto (el riel le saca 4 de cada lado): el área de toque sale del riel hasta los 44 */
+  .gr-segmented > *::after { content: ''; position: absolute; inset: -6px 0; }
   .gr-segmented > [aria-pressed="true"],
   .gr-segmented > [aria-checked="true"],
   .gr-segmented > [aria-current="page"],
@@ -364,21 +365,6 @@
   }
   .gr-input[type="date"]::-webkit-date-and-time-value { margin: 0; text-align: left; }
 
-  /* Avatares: con un aro del color de la tarjeta, para que se separen al superponerse */
-  .gr-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 2px solid var(--gr-surface);
-    background: var(--gr-soft);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 13px;
-  }
-  .gr-avatar + .gr-avatar { margin-left: -9px; }
-
   /* Filas de opciones (Perfil): ícono en un círculo, texto y flecha, separadas por una línea fina */
   .gr-rows > * + * { border-top: 1px solid var(--gr-line); }
   .gr-row {
@@ -428,8 +414,9 @@
     position: fixed;
     left: max(14px, calc(50% - 224px + 14px));
     right: max(14px, calc(50% - 224px + 14px));
-    /* --anclaje: en iOS instalado, cuánto hay que correrla para que quede abajo de lo que se ve (ver BottomNav) */
-    bottom: calc(22px - var(--anclaje, 0px));
+    /* Arriba de la barra de gestos del iPhone (el inset vale desde que el viewport va con viewport-fit=cover, ver
+       layout.tsx). --anclaje: en iOS instalado, cuánto hay que correrla para que quede abajo de lo que se ve (ver BottomNav) */
+    bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) - var(--anclaje, 0px));
     z-index: 20;
     display: flex;
     align-items: center;
@@ -554,30 +541,32 @@
 
 /* Las piezas de las tapas, también en la capa de componentes (las utilidades de Tailwind las pueden pisar) */
 @layer components {
-  /* La tapa (<Tapa>): arriba de la lista, de lado a lado, un velo apenas teñido con el color de la persona (--c) que se funde
-     con el fondo. El color lo ponen las fotos: acá es solo un toque. El texto va en tinta, como en el resto. */
+  /* La tapa (<Tapa>): arriba de la lista, de lado a lado, el color de la lista (--c, ver lib/tapas.ts) que se oscurece y se
+     funde con el fondo. Lo de adentro va en blanco. Arranca oscurecida (72 % del color): sobre el verde de la marca puro
+     el blanco no se leía (2,65:1); así el texto pasa 4,5:1 en todo el recorrido, también en lo más claro del brillo. */
   .gr-tapa {
     position: relative;
     isolation: isolate;
     margin-inline: calc(-1 * var(--gr-gutter));
-    padding: 8px var(--gr-gutter) 84px;
+    /* llega al borde de arriba: lo de adentro, abajo del notch si la barra del sistema va transparente */
+    padding: calc(8px + env(safe-area-inset-top, 0px)) var(--gr-gutter) 84px;
     color: #FFFFFF;
     /* lo de adentro queda sobre el color; el fundido al fondo va en los últimos 84 px, abajo de todo */
-    background: linear-gradient(180deg, var(--c), color-mix(in oklch, var(--c) 70%, black) 50%, color-mix(in oklch, var(--c) 64%, black) calc(100% - 84px), var(--gr-bg));
-    background: linear-gradient(in oklch 180deg, var(--c) 0%, color-mix(in oklch, var(--c) 70%, black) 50%, color-mix(in oklch, var(--c) 64%, black) calc(100% - 84px), var(--gr-bg) 100%);
+    background: linear-gradient(180deg, color-mix(in oklch, var(--c) 72%, black), color-mix(in oklch, var(--c) 64%, black) 50%, color-mix(in oklch, var(--c) 56%, black) calc(100% - 84px), var(--gr-bg));
+    background: linear-gradient(in oklch 180deg, color-mix(in oklch, var(--c) 72%, black) 0%, color-mix(in oklch, var(--c) 64%, black) 50%, color-mix(in oklch, var(--c) 56%, black) calc(100% - 84px), var(--gr-bg) 100%);
   }
-  /* un brillo arriba a la derecha, como luz sobre la tapa */
+  /* un brillo arriba a la derecha, como luz sobre la tapa: apenas, con el color de la tapa (más claro lavaba la campanita) */
   .gr-tapa::before {
     content: '';
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: radial-gradient(120% 60% at 85% 0%, color-mix(in oklch, var(--c) 55%, white) 0%, transparent 60%);
-    opacity: 0.5;
+    background: radial-gradient(120% 60% at 85% 0%, var(--c) 0%, transparent 60%);
+    opacity: 0.12;
     pointer-events: none;
   }
-  .gr-tapa .gr-muted, .gr-tapa__sub { color: rgb(255 255 255 / 0.78); }
-  .gr-tapa .gr-label { color: rgb(255 255 255 / 0.8); }
+  .gr-tapa .gr-muted, .gr-tapa__sub { color: rgb(255 255 255 / 0.92); }
+  .gr-tapa .gr-label { color: rgb(255 255 255 / 0.92); }
   .gr-tapa :focus-visible { outline-color: #FFFFFF; }
 
   /* La tarjeta grande de Inicio (<Destacada>, lo próximo): la tapa de su lista en degradé, lo que más quiere pegado
@@ -593,9 +582,10 @@
     padding: 18px;
     border-radius: 26px;
     color: #FFFFFF;
-    /* de la tapa de su lista (ver lib/tapas.ts) a más oscura, para que el texto blanco se lea también sobre el verde */
-    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 92%, black), color-mix(in oklch, var(--c) 72%, black) 55%, color-mix(in oklch, var(--c) 56%, black));
-    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 92%, black), color-mix(in oklch, var(--c) 72%, black) 55%, color-mix(in oklch, var(--c) 56%, black));
+    /* de la tapa de su lista (ver lib/tapas.ts) a más oscura, para que el texto blanco se lea también sobre el verde: como
+       la tapa, arranca en el 72 % (con 92 %, el nombre de arriba quedaba en 3,3:1) */
+    background: linear-gradient(155deg, color-mix(in oklch, var(--c) 72%, black), color-mix(in oklch, var(--c) 60%, black) 55%, color-mix(in oklch, var(--c) 48%, black));
+    background: linear-gradient(in oklch 155deg, color-mix(in oklch, var(--c) 72%, black), color-mix(in oklch, var(--c) 60%, black) 55%, color-mix(in oklch, var(--c) 48%, black));
   }
   .gr-destacada > :first-child { align-self: start; }
   .gr-destacada__sticker {
@@ -697,8 +687,9 @@
   .gr-arte--apagado > * { opacity: 0.45; }
 
   /* La ficha de un deseo (ver FichaDeseo): la foto a sangre arriba de todo, que abajo se funde con el fondo; encima, volver
-     y compartir de vidrio oscuro (se ven sobre cualquier foto) y "Ver foto" al medio, donde empieza el degradé. El nombre
-     se apoya sobre el final de la foto. Sin foto, el regalito gris y más bajita. */
+     y compartir de vidrio oscuro (se ven sobre cualquier foto: con 0.62 de tinta, el blanco de adentro da 5:1 sobre una
+     foto blanca, la más difícil; con 0.34 daba 2:1) y "Ver foto" al medio, donde empieza el degradé. El nombre se apoya
+     sobre el final de la foto. Sin foto, el regalito gris y más bajita. */
   .gr-ficha__portada {
     position: relative;
     height: clamp(340px, 56svh, 500px);
@@ -723,7 +714,7 @@
   .gr-ficha__arriba .gr-icon-btn { width: 46px; height: 46px; }
   .gr-icon-btn.gr-vidrio-oscuro, .gr-vidrio-oscuro {
     border-color: rgb(255 255 255 / 0.16);
-    background: rgb(18 18 22 / 0.34);
+    background: rgb(18 18 22 / 0.62);
     color: #FFFFFF;
     -webkit-backdrop-filter: blur(16px) saturate(1.6);
     backdrop-filter: blur(16px) saturate(1.6);
@@ -946,7 +937,11 @@
   .gr-listo h2 { margin: 0; font-family: var(--gr-font-display); font-weight: 900; font-size: 46px; line-height: 0.92; letter-spacing: -0.05em; }
   .gr-listo .gr-arte { width: 168px; border-radius: 20px; box-shadow: 0 24px 44px -16px rgb(0 0 0 / 0.5); }
   .gr-cuanto { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  /* se ven de 36 de alto; el área de toque llega a 44 */
+  .gr-cuanto button::after { content: ''; position: absolute; inset: -4px 0; }
   .gr-cuanto button {
+    position: relative;
+    min-width: 44px;
     min-height: 36px;
     padding: 0 13px;
     border: 1px solid color-mix(in oklch, var(--gr-on-acento) 22%, transparent);
@@ -965,6 +960,17 @@
   /* El deseo recién agregado entra primero en la lista, con "Nuevo" en el acento */
   .gr-nuevo { animation: gr-entra-deseo 700ms var(--gr-entra) both; }
   @keyframes gr-entra-deseo { from { opacity: 0; transform: translateY(-24px) scale(0.96); } }
+
+  /* Con el teléfono de costado (pantalla baja) el agregado no entra en lo que se ve y, como va fijo, lo de abajo quedaba
+     cortado (los botones de "¡Anotado!"): ahí se desliza, con los títulos y la foto más chicos. Antes un cartel tapaba
+     la app y pedía girar el teléfono; hay quien lo usa de costado (en un soporte, con la rotación trabada). */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .gr-agr__elegir { overflow-y: auto; gap: 14px; padding-top: max(20px, env(safe-area-inset-top)); }
+    .gr-agr__elegir h2 { font-size: 30px; }
+    .gr-agr__listo { overflow-y: auto; align-items: start; padding-top: 20px; }
+    .gr-listo h2 { font-size: 30px; }
+    .gr-listo .gr-arte { width: 96px; }
+  }
 }
 
 
@@ -1122,10 +1128,13 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
 }
 
 /* El ícono de cada aviso (<IconoAviso> en FilaAviso): mientras es nuevo, el dibujo se mueve como lo que pasó y después
-   descansa, cada 4 segundos. --i corre cada fila medio segundo, así no se mueven todas a la vez, y hasta que le toca ya
-   está en su primer cuadro (backwards): la moneda y el ticket entran desde afuera del cuadradito, que los recorta. */
+   descansa. Dos veces (4 segundos cada una) y se queda quieto en su lugar: moviéndose para siempre, al lado de lo que
+   hay que leer, molesta, y no hay cómo pararlo. Son 1.85 vueltas y no 2: la segunda se corta en el descanso (todos
+   están en su lugar del 30 % al 88 %), así la moneda y el ticket no se van y reaparecen de golpe al terminar. --i corre
+   cada fila medio segundo, así no se mueven todas a la vez, y hasta que le toca ya está en su primer cuadro (backwards):
+   la moneda y el ticket entran desde afuera del cuadradito, que los recorta. */
 .gr-aviso-icono { overflow: hidden; }
-.gr-aviso-icono[data-mueve] > svg { animation: 4s ease-in-out calc(var(--i, 0) * 0.5s) infinite backwards; }
+.gr-aviso-icono[data-mueve] > svg { animation: 4s ease-in-out calc(var(--i, 0) * 0.5s) 1.85 backwards; }
 /* te pagaron: cae una moneda girando, rebota y después se va por abajo, como en una alcancía */
 .gr-aviso-icono[data-mueve="cae"] > svg { animation-name: gr-aviso-cae; }
 @keyframes gr-aviso-cae {
@@ -1165,9 +1174,9 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   15% { transform: rotate(14deg) translateY(-6%); }
   22% { transform: rotate(-6deg) translateY(0); }
 }
-/* te contestaron: los puntitos de "escribiendo…", de a uno y sin descanso */
+/* te contestaron: los puntitos de "escribiendo…", de a uno; lo mismo que duran los demás (unos 8 segundos) y paran */
 .gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto {
-  animation: gr-aviso-punto 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center;
+  animation: gr-aviso-punto 1.2s ease-in-out 7; transform-box: fill-box; transform-origin: center;
 }
 .gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto:nth-of-type(2) { animation-delay: 0.15s; }
 .gr-aviso-icono[data-mueve="escribe"] .gr-aviso__punto:nth-of-type(3) { animation-delay: 0.3s; }
@@ -1206,28 +1215,6 @@ form:has([data-sin-presupuesto]) .gr-campo-presupuesto { display: none; }
   6% { transform: scale(1.18); }
   18% { transform: scale(1.12); }
 }
-
-/* Girá el teléfono: GiftR va en vertical. Solo en un teléfono de costado (pantalla táctil y baja): una tablet o la compu
-   apaisadas, no. */
-.gr-girar { display: none; }
-@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
-  .gr-girar {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 24px;
-    background: var(--gr-bg);
-    color: var(--gr-ink);
-    text-align: center;
-  }
-  .gr-girar__tel { margin-bottom: 6px; animation: gr-girar 1.6s ease-in-out infinite; }
-}
-@keyframes gr-girar { 0%, 25% { transform: rotate(-90deg); } 60%, 100% { transform: rotate(0deg); } }
 
 /* La foto de un deseo entera (<FotoAmpliable>): a pantalla completa, sin recortar, sobre fondo oscuro. */
 .gr-foto-grande {
@@ -1365,7 +1352,6 @@ body:has(main[aria-busy="true"], .gr-cargando[aria-busy="true"]) .gr-arranque:no
   .gr-toast { animation-name: gr-toast-quieto; }
   .gr-foto-grande[open] { animation: none; }
   .gr-sheet[open] { animation: none; }
-  .gr-girar__tel { animation: none; }
   /* los íconos de los avisos, quietos (en su lugar, con los tres puntitos prendidos) */
   .gr-aviso-icono[data-mueve] > svg, .gr-aviso-icono[data-mueve] .gr-aviso__punto { animation: none; }
   /* el moño quieto mientras carga (sin pegarse ni latir), y se va de una */

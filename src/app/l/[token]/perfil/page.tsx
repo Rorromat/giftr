@@ -116,7 +116,7 @@ export default async function Perfil({ params, searchParams }: Props) {
       )}
 
       <Link href={dueno ? suLista.href : `/l/${token}`}
-            className="gr-btn gr-btn--dark fixed bottom-7 left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
+            className="gr-btn gr-btn--dark fixed bottom-[max(28px,env(safe-area-inset-bottom))] left-1/2 z-10 h-[54px] -translate-x-1/2 whitespace-nowrap rounded-[18px] px-[22px]">
         <Icon name="gift" size={20} strokeWidth={2} />
         {dueno ? suLista.texto : `Ver la lista de ${primer}`}
       </Link>
