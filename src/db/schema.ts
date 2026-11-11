@@ -166,6 +166,15 @@ export const items = pgTable('items', {
   fotoUrl: text('foto_url'),
   precio: text('precio'),
   rangoPrecio: text('rango_precio'),
+  // El precio en número, al lado del texto (que es lo que se muestra, tal cual lo escribió): quien abre la lista con un
+  // presupuesto filtra "hasta $X". Se lee del texto al guardar (ver leerPrecio y numerosDelPrecio): el piso, el techo si es
+  // un rango ("$20.000 a $40.000") y la moneda. Null: sin precio, o uno que no se pudo leer ("a consultar").
+  precioMin: integer('precio_min'),
+  precioMax: integer('precio_max'),
+  precioMoneda: text('precio_moneda', { enum: ['ARS', 'USD'] }),
+  // Cuándo se cargó o cambió el precio (o el dueño dijo que sigue igual): con inflación, uno de hace cuatro meses ya no es
+  // el de hoy, y se le avisa a quien regala (ver antiguedadDelPrecio).
+  precioAt: timestamp('precio_at', { withTimezone: true }),
   categoria: text('categoria'),
   prioridad: text('prioridad', { enum: ['mucho', 'gustaria', 'suelta'] }).notNull().default('gustaria'),
   cantidad: integer('cantidad').notNull().default(1),

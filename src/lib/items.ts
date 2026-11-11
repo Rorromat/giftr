@@ -8,6 +8,7 @@ import { dejarAviso, type TipoAviso } from '@/lib/notifications'
 import { desdeElUltimoEvento } from '@/lib/events'
 import { recienHecho } from '@/lib/repetido'
 import { acotarCantidad, CANTIDAD_MAXIMA, LARGO, recortar } from '@/lib/limites'
+import { leerPrecio } from '@/lib/pesos'
 
 export type NewItemData = {
   tipo: 'exacto' | 'idea'
@@ -44,6 +45,20 @@ export function acotarDeseo<T extends CambiosDeseo>(data: T, topeCantidad = CANT
   return r as T
 }
 
+/** El precio que se muestra de un deseo: el suyo o, en una idea de antes, su rango. */
+const textoDelPrecio = (d: { precio?: string | null; rangoPrecio?: string | null }) => d.precio ?? d.rangoPrecio ?? null
+
+/**
+ * Lo que se guarda al lado del texto del precio (que no se toca: es lo que escribió): el número, para filtrar "hasta $X"
+ * (ver leerPrecio; lo que no se puede leer queda sin número, y se guarda igual), y la fecha de hoy, para decirle a quien
+ * regala que un precio de hace cuatro meses puede haber cambiado. Sin precio, todo vacío.
+ */
+export function numerosDelPrecio(d: { precio?: string | null; rangoPrecio?: string | null }, ahora = new Date()) {
+  const texto = textoDelPrecio(d)
+  const leido = leerPrecio(texto)
+  return { precioMin: leido?.min ?? null, precioMax: leido?.max ?? null, precioMoneda: leido?.moneda ?? null, precioAt: texto ? ahora : null }
+}
+
 /** Agrega a la lista personal del usuario o, con listId, a un grupo del que es dueño. */
 export async function createItem(db: Db, userId: string, deseo: NewItemData, listId?: string): Promise<OwnerItemView | null> {
   // un id que no es UUID no es de nadie (y la base lo rechazaría con un error)
@@ -70,7 +85,7 @@ export async function createItem(db: Db, userId: string, deseo: NewItemData, lis
         ...CAMPOS_OPCIONALES.map((k) => sql`${items[k]} is not distinct from ${nuevo[k] ?? null}`),
       ))
     if (repetido) return pickItemFields(repetido)
-    const [item] = await t.insert(items).values({ ...nuevo, listId: list.id }).returning()
+    const [item] = await t.insert(items).values({ ...nuevo, ...numerosDelPrecio(nuevo), listId: list.id }).returning()
     return pickItemFields(item)
   })
 }
@@ -109,7 +124,13 @@ export async function genteDelDeseo(db: Db, itemId: string, listId: string) {
 /** Lo que se puede cambiar de un deseo; null borra un campo opcional (las notas, el precio, la foto…). */
 export const CAMPOS_OPCIONALES = ['notas', 'fotoUrl', 'precio', 'rangoPrecio', 'categoria', 'linkTienda', 'videoUrl'] as const
 type Opcional = (typeof CAMPOS_OPCIONALES)[number]
-export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null }
+export type CambiosDeseo = Partial<Omit<NewItemData, Opcional>> & { [K in Opcional]?: string | null } & {
+  /**
+   * El dueño dijo que el precio sigue igual ("Sigue costando lo mismo" al editar, o lo volvió a traer de la tienda y no
+   * cambió): la fecha del precio pasa a hoy aunque el texto no cambie. No es un cambio del deseo: no le avisa a nadie.
+   */
+  precioVisto?: boolean
+}
 
 /**
  * Lo que le importa a quien regala (qué comprar). La prioridad, la categoría y el video no le cambian el regalo: no le
@@ -126,7 +147,7 @@ export async function updateItem(db: Db, itemId: string, userId: string, deseo: 
  * Los cambios de un deseo, sin mirar de quién es (lo mira quien llama: updateItem, o editarSorpresa con quien la armó).
  * A los que lo regalan se les avisa si cambió algo que les importa; noAvisarA: el que lo editó, si también lo regala.
  */
-export async function cambiarDeseo(db: Db, itemId: string, deseo: CambiosDeseo, noAvisarA?: string): Promise<boolean> {
+export async function cambiarDeseo(db: Db, itemId: string, { precioVisto, ...deseo }: CambiosDeseo, noAvisarA?: string): Promise<boolean> {
   const [antes] = await db.select().from(items).where(eq(items.id, itemId))
   if (!antes) return false
   // Uno archivado no se edita (una pantalla vieja, la prioridad desde Mi lista): avisaría de algo que ya no está.
@@ -139,11 +160,15 @@ export async function cambiarDeseo(db: Db, itemId: string, deseo: CambiosDeseo, 
   ) as CambiosDeseo
   // Uno de antes del tope se puede bajar sin que quede en 99: el formulario deja hasta lo que tenía (ver DeseoForm).
   const cambios = distinto(soloIdeasSeRepiten(acotarDeseo(distinto(deseo), Math.max(CANTIDAD_MAXIMA, antes.cantidad)), antes.tipo))
-  if (!Object.keys(cambios).length) return true
-  await db.update(items).set(cambios).where(eq(items.id, itemId))
+  const despues = { ...antes, ...cambios }
+  // El número y la fecha del precio, solo si cambió el precio que se muestra (o si dijo que sigue igual): cambiar las notas
+  // no hace que un precio de hace cuatro meses parezca de hoy.
+  const precio = textoDelPrecio(despues)
+  const numeros = precio !== textoDelPrecio(antes) || (precioVisto && precio) ? numerosDelPrecio(despues) : null
+  if (!Object.keys(cambios).length && !numeros) return true
+  await db.update(items).set({ ...cambios, ...numeros }).where(eq(items.id, itemId))
   // Bajar la cantidad por debajo de lo reservado también llega así (sin nada distinto para el dueño, que no lo sabe).
   // La marca de repetible, solo si cambia de verdad: un "Quiero ESTO" de antes que la tenía no se repetía igual.
-  const despues = { ...antes, ...cambios }
   const avisar = AVISAN.some((k) => k in cambios && (k !== 'repetible' || esRepetible(despues) !== esRepetible(antes)))
   if (avisar) await dejarAviso(db, itemId, 'item_editado', (await genteDelDeseo(db, itemId, antes.listId)).filter((d) => d.userId !== noAvisarA))
   return true

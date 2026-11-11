@@ -89,6 +89,8 @@ export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | 
     linkTienda,
     // el link de un video del producto (ver VideoDeseo)
     videoUrl: link(fd, 'videoUrl'),
+    // solo al editar: "Sigue costando lo mismo", o lo trajo de nuevo de la tienda (ver PrecioAlDia)
+    precioVisto: (!alAgregar && fd.get('precioVisto') === '1') || undefined,
     // una foto subida desde el teléfono (/foto/deseo/:id, en minúsculas como la ruta) o el link de una foto
     fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto.toLowerCase() : linkHttp(foto) ?? undefined,
   }

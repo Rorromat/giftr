@@ -309,6 +309,13 @@
       "when": 1794377408404,
       "tag": "0043_post_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794377445588,
+      "tag": "0044_precio_en_numero",
+      "breakpoints": true
     }
   ]
 }

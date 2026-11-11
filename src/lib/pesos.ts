@@ -57,6 +57,15 @@ function esNegativo(texto: string) {
  * (otra moneda, negativo), en cuotas o muy largo: mejor no estimar que estimar mal.
  */
 export function parsePesos(texto: string | null | undefined): number | null {
+  return rangoEnPesos(texto)?.min ?? null
+}
+
+/**
+ * Lo mismo que parsePesos, con el techo si es un rango ("$20.000 a $40.000" → 20.000 y 40.000; "$10–30k" → 10.000 y
+ * 30.000). El techo va solo si el número está pegado a lo que une ("$45.000 - talle 42" no es un rango) y no es más chico
+ * que el piso ("$45.000 - 2 unidades"): si no, sin techo, que es lo que ya se leía.
+ */
+function rangoEnPesos(texto: string | null | undefined): { min: number; max: number | null } | null {
   if (!texto || texto.length > LARGO_MAXIMO || OTRA_MONEDA.test(texto) || CUOTAS.test(texto)) return null
   const desde = texto.indexOf('$')
   const desdeAca = desde >= 0 ? texto.slice(desde) : texto
@@ -77,15 +86,19 @@ export function parsePesos(texto: string | null | undefined): number | null {
   }
   if (!n) return null
   let por = n.por ?? 1
-  if (!n.por && HASTA.test(n.resto)) {
-    const hasta = leerNumero(n.resto.replace(HASTA, ''))
+  const hasta = HASTA.test(n.resto) ? leerNumero(n.resto.replace(HASTA, '')) : null
+  if (!n.por && hasta) {
     // la "k" del final de un rango vale también para el de abajo, si es más chico
-    if (hasta?.por && n.crudo <= hasta.crudo) por = hasta.por
+    if (hasta.por && n.crudo <= hasta.crudo) por = hasta.por
     // y los miles escritos solo en el de arriba también ("$20-30.000"), si así queda más chico
-    else if (hasta && !hasta.por && hasta.grupos && n.corto && n.crudo * 1000 ** hasta.grupos <= hasta.crudo) por = 1000 ** hasta.grupos
+    else if (!hasta.por && hasta.grupos && n.corto && n.crudo * 1000 ** hasta.grupos <= hasta.crudo) por = 1000 ** hasta.grupos
   }
-  const pesos = Math.round(n.crudo * por)
-  return Number.isSafeInteger(pesos) && pesos > 0 ? pesos : null
+  const min = Math.round(n.crudo * por)
+  if (!Number.isSafeInteger(min) || min <= 0) return null
+  // el techo: el número pegado a lo que une ("a $40.000"), no uno que aparece más lejos ("- talle 42")
+  const pegado = hasta && /^\d/.test(n.resto.replace(HASTA, ''))
+  const max = pegado ? Math.round(hasta.crudo * (hasta.por ?? 1)) : null
+  return { min, max: max !== null && Number.isSafeInteger(max) && max >= min ? max : null }
 }
 
 /**
@@ -119,7 +132,31 @@ export function parseDolares(texto: string | null | undefined): number | null {
   return parsePesos(texto!.replace(/US\$|U\$[SD]|USD|d[oó]lar(?:es)?/gi, ' '))
 }
 
-/** Partes iguales en pesos enteros; los pesos que sobran van a los primeros (el encargado va primero). */
+/** Lo más grande que entra en la columna (un entero de la base): más que eso no es el precio de un regalo. */
+const MONTO_MAXIMO = 2_000_000_000
+const MARCA_DE_DOLARES = /US\$|U\$[SD]|USD|d[oó]lar(?:es)?/gi
+
+/** El precio de un deseo en número: el piso, el techo si es un rango, y en qué moneda. */
+export type PrecioLeido = { min: number; max: number | null; moneda: Moneda }
+
+/**
+ * El precio de un deseo (el texto libre que escribió la persona, que se sigue mostrando tal cual) en número, para poder
+ * filtrar "hasta $X": "$ 120.000", "120 mil", "$20.000 a $40.000" (piso y techo), "US$ 100", "u$s 100", "USD 100". Null si
+ * no se puede leer con confianza (ver parsePesos: otra moneda, en cuotas, "a consultar") o si mezcla pesos y dólares
+ * ("$120.000 o US$ 100": no se sabe cuál de los dos números es de cuál). Sin número no es un error: el deseo se guarda
+ * igual, y en el filtro va con los que no tienen precio.
+ */
+export function leerPrecio(texto: string | null | undefined): PrecioLeido | null {
+  if (!texto) return null
+  const dolares = enDolares(texto)
+  const sinMarca = dolares ? texto.replace(MARCA_DE_DOLARES, ' ') : texto
+  if (dolares && sinMarca.includes('$')) return null
+  const r = rangoEnPesos(sinMarca)
+  if (!r || r.min > MONTO_MAXIMO) return null
+  return { min: r.min, max: r.max !== null && r.max <= MONTO_MAXIMO ? r.max : null, moneda: dolares ? 'USD' : 'ARS' }
+}
+
+/** Partes iguales en pesos enteros;los pesos que sobran van a los primeros (el encargado va primero). */
 export function dividir(total: number, n: number): number[] {
   const base = Math.floor(total / n)
   return Array.from({ length: n }, (_, i) => base + (i < total - base * n ? 1 : 0))

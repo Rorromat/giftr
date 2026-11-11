@@ -489,14 +489,16 @@ test('historial: quién se ocupó de cada regalo y cuántos compró cada uno', a
   expect((await misEventos(db, ana.id))[0].ultimo).toMatchObject({ encargado: 'Rodri', titulo: 'Vela' })
 })
 
-const SPOILERS = ['grupal', 'giftId', 'encargado', 'monto', 'pagado', 'Rodri', 'Sofi', 'Ana', '90000', '30000', 'la roja', 'Vela']
+// Lo que salió y lo que puso cada uno (87.000 entre tres: 29.000), distinto del precio que cargó ella ($90.000): ese es
+// suyo y va en su vista también como número (ver precioMin); lo que pagaron, no.
+const SPOILERS = ['grupal', 'giftId', 'encargado', 'monto', 'pagado', 'Rodri', 'Sofi', 'Ana', '87000', '29000', 'la roja', 'Vela']
 
 test('EL TEST DE ORO, regalos grupales: la dueña no ve regalos, cuentas ni historial por ningún camino', async () => {
   const { db, mama, lista, rodri, sofi, bici, giftId } = await conRegalo()
   // la dueña no puede armar ni sumarse
   expect(await iniciarRegaloGrupal(db, bici.id, mama.id)).toEqual({ ok: false, reason: 'propio' })
   expect(await sumarseARegalo(db, giftId, mama.id)).toBe(false)
-  await comprarRegalo(db, giftId, rodri.id, { total: 90000, nota: 'la roja' })
+  expect(await comprarRegalo(db, giftId, rodri.id, { total: 87000, nota: 'la roja' })).toEqual({ ok: true })
   const vela = (await createItem(db, mama.id, { tipo: 'exacto', titulo: 'Vela' }))!
   const r = await reserveItem(db, vela.id, { userId: sofi.id })
   if (!r.ok) throw new Error(r.reason)

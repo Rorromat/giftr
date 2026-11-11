@@ -1,4 +1,5 @@
 import type { items } from '@/db/schema'
+import { leerPrecio, type Moneda } from '@/lib/pesos'
 
 type ItemRow = typeof items.$inferSelect
 
@@ -12,6 +13,14 @@ export type OwnerItemView = {
   fotoUrl: string | null
   precio: string | null
   rangoPrecio: string | null
+  /**
+   * El precio en número (el piso; el techo solo si es un rango) y su moneda, leídos del texto, y cuándo se cargó o cambió.
+   * Null si no tiene precio o no se pudo leer. Sale del deseo, no de quién lo reservó: no rompe la regla de arriba.
+   */
+  precioMin: number | null
+  precioMax: number | null
+  precioMoneda: Moneda | null
+  precioAt: Date | null
   categoria: string | null
   prioridad: 'mucho' | 'gustaria' | 'suelta'
   cantidad: number
@@ -74,9 +83,14 @@ export function avisoDeCupo(i: { cantidad: number; quedan: number | null }, rese
 }
 
 export function pickItemFields(i: ItemRow): OwnerItemView {
+  // Un deseo de antes de que se guardara el número, con un precio que el relleno de la migración no entendía ("45k",
+  // "15 lucas"): se lee acá, así también entra en "Hasta $X" sin esperar a que el dueño lo edite.
+  const leido = i.precioMin === null ? leerPrecio(i.precio ?? i.rangoPrecio) : null
   return {
     id: i.id, tipo: i.tipo, titulo: i.titulo, notas: i.notas, fotoUrl: i.fotoUrl,
     precio: i.precio, rangoPrecio: i.rangoPrecio, categoria: i.categoria,
+    precioMin: i.precioMin ?? leido?.min ?? null, precioMax: leido ? leido.max : i.precioMax,
+    precioMoneda: i.precioMoneda ?? leido?.moneda ?? null, precioAt: i.precioAt,
     prioridad: i.prioridad, cantidad: i.cantidad, repetible: esRepetible(i),
     estadoDueno: i.estadoDueno, linkTienda: i.linkTienda, videoUrl: i.videoUrl,
   }
