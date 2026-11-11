@@ -288,6 +288,13 @@
       "when": 1794361617493,
       "tag": "0040_amigo_invisible_por_link",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794362323334,
+      "tag": "0041_recordatorios_enviados",
+      "breakpoints": true
     }
   ]
 }

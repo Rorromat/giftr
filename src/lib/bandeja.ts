@@ -3,7 +3,7 @@ import { avisos, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import type { Aviso } from '@/lib/codazos'
-import { avisosDeDeseos, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
+import { avisosDeDeseos, emojiDeAviso, markNotificationsRead, partirTexto, textoDeAviso } from '@/lib/notifications'
 import { urlFoto } from '@/lib/users'
 import { esUuid } from '@/lib/groups'
 
@@ -62,18 +62,6 @@ export function separarEmoji(titulo: string): { emoji: string | null; texto: str
   return m ? { emoji: m[1], texto: titulo.slice(m[0].length) } : { emoji: null, texto: titulo }
 }
 
-const EMOJI_DESEO: Record<string, string> = {
-  item_editado: '✏️', compra_corregida: '💸', regalo_redividido: '💸', regalo_a_mano: '💸', item_vuelve: '↩️', compra_vuelve: '↩️', regalo_vuelve: '↩️',
-  item_baja: '📦', item_baja_comprado: '📦', regalo_baja: '📦', regalo_lo_tiene: '📦',
-}
-
-/** El cartel de un aviso sobre un deseo, partido en título y detalle donde tiene la raya. */
-function partirTexto(texto: string): { titulo: string; cuerpo: string | null } {
-  const [titulo, ...resto] = texto.split(' — ')
-  const cuerpo = resto.join(' — ')
-  return { titulo, cuerpo: cuerpo ? cuerpo[0].toUpperCase() + cuerpo.slice(1) : null }
-}
-
 async function vistosAt(db: Db, userId: string): Promise<Date | null> {
   const [u] = await db.select({ vistos: users.avisosVistosAt }).from(users).where(eq(users.id, userId))
   return u?.vistos ?? null
@@ -117,7 +105,7 @@ export async function bandeja(db: Db, viewer: Viewer & { userId: string }): Prom
       const texto = textoDeAviso(n.tipo, n.itemTitulo, n.sorpresa)
       if (!texto) return []
       return [{
-        id: n.id, emoji: EMOJI_DESEO[n.tipo] ?? '🎁', ...partirTexto(texto), href: n.href, de: null, tipo: null, createdAt: n.createdAt, nuevo: !n.leida,
+        id: n.id, emoji: emojiDeAviso(n.tipo), ...partirTexto(texto), href: n.href, de: null, tipo: null, createdAt: n.createdAt, nuevo: !n.leida,
       }]
     }),
   ]

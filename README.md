@@ -54,6 +54,7 @@ para el login.
    | `NEXT_PUBLIC_BASE_URL` | `https://TU-PROYECTO.vercel.app` (arma el link que se comparte) |
    | `MELI_CLIENT_ID` | opcional: el *App ID* de una aplicación de [developers.mercadolibre.com.ar](https://developers.mercadolibre.com.ar). Con `MELI_CLIENT_SECRET`, al pegar el link de una publicación de MercadoLibre en un deseo, el nombre, la foto y el precio salen de su API oficial (la página tiene un muro para los servidores). Sin las dos, se usa la página |
    | `MELI_CLIENT_SECRET` | opcional: la *Clave secreta* de esa aplicación |
+   | `CRON_SECRET` | una clave larga al azar (`openssl rand -base64 32`). Con ella Vercel llama una vez por día a `/api/cron/diario`, que manda los recordatorios ("¿Ya lo compraste?", "Tu reserva vence mañana", los cumples que se acercan, las cuentas pendientes). Sin ella, los recordatorios no salen |
 
 5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) compila y, si
    salió bien y es el deploy a producción, aplica las migraciones: la base queda lista sola en cada

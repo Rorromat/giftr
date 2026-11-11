@@ -1,8 +1,11 @@
-import { and, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, inArray, is, isNull, lte, or, sql } from 'drizzle-orm'
+import { PgTransaction } from 'drizzle-orm/pg-core'
+import { after } from 'next/server'
 import { items, listasDeInvitado, listFollows, lists, notifications } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { listasAjenasSql } from '@/lib/acceso'
+import { mandarPush, type Enviar } from '@/lib/codazos'
 
 const TEXTOS = {
   item_baja: (t: string) => `"${t}" fue dado de baja por su dueño — te conviene elegir otro regalo.`,
@@ -35,6 +38,21 @@ export function textoDeAviso(tipo: string, itemTitulo: string, sorpresa = false)
   return Object.hasOwn(TEXTOS, tipo) ? TEXTOS[tipo as keyof typeof TEXTOS](itemTitulo) : null
 }
 
+const EMOJI_DESEO: Record<string, string> = {
+  item_editado: '✏️', compra_corregida: '💸', regalo_redividido: '💸', regalo_a_mano: '💸', item_vuelve: '↩️', compra_vuelve: '↩️', regalo_vuelve: '↩️',
+  item_baja: '📦', item_baja_comprado: '📦', regalo_baja: '📦', regalo_lo_tiene: '📦',
+}
+
+/** El emoji de un aviso sobre un deseo, en la bandeja y en el celular. */
+export const emojiDeAviso = (tipo: string) => EMOJI_DESEO[tipo] ?? '🎁'
+
+/** El cartel de un aviso sobre un deseo, partido en título y detalle donde tiene la raya. */
+export function partirTexto(texto: string): { titulo: string; cuerpo: string | null } {
+  const [titulo, ...resto] = texto.split(' — ')
+  const cuerpo = resto.join(' — ')
+  return { titulo, cuerpo: cuerpo ? cuerpo[0].toUpperCase() + cuerpo.slice(1) : null }
+}
+
 export type TipoAviso = NonNullable<(typeof notifications.$inferInsert)['tipo']>
 type Destinatario = { userId: string | null; guestId: string | null }
 
@@ -43,8 +61,11 @@ const clave = (d: Destinatario) => (d.userId ? `u:${d.userId}` : `g:${d.guestId}
 /**
  * Avisos sobre un deseo para los que regalan: uno por persona, deseo y tipo. Si ya tiene uno igual sin leer (otra
  * edición del mismo deseo), ese sube arriba en vez de sumarle otro cartel idéntico.
+ * A los que tienen cuenta, el nuevo también les llega al celular (ver pushDeAviso): "lo dieron de baja" tres días antes
+ * del cumple no puede esperar a que abran la app. El que solo sube no vuelve a sonar (cinco ediciones seguidas del mismo
+ * deseo son un aviso), y un invitado no tiene dispositivo: le queda el cartel.
  */
-export async function dejarAviso(db: Db, itemId: string, tipo: TipoAviso, para: Destinatario[]) {
+export async function dejarAviso(db: Db, itemId: string, tipo: TipoAviso, para: Destinatario[], enviar?: Enviar) {
   const unicos = [...new Map(para.filter((d) => d.userId || d.guestId).map((d) => [clave(d), d])).values()]
   if (!unicos.length) return
   const userIds = unicos.flatMap((d) => (d.userId ? [d.userId] : []))
@@ -57,9 +78,52 @@ export async function dejarAviso(db: Db, itemId: string, tipo: TipoAviso, para: 
     .returning({ userId: notifications.userId, guestId: notifications.guestId })
   const tienen = new Set(ya.map(clave))
   const nuevos = unicos.filter((d) => !tienen.has(clave(d)))
-  if (nuevos.length) {
-    await db.insert(notifications).values(nuevos.map((d) => ({ userId: d.userId, guestId: d.userId ? null : d.guestId, tipo, itemId })))
+  if (!nuevos.length) return
+  await db.insert(notifications).values(nuevos.map((d) => ({ userId: d.userId, guestId: d.userId ? null : d.guestId, tipo, itemId })))
+  const cuentas = nuevos.flatMap((d) => (d.userId ? [d.userId] : []))
+  if (!cuentas.length) return
+  // El cartel ya quedó: el push va después de contestar, y si falla, quien llamó sigue como si nada.
+  if (despuesDeContestar((afuera) => pushDeAviso(afuera, itemId, tipo, cuentas, enviar))) return
+  // Fuera de un pedido (un script, un test) no hay después: sale ahora, salvo adentro de una transacción, donde queda
+  // solo el cartel, que es lo que no puede faltar.
+  if (!is(db, PgTransaction)) await pushDeAviso(db, itemId, tipo, cuentas, enviar).catch(() => 0)
+}
+
+/**
+ * Deja algo para cuando la respuesta ya salió (after de Next), con la base de afuera. El push de un aviso no puede ir
+ * donde se deja el aviso: archivar un deseo o cancelar un regalo lo dejan adentro de una transacción, con el deseo
+ * bloqueado, y mandarlo ahí lo tendría trabado mientras contestan los servicios de push; si además la transacción se
+ * deshace, el celular ya sonó por algo que no pasó. Después de contestar la transacción ya cerró (si se deshizo, el aviso
+ * no está y no sale nada: ver pushDeAviso), y el dueño que editó su deseo no espera al celular de nadie.
+ * Devuelve si lo pudo dejar: fuera de un pedido no hay después.
+ */
+function despuesDeContestar(tarea: (db: Db) => Promise<unknown>): boolean {
+  try {
+    after(async () => {
+      const { db } = await import('@/db')
+      await tarea(db).catch(() => 0)
+    })
+    return true
+  } catch {
+    return false
   }
+}
+
+/**
+ * El push de un aviso sobre un deseo a quienes tienen cuenta: dice lo mismo que su cartel y lleva adonde lleva él (ver
+ * avisosDeDeseos, con sus reglas: nunca sobre una lista propia, y sin el link para regalar si no lo tiene: ese va a la
+ * bandeja). No suma nada a la bandeja: el cartel ya está ahí. Solo si el aviso sigue sin leer. Devuelve a cuántos
+ * dispositivos llegó.
+ */
+export async function pushDeAviso(db: Db, itemId: string, tipo: TipoAviso, userIds: string[], enviar?: Enviar): Promise<number> {
+  const llegaron = await Promise.all(userIds.map(async (userId) => {
+    const aviso = (await avisosDeDeseos(db, { userId })).find((n) => n.itemId === itemId && n.tipo === tipo)
+    const texto = aviso && textoDeAviso(tipo, aviso.itemTitulo, aviso.sorpresa)
+    if (!aviso || !texto) return 0
+    const { titulo, cuerpo } = partirTexto(texto)
+    return mandarPush(db, userId, { title: `${emojiDeAviso(tipo)} ${titulo}`, body: cuerpo ?? '', url: aviso.href ?? '/avisos' }, enviar).catch(() => 0)
+  }))
+  return llegaron.reduce((a, b) => a + b, 0)
 }
 
 function notifDe(viewer: Viewer) {
@@ -99,6 +163,7 @@ export async function avisosDeDeseos(db: Db, viewer: Viewer, { desde }: { desde?
     .orderBy(desc(notifications.createdAt))
   return filas.map(({ itemId, token, activo, conLink, tipoLista, ...n }) => ({
     ...n,
+    itemId,
     sorpresa: tipoLista === 'sorpresa',
     // al deseo (qué cambió, el regalo para dividir); si ya no está en la lista, a la lista, para elegir otro. El regalo
     // grupal de uno que ya lo tiene se termina en Cuentas (sin pasar el link de la lista), y una parte corregida se ve ahí.

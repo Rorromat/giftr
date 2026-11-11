@@ -162,21 +162,23 @@ const enviarConWebPush: Enviar = async (s, aviso, vapid) => {
 }
 
 /**
- * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí; tipo: qué es, para "Para vos" en
- * Inicio) y le llega al celular (ver mandarPush). Devuelve a cuántos dispositivos llegó.
+ * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí; tipo: qué es, para su ícono y
+ * para "Para vos" en Inicio; null en los que van con el emoji de su título, como los recordatorios) y le llega al celular
+ * (ver mandarPush). Devuelve a cuántos dispositivos llegó.
  */
-export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null; tipo: TipoEnBandeja }, enviar: Enviar = enviarConWebPush): Promise<number> {
+export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null; tipo: TipoEnBandeja | null }, enviar: Enviar = enviarConWebPush): Promise<number> {
   const { de = null, tipo, ...push } = aviso
-  await guardarAviso(db, userId, { ...push, tipo }, de)
+  await guardarAviso(db, userId, { ...push, tipo: tipo ?? undefined }, de)
   return mandarPush(db, userId, push, enviar)
 }
 
 /**
  * Manda un aviso a todos los dispositivos del usuario, a la vez (un servicio lento no hace esperar a los demás). Borra los
  * que ya no existen (404/410) y los de antes de los controles de guardarSuscripcion que no los pasan (otro host, claves que
- * no sirven, más de 10), sin mandarles nada. Devuelve a cuántos llegó.
+ * no sirven, más de 10), sin mandarles nada. Devuelve a cuántos llegó. Solo el celular: lo que además queda en la bandeja
+ * va con avisar; esto es para lo que ya tiene su cartel en otro lado (los avisos sobre un deseo, ver dejarAviso).
  */
-async function mandarPush(db: Db, userId: string, aviso: Aviso, enviar: Enviar): Promise<number> {
+export async function mandarPush(db: Db, userId: string, aviso: Aviso, enviar: Enviar = enviarConWebPush): Promise<number> {
   const subs = (await db.select().from(pushSubs).where(eq(pushSubs.userId, userId)).orderBy(desc(pushSubs.createdAt), desc(pushSubs.id)))
     .map((s) => ({ id: s.id, suscripcion: { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } } }))
   const sirven = subs.filter((s) => esSuscripcion(s.suscripcion)).slice(0, SUSCRIPCIONES_POR_USUARIO)

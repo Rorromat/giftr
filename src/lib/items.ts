@@ -93,7 +93,7 @@ function soloIdeasSeRepiten<T extends { tipo?: 'exacto' | 'idea'; repetible?: bo
  * comprado (no solo el encargado). Lo comprado para un evento anterior ya se regaló: no le importa lo que cambie ahora, como
  * en restoreItem y desmarcarComprado (ver desdeElUltimoEvento). Lo comprado se anota en la reserva, también la de un regalo.
  */
-async function genteDelDeseo(db: Db, itemId: string, listId: string) {
+export async function genteDelDeseo(db: Db, itemId: string, listId: string) {
   const desde = await desdeElUltimoEvento(db, listId)
   const reservas = await db.select({ userId: claims.claimerUserId, guestId: claims.claimerGuestId }).from(claims)
     .where(and(eq(claims.itemId, itemId), ocupaSql(desde)))

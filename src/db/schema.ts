@@ -398,6 +398,16 @@ export const avisos = pgTable('avisos', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('avisos_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
+// Los recordatorios programados que ya salieron (ver recordatorios.ts): uno por persona, tipo y motivo. clave es el
+// motivo (la reserva y la fecha del evento, el cumple de ese año…): si el cron del día corre dos veces, o al otro día el
+// motivo sigue siendo el mismo, no se repite.
+export const recordatoriosEnviados = pgTable('recordatorios_enviados', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tipo: text('tipo').notNull(),
+  clave: text('clave').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.tipo, t.clave] })])
+
 // Amigo invisible: alguien arma el juego (con un nombre, una temática, presupuesto y la fecha en que se dan los regalos;
 // puede ser de una fecha especial, ver fechas-especiales.ts), invita amigos suyos y, cuando están, lo sortea. Cada uno ve
 // solo a quién le regala (ver amigo-invisible.ts).
