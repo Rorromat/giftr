@@ -247,8 +247,8 @@ export default async function ListaAjena({
           primeros deseos (y "Reservar") sin scrollear; su perfil y sus gustos quedan a un toque, en un chip. */}
       <Tapa color={color}>
         <header className="grid min-h-11 grid-cols-[44px_1fr_44px] items-center">
-          {/* con tu cuenta, abajo está la barra; volver lleva a tu gente */}
-          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio />}</div>
+          {/* con tu cuenta, abajo está la barra; volver lleva a donde estabas (Inicio, Todo el año…) y, si no se sabe, a tu gente */}
+          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio origen={{ pantalla: `/l/${token}` }} />}</div>
           <LogoSticker sobreTapa className="justify-self-center" />
         </header>
         <div className="mt-1 flex items-center gap-3">

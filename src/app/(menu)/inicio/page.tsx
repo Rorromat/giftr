@@ -6,79 +6,78 @@ import { db } from '@/db'
 import { necesitaBienvenida } from '@/lib/bienvenida'
 import { hoyLocal, miCumple, misEventos } from '@/lib/events'
 import { misCuentas } from '@/lib/regalos'
-import { Banners } from '@/components/Banners'
 import { CargaTuCumple, Proximos } from '@/components/Eventos'
 import { CuentasPendientes } from '@/components/ResumenCuentas'
 import { yo } from '@/lib/perfil'
 import { amigosEnComun, misAmigos, sugerenciasDeAmigos } from '@/lib/amigos'
 import { NO_SUGERIR_COOKIE, noSugerir } from '@/lib/no-sugerir'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
-import { avisosSinLeer, paraVos } from '@/lib/bandeja'
-import { ContenidoAviso } from '@/components/FilaAviso'
-import { AvisoDeslizable } from '@/components/AvisoDeslizable'
-import { BotonEnviar } from '@/components/BotonEnviar'
-import { limpiarParaVosAction } from '@/app/actions'
+import { avisosSinLeer } from '@/lib/bandeja'
+import { juegoParaProponer, pendientesDe } from '@/lib/para-vos'
+import { ArmarJuegoDeFecha, ParaVosEnInicio } from '@/components/ParaVos'
+import { invitadoParaPreguntar } from '@/lib/viewer'
+import { conVolver } from '@/lib/volver'
 import { porComprar } from '@/lib/mis-regalos'
 import { FilaRegalo } from '@/components/FilaRegalo'
 import { hace, novedadesDeAmigos, PRIMEROS } from '@/lib/novedades'
 import { CarruselNovedades } from '@/components/Novedades'
-import { InvitacionesRegalo } from '@/components/Dividir'
-import { invitacionesPendientes } from '@/lib/invitaciones'
-import { misAmigosInvisibles } from '@/lib/amigo-invisible'
 import { especialesQueVienen } from '@/lib/fechas-especiales'
-import { JuegosEnInicio } from '@/components/AmigoInvisible'
 import { AppHeader, Icon, Seccion, SectionHeader } from '@/components/ui'
 import { Destacada } from '@/components/Estante'
 import { getListForViewer } from '@/lib/lists'
 import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
 
 // Inicio: lo que viene. Arriba, lo próximo en grande: la tapa de esa persona (su color) y un estante con sus deseos. Después
-// lo que te espera (los carteles, las propuestas, y "Para vos": lo último de la campanita que
-// te pide algo), los próximos cumples y fechas de tu gente (con lo que ya hiciste para cada uno, y las fechas especiales con
-// tus amigos invisibles), lo nuevo de tus amigos, lo que tenés por comprar, las cuentas pendientes y alguien que quizás
-// conocés. Tu lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
+// "Para vos": lo que espera que hagas algo, en un solo bloque y por urgencia (ver lib/para-vos.ts; lo que solo informa
+// está en la campanita), los próximos cumples y fechas de tu gente (con lo que ya hiciste para cada uno, y las fechas
+// especiales con tus amigos invisibles), lo nuevo de tus amigos, lo que tenés por comprar, las cuentas pendientes y alguien
+// que quizás conocés. Tu lista está en Vos: en ella, por la regla de la sorpresa, nunca pasa nada que puedas ver.
 
-/** Cuántos días después de su fecha sigue un amigo invisible en Inicio (para "¿Quién te regaló?"). */
-const JUEGOS_PASADOS = 15
+/** Esta pantalla, para el "Volver" de lo que se abre desde acá (ver lib/volver.ts). */
+const ACA = '/inicio'
 /** Cuántos regalos por comprar van en Inicio como mucho (los demás, en Regalos). */
 const POR_COMPRAR = 3
-export default async function Inicio({ searchParams }: { searchParams: Promise<{ invitacion?: string }> }) {
+export default async function Inicio() {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const hoy = hoyLocal()
   const sacada = noSugerir((await cookies()).get(NO_SUGERIR_COOKIE)?.value, session.userId)
   const [
-    bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, invitaciones, juegos, { invitacion }, avisos, sugerencias,
-    importantes, pendientes,
+    bienvenida, eventos, cumple, cuentas, { nombre, foto }, { novedades }, amigos, avisos, sugerencias,
+    { pendientes: paraVos, total: cuantosParaVos, juegos }, pendientes,
   ] = await Promise.all([
     necesitaBienvenida(db, session.userId), misEventos(db, session.userId, hoy), miCumple(db, session.userId), misCuentas(db, session.userId),
     yo(db, session.userId), novedadesDeAmigos(db, session.userId, { limite: PRIMEROS }), misAmigos(db, session.userId),
-    invitacionesPendientes(db, session.userId), misAmigosInvisibles(db, session.userId, hoy, JUEGOS_PASADOS), searchParams,
     avisosSinLeer(db, { userId: session.userId }),
     // la primera, y si hay otra (para "Ver más")
     sugerenciasDeAmigos(db, session.userId, 2, sacada),
-    paraVos(db, session.userId), porComprar(db, session.userId),
+    invitadoParaPreguntar(session.userId).then((invitado) => pendientesDe(db, session.userId!, hoy, invitado)), porComprar(db, session.userId),
   ])
   // La primera vez que entra: la bienvenida (una pantalla, su cumple), y de ahí a su primer deseo.
   if (bienvenida) redirect('/bienvenida')
   const especiales = especialesQueVienen(hoy, juegos)
+  // falta poco para Navidad (o el Día del Amigo) y no está en ningún amigo invisible de esa fecha: que lo arme
+  const paraArmar = juegoParaProponer(hoy, juegos)
+  // las listas que se abren desde acá vuelven acá, no a Tu gente
+  const conVuelta = eventos.map((e) => (e.href.startsWith('/l/') ? { ...e, href: conVolver(e.href, ACA) } : e))
   // lo próximo de tu gente (no lo tuyo): su lista, para la tarjeta grande con su tapa (la de su lista: el verde si es de
   // una persona, uva si es en común), lo que más quiere y cuántos deseos tiene. Abajo, en "Más adelante", va todo lo demás
   // (sin repetirlo)
   const destacado = eventos.find((e) => !e.propio && e.href.startsWith('/l/'))
   const token = destacado?.href.slice('/l/'.length)
+  const destacadoConVuelta = destacado && conVuelta[eventos.indexOf(destacado)]
   const suLista = token ? await getListForViewer(db, token, { userId: session.userId }) : null
   const suColor = suLista ? (suLista.role !== 'owner' && suLista.grupoNombre ? TAPA_EN_COMUN : TAPA_PERSONA) : null
   // la tarjeta va si su lista se pudo abrir; si no, ese evento queda abajo con los demás
   const enGrande = destacado && suColor && suLista && suLista.role !== 'owner'
-    ? { e: destacado, color: suColor, deseos: suLista.items.filter((i) => !('disponible' in i) || i.disponible).length }
+    ? { e: destacadoConVuelta!, color: suColor, deseos: suLista.items.filter((i) => !('disponible' in i) || i.disponible).length }
     : null
   // lo que vence antes primero (los grupales no vencen); si no, lo último que reservaste
   const aComprar = [...pendientes].sort((a, b) => (a.venceEnDias ?? Infinity) - (b.venceEnDias ?? Infinity)).slice(0, POR_COMPRAR)
 
   return (
     <Seccion className="flex flex-col gap-5 pb-48 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos}
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} desde={ACA}
                  accion={<Link href="/eventos" aria-label="Todo el año" className="gr-icon-btn"><Icon name="calendar" size={19} /></Link>} />
       <div className="flex flex-col gap-1">
         <h1 className="gr-title">Lo que viene</h1>
@@ -87,43 +86,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
       {enGrande && <Destacada e={enGrande.e} color={enGrande.color} hoy={hoy} deseos={enGrande.deseos} />}
 
-      <Banners />
-      {/* te proponen dividir un regalo: te sumás o no */}
-      <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} />
-      {/* te invitaron a un amigo invisible (juego o no), o ya pasó y podés pedir saber quién te regaló */}
-      <JuegosEnInicio invitaciones={juegos.filter((j) => j.miEstado === 'invitado' && j.dias >= 0)}
-                      pasados={juegos.filter((j) => j.dias < 0 && j.miEstado === 'juega' && j.sorteado && !j.revelado)} />
-
-      {/* lo último de la campanita que te pide algo: te toca pagar, te pagaron, el amigo invisible (ver PARA_VOS). Cada uno
-          con su ícono moviéndose; se desliza para verlo o archivarlo, y abajo, limpiarlos todos de acá o ir a la campanita */}
-      {importantes.entradas.length > 0 && (
-        <section aria-labelledby="para-vos" className="flex flex-col gap-3">
-          <SectionHeader id="para-vos" title={<>Para vos<span className="text-gr-muted"> · {importantes.total}</span></>} />
-          <div className="gr-card">
-            <ul className="divide-y divide-gr-line">
-              {importantes.entradas.map((e, i) => (
-                <AvisoDeslizable key={e.id} id={e.id} titulo={e.titulo}><ContenidoAviso e={e} animar i={i} /></AvisoDeslizable>
-              ))}
-            </ul>
-            <div className="flex divide-x divide-gr-line border-t border-gr-line text-sm font-semibold">
-              <form action={limpiarParaVosAction} className="flex flex-1">
-                <input type="hidden" name="hasta" value={importantes.hasta.toISOString()} />
-                <BotonEnviar pendiente="Limpiando…" className="flex min-h-12 flex-1 items-center justify-center gap-2">
-                  <Icon name="check" size={17} strokeWidth={2.6} className="flex-none" /> Limpiar
-                </BotonEnviar>
-              </form>
-              <Link href="/avisos" className="flex min-h-12 flex-1 items-center justify-center gap-2">
-                <Icon name="bell" size={17} className="flex-none" /> Ver todos
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      <ParaVosEnInicio pendientes={paraVos} total={cuantosParaVos} />
+      {paraArmar && <ArmarJuegoDeFecha fecha={paraArmar} />}
 
       {(eventos.length > 0 || especiales.length > 0) && (
         <>
           <SectionHeader title={enGrande ? 'Más adelante' : 'Próximos'} href="/eventos" linkLabel="Todo el año" />
-          <Proximos eventos={enGrande ? eventos.filter((e) => e !== enGrande.e) : eventos} hoy={hoy} especiales={especiales} />
+          <Proximos eventos={enGrande ? conVuelta.filter((e) => e !== enGrande.e) : conVuelta} hoy={hoy} especiales={especiales} />
         </>
       )}
       {eventos.length === 0 && (

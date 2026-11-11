@@ -85,14 +85,14 @@ export async function invitarARegalo(db: Db, giftId: string, deUserId: string, p
       tipo: 'propuesta_regalo',
       title: `🤫 ${quien} te propone una sorpresa`,
       body: `"${r.titulo}" para ${r.para}: no está en su lista y no se entera. ${comprado ? 'Ya la compró: en' : 'En'} partes iguales, ¿te sumás?`,
-      url: '/inicio#invitaciones',
+      url: '/avisos#invitaciones',
     }
     : {
       de: deUserId,
       tipo: 'propuesta_regalo',
-      title: `🎁 ${quien} te propone dividir un regalo`,
+      title: `🎁 ${quien} te propone un regalo grupal`,
       body: `"${r.titulo}" para ${r.para}, en partes iguales.${comprado ? ' Ya lo compró.' : ''} ¿Te sumás?`,
-      url: '/inicio#invitaciones',
+      url: '/avisos#invitaciones',
     }, enviar).catch(() => 0)))
   return insertados.length
 }

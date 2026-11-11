@@ -21,11 +21,11 @@ const desdeHace = (dias: number) => new Date(Date.now() - dias * 86_400_000)
 export type TipoEnBandeja = NonNullable<(typeof avisos.$inferInsert)['tipo']>
 
 /**
- * Lo que va en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás, contestarle
- * a tu amigo invisible, sumarte a la lista en común a la que te sumaron) o que estabas esperando (te pagaron, te
- * contestaron). Los codazos, las solicitudes de amistad, las propuestas para dividir y las invitaciones al amigo invisible
- * no: mientras esperan que contestes ya tienen su cartel en Inicio, con sus botones. Que aceptaron tu solicitud o se
- * sumaron a tu regalo, tampoco: no te piden nada.
+ * Los avisos que van en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás,
+ * contestarle a tu amigo invisible, sumarte a la lista en común a la que te sumaron) o que estabas esperando (te pagaron,
+ * te contestaron). Los codazos, las solicitudes de amistad, las propuestas de regalo grupal y las invitaciones al amigo
+ * invisible no: mientras esperan que contestes ya están en "Para vos" por sí mismos, no como aviso (ver lib/para-vos.ts).
+ * Que aceptaron tu solicitud o se sumaron a tu regalo, tampoco: no te piden nada.
  */
 export const PARA_VOS: TipoEnBandeja[] = [
   'regalo_comprado', 'pago', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun',
@@ -121,9 +121,10 @@ function deParaVos(userId: string, vistos: Date | null) {
 }
 
 /**
- * "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más nuevo primero;
- * cuántos son (se muestran los primeros) y cuándo se armó (lo que se limpia con "Limpiar", ver limpiarParaVos). Como el
- * número de la campanita: al abrirla dejan de ser nuevos y se van de Inicio (siguen en la bandeja).
+ * Los avisos de "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más
+ * nuevo primero; cuántos son (vienen los primeros) y cuándo se armó. Como el número de la campanita: al abrirla dejan de
+ * ser nuevos y se van de Inicio (siguen en la bandeja). Van mezclados, por urgencia, con lo demás que te espera (ver
+ * lib/para-vos.ts).
  */
 export async function paraVos(db: Db, userId: string): Promise<{ entradas: EntradaBandeja[]; total: number; hasta: Date }> {
   const hasta = new Date()
@@ -148,8 +149,7 @@ export async function limpiarParaVos(db: Db, userId: string, hasta: Date) {
 }
 
 /**
- * Uno de "Para vos" que abrió (tocándolo, o "Ver" al deslizarlo) o que deslizó para archivarlo: se va de ahí y ya no es
- * nuevo en la campanita. Devuelve adónde lleva; null si no es suyo.
+ * Uno de "Para vos" que abrió (tocándolo) o que sacó con "Listo": se va de ahí y ya no es nuevo en la campanita. Devuelve adónde lleva; null si no es suyo.
  */
 export async function marcarAvisoVisto(db: Db, userId: string, id: string): Promise<string | null> {
   if (!esUuid(id)) return null

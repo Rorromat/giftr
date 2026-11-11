@@ -2,51 +2,51 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/db'
-import { bandeja, type EntradaBandeja } from '@/lib/bandeja'
-import { solicitudesRecibidas } from '@/lib/amigos'
-import { invitacionesPendientes } from '@/lib/invitaciones'
-import { misAmigosInvisibles } from '@/lib/amigo-invisible'
+import { bandeja, type EntradaBandeja, type TipoEnBandeja } from '@/lib/bandeja'
+import { pendientesDe, type Pendiente } from '@/lib/para-vos'
 import { tieneAvisos } from '@/lib/codazos'
 import { hoyLocal } from '@/lib/events'
-import { SolicitudRecibida } from '@/components/Amigos'
-import { InvitacionesRegalo } from '@/components/Dividir'
-import { JuegosEnInicio } from '@/components/AmigoInvisible'
+import { invitadoParaPreguntar } from '@/lib/viewer'
 import { MarcarBandejaVista } from '@/components/MarcarBandejaVista'
 import { FilaAviso } from '@/components/FilaAviso'
+import { ParaVosEntero } from '@/components/ParaVos'
 import { Icon, PageHeader, Seccion } from '@/components/ui'
 
 /**
- * Avisos (la campanita): arriba lo que espera que contestes (solicitudes de amistad, propuestas de dividir, invitaciones al
- * amigo invisible) y abajo todo lo que te llegó en los últimos 60 días, lo nuevo primero. Al abrirla, deja de ser nuevo.
+ * Avisos (la campanita): arriba todo lo que espera que hagas algo, entero y por urgencia (ver ParaVosEntero: en Inicio van
+ * solo los primeros) y abajo todo lo que te llegó en los últimos 60 días, lo nuevo primero. Al abrirla, deja de ser nuevo.
+ * Se llega desde la campanita de las cuatro secciones: "Volver" lleva a la que estaba (?volver=, ver lib/volver.ts).
  */
-export default async function Avisos({ searchParams }: { searchParams: Promise<{ invitacion?: string }> }) {
+/**
+ * Lo que llegó como aviso y además espera arriba, entero y con sus botones: la solicitud de Sofi estaba dos veces en la
+ * misma pantalla, una para contestarla y otra como aviso. Mientras espera arriba, el aviso no se repite abajo.
+ */
+const YA_ARRIBA: Partial<Record<Pendiente['tipo'], TipoEnBandeja>> = {
+  solicitudes: 'amistad_pedida', propuesta: 'propuesta_regalo', juego: 'invisible_invitacion', codazos: 'codazo',
+}
+
+export default async function Avisos({ searchParams }: { searchParams: Promise<{ invitacion?: string; volver?: string | string[] }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')
   const yo = session.userId
-  const [{ entradas, hasta }, solicitudes, invitaciones, juegos, conPush, { invitacion }] = await Promise.all([
-    bandeja(db, { userId: yo }), solicitudesRecibidas(db, yo), invitacionesPendientes(db, yo),
-    misAmigosInvisibles(db, yo, hoyLocal(), 0), tieneAvisos(db, yo), searchParams,
+  const [{ entradas: todas, hasta }, { pendientes }, conPush, { invitacion, volver }] = await Promise.all([
+    bandeja(db, { userId: yo }), invitadoParaPreguntar(yo).then((invitado) => pendientesDe(db, yo, hoyLocal(), invitado)),
+    tieneAvisos(db, yo), searchParams,
   ])
-  const juegosInvitado = juegos.filter((j) => j.miEstado === 'invitado' && j.dias >= 0)
+  // los avisos de la campanita que piden algo ya están abajo, entre los nuevos
+  const esperan = pendientes.filter((p) => p.tipo !== 'aviso')
+  const arriba = new Set(esperan.flatMap((p) => YA_ARRIBA[p.tipo] ?? []))
+  const entradas = todas.filter((e) => !(e.tipo && arriba.has(e.tipo)))
   const nuevos = entradas.filter((e) => e.nuevo)
   const antes = entradas.filter((e) => !e.nuevo)
-  const nada = !entradas.length && !solicitudes.length && !invitaciones.length && !juegosInvitado.length
+  const nada = !entradas.length && !esperan.length
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <PageHeader title="Avisos" back="/inicio" backLabel="Volver a Inicio" />
+      <PageHeader title="Avisos" back="/inicio" backLabel="Volver a Inicio" origen={{ pantalla: '/avisos', volver }} />
       <MarcarBandejaVista hasta={hasta.toISOString()} />
 
-      {solicitudes.length > 0 && (
-        <section id="solicitudes" aria-labelledby="solicitudes-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
-          <h2 id="solicitudes-titulo" className="gr-label">Solicitudes de amistad</h2>
-          <ul className="flex flex-col gap-2.5">
-            {solicitudes.map((s) => <SolicitudRecibida key={s.id} id={s.id} de={s.de} volver="avisos" />)}
-          </ul>
-        </section>
-      )}
-      <InvitacionesRegalo invitaciones={invitaciones} noSePudo={invitacion === 'no_se_pudo'} volver="avisos" />
-      <JuegosEnInicio invitaciones={juegosInvitado} pasados={[]} />
+      <ParaVosEntero pendientes={esperan} noSePudo={invitacion === 'no_se_pudo'} />
 
       {nuevos.length > 0 && <ListaDeAvisos titulo="Nuevos" entradas={nuevos} animar />}
       {antes.length > 0 && <ListaDeAvisos titulo={nuevos.length ? 'Antes' : 'Lo último'} entradas={antes} />}
@@ -54,7 +54,7 @@ export default async function Avisos({ searchParams }: { searchParams: Promise<{
       {nada && (
         <div className="gr-empty flex flex-col items-center gap-2 py-8 text-center">
           <span className="mb-1 flex size-14 items-center justify-center rounded-full bg-gr-surface shadow-card"><Icon name="bell" size={26} /></span>
-          <p>Todavía no te llegó nada. Acá vas a ver los codazos, las solicitudes de amistad, las propuestas para dividir un regalo, las cuentas de los regalos grupales y los cambios en lo que regalás.</p>
+          <p>Todavía no te llegó nada. Acá vas a ver los codazos, las solicitudes de amistad, las propuestas de regalo grupal, las cuentas de los regalos grupales y los cambios en lo que regalás.</p>
         </div>
       )}
 

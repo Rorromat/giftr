@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { VolverAOrigen } from '@/components/Volver'
+import { conVolver } from '@/lib/volver'
 import { PARTES_MONO, type TonosMono } from '@/lib/mono'
 import { ONDAS } from '@/lib/ondas'
 
@@ -142,11 +144,18 @@ export function QuizasLink({ href, className, children }: { href: string | null;
   return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
 }
 
-export function BackLink({ href, label, vidrio = false }: {
+/**
+ * "Volver". origen: en las pantallas a las que se llega desde varios lados (Avisos, Perfil, la lista de alguien), lleva a
+ * donde la persona estaba y `href` queda de respaldo (ver VolverAOrigen). pantalla: su ruta; volver: el ?volver= que le
+ * llegó, si la pantalla lo leyó (si no, lo lee el navegador).
+ */
+export function BackLink({ href, label, vidrio = false, origen }: {
   href: string; label: string
   /** de vidrio: ahumado sobre una tapa o un color; oscuro, más cerrado, sobre una foto (se ve sobre cualquiera) */
   vidrio?: boolean | 'oscuro'
+  origen?: { pantalla: string; volver?: unknown }
 }) {
+  if (origen) return <VolverAOrigen respaldo={href} pantalla={origen.pantalla} volver={origen.volver} vidrio={vidrio} />
   return (
     <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio === 'oscuro' ? ' gr-vidrio-oscuro' : vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="back" size={20} strokeWidth={2.4} />
@@ -218,10 +227,13 @@ export function LogoSticker({ sobreTapa = false, className = '' }: { sobreTapa?:
   )
 }
 
-/** La campanita de Avisos, con cuántos nuevos hay. vidrio: sobre una tapa (y el número en blanco, que el verde no se vería). */
-export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: boolean }) {
+/**
+ * La campanita de Avisos, con cuántos nuevos hay. vidrio: sobre una tapa (y el número en blanco, que el verde no se vería).
+ * desde: la sección que la muestra, para que el "Volver" de Avisos traiga de vuelta ahí (ver lib/volver.ts).
+ */
+export function Campana({ nuevos, vidrio = false, desde }: { nuevos: number; vidrio?: boolean; desde?: string }) {
   return (
-    <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
+    <Link href={desde ? conVolver('/avisos', desde) : '/avisos'} aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
           className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="bell" size={19} />
       {nuevos > 0 && (
@@ -237,17 +249,19 @@ export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: b
  * Barra de arriba de las secciones del menú: el logo a la izquierda y a la derecha lo que sume la pantalla (accion), la
  * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto. Sobre una tapa
  * (sobreTapa), el logo va en blanco y la campanita, de vidrio.
+ * desde: la sección que la muestra ("/gente"). La campanita y la foto están en las cuatro, y Avisos y Perfil volvían
+ * siempre a la misma: con esto vuelven a donde la persona estaba.
  */
-export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false }: {
-  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean
+export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false, desde }: {
+  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean; desde?: string
 }) {
   return (
     <header className="flex min-h-14 items-center justify-between gap-3">
       <LogoSticker sobreTapa={sobreTapa} />
       <div className="flex items-center gap-2">
         {accion}
-        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
-        <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
+        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} desde={desde} />}
+        <Link href={desde ? conVolver('/perfil', desde) : '/perfil'} prefetch aria-label="Tu perfil" className="rounded-full">
           <AvatarSticker nombre={nombre} foto={foto} size={40} pronto className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
         </Link>
       </div>
@@ -296,17 +310,19 @@ export function Arte({ src, titulo, apagado = false, pronto = false, className =
 /**
  * Barra de las pantallas de adentro: volver, el título al medio y una acción opcional. El título es el h1 de la
  * pantalla, salvo que la pantalla tenga el suyo más abajo (titulo="p").
+ * origen: para las pantallas a las que se llega desde varias secciones (Avisos, Perfil): ver BackLink.
  */
-export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: Titulo = 'h1' }: {
+export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: Titulo = 'h1', origen }: {
   title: string
   back?: string
   backLabel?: string
   action?: React.ReactNode
   titulo?: 'h1' | 'p'
+  origen?: { pantalla: string; volver?: unknown }
 }) {
   return (
     <header className="grid min-h-14 grid-cols-[48px_1fr_48px] items-center gap-2">
-      <div>{back && <BackLink href={back} label={backLabel} />}</div>
+      <div>{back && <BackLink href={back} label={backLabel} origen={origen} />}</div>
       <Titulo className="truncate text-center text-[17px] font-bold tracking-[-0.02em]">{title}</Titulo>
       <div className="justify-self-end">{action}</div>
     </header>
@@ -385,8 +401,6 @@ const ICONS = {
   cup: <><path d="M4.5 9h12v4.5a6 6 0 0 1-12 0z" /><path d="M16.5 10h1.3a2.5 2.5 0 0 1 0 5h-1.6" /><path d="M8.5 2.8c-.8 1 .8 2 0 3.2M12.5 2.8c-.8 1 .8 2 0 3.2" /></>,
   ban: <><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></>,
   note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" /><path d="M8 9h8M8 12.5h5" /></>,
-  // archivar un aviso: la caja de archivo
-  archivar: <><rect x="3" y="4" width="18" height="5" rx="1.5" /><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9" /><path d="M10 13h4" /></>,
   // eliminar
   basura: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12.4a2 2 0 0 0 2 1.6h6a2 2 0 0 0 2-1.6L18 7" /><path d="M9 7V4.5h6V7" /></>,
   // un secreto (el amigo invisible): un antifaz

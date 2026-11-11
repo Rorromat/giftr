@@ -75,7 +75,7 @@ export default async function MiLista({ searchParams }: { searchParams: Promise<
       {/* Vos: tu lista con la tapa de las personas (la misma que ven tus amigos) y, tocando tu foto, tu perfil */}
       <ListaHero
         color={TAPA_PERSONA}
-        arriba={<AppHeader nombre={nombre} foto={foto} avisos={avisos} sobreTapa />}
+        arriba={<AppHeader nombre={nombre} foto={foto} avisos={avisos} sobreTapa desde="/mi-lista" />}
         etiqueta={nombre.split(' ')[0]}
         titulo="Mi lista"
         cantidad={activos.length}

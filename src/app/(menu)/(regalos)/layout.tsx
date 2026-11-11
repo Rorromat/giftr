@@ -15,7 +15,8 @@ export default async function RegalosLayout({ children }: { children: React.Reac
   const [{ nombre, foto }, avisos] = await Promise.all([yo(db, session.userId), avisosSinLeer(db, { userId: session.userId })])
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
+      {/* desde: el layout no sabe en cuál de las dos pestañas está; Avisos y Perfil vuelven a la primera */}
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} desde="/regalos" />
       <PestanasRegalos />
       {children}
     </Seccion>

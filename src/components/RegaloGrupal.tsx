@@ -39,9 +39,9 @@ function EntrarParaSumarte({ token, itemId, texto }: Ctx & { texto: string }) {
   )
 }
 
-/** "Armar regalo grupal" (o convertir la reserva propia en uno). */
+/** "Armar regalo grupal". convertir: con la reserva propia, que pasa a ser uno (la acción se llama igual; lo dice abajo). */
 export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }: Ctx & { logueado: boolean; convertir?: boolean }) {
-  const texto = convertir ? 'Hacerlo regalo grupal' : 'Armar regalo grupal'
+  const texto = 'Armar regalo grupal'
   return (
     <div className="flex flex-col gap-1.5">
       {logueado ? (
@@ -52,7 +52,9 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
           </BotonEnviar>
         </form>
       ) : <EntrarParaSumarte token={token} itemId={itemId} texto={texto} />}
-      <p className="text-xs leading-snug text-gr-muted">Lo comprás vos, los demás se suman y te pagan su parte. Queda todo anotado en Cuentas.</p>
+      <p className="text-xs leading-snug text-gr-muted">
+        {convertir && 'Tu reserva pasa a ser un regalo grupal. '}Lo comprás vos, los demás se suman y te pagan su parte. Queda todo anotado en Cuentas.
+      </p>
     </div>
   )
 }
@@ -179,7 +181,7 @@ export function RegaloGrupal({
   logueado: boolean
   /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
   ocupado?: string | null
-  /** Para el que lo organiza: a quiénes les propuso dividirlo y qué contestaron, abierto o comprado (ver InvitadosDelRegalo). */
+  /** Para el que lo organiza: a quiénes les propuso el regalo grupal y qué contestaron, abierto o comprado (ver InvitadosDelRegalo). */
   invitar?: React.ReactNode
   /** Para el que lo organiza, mientras está abierto: a los que se lo propuso y no contestaron (si se suman después, se redivide). */
   sinContestar?: string[]
