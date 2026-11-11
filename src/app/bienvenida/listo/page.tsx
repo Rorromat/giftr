@@ -12,7 +12,10 @@ import { AvatarSticker, Icon, Insignia, type IconName, LogoSticker } from '@/com
 
 type Fila = { paso: PasoGustos; icono: IconName; titulo: string; valor: string | null }
 
-/** "¡Todo listo!": el final de la bienvenida, con todo lo que cargó y lo que le falta (con link a ese paso). */
+/**
+ * "¡Todo listo!": todo lo que contó de sus gustos y lo que le falta (con link a ese paso). Ya no es un paso de la
+ * bienvenida: se llega al terminar de contar los gustos desde la tarjeta de Mi lista (ver gustosPorContar).
+ */
 export default async function Listo({ searchParams }: { searchParams: Promise<{ desde?: string }> }) {
   const session = await auth()
   if (!session?.userId) redirect('/')

@@ -11,7 +11,7 @@ import { GRUPOS_REGLAS, LARGO_REGLA_PROPIA, REGLAS, leerRegla, reglaDe, type LoQ
 /** El dibujo de una regla en su recuadro ('propia', o null: sin regla). */
 export function IconoRegla({ id, size = 56, className = '' }: { id: string | null; size?: number; className?: string }) {
   return (
-    <span aria-hidden className={`flex flex-none items-center justify-center rounded-[16px] bg-gr-soft ${className}`} style={{ width: size, height: size }}>
+    <span aria-hidden className={`flex flex-none items-center justify-center rounded-gr-md bg-gr-soft ${className}`} style={{ width: size, height: size }}>
       <IlustracionRegla id={id ?? 'sin'} size={size * 0.86} />
     </span>
   )
@@ -172,11 +172,11 @@ export function LoQueTeTocaA({ toca, nombre, className = '' }: { toca: LoQueTeTo
       : toca.tipo === 'palabra' ? ['Tu palabra: tu regalo la tiene que contar', `«${toca.palabra}»`]
         : ['Tu década: algo de esa época', toca.decada]
   return (
-    <p className={`flex items-center gap-3 rounded-[18px] bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
+    <p className={`flex items-center gap-3 rounded-gr-md bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
       {toca.tipo === 'color'
         ? <span aria-hidden className="size-11 flex-none rounded-full border-2 border-gr-line" style={{ background: toca.hex }} />
         : toca.tipo === 'inicial'
-          ? <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-[12px] bg-gr-acento text-[24px] font-black text-gr-on-acento">{toca.letra}</span>
+          ? <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-gr-sm bg-gr-acento text-[24px] font-black text-gr-on-acento">{toca.letra}</span>
           : <IconoRegla id={toca.tipo === 'palabra' ? 'palabra' : 'epoca'} size={44} />}
       <span className="flex min-w-0 flex-col">
         <span className="text-[12px] leading-snug font-semibold text-gr-muted">{titulo}</span>
@@ -189,7 +189,7 @@ export function LoQueTeTocaA({ toca, nombre, className = '' }: { toca: LoQueTeTo
 /** En "Robo de regalos": en qué turno abrís (o robás), de cuántos. */
 export function TuTurno({ turno, de, className = '' }: { turno: number; de: number; className?: string }) {
   return (
-    <p className={`flex items-center gap-3 rounded-[18px] bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
+    <p className={`flex items-center gap-3 rounded-gr-md bg-gr-surface px-3.5 py-3 text-left text-gr-ink ${className}`}>
       <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-acento text-[20px] font-black text-gr-on-acento">{turno}</span>
       <span className="flex min-w-0 flex-col">
         <span className="text-[12px] leading-snug font-semibold text-gr-muted">Robo de regalos: tu turno para abrir o robar</span>

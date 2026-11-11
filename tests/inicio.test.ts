@@ -10,7 +10,8 @@ import { createItem } from '@/lib/items'
 import { reserveItem } from '@/lib/claims'
 import { guardarCumple } from '@/lib/events'
 import { comprarRegalo, iniciarRegaloGrupal, sumarseARegalo } from '@/lib/regalos'
-import { guardarAviso, paraVos, type EntradaBandeja } from '@/lib/bandeja'
+import { guardarAviso, paraVos } from '@/lib/bandeja'
+import type { Pendiente } from '@/lib/para-vos'
 import type { MiRegalo } from '@/lib/mis-regalos'
 
 // Inicio es lo primero al entrar: con la base en PGlite y la sesión, las cookies y las redirecciones de Next simuladas.
@@ -37,19 +38,18 @@ vi.mock('next/navigation', () => ({
 import Inicio from '@/app/(menu)/inicio/page'
 import Gente from '@/app/(menu)/gente/page'
 import Home from '@/app/page'
-import { abrirAvisoAction, archivarAvisoAction, limpiarParaVosAction, noSugerirAction } from '@/app/actions'
+import { abrirAvisoAction, archivarAvisoAction, noSugerirAction } from '@/app/actions'
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { SectionHeader } from '@/components/ui'
 import { Portada } from '@/components/Portada'
 import { Proximos } from '@/components/Eventos'
-import { ContenidoAviso } from '@/components/FilaAviso'
-import { AvisoDeslizable } from '@/components/AvisoDeslizable'
+import { ParaVosEnInicio } from '@/components/ParaVos'
 import { FilaRegalo } from '@/components/FilaRegalo'
 import { CuentasPendientes } from '@/components/ResumenCuentas'
 
 type Props = {
-  id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode; e?: EntradaBandeja; r?: MiRegalo
-  cuentas?: { debes: number }; animar?: boolean; action?: unknown; name?: string; value?: string; titulo?: string
+  id?: string; p?: { nombre: string }; enComun?: string; href?: string; children?: ReactNode; r?: MiRegalo
+  cuentas?: { debes: number }; pendientes?: Pendiente[]; total?: number
 }
 
 /** Los elementos de la pantalla, en orden, sin renderizar (las partes async, como los carteles, no se renderizan acá). */
@@ -74,12 +74,12 @@ async function redirige(p: Promise<unknown>): Promise<string | null> {
 test('al entrar con sesión va a Inicio; la primera vez, a la bienvenida; sin sesión, a la portada', async () => {
   h.db = await createTestDb()
   const { owner } = await seedOwnerAndGiver(h.db)
-  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBe('/')
+  expect(await redirige(Inicio())).toBe('/')
   h.session = { userId: owner.id }
   expect(await redirige(Home({ searchParams: Promise.resolve({}) }))).toBe('/inicio')
-  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBe('/bienvenida')
+  expect(await redirige(Inicio())).toBe('/bienvenida')
   await saltearBienvenida(h.db, owner.id)
-  expect(await redirige(Inicio({ searchParams: Promise.resolve({}) }))).toBeNull()
+  expect(await redirige(Inicio())).toBeNull()
 })
 
 test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente, donde van arriba; "Ahora no" la saca', async () => {
@@ -92,7 +92,7 @@ test('gente que quizás conocés: la primera en Inicio, con Ver más a Tu gente,
   for (const o of [sofi, juan]) await amigos(o.id, ana.id)
   await amigos(sofi.id, beto.id)
   h.session = { userId: yo.id }
-  const inicio = () => Inicio({ searchParams: Promise.resolve({}) })
+  const inicio = () => Inicio()
   const gente = () => Gente({ searchParams: Promise.resolve({}) })
   const verMas = async () => elementos(await inicio()).find((e) => e.type === SectionHeader && e.props.id === 'quizas-conoces')?.props.href
 
@@ -135,11 +135,13 @@ test('arriba lo que es para vos; abajo de lo nuevo de tus amigos, lo que tenés 
     (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Bici' }))!, (await createItem(h.db, sofi.id, { tipo: 'exacto', titulo: 'Termo' }))!,
   ]
   h.session = { userId: yo.id }
-  const inicio = async () => elementos(await Inicio({ searchParams: Promise.resolve({}) }))
+  const inicio = async () => elementos(await Inicio())
 
   // sin nada pendiente, no están
   const vacio = await inicio()
-  expect(vacio.some((e) => e.props.id === 'para-vos' || e.props.id === 'por-comprar')).toBe(false)
+  expect(vacio.find((e) => e.type === ParaVosEnInicio)?.props.pendientes).toEqual([])
+  expect(renderToStaticMarkup(createElement(ParaVosEnInicio, { pendientes: [], total: 0 }))).toBe('')
+  expect(vacio.some((e) => e.props.id === 'por-comprar')).toBe(false)
   expect(vacio.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(0)
 
   // Rodri arma el regalo de la bici, me sumo y lo compra: me toca la mitad. Y el termo lo reservé yo
@@ -152,30 +154,33 @@ test('arriba lo que es para vos; abajo de lo nuevo de tus amigos, lo que tenés 
   const pantalla = await inicio()
   const donde = (que: (e: (typeof pantalla)[number]) => boolean) => pantalla.findIndex(que)
   const orden = [
-    donde((e) => e.props.id === 'para-vos'), donde((e) => e.type === Proximos), donde((e) => e.props.id === 'novedades'),
+    donde((e) => e.type === ParaVosEnInicio), donde((e) => e.type === Proximos), donde((e) => e.props.id === 'novedades'),
     donde((e) => e.props.id === 'por-comprar'), donde((e) => e.type === CuentasPendientes),
   ]
   expect(orden.every((i) => i > -1)).toBe(true)
   expect([...orden].sort((a, b) => a - b)).toEqual(orden)
-  expect(pantalla.filter((e) => e.type === ContenidoAviso).map((e) => [e.props.e!.titulo, e.props.e!.tipo, e.props.animar]))
-    .toEqual([['Rodri compró "Bici"', 'regalo_comprado', true]])
-  // cada uno se desliza para verlo o archivarlo
-  expect(pantalla.filter((e) => e.type === AvisoDeslizable).map((e) => e.props.titulo)).toEqual(['Rodri compró "Bici"'])
+  const paraVosProps = pantalla.find((e) => e.type === ParaVosEnInicio)!.props
+  expect(paraVosProps.pendientes!.map((p) => (p.tipo === 'aviso' ? [p.aviso.titulo, p.aviso.tipo] : p.tipo)))
+    .toEqual([['Rodri compró "Bici"', 'regalo_comprado']])
+  expect(paraVosProps.total).toBe(1)
+  // en un solo bloque: tocarlo lo abre, y se saca de ahí con "Listo" (el mismo gesto en toda la app); con uno solo, sin "Ver todos"
+  const bloque = renderToStaticMarkup(createElement(ParaVosEnInicio, { pendientes: paraVosProps.pendientes!, total: 1 }))
+  expect(bloque).toContain('id="para-vos"')
+  expect(bloque).toContain('Rodri compró &quot;Bici&quot;')
+  expect(bloque).toContain('aria-label="Listo: Rodri compró &quot;Bici&quot;"')
+  expect(bloque).not.toContain('Ver todos')
+  for (const viejo of ['Limpiar', 'Archivar', 'Marcar como leídas']) expect(bloque).not.toContain(viejo)
   expect(pantalla.filter((e) => e.type === FilaRegalo).map((e) => e.props.r!.titulo)).toEqual(['Termo'])
   expect(pantalla.find((e) => e.type === CuentasPendientes)?.props.cuentas?.debes).toBe(25000)
 
-  // desde Inicio: ver todos (la campanita) o limpiarlos de acá
-  expect(pantalla.some((e) => e.props.href === '/avisos')).toBe(true)
-  const limpiar = pantalla.find((e) => e.type === 'form' && e.props.action === limpiarParaVosAction)
-  const hasta = elementos(limpiar?.props.children).find((e) => e.props.name === 'hasta')?.props.value
-  expect(hasta).toBeTruthy()
+  // "Listo" lo saca de Inicio (sigue en la campanita)
   const fd = new FormData()
-  fd.set('hasta', hasta!)
-  await limpiarParaVosAction(fd)
-  expect((await inicio()).some((e) => e.props.id === 'para-vos')).toBe(false)
+  fd.set('id', paraVosProps.pendientes!.flatMap((p) => (p.tipo === 'aviso' ? [p.aviso.id] : []))[0])
+  await archivarAvisoAction(fd)
+  expect((await inicio()).find((e) => e.type === ParaVosEnInicio)?.props.pendientes).toEqual([])
 })
 
-test('en Para vos, tocar un aviso (o "Ver") lleva adonde dice y "Archivar" lo saca; uno ajeno, a la campanita', async () => {
+test('en Para vos, tocar un aviso lleva adonde dice y "Listo" lo saca; uno ajeno, a la campanita', async () => {
   h.db = await createTestDb()
   const [yo, sofi] = await Promise.all(['Yo', 'Sofi'].map(usuario))
   await guardarAviso(h.db, yo.id, { tipo: 'pago', title: '💸 Sofi te pagó $1', body: '', url: '/cuentas' })
@@ -205,7 +210,7 @@ test('la portada: una carta por función, arriba la primera, con las flechas y u
   for (const titulo of ['Armá tu lista', 'Te lo regalan en secreto', 'Lo pagan entre todos', 'Amigo invisible sin papelitos', 'Cumples con tiempo']) {
     expect(html).toContain(`>${titulo}</p>`)
   }
-  for (const nombre of ['Anterior', 'Siguiente', 'Tu lista', 'En secreto', 'Entre todos', 'Amigo invisible', 'Cumples']) {
+  for (const nombre of ['Anterior', 'Siguiente', 'Tu lista', 'En secreto', 'Regalo grupal', 'Amigo invisible', 'Cumples']) {
     expect(html).toContain(`aria-label="${nombre}"`)
   }
   expect(html.match(/aria-current="true"/g)).toHaveLength(1)

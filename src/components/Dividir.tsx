@@ -8,8 +8,9 @@ import { Buscador } from '@/components/Buscador'
 import { paraBuscar } from '@/lib/buscar'
 import { plata } from '@/lib/pesos'
 
-// "Lo dividimos": elegir amigos para proponerles dividir un regalo, a quiénes se invitó (para el que lo organiza) y las
-// propuestas que te llegaron (Inicio). Siempre en partes iguales entre los que se sumen.
+// El regalo grupal con amigos: elegir a quiénes proponérselo, a quiénes se invitó (para el que lo organiza) y las
+// propuestas que te llegaron (Avisos). Siempre en partes iguales entre los que se sumen. La cosa se llama siempre "regalo
+// grupal" (antes también "Lo dividimos" y "Proponerles dividirlo"): dividir es lo que se hace con la plata.
 
 /** Con más amigos que esto, para elegir aparece el buscador. */
 const BUSCAR_DESDE = 7
@@ -19,7 +20,7 @@ export function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: st
   return (
     <>
       {amigos.length >= BUSCAR_DESDE && <Buscador ambito={ambito} placeholder="Buscar un amigo" vacio="No tenés un amigo con «%s»." />}
-      <ul id={ambito} className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+      <ul id={ambito} className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line bg-gr-surface px-3">
         {amigos.map((a) => (
           <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
           <label className="flex min-h-14 cursor-pointer items-center gap-3 py-2">
@@ -35,7 +36,7 @@ export function ElegirAmigos({ amigos, ambito }: { amigos: Persona[]; ambito: st
 }
 
 /**
- * "Lo dividimos", en el deseo: con quiénes (sus amigos, nunca los del cumple) y armarlo. Les llega la propuesta y cada uno
+ * "Armar regalo grupal", en el deseo: con quiénes (sus amigos, nunca los del cumple) y armarlo. Les llega la propuesta y cada uno
  * elige si se suma. Sin amigos en GiftR, se arma igual y se suman con el link.
  */
 export function FormDividir({ token, itemId, amigos }: { token: string; itemId: string; amigos: Persona[] }) {
@@ -45,7 +46,7 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
       <input type="hidden" name="itemId" value={itemId} />
       {amigos.length > 0 ? (
         <>
-          <p className="text-sm font-semibold">¿Con quién lo dividís?</p>
+          <p className="text-sm font-semibold">¿Con quién armás el regalo grupal?</p>
           <ElegirAmigos amigos={amigos} ambito="amigos-dividir" />
           <p className="text-xs leading-snug text-gr-muted">
             A cada uno le llega la propuesta y elige si se suma. Se divide en partes iguales entre los que se sumen; también se
@@ -59,7 +60,7 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
         </p>
       )}
       <BotonEnviar pendiente="Armando…" className="gr-btn-primary w-full min-h-12">
-        {amigos.length > 0 ? 'Proponerles dividirlo' : 'Armar el regalo'}
+        Armar regalo grupal
       </BotonEnviar>
     </form>
   )
@@ -68,7 +69,7 @@ export function FormDividir({ token, itemId, amigos }: { token: string; itemId: 
 const ESTADOS: Record<Invitado['estado'], string> = { esperando: 'Esperando', se_sumo: 'Se sumó ✓', no_puede: 'No puede', se_bajo: 'Se bajó' }
 
 /**
- * Para el que organiza: a quiénes les propuso dividirlo y qué contestaron, y proponérselo a más amigos. También ya
+ * Para el que organiza: a quiénes les propuso el regalo grupal y qué contestaron, y proponérselo a más amigos. También ya
  * comprado: el que acepta después entra y se vuelve a dividir (ver redividir).
  */
 export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvitar }: {
@@ -79,8 +80,8 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
     <div className="flex flex-col gap-2">
       {invitados.length > 0 && (
         <>
-          <p className="gr-label">Les propusiste dividirlo</p>
-          <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line px-3">
+          <p className="gr-label">Les propusiste el regalo grupal</p>
+          <ul className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line px-3">
             {invitados.map((i) => (
               <li key={i.persona.id} className="flex min-h-12 items-center gap-3 py-1.5">
                 <AvatarSticker nombre={i.persona.nombre} foto={i.persona.foto} size={28} />
@@ -109,27 +110,27 @@ export function InvitadosDelRegalo({ token, itemId, giftId, invitados, paraInvit
   )
 }
 
-/** Las propuestas de dividir un regalo que te llegaron (Inicio): de quién, qué y para quién; te sumás o no. */
+/** Las propuestas de regalo grupal que te llegaron (Avisos): de quién, qué y para quién; te sumás o no. */
 export function InvitacionesRegalo({ invitaciones, noSePudo, volver }: { invitaciones: Invitacion[]; noSePudo: boolean; volver?: 'avisos' }) {
   if (!invitaciones.length && !noSePudo) return null
   return (
     <section id="invitaciones" aria-labelledby="invitaciones-titulo" className="flex scroll-mt-6 flex-col gap-2.5">
-      <h2 id="invitaciones-titulo" className="gr-label">Te proponen dividir</h2>
+      <h2 id="invitaciones-titulo" className="gr-label">Te proponen un regalo grupal</h2>
       {noSePudo && (
-        <p role="status" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+        <p role="status" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           No te pudimos sumar: el regalo ya no está abierto, o ese deseo ya lo tenías reservado vos.
         </p>
       )}
       {invitaciones.map((i) => (
         <article key={i.id} className="gr-card flex flex-col gap-3 p-3.5">
           <Link href={i.href} className="flex items-center gap-3">
-            <div className="w-16 flex-none overflow-hidden rounded-2xl">
+            <div className="w-16 flex-none overflow-hidden rounded-gr-md">
               <ItemPhoto src={i.foto} titulo={i.titulo} height={64} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-medium leading-snug text-gr-muted">
                 <span className="font-semibold text-gr-ink">{i.de.nombre.split(' ')[0]}</span>
-                {i.sorpresa ? ' te propone una sorpresa 🤫' : ' te propone dividir'}
+                {i.sorpresa ? ' te propone una sorpresa 🤫' : ' te propone un regalo grupal'}
               </p>
               <p className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{i.titulo}</p>
               <p className="text-[13px] leading-snug text-gr-muted">

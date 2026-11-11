@@ -274,6 +274,62 @@
       "when": 1793556398518,
       "tag": "0038_regla_amigo_invisible",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794360228752,
+      "tag": "0039_alias_pago",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794361617493,
+      "tag": "0040_amigo_invisible_por_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794362323334,
+      "tag": "0041_recordatorios_enviados",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794376357347,
+      "tag": "0042_solo_con_cuenta_y_tope_de_invitados",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794377408404,
+      "tag": "0043_post_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794377445588,
+      "tag": "0044_precio_en_numero",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794377674377,
+      "tag": "0045_cuenta_eliminada",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794379050013,
+      "tag": "0046_ocasion_y_aporte_en_plata",
+      "breakpoints": true
     }
   ]
 }

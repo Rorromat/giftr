@@ -1,10 +1,14 @@
-import { eq, inArray } from 'drizzle-orm'
-import { lists, users } from '@/db/schema'
+import { eq, inArray, sql } from 'drizzle-orm'
+import { items, lists, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { duenosDeLista } from '@/lib/groups'
-import { seccionesDeGustos, type Gustos, type SeccionGustos } from '@/lib/gustos'
+import { bloquesDeGustos, PASOS_GUSTOS, seccionesDeGustos, type BloqueGustos, type Gustos, type PasoGustos, type SeccionGustos } from '@/lib/gustos'
 
-/** La primera vez que entra (o si nunca pasó por la bienvenida) le mostramos los pasos. */
+// La bienvenida es una sola pantalla (su cumple, o "Ahora no") y de ahí va a anotar su primer deseo y a compartir la lista,
+// que es para lo que vino. Antes eran ocho pasos de gustos, el pedido de avisos y un resumen: diez pantallas antes del
+// primer deseo. Los gustos se cuentan después, desde la tarjeta de Mi lista (ver gustosPorContar) o desde Perfil.
+
+/** La primera vez que entra (o si nunca pasó por la bienvenida) le mostramos la pantalla de bienvenida. */
 export async function necesitaBienvenida(db: Db, userId: string): Promise<boolean> {
   const [u] = await db.select({ at: users.bienvenidaAt }).from(users).where(eq(users.id, userId))
   return !!u && !u.at
@@ -15,14 +19,40 @@ export async function misGustos(db: Db, userId: string): Promise<Gustos | null> 
   return u?.gustos ?? null
 }
 
-/** Guarda los gustos (ya sanitizados) y da la bienvenida por hecha. */
+/**
+ * Guarda los gustos (ya sanitizados) y da la bienvenida por hecha, si no lo estaba. La fecha de la bienvenida no se pisa:
+ * de ella depende cuándo se le pregunta por los avisos (ver preguntarAvisos), y editar un talle no es entrar de nuevo.
+ */
 export async function guardarGustos(db: Db, userId: string, gustos: Gustos) {
-  await db.update(users).set({ gustos, bienvenidaAt: new Date() }).where(eq(users.id, userId))
+  await db.update(users).set({ gustos, bienvenidaAt: sql`coalesce(${users.bienvenidaAt}, now())` }).where(eq(users.id, userId))
 }
 
-/** "Más tarde": no se la volvemos a mostrar sola; los gustos quedan como estaban. */
+/** La bienvenida ya pasó (con su cumple o con "Ahora no"): no se la volvemos a mostrar. Los gustos quedan como estaban. */
 export async function saltearBienvenida(db: Db, userId: string) {
-  await db.update(users).set({ bienvenidaAt: new Date() }).where(eq(users.id, userId))
+  await db.update(users).set({ bienvenidaAt: sql`coalesce(${users.bienvenidaAt}, now())` }).where(eq(users.id, userId))
+}
+
+/**
+ * Si ya anotó algún deseo en su lista (aunque después lo haya archivado o eliminado). Sin ninguno, de la bienvenida va a
+ * anotar el primero y Agregar lo invita; con alguno (lo compartió a GiftR desde una tienda antes de pasar por Inicio), no.
+ */
+export async function yaAnotoUnDeseo(db: Db, userId: string): Promise<boolean> {
+  const [fila] = await db.select({ id: items.id }).from(items).innerJoin(lists, eq(items.listId, lists.id))
+    .where(eq(lists.ownerId, userId)).limit(1)
+  return !!fila
+}
+
+/**
+ * Cuántos bloques de Tus gustos contó y cuál le falta: para la tarjeta "Contá tus gustos · 2 de 7" de Mi lista, que lleva
+ * al primero sin cargar. Con `despuesDe`, el que sigue a ese paso: guardado uno, va al próximo que falta sin volver al que
+ * acaba de dejar vacío (no le interesa el fútbol y no eligió nada: no se lo preguntamos de nuevo). Null: no falta ninguno
+ * (o ninguno más adelante).
+ */
+export function gustosPorContar(g: Gustos | null, despuesDe?: PasoGustos): { cargados: number; total: number; siguiente: BloqueGustos['paso'] | null } {
+  const bloques = bloquesDeGustos(g)
+  const desde = despuesDe ? PASOS_GUSTOS.indexOf(despuesDe) : -1
+  const siguiente = bloques.find((b) => !b.cargado && PASOS_GUSTOS.indexOf(b.paso) > desde)?.paso ?? null
+  return { cargados: bloques.filter((b) => b.cargado).length, total: bloques.length, siguiente }
 }
 
 export type GustosDeDueno = { id: string; nombre: string; secciones: SeccionGustos[] }

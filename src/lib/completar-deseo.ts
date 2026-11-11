@@ -253,6 +253,25 @@ export function loDelAnterior(v: Valores, link: string, puesto: Puesto | null, e
   return { campos, puesto: nuevo }
 }
 
+export const AVISO_SIN_LINK = 'Poné el link de la tienda y probá de nuevo.'
+
+/**
+ * "Traer el precio de la tienda", al editar un deseo que ya tiene su link: lo pide el dueño a mano (no hay refresco solo:
+ * la página de la tienda puede fallar, y un precio que cambia sin que nadie lo toque les avisaría a los que lo reservaron).
+ * A diferencia de pegar el link (ver queCompletar), acá el precio escrito se reemplaza: es lo que pidió.
+ * - precio: lo que va al campo; sin eso, el campo queda como está (una falla no dice nada del producto).
+ * - visto: la tienda contestó con un precio: aunque sea el mismo de antes, al guardar su fecha pasa a hoy.
+ * - aviso: una línea corta, como las de avisoDe.
+ */
+export function precioTraido(r: Contestado | undefined, escrito: string): { precio?: string; visto: boolean; aviso: string } {
+  if (r === undefined) return { visto: false, aviso: AVISO_NO_CARGA }
+  const ok = esOk(r)
+  if (!ok) return { visto: false, aviso: avisoDe(r, false, false) ?? AVISO_NO_CARGA }
+  if (!ok.precio) return { visto: false, aviso: 'Esa página no dice el precio.' }
+  if (ok.precio === escrito.trim()) return { visto: true, aviso: `Sigue costando ${ok.precio}.` }
+  return { precio: ok.precio, visto: true, aviso: `Ahora cuesta ${ok.precio}. Guardá los cambios.` }
+}
+
 const ESTADOS: readonly string[] = ['ok', 'bloqueado', 'sin-datos', 'no-esta', 'no-carga'] satisfies Estado[]
 const textoONull = (v: unknown): v is string | null => v === null || typeof v === 'string'
 

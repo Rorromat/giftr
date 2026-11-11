@@ -3,8 +3,8 @@ import { conConsultas, createTestDb, seedOwnerAndGiver } from './helpers'
 import { claims, groupGifts, guestIdentities, items, lists, users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import {
-  desmarcarComprado, expireStaleClaims, getMyClaimWarnings, markBought, miReservaVencida, releaseClaim, reserveItem,
-  vencimientoDeReserva,
+  afirmarReservas, cuandoPreguntar, desmarcarComprado, expireStaleClaims, getMyClaimWarnings, markBought, miReservaVencida, releaseClaim,
+  reserveItem, vencimientoDeReserva,
 } from '@/lib/claims'
 import { guardarCumple, guardarFechaGrupo, hoyLocal, inicioDelDia } from '@/lib/events'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
@@ -170,28 +170,43 @@ test('un "Quiero ESTO" con la marca de repetible (datos de antes) respeta la can
   expect(await vistaDe(db, otro.id, item.id)).toMatchObject({ repetible: false, quedan: 0, disponible: false })
 })
 
-test('vencimiento: 14 días o 3 días antes del evento de la lista, lo que pase primero, pero nunca menos de 24 horas', async () => {
+test('vencimiento: 14 días, pero cerca del evento de la lista no vence antes: dura hasta el final del día siguiente', async () => {
   const { db, owner, list } = await setup()
   // sábado 8 de agosto de 2026, mediodía en Argentina
   const ahora = new Date('2026-08-08T15:00:00Z')
   expect(inicioDelDia(new Date('2026-08-18T00:00:00Z'))).toEqual(new Date('2026-08-18T03:00:00Z'))
   // sin cumple: 14 días
   expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + 14 * DIA))
-  // cumple el 18: hasta el arranque del 15 (3 días antes del cumple), antes que los 14 días
+  // cumple el 18 (en 10 días; antes vencía el 15, y el deseo quedaba libre en la víspera): hasta el final del 19
   await guardarCumple(db, owner.id, 18, 8)
-  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-15T03:00:00Z'))
-  // cumple pasado mañana (o hoy): 24 horas, para que llegue a comprarlo
-  await guardarCumple(db, owner.id, 10, 8)
-  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + DIA))
-  await guardarCumple(db, owner.id, 8, 8)
-  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + DIA))
-  // cumple en más de 17 días: 14 días
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-20T03:00:00Z'))
+  // cumple el 24 (en 16 días): a los 14 días ya estaría en los 3 días previos, así que llega hasta el final del 25
+  await guardarCumple(db, owner.id, 24, 8)
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-26T03:00:00Z'))
+  // cumple el 25: los 3 días previos arrancan el 22 a las 0 y los 14 días se cumplen el 22 a mediodía: también
+  await guardarCumple(db, owner.id, 25, 8)
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-27T03:00:00Z'))
+  // cumple el 26, o lejos: 14 días (queda libre antes de los 3 días previos, y otro llega a comprarlo)
+  await guardarCumple(db, owner.id, 26, 8)
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + 14 * DIA))
   await guardarCumple(db, owner.id, 1, 10)
   expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + 14 * DIA))
+  // cumple pasado mañana, o hoy: hasta el final del día siguiente al cumple
+  await guardarCumple(db, owner.id, 10, 8)
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-12T03:00:00Z'))
+  await guardarCumple(db, owner.id, 8, 8)
+  expect(await vencimientoDeReserva(db, list.id, ahora)).toEqual(new Date('2026-08-10T03:00:00Z'))
+  // nunca menos de 24 horas: reservado el mismo día del cumple a las 23:30, le queda todo el día siguiente
+  const deNoche = new Date('2026-08-09T02:30:00Z')
+  expect(await vencimientoDeReserva(db, list.id, deNoche)).toEqual(new Date('2026-08-10T03:00:00Z'))
+  expect((await vencimientoDeReserva(db, list.id, deNoche)).getTime() - deNoche.getTime()).toBeGreaterThanOrEqual(DIA)
   // la fecha de un grupo cuenta igual
   const grupo = await crearGrupo(db, owner.id, { nombre: 'Casa' })
   await guardarFechaGrupo(db, grupo, owner.id, '2026-08-13', false)
-  expect(await vencimientoDeReserva(db, grupo, ahora)).toEqual(new Date('2026-08-10T03:00:00Z'))
+  expect(await vencimientoDeReserva(db, grupo, ahora)).toEqual(new Date('2026-08-15T03:00:00Z'))
+  // lo que se le pregunta al encargado de un regalo grupal sin nadie más sigue siendo 3 días antes (ver cuandoRecordar)
+  expect(await cuandoPreguntar(db, grupo, ahora)).toEqual(new Date('2026-08-10T03:00:00Z'))
+  expect(await cuandoPreguntar(db, list.id, ahora)).toEqual(new Date(ahora.getTime() + DIA))
 })
 
 test('al reservar, el vencimiento mira el cumple del dueño', async () => {
@@ -201,13 +216,63 @@ test('al reservar, el vencimiento mira el cumple del dueño', async () => {
   const r = await reserveItem(db, item.id, { userId: giver.id })
   if (!r.ok) throw new Error(r.reason)
   const [c] = await db.select().from(claims)
-  expect(c.expiresAt).toEqual(new Date(inicioDelDia(enDiez).getTime() - 3 * DIA))
+  // no vence antes del cumple: hasta el final del día siguiente
+  expect(c.expiresAt).toEqual(inicioDelDia(new Date(enDiez.getTime() + 2 * DIA)))
   // la de un regalo grupal no vence
   const [otro] = await db.insert(items).values({ listId: item.listId, tipo: 'exacto', titulo: 'Bici' }).returning()
   const g = await iniciarRegaloGrupal(db, otro.id, giver.id)
   if (!g.ok) throw new Error(g.reason)
   const [delRegalo] = await db.select().from(claims).where(eq(claims.itemId, otro.id))
   expect(delRegalo.expiresAt).toBeNull()
+})
+
+test('una reserva de antes, que vencía 3 días antes del cumple, no se cae en la víspera: se estira hasta el día siguiente al cumple', async () => {
+  const { db, item, owner, giver, list } = await setup()
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  const [caro] = await db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
+  const cumple = new Date(hoyLocal().getTime() + 2 * DIA)
+  await guardarCumple(db, owner.id, cumple.getUTCDate(), cumple.getUTCMonth() + 1)
+  const hastaElOtroDia = inicioDelDia(new Date(cumple.getTime() + 2 * DIA))
+  // con la regla de antes: Rodri reservó hace 10 días y le vencía 3 días antes del cumple (ayer a las 0)
+  const [vieja] = await db.insert(claims).values({
+    itemId: item.id, claimerUserId: giver.id, createdAt: new Date(Date.now() - 10 * DIA), expiresAt: new Date(inicioDelDia(cumple).getTime() - 3 * DIA),
+  }).returning()
+  // la de Caro venció antes de esos 3 días (hace 5): esa sí venció
+  const [vencida] = await db.insert(claims).values({
+    itemId: mate.id, claimerUserId: caro.id, createdAt: new Date(Date.now() - 19 * DIA), expiresAt: new Date(Date.now() - 5 * DIA),
+  }).returning()
+  await expireStaleClaims(db)
+  const estado = async (id: string) => (await db.select({ estado: claims.estado, expiresAt: claims.expiresAt }).from(claims).where(eq(claims.id, id)))[0]
+  expect(await estado(vieja.id)).toEqual({ estado: 'reservado', expiresAt: hastaElOtroDia })
+  expect((await estado(vencida.id)).estado).toBe('expirado')
+  // el deseo sigue tomado: Caro no lo puede reservar encima en la víspera
+  expect(await reserveItem(db, item.id, { userId: caro.id })).toEqual({ ok: false, reason: 'sin_stock' })
+  const vista = await getItemForViewer(db, 'tok-euge', item.id, { userId: giver.id })
+  if (vista?.role !== 'giver') throw new Error('esperaba giver')
+  expect(vista.miVencida).toBeNull()
+  // pasado el día siguiente al cumple, vence como cualquiera
+  await expireStaleClaims(db, undefined, new Date(hastaElOtroDia.getTime() + 1000))
+  expect((await estado(vieja.id)).estado).toBe('expirado')
+})
+
+test('el repaso del día estira las que vencerían en los 3 días previos al evento (las de antes, o si la fecha se puso después)', async () => {
+  const { db, item, owner, giver, list } = await setup()
+  const [mate] = await db.insert(items).values({ listId: list.id, tipo: 'exacto', titulo: 'Mate' }).returning()
+  const [caro] = await db.insert(users).values({ googleId: 'g-caro', nombre: 'Caro', email: 'caro@test.com' }).returning()
+  // sin cumple cargado, las dos duran 14 días: una vence en 4 días y la otra en 12
+  const [cerca] = await db.insert(claims).values({ itemId: item.id, claimerUserId: giver.id, expiresAt: new Date(Date.now() + 4 * DIA) }).returning()
+  const [lejos] = await db.insert(claims).values({ itemId: mate.id, claimerUserId: caro.id, expiresAt: new Date(Date.now() + 12 * DIA) }).returning()
+  expect(await afirmarReservas(db)).toBe(0)
+  // Euge carga su cumple, que es en 6 días: la que vencía 2 días antes ya no se libera en la víspera
+  const cumple = new Date(hoyLocal().getTime() + 6 * DIA)
+  await guardarCumple(db, owner.id, cumple.getUTCDate(), cumple.getUTCMonth() + 1)
+  expect(await afirmarReservas(db)).toBe(1)
+  const vencen = Object.fromEntries((await db.select().from(claims)).map((c) => [c.id, c.expiresAt]))
+  expect(vencen[cerca.id]).toEqual(inicioDelDia(new Date(cumple.getTime() + 2 * DIA)))
+  // la otra vence después del cumple: queda como estaba
+  expect(vencen[lejos.id]).toEqual(lejos.expiresAt)
+  // y correrlo de nuevo no cambia nada
+  expect(await afirmarReservas(db)).toBe(0)
 })
 
 test('una reserva vencida no deja trabado: si sigue habiendo lugar, "Ya lo compré" vale; si lo tomó otro, no', async () => {

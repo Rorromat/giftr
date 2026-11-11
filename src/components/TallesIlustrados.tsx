@@ -10,7 +10,8 @@ import type { Talles } from '@/lib/gustos'
 
 const BLANCO = '#FFFFFF'
 const TINTA = '#141414'
-const LIMA = '#C8F31D'
+// el verde de la marca en su tono claro (como en IlustracionFecha)
+const VERDE = '#3CD592'
 const CARTON = '#F4E4C1'
 const CARTON_TEXTO = '#8A7653'
 const METAL = '#DCE6E5'
@@ -99,12 +100,12 @@ export function TallesIlustrados({ talles, nombre }: { talles: Talles; nombre?: 
       <path d="M168 84 H226" stroke={jeanSombra} strokeWidth="9" />
       <path d="M197 92 V124 M174 100 Q182 104 186 96 M220 100 Q212 104 208 96" fill="none" stroke={jeanCostura} strokeWidth="2" strokeLinecap="round" />
 
-      {/* la zapatilla, en el estante: suela negra, entresuela, la capellada con su puntera y su talón lima, y los cordones */}
+      {/* la zapatilla, en el estante: suela negra, entresuela, la capellada con su puntera y su talón verdes, y los cordones */}
       <rect x="240" y="247" width="100" height="9" rx="4.5" fill={TINTA} />
       <rect x="242" y="239" width="96" height="11" rx="5.5" fill="#F2F1EC" />
       {conSombra(capellada, BLANCO, '#E3E6E4', 293)}
-      <path d="M318 231 C327 233 334 238 335 246 H316 C314 240 315 234 318 231 Z" fill={LIMA} />
-      <rect x="244" y="214" width="11" height="26" rx="4" fill={LIMA} />
+      <path d="M318 231 C327 233 334 238 335 246 H316 C314 240 315 234 318 231 Z" fill={VERDE} />
+      <rect x="244" y="214" width="11" height="26" rx="4" fill={VERDE} />
       <path d="M262 213 Q272 222 283 212" fill="none" stroke={TINTA} strokeWidth="2.6" strokeLinecap="round" />
       <path d="M284 217 L292 225 M292 219 L300 227 M300 221 L307 229" stroke={TINTA} strokeWidth="2.4" strokeLinecap="round" />
       <path d="M262 238 Q290 234 316 240" fill="none" stroke="#C9CFCC" strokeWidth="2" strokeLinecap="round" />
@@ -113,7 +114,7 @@ export function TallesIlustrados({ talles, nombre }: { talles: Talles; nombre?: 
       <Etiqueta x={244} y={86} hx={226} hy={88} giro={6} prenda="Pantalón" talle={talles.pantalon} />
       <Etiqueta x={262} y={146} hx={292} hy={218} giro={-6} prenda="Calzado" talle={talles.calzado} />
 
-      <Destello cx={140} cy={150} s={6} fill={BLANCO} /><Destello cx={150} cy={222} s={4} fill={LIMA} />
+      <Destello cx={140} cy={150} s={6} fill={BLANCO} /><Destello cx={150} cy={222} s={4} fill={paleta.acento} />
       <Destello cx={318} cy={118} s={4} fill={BLANCO} />
       </g>
     </svg>

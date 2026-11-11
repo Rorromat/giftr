@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { FotoConRespaldo } from '@/components/FotoConRespaldo'
+import { VolverAOrigen } from '@/components/Volver'
+import { conVolver } from '@/lib/volver'
 import { PARTES_MONO, type TonosMono } from '@/lib/mono'
 import { ONDAS } from '@/lib/ondas'
 
@@ -79,11 +81,13 @@ export function PriorityTag({ prioridad, children, className = '' }: {
 }
 
 /** Foto del deseo a sangre; sin foto (o si no carga), un regalito gris sobre la superficie suave (como en Arte). */
-export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' }: {
+export function ItemPhoto({ src, titulo, height, dimmed = false, pronto = false, className = '' }: {
   src: string | null
   titulo: string
   height: number
   dimmed?: boolean
+  /** está en lo primero que se ve: que cargue ya, sin esperar a que se acerque (ver FotoConRespaldo) */
+  pronto?: boolean
   className?: string
 }) {
   const placeholder = (
@@ -93,14 +97,18 @@ export function ItemPhoto({ src, titulo, height, dimmed = false, className = '' 
   )
   if (!src) return placeholder
   return (
-    <FotoConRespaldo src={src} alt={titulo} respaldo={placeholder}
+    <FotoConRespaldo src={src} alt={titulo} respaldo={placeholder} pronto={pronto}
                      className={`gr-sticker__img ${dimmed ? 'opacity-45' : ''} ${className}`} style={{ height }} />
   )
 }
 
-/** Avatar redondo: la foto si hay, si no las iniciales sobre la superficie suave (o sobre color, si lo pide: en una tapa). */
-export function AvatarSticker({ nombre, foto, size = 56, color, className = '' }: {
-  nombre: string; foto?: string | null; size?: number; color?: string; className?: string
+/**
+ * Avatar redondo: la foto si hay, si no las iniciales sobre la superficie suave (o sobre color, si lo pide: en una tapa).
+ * La foto se pide recién cuando se acerca a la pantalla (en Tu gente hay decenas); pronto: la del encabezado, que se ve
+ * apenas abre.
+ */
+export function AvatarSticker({ nombre, foto, size = 56, color, pronto = false, className = '' }: {
+  nombre: string; foto?: string | null; size?: number; color?: string; pronto?: boolean; className?: string
 }) {
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('')
   return (
@@ -108,7 +116,7 @@ export function AvatarSticker({ nombre, foto, size = 56, color, className = '' }
          className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-bold tracking-[-0.02em] ${color ? 'text-white' : 'bg-gr-soft text-gr-ink'} ${className}`}
          style={{ width: size, height: size, fontSize: size * 0.36, background: color }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google, ya del tamaño justo */}
-      {foto ? <img src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
+      {foto ? <img loading={pronto ? undefined : 'lazy'} decoding="async" src={foto} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : iniciales}
     </div>
   )
 }
@@ -124,7 +132,7 @@ export function AvatarStack({ nombres, fotos = [], size = 40, className = '' }: 
               className="flex items-center justify-center overflow-hidden rounded-full border-2 border-gr-surface bg-gr-soft font-bold"
               style={{ width: size, height: size, fontSize: size * 0.4, marginLeft: i ? -size * 0.3 : 0, zIndex: nombres.length - i }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- foto propia o de Google */}
-          {fotos[i] ? <img src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
+          {fotos[i] ? <img loading="lazy" decoding="async" src={fotos[i]!} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : n.trim().charAt(0).toUpperCase()}
         </span>
       ))}
     </div>
@@ -136,11 +144,18 @@ export function QuizasLink({ href, className, children }: { href: string | null;
   return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>
 }
 
-export function BackLink({ href, label, vidrio = false }: {
+/**
+ * "Volver". origen: en las pantallas a las que se llega desde varios lados (Avisos, Perfil, la lista de alguien), lleva a
+ * donde la persona estaba y `href` queda de respaldo (ver VolverAOrigen). pantalla: su ruta; volver: el ?volver= que le
+ * llegó, si la pantalla lo leyó (si no, lo lee el navegador).
+ */
+export function BackLink({ href, label, vidrio = false, origen }: {
   href: string; label: string
-  /** de vidrio: claro sobre una tapa o un color; oscuro sobre una foto (se ve sobre cualquiera) */
+  /** de vidrio: ahumado sobre una tapa o un color; oscuro, más cerrado, sobre una foto (se ve sobre cualquiera) */
   vidrio?: boolean | 'oscuro'
+  origen?: { pantalla: string; volver?: unknown }
 }) {
+  if (origen) return <VolverAOrigen respaldo={href} pantalla={origen.pantalla} volver={origen.volver} vidrio={vidrio} />
   return (
     <Link href={href} aria-label={label} className={`gr-icon-btn${vidrio === 'oscuro' ? ' gr-vidrio-oscuro' : vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="back" size={20} strokeWidth={2.4} />
@@ -185,7 +200,7 @@ export function Mono({ tonos, borde, className = '', style }: {
 export function Faltan({ dias, className = '' }: { dias: number; className?: string }) {
   return (
     <span role="img" aria-label={dias === 0 ? 'Es hoy' : `Faltan ${dias} ${dias === 1 ? 'día' : 'días'}`}
-          className={`flex w-[54px] flex-col overflow-hidden rounded-[14px] bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
+          className={`flex w-[54px] flex-col overflow-hidden rounded-gr-sm bg-white text-center text-[#121216] shadow-[0_2px_10px_rgb(20_20_20/0.2)] ${className}`}>
       <span className="bg-gr-acento py-[3px] text-[9.5px] leading-none font-extrabold tracking-[0.08em] text-gr-on-acento uppercase">
         {dias === 0 ? 'Es' : 'Faltan'}
       </span>
@@ -201,10 +216,13 @@ export function Faltan({ dias, className = '' }: { dias: number; className?: str
   )
 }
 
-/** El logo: "GiftR" en 900 con el moño al final, un poco torcido. */
+/**
+ * El logo: "GiftR" en 900 con el moño al final, un poco torcido. gr-logo: en escritorio, donde hay barra al costado (que
+ * ya lo lleva), el de la pantalla no se ve (ver "Pantallas anchas" en tokens.css).
+ */
 export function LogoSticker({ sobreTapa = false, className = '' }: { sobreTapa?: boolean; className?: string }) {
   return (
-    <span className={`inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${sobreTapa ? 'text-white' : ''} ${className}`}>
+    <span className={`gr-logo inline-flex items-start font-brand text-[23px] leading-none font-black tracking-[-0.05em] ${sobreTapa ? 'text-white' : ''} ${className}`}>
       GiftR
       {/* sobre una tapa (que puede ser verde), el moño con borde blanco, como pegado */}
       <Mono borde={sobreTapa ? '#FFFFFF' : undefined} className="-mt-[9px] ml-px size-[24px] flex-none rotate-[14deg]" />
@@ -212,10 +230,13 @@ export function LogoSticker({ sobreTapa = false, className = '' }: { sobreTapa?:
   )
 }
 
-/** La campanita de Avisos, con cuántos nuevos hay. vidrio: sobre una tapa (y el número en blanco, que el verde no se vería). */
-export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: boolean }) {
+/**
+ * La campanita de Avisos, con cuántos nuevos hay. vidrio: sobre una tapa (y el número en blanco, que el verde no se vería).
+ * desde: la sección que la muestra, para que el "Volver" de Avisos traiga de vuelta ahí (ver lib/volver.ts).
+ */
+export function Campana({ nuevos, vidrio = false, desde }: { nuevos: number; vidrio?: boolean; desde?: string }) {
   return (
-    <Link href="/avisos" aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
+    <Link href={desde ? conVolver('/avisos', desde) : '/avisos'} aria-label={nuevos ? `Avisos: ${nuevos} ${nuevos === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'}
           className={`gr-icon-btn${vidrio ? ' gr-vidrio' : ''}`}>
       <Icon name="bell" size={19} />
       {nuevos > 0 && (
@@ -231,18 +252,20 @@ export function Campana({ nuevos, vidrio = false }: { nuevos: number; vidrio?: b
  * Barra de arriba de las secciones del menú: el logo a la izquierda y a la derecha lo que sume la pantalla (accion), la
  * campanita de Avisos (con avisos: cuántos nuevos) y tu foto (lleva a tu perfil). Mide 56 de alto. Sobre una tapa
  * (sobreTapa), el logo va en blanco y la campanita, de vidrio.
+ * desde: la sección que la muestra ("/gente"). La campanita y la foto están en las cuatro, y Avisos y Perfil volvían
+ * siempre a la misma: con esto vuelven a donde la persona estaba.
  */
-export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false }: {
-  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean
+export function AppHeader({ accion, nombre, foto, avisos, sobreTapa = false, desde }: {
+  accion?: React.ReactNode; nombre: string; foto: string | null; avisos?: number; sobreTapa?: boolean; desde?: string
 }) {
   return (
     <header className="flex min-h-14 items-center justify-between gap-3">
       <LogoSticker sobreTapa={sobreTapa} />
       <div className="flex items-center gap-2">
         {accion}
-        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} />}
-        <Link href="/perfil" prefetch aria-label="Tu perfil" className="rounded-full">
-          <AvatarSticker nombre={nombre} foto={foto} size={40} className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
+        {avisos !== undefined && <Campana nuevos={avisos} vidrio={sobreTapa} desde={desde} />}
+        <Link href={desde ? conVolver('/perfil', desde) : '/perfil'} prefetch aria-label="Tu perfil" className="rounded-full">
+          <AvatarSticker nombre={nombre} foto={foto} size={40} pronto className={sobreTapa ? 'ring-2 ring-white/30' : ''} />
         </Link>
       </div>
     </header>
@@ -265,11 +288,13 @@ export function Tapa({ color, className = '', children }: { color: string; class
  * La foto de un deseo, a sangre y más alta que ancha (ver .gr-arte); sin foto (o si no carga), un regalito gris sobre la
  * superficie suave. Ocupa el ancho de su lugar; el alto, con style={{ aspectRatio }} si va otra proporción.
  */
-export function Arte({ src, titulo, apagado = false, className = '', style }: {
+export function Arte({ src, titulo, apagado = false, pronto = false, className = '', style }: {
   src: string | null
   titulo: string
   /** lo que ya no se puede reservar */
   apagado?: boolean
+  /** está en lo primero que se ve (la foto grande de la ficha): que cargue ya (ver FotoConRespaldo) */
+  pronto?: boolean
   className?: string
   style?: React.CSSProperties
 }) {
@@ -280,7 +305,7 @@ export function Arte({ src, titulo, apagado = false, className = '', style }: {
   )
   return (
     <div className={`gr-arte${apagado ? ' gr-arte--apagado' : ''} ${className}`} style={style}>
-      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={sinFoto} className="gr-arte__foto" /> : sinFoto}
+      {src ? <FotoConRespaldo src={src} alt={titulo} respaldo={sinFoto} pronto={pronto} className="gr-arte__foto" /> : sinFoto}
     </div>
   )
 }
@@ -288,29 +313,31 @@ export function Arte({ src, titulo, apagado = false, className = '', style }: {
 /**
  * Barra de las pantallas de adentro: volver, el título al medio y una acción opcional. El título es el h1 de la
  * pantalla, salvo que la pantalla tenga el suyo más abajo (titulo="p").
+ * origen: para las pantallas a las que se llega desde varias secciones (Avisos, Perfil): ver BackLink.
  */
-export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: Titulo = 'h1' }: {
+export function PageHeader({ title, back, backLabel = 'Volver', action, titulo: Titulo = 'h1', origen }: {
   title: string
   back?: string
   backLabel?: string
   action?: React.ReactNode
   titulo?: 'h1' | 'p'
+  origen?: { pantalla: string; volver?: unknown }
 }) {
   return (
     <header className="grid min-h-14 grid-cols-[48px_1fr_48px] items-center gap-2">
-      <div>{back && <BackLink href={back} label={backLabel} />}</div>
+      <div>{back && <BackLink href={back} label={backLabel} origen={origen} />}</div>
       <Titulo className="truncate text-center text-[17px] font-bold tracking-[-0.02em]">{title}</Titulo>
       <div className="justify-self-end">{action}</div>
     </header>
   )
 }
 
-/** Título de sección con su "Ver más" a la derecha. */
+/** Título de sección con su "Ver más" a la derecha (gr-toque: se ve chico, pero se toca en 44 × 44). */
 export function SectionHeader({ title, href, linkLabel = 'Ver más', id }: { title: React.ReactNode; href?: string; linkLabel?: string; id?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h2 id={id} className="gr-heading">{title}</h2>
-      {href && <Link href={href} className="flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
+      {href && <Link href={href} className="gr-toque flex-none text-sm font-semibold text-gr-acento-texto">{linkLabel}</Link>}
     </div>
   )
 }
@@ -377,8 +404,6 @@ const ICONS = {
   cup: <><path d="M4.5 9h12v4.5a6 6 0 0 1-12 0z" /><path d="M16.5 10h1.3a2.5 2.5 0 0 1 0 5h-1.6" /><path d="M8.5 2.8c-.8 1 .8 2 0 3.2M12.5 2.8c-.8 1 .8 2 0 3.2" /></>,
   ban: <><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></>,
   note: <><path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" /><path d="M8 9h8M8 12.5h5" /></>,
-  // archivar un aviso: la caja de archivo
-  archivar: <><rect x="3" y="4" width="18" height="5" rx="1.5" /><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9" /><path d="M10 13h4" /></>,
   // eliminar
   basura: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12.4a2 2 0 0 0 2 1.6h6a2 2 0 0 0 2-1.6L18 7" /><path d="M9 7V4.5h6V7" /></>,
   // un secreto (el amigo invisible): un antifaz

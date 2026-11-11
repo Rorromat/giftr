@@ -1,7 +1,8 @@
 import type { CambiosDeseo, NewItemData } from '@/lib/items'
-import { largo, LARGO } from '@/lib/limites'
+import { esMontoDeAporte, largo, LARGO } from '@/lib/limites'
 import { esUrlFotoDeseo, linkEnTexto, linkHttp, sitioDeLink, tituloDelLink } from '@/lib/links'
-import { pesos } from '@/lib/pesos'
+import { parsePesos, pesos } from '@/lib/pesos'
+import { AVISO_ALIAS, validarAliasPago } from '@/lib/alias-pago'
 
 // Sin dependencias del servidor: los avisos de abajo los usan los campos del formulario en el navegador.
 
@@ -89,13 +90,66 @@ export function deseoDesdeForm(fd: FormData, alAgregar = false): DeseoDelForm | 
     linkTienda,
     // el link de un video del producto (ver VideoDeseo)
     videoUrl: link(fd, 'videoUrl'),
+    // solo al editar: "Sigue costando lo mismo", o lo trajo de nuevo de la tienda (ver PrecioAlDia)
+    precioVisto: (!alAgregar && fd.get('precioVisto') === '1') || undefined,
     // una foto subida desde el teléfono (/foto/deseo/:id, en minúsculas como la ruta) o el link de una foto
     fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto.toLowerCase() : linkHttp(foto) ?? undefined,
   }
 }
 
+/** El formulario es el de un aporte en plata (ver AporteForm): lleva tipo=aporte. */
+export const esFormDeAporte = (fd: FormData) => fd.get('tipo') === 'aporte'
+
+export type AporteDelForm =
+  | { ok: true; datos: { tipo: 'aporte'; titulo: string; notas: string | null; fotoUrl: string | null | undefined; aporteAlias: string; aporteMeta: number | null } }
+  | { ok: false; error: 'titulo' | 'alias' | 'meta' }
+
+/**
+ * Los campos del formulario de un aporte en plata (agregar o editar): el nombre ("Luna de miel"), la descripción, la foto
+ * si puso una, a qué alias o CVU transferir y la meta, si quiso poner una. El alias es obligatorio y tiene que ser uno de
+ * verdad (ver validarAliasPago): con uno mal escrito la transferencia no sale, así que no se guarda y se le dice. La meta
+ * se escribe como un precio ("$300.000", "300 mil"); vacía, sin meta.
+ */
+export function aporteDesdeForm(fd: FormData): AporteDelForm {
+  const titulo = campo(fd, 'titulo')
+  if (!titulo) return { ok: false, error: 'titulo' }
+  const alias = validarAliasPago(fd.get('aporteAlias'))
+  if (!alias.ok || !alias.alias) return { ok: false, error: 'alias' }
+  const escrita = campo(fd, 'aporteMeta')
+  const meta = escrita === null ? null : parsePesos(escrita)
+  if (escrita !== null && !esMontoDeAporte(meta)) return { ok: false, error: 'meta' }
+  const foto = campo(fd, 'fotoUrl')
+  return {
+    ok: true,
+    datos: {
+      tipo: 'aporte', titulo, notas: campo(fd, 'notas'), aporteAlias: alias.alias, aporteMeta: meta,
+      fotoUrl: foto === null ? null : esUrlFotoDeseo(foto) ? foto.toLowerCase() : linkHttp(foto) ?? undefined,
+    },
+  }
+}
+
+/** Lo que frena el envío del alias de un aporte en el navegador ('' si está bien): el servidor no lo guardaría. */
+export function avisoDelAlias(escrito: string): string {
+  const v = validarAliasPago(escrito)
+  return !v.ok ? AVISO_ALIAS : v.alias ? '' : 'Poné el alias o CVU a donde te transfieren.'
+}
+
+/** Lo que frena el envío de la meta de un aporte ('' si está bien, también vacía: es opcional). */
+export function avisoDeLaMeta(escrito: string): string {
+  const v = escrito.trim()
+  return !v || esMontoDeAporte(parsePesos(v)) ? '' : 'Poné la meta en pesos, por ejemplo $300.000. Si no querés poner una, dejala vacía.'
+}
+
+/** Lo que alguien anota que aportó ("Ya aporté"): pesos, escrito como un precio. Vacío: no lo dijo (null). Mal escrito: undefined. */
+export function montoDelAporte(escrito: unknown): number | null | undefined {
+  const v = typeof escrito === 'string' ? escrito.trim() : ''
+  if (!v) return null
+  const n = parsePesos(v)
+  return esMontoDeAporte(n) ? n : undefined
+}
+
 /** Para agregar: lo vacío o lo que no sirve, simplemente no se carga. */
-export function paraAgregar(d: DeseoDelForm): NewItemData {
+export function paraAgregar(d: DeseoDelForm | Extract<AporteDelForm, { ok: true }>['datos']): NewItemData {
   return Object.fromEntries(Object.entries(d).filter(([, v]) => v !== null && v !== undefined)) as NewItemData
 }
 

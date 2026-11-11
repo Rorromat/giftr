@@ -63,6 +63,12 @@ export function entregarFoto(form: HTMLFormElement, foto: Blob) {
   form.dispatchEvent(new CustomEvent<Blob>(COMPARTIDA, { detail: foto }))
 }
 
+const SIN_LINK = 'deseo:sin-link'
+/** "Pegar un link" del agregado sin nada copiado (ver AlLlegarDelAgregado): el mismo aviso que el botón "Pegar link" de acá. */
+export function avisarSinLink(form: HTMLFormElement) {
+  form.dispatchEvent(new Event(SIN_LINK))
+}
+
 /**
  * La foto del deseo, que es lo que más ayuda a que acierten: de la galería o la cámara, pegada (con el botón
  * o pegando una imagen en cualquier campo del formulario) o con el link de una foto. Lo elegido viaja en el
@@ -271,11 +277,14 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
     const texto = (e: Event) => (e instanceof CustomEvent && typeof e.detail === 'string' ? e.detail : null)
     const escuchar = (e: Event) => alProponer(texto(e))
     const aconsejar = (e: Event) => setConsejo(texto(e))
+    const sinLink = () => setAviso('sin-link')
     form?.addEventListener(PROPUESTA, escuchar)
     form?.addEventListener(CONSEJO, aconsejar)
+    form?.addEventListener(SIN_LINK, sinLink)
     return () => {
       form?.removeEventListener(PROPUESTA, escuchar)
       form?.removeEventListener(CONSEJO, aconsejar)
+      form?.removeEventListener(SIN_LINK, sinLink)
     }
   }, [])
   // la compartida desde otra app (ver entregarFoto): el mismo camino que Foto
@@ -334,7 +343,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
   return (
     <div ref={raiz} className="flex flex-col gap-2">
       {foto && rota !== foto ? (
-        <div className="relative overflow-hidden rounded-[18px]">
+        <div className="relative overflow-hidden rounded-gr-md">
           {/* eslint-disable-next-line @next/next/no-img-element -- fotos subidas o de tiendas externas */}
           <img src={foto} alt="Vista previa de la foto" data-vista-previa onError={() => setRota(foto)}
                // si falló antes de que cargue la página, onError no llega
@@ -353,7 +362,7 @@ export function FotoField({ inicial = null }: { inicial?: string | null }) {
       ) : (
         // Donde va a estar la foto del deseo: pegar el link de la tienda (trae nombre, foto y precio) o elegir una foto.
         // Mientras se trae la del link lo dice acá, y al llegar la foto queda en este lugar: no se corre nada.
-        <div className={`flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[18px] bg-gr-soft px-3 py-5 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
+        <div className={`flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-gr-md bg-gr-soft px-3 py-5 text-center ${subiendo || trayendo ? 'motion-safe:animate-pulse' : ''}`}>
           <div className="grid w-full grid-cols-2 gap-2">
             <button type="button" onClick={pegarElLink} className="gr-btn gr-btn--dark h-[52px] gap-2 text-[15px]">
               <Icon name="paste" size={18} strokeWidth={2} />Pegar link

@@ -3,7 +3,7 @@ import { avisos, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import type { Aviso } from '@/lib/codazos'
-import { avisosDeDeseos, markNotificationsRead, textoDeAviso } from '@/lib/notifications'
+import { avisosDeDeseos, emojiDeAviso, markNotificationsRead, partirTexto, textoDeAviso } from '@/lib/notifications'
 import { urlFoto } from '@/lib/users'
 import { esUuid } from '@/lib/groups'
 
@@ -21,11 +21,11 @@ const desdeHace = (dias: number) => new Date(Date.now() - dias * 86_400_000)
 export type TipoEnBandeja = NonNullable<(typeof avisos.$inferInsert)['tipo']>
 
 /**
- * Lo que va en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás, contestarle
- * a tu amigo invisible, sumarte a la lista en común a la que te sumaron) o que estabas esperando (te pagaron, te
- * contestaron). Los codazos, las solicitudes de amistad, las propuestas para dividir y las invitaciones al amigo invisible
- * no: mientras esperan que contestes ya tienen su cartel en Inicio, con sus botones. Que aceptaron tu solicitud o se
- * sumaron a tu regalo, tampoco: no te piden nada.
+ * Los avisos que van en "Para vos", arriba en Inicio: lo que te pide hacer algo (pagar tu parte, ver a quién le regalás,
+ * contestarle a tu amigo invisible, sumarte a la lista en común a la que te sumaron) o que estabas esperando (te pagaron,
+ * te contestaron). Los codazos, las solicitudes de amistad, las propuestas de regalo grupal y las invitaciones al amigo
+ * invisible no: mientras esperan que contestes ya están en "Para vos" por sí mismos, no como aviso (ver lib/para-vos.ts).
+ * Que aceptaron tu solicitud o se sumaron a tu regalo, tampoco: no te piden nada.
  */
 export const PARA_VOS: TipoEnBandeja[] = [
   'regalo_comprado', 'pago', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun',
@@ -60,18 +60,6 @@ const EMOJI = /^(\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic})*)
 export function separarEmoji(titulo: string): { emoji: string | null; texto: string } {
   const m = titulo.match(EMOJI)
   return m ? { emoji: m[1], texto: titulo.slice(m[0].length) } : { emoji: null, texto: titulo }
-}
-
-const EMOJI_DESEO: Record<string, string> = {
-  item_editado: '✏️', compra_corregida: '💸', regalo_redividido: '💸', regalo_a_mano: '💸', item_vuelve: '↩️', compra_vuelve: '↩️', regalo_vuelve: '↩️',
-  item_baja: '📦', item_baja_comprado: '📦', regalo_baja: '📦', regalo_lo_tiene: '📦',
-}
-
-/** El cartel de un aviso sobre un deseo, partido en título y detalle donde tiene la raya. */
-function partirTexto(texto: string): { titulo: string; cuerpo: string | null } {
-  const [titulo, ...resto] = texto.split(' — ')
-  const cuerpo = resto.join(' — ')
-  return { titulo, cuerpo: cuerpo ? cuerpo[0].toUpperCase() + cuerpo.slice(1) : null }
 }
 
 async function vistosAt(db: Db, userId: string): Promise<Date | null> {
@@ -117,7 +105,7 @@ export async function bandeja(db: Db, viewer: Viewer & { userId: string }): Prom
       const texto = textoDeAviso(n.tipo, n.itemTitulo, n.sorpresa)
       if (!texto) return []
       return [{
-        id: n.id, emoji: EMOJI_DESEO[n.tipo] ?? '🎁', ...partirTexto(texto), href: n.href, de: null, tipo: null, createdAt: n.createdAt, nuevo: !n.leida,
+        id: n.id, emoji: emojiDeAviso(n.tipo), ...partirTexto(texto), href: n.href, de: null, tipo: null, createdAt: n.createdAt, nuevo: !n.leida,
       }]
     }),
   ]
@@ -133,9 +121,10 @@ function deParaVos(userId: string, vistos: Date | null) {
 }
 
 /**
- * "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más nuevo primero;
- * cuántos son (se muestran los primeros) y cuándo se armó (lo que se limpia con "Limpiar", ver limpiarParaVos). Como el
- * número de la campanita: al abrirla dejan de ser nuevos y se van de Inicio (siguen en la bandeja).
+ * Los avisos de "Para vos", en Inicio: lo nuevo de la bandeja que te pide algo (ver PARA_VOS), de la última semana, lo más
+ * nuevo primero; cuántos son (vienen los primeros) y cuándo se armó. Como el número de la campanita: al abrirla dejan de
+ * ser nuevos y se van de Inicio (siguen en la bandeja). Van mezclados, por urgencia, con lo demás que te espera (ver
+ * lib/para-vos.ts).
  */
 export async function paraVos(db: Db, userId: string): Promise<{ entradas: EntradaBandeja[]; total: number; hasta: Date }> {
   const hasta = new Date()
@@ -160,8 +149,7 @@ export async function limpiarParaVos(db: Db, userId: string, hasta: Date) {
 }
 
 /**
- * Uno de "Para vos" que abrió (tocándolo, o "Ver" al deslizarlo) o que deslizó para archivarlo: se va de ahí y ya no es
- * nuevo en la campanita. Devuelve adónde lleva; null si no es suyo.
+ * Uno de "Para vos" que abrió (tocándolo) o que sacó con "Listo": se va de ahí y ya no es nuevo en la campanita. Devuelve adónde lleva; null si no es suyo.
  */
 export async function marcarAvisoVisto(db: Db, userId: string, id: string): Promise<string | null> {
   if (!esUuid(id)) return null

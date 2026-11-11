@@ -1,44 +1,46 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
+import { redirect, RedirectType } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { items, lists } from '@/db/schema'
 import { getViewer } from '@/lib/viewer'
 import {
-  anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, leerInvitado, NO_SOY_COOKIE,
-  OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarNoSoy,
+  ANOTADOS_COOKIE, anotadosHoy, anotarCuenta, cuentaAnotada, CUENTAS_COOKIE, firmarInvitado, GUEST_COOKIE, INVITADOS_POR_NAVEGADOR,
+  leerInvitado, NO_SOY_COOKIE, OPCIONES_COOKIE_INVITADO, renovarCuentas, sumarAnotado, sumarNoSoy,
 } from '@/lib/cookie-invitado'
 import { auth, signIn, signOut } from '@/auth'
-import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, updateItem } from '@/lib/items'
-import { deseoDesdeForm, paraAgregar } from '@/lib/deseo-form'
-import { desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
+import { createItem, archiveItem, borrarDeseo, deseoParaEditar, restoreItem, sumarDeseoSugerido, updateItem } from '@/lib/items'
+import { agradecer, cerrarPostEvento, marcarRecibidos, revelarRegalo } from '@/lib/post-evento'
+import { aporteDesdeForm, deseoDesdeForm, esFormDeAporte, montoDelAporte, paraAgregar } from '@/lib/deseo-form'
+import { aportar, deshacerAporte, desmarcarComprado, markBought, releaseClaim, reserveItem } from '@/lib/claims'
 import { addComment } from '@/lib/comments'
-import { createGuest, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
-import { abrirListaAInvitado } from '@/lib/acceso'
+import { anotarInvitado, nombreDeViewer, unirInvitadoACuenta, validarNombre, viewerSinSesion, type NombreValidado } from '@/lib/guest'
+import { abrirListaAInvitado, accesoALista, veQuienReservo } from '@/lib/acceso'
 import { markNotificationsRead } from '@/lib/notifications'
-import { limpiarParaVos, marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
+import { marcarAvisoVisto, marcarBandejaVista } from '@/lib/bandeja'
 import {
   crearGrupo, esToken, esUuid, fechaDeCumple, fechaDeGrupoValida, guardarFotoGrupo, guardarParentesco, nuevaInvitacion, parentescoDelForm,
   sacarDelGrupo, salirDeGrupo, unirseAGrupo,
 } from '@/lib/groups'
 import { invitarAGrupo } from '@/lib/invitar-a-grupo'
 import { agregarListaDeAmigo } from '@/lib/gente'
-import { cambiarLinkParaRegalar } from '@/lib/lists'
-import { asegurarListaPropia, existeUsuario } from '@/lib/users'
+import { cambiarLinkParaRegalar, guardarNombresSoloConCuenta } from '@/lib/lists'
+import { asegurarListaPropia, existeUsuario, guardarAliasPago } from '@/lib/users'
 import { cambiarNombre } from '@/lib/perfil'
-import { dejarDeSeguir, guardarCumple, guardarFechaGrupo } from '@/lib/events'
-import { guardarGustos } from '@/lib/bienvenida'
+import { dejarDeSeguir, guardarCumple, guardarFechaGrupo, hoyLocal } from '@/lib/events'
+import { guardarGustos, gustosPorContar, saltearBienvenida, yaAnotoUnDeseo } from '@/lib/bienvenida'
 import { avisosPreguntados, borrarSuscripcion, confirmarSuscripcion, guardarSuscripcion, mandarCodazo, marcarCodazosVistos, probarAviso } from '@/lib/codazos'
 import { esPasoGustos, gustosDesdeForm } from '@/lib/gustos'
 import { hace, novedadesDeAmigos, robarDeseo, type Novedad } from '@/lib/novedades'
 import { invitarARegalo, responderInvitacion } from '@/lib/invitaciones'
 import { crearSorpresa, editarSorpresa, type ParaElegido } from '@/lib/sorpresas'
 import {
-  borrarAmigoInvisible, cambiarExcluidos, crearAmigoInvisible, editarAmigoInvisible, invitarAlJuego, marcarYaLoTengo, preguntar,
-  responderJuego, responderPregunta, revelarQuienMeRegalo, sortear, verAQuienLeRegalo, type DatosJuego,
+  borrarAmigoInvisible, cambiarExcluidos, cambiarLinkDelJuego, cerrarAltas, crearAmigoInvisible, dejarVolverAlJuego, editarAmigoInvisible,
+  invitarAlJuego, marcarYaLoTengo, preguntar, responderJuego, responderPregunta, revelarQuienMeRegalo, sacarDelJuego, sortear, unirsePorLink,
+  verAQuienLeRegalo, type DatosJuego,
 } from '@/lib/amigo-invisible'
 import { esFechaEspecial } from '@/lib/fechas-especiales'
 import {
@@ -53,6 +55,8 @@ import { esMoneda, parsePesos, partePesos, plata } from '@/lib/pesos'
 import { identificado, type Viewer } from '@/lib/types'
 import { LARGO, recortar } from '@/lib/limites'
 import { NO_SUGERIR_COOKIE, sumarNoSugerir } from '@/lib/no-sugerir'
+import { borrarCuenta } from '@/lib/cuenta'
+import { esOcasion } from '@/lib/ocasiones'
 
 /** Lo que devuelven los formularios que muestran un mensaje (con useActionState). */
 export type EstadoForm = { error: string } | null
@@ -99,10 +103,17 @@ const conParametro = (ruta: string, clave: string, valor: string) => `${ruta}${r
 export async function addItemAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  const data = deseoDesdeForm(formData, true)
-  if (!data) redirect('/agregar')
   // Sin listaId va a la lista personal; con listaId, a un grupo del que es dueño.
   const listaId = str(formData, 'listaId')
+  // Un aporte en plata tiene su formulario (ver AporteForm). Si algo no vale (lo frena el navegador; llega así sin JS o
+  // armado a mano), vuelve a él diciendo qué, con el nombre que había puesto.
+  const aporte = esFormDeAporte(formData) ? aporteDesdeForm(formData) : null
+  if (aporte && !aporte.ok) {
+    const q = new URLSearchParams({ aporte: '1', error: aporte.error, ...(listaId && { lista: listaId }), ...(str(formData, 'titulo') && { titulo: str(formData, 'titulo') }) })
+    redirect(`/agregar?${q}`)
+  }
+  const data = aporte ? aporte.datos : deseoDesdeForm(formData, true)
+  if (!data) redirect('/agregar')
   const creado = await createItem(db, session.userId, paraAgregar(data), listaId)
   revalidatePath('/mi-lista')
   revalidatePath('/grupos', 'layout')
@@ -117,7 +128,10 @@ export async function updateItemAction(formData: FormData) {
   const itemId = str(formData, 'itemId') ?? ''
   const editable = await deseoParaEditar(db, itemId, session.userId)
   if (!editable) redirect('/mi-lista')
-  const data = deseoDesdeForm(formData)
+  // un aporte en plata se edita con su formulario; lo que no vale (un alias mal escrito) vuelve a él diciendo qué
+  const aporte = editable.deseo.tipo === 'aporte' ? aporteDesdeForm(formData) : null
+  if (aporte && !aporte.ok) redirect(`/editar/${itemId}?error=${aporte.error}`)
+  const data = aporte ? aporte.datos : deseoDesdeForm(formData)
   if (!data) redirect(`/editar/${itemId}`)
   // Al editar, lo que quedó vacío se borra; un link que no es link deja el que había (ver deseoDesdeForm).
   await updateItem(db, itemId, session.userId, data)
@@ -165,6 +179,51 @@ export async function restoreItemAction(formData: FormData) {
   revalidatePath('/l', 'layout')
 }
 
+const uno = (v: string | undefined) => (v === 'grupal' ? 'grupal' : 'suelto')
+
+/**
+ * "¿Qué te regalaron?": los deseos que tildó pasan a Recibidos, todos de una vez (ver marcarRecibidos), y va a "Listo" con
+ * cuántos marcó. Con aca (uno solo, desde Recibidos en Mi lista), se queda donde está y la tarjeta del cumple no se cierra.
+ */
+export async function marcarRecibidosAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const aca = !!str(formData, 'aca')
+  const ids = formData.getAll('itemId').filter((v): v is string => typeof v === 'string')
+  const marcados = await marcarRecibidos(db, session.userId, ids, new Date(), { cerrar: !aca })
+  revalidatePath('/mi-lista')
+  revalidatePath('/l', 'layout')
+  revalidatePath('/regalos')
+  revalidatePath('/inicio')
+  if (!aca) redirect(marcados === null ? '/mi-lista' : `/mi-lista/recibidos?listo=${marcados}`)
+}
+
+/** "Ahora no" en la tarjeta de después del cumple: no vuelve para ese cumple (ver cerrarPostEvento). */
+export async function cerrarPostEventoAction() {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await cerrarPostEvento(db, session.userId)
+  revalidatePath('/mi-lista')
+}
+
+/** "Contarle a Euge que fue tuyo", en Tus regalos (ver revelarRegalo): tipo e id, el claim suelto o el regalo grupal. */
+export async function revelarRegaloAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await revelarRegalo(db, session.userId, uno(str(formData, 'tipo')), str(formData, 'id') ?? '')
+  revalidatePath('/regalos')
+  revalidatePath('/mi-lista')
+}
+
+/** "Mandarle gracias" a quien le contó que un regalo fue suyo (ver agradecer): una vez por regalo. */
+export async function agradecerAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  await agradecer(db, session.userId, uno(str(formData, 'tipo')), str(formData, 'id') ?? '', str(formData, 'de') ?? '')
+  revalidatePath('/mi-lista')
+  revalidatePath('/deseo', 'layout')
+}
+
 export async function updatePriorityAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
@@ -179,8 +238,8 @@ export async function updatePriorityAction(formData: FormData) {
  * La fecha del formulario de un grupo: la del cumple (cumple=1: día y mes, ver fechaDeCumple) o la elegida en el
  * calendario. invalida: escribió algo que no es una fecha que exista (el 31 de abril, o el día sin el mes).
  */
-function fechaDelForm(fd: FormData): { esCumple: boolean; fecha: string | null; invalida: boolean } {
-  if (fd.get('cumple') === '1') {
+function fechaDelForm(fd: FormData, esCumple = fd.get('cumple') === '1'): { esCumple: boolean; fecha: string | null; invalida: boolean } {
+  if (esCumple) {
     const fecha = fechaDeCumple(numero(fd, 'dia'), numero(fd, 'mes'))
     return { esCumple: true, fecha, invalida: !fecha && !!(str(fd, 'dia') || str(fd, 'mes')) }
   }
@@ -196,12 +255,16 @@ export async function createGroupAction(formData: FormData) {
   if (!session?.userId) redirect('/')
   const nombre = recortar(str(formData, 'nombre') ?? '', LARGO.nombreGrupo)
   if (!nombre) redirect('/grupos/nuevo')
-  const { esCumple, fecha, invalida } = fechaDelForm(formData)
+  // Para qué es (ver ocasiones.ts): lo eligió en el primer paso. Si es un cumple, la fecha es día y mes; si no, una del
+  // calendario. Sin ocasión (un formulario de antes), lo que diga "cumple", como siempre.
+  const elegida = str(formData, 'ocasion')
+  const ocasion = esOcasion(elegida) ? elegida : undefined
+  const { esCumple, fecha, invalida } = fechaDelForm(formData, ocasion ? ocasion === 'cumple' : undefined)
   // Una fecha que no existe (un navegador sin calendario, un pedido armado) no frena el grupo: se crea sin fecha y la
   // pantalla del grupo avisa, con la fecha abierta para elegir otra. Todo en un alta: nunca queda un grupo a medias.
   const id = await crearGrupo(db, session.userId, {
     nombre, descripcion: recortar(str(formData, 'descripcion') ?? '', LARGO.descripcionGrupo) || undefined,
-    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on', esCumple, fotoUrl: str(formData, 'foto'),
+    eventoFecha: fecha, eventoAnual: formData.get('anual') === 'on', esCumple, ocasion, fotoUrl: str(formData, 'foto'),
     parentesco: parentescoDelForm(str(formData, 'parentesco'), str(formData, 'parentescoOtro')),
   })
   // a los amigos elegidos les llega el aviso; con la lista ya creada, que no llegue uno no la frena
@@ -261,6 +324,19 @@ export async function invitarAlGrupoAction(formData: FormData) {
   if (invitados.length) redirect(`/grupos/${id}?nuevo=invitados`)
 }
 
+/**
+ * Un deseo para empezar, en una lista en común recién armada ("Vajilla", "Pañales": los de su ocasión, ver
+ * sumarDeseoSugerido): se suma con un toque y se queda en la pantalla, para seguir con el que sigue.
+ */
+export async function sumarDeseoSugeridoAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const id = str(formData, 'grupoId') ?? ''
+  await sumarDeseoSugerido(db, session.userId, id, str(formData, 'titulo') ?? '')
+  revalidatePath(`/grupos/${id}`)
+  revalidatePath('/l', 'layout')
+}
+
 /** "Agregar" la lista en común de un amigo a tu gente (y su cumple a tus Eventos). */
 export async function agregarListaAction(formData: FormData) {
   const session = await auth()
@@ -292,37 +368,61 @@ export async function saveBirthdayAction(formData: FormData) {
   if (str(formData, 'conAviso')) redirect('/perfil#cumple')
 }
 
-/** Bienvenida (o editar gustos desde Perfil): guarda lo elegido, aunque se corte a mitad de camino. */
+/**
+ * La bienvenida, una sola pantalla: su cumple, o "Ahora no". De ahí va a anotar su primer deseo (o a su lista, si ya tenía
+ * alguno: lo compartió a GiftR desde una tienda antes de pasar por acá). Por los avisos se le pregunta después, cuando ya
+ * anotó algo (ver preguntarAvisos).
+ */
+export async function bienvenidaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  if (!formData.has('ahoraNo')) {
+    // los dos vacíos no es un error (lo deja para después); uno sin el otro, o un día que no existe, vuelve con el aviso
+    const ok = await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
+    if (!ok) redirect('/bienvenida?cumple=invalido')
+    revalidatePath('/perfil')
+    revalidatePath('/eventos')
+  }
+  await saltearBienvenida(db, session.userId)
+  revalidatePath('/mi-lista')
+  revalidatePath('/inicio')
+  redirect(await yaAnotoUnDeseo(db, session.userId) ? '/mi-lista' : '/agregar')
+}
+
+/** De dónde se abrió un paso de los gustos, para volver ahí al guardar (ver VolverGustos en BienvenidaForm). */
+const VUELTAS_GUSTOS = ['listo', 'listo-perfil', 'lista'] as const
+
+/** Editar un paso de los gustos (desde Tus gustos, "¡Todo listo!" o la tarjeta de Mi lista): guarda lo elegido. */
 export async function saveGustosAction(formData: FormData) {
   const session = await auth()
   if (!session?.userId) redirect('/')
-  await guardarGustos(db, session.userId, gustosDesdeForm(formData))
+  const gustos = gustosDesdeForm(formData)
+  await guardarGustos(db, session.userId, gustos)
   // los dos vacíos lo borran (los campos vienen con el cumple guardado); uno sin el otro, o uno que no existe, no se guarda
   const cumpleOk = !formData.has('dia') || await guardarCumple(db, session.userId, numero(formData, 'dia'), numero(formData, 'mes'))
   revalidatePath('/perfil')
   revalidatePath('/perfil/gustos')
   revalidatePath('/eventos')
   revalidatePath('/mi-lista')
-  // Un paso solo, desde Tus gustos (o desde "¡Todo listo!", que vuelve ahí). Con el cumple que no se guardó, al mismo
-  // paso a avisar.
+  // Con el cumple que no se guardó, al mismo paso a avisar.
   const solo = str(formData, 'solo')
   if (esPasoGustos(solo)) {
-    const volver = str(formData, 'volver')
-    const listo = volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil' : null
-    if (!cumpleOk) redirect(`/perfil/gustos/${solo}?cumple=invalido${listo ? `&volver=${volver}` : ''}`)
-    redirect(listo ?? `/perfil/gustos?guardado=${solo}`)
+    const volver = VUELTAS_GUSTOS.find((v) => v === str(formData, 'volver')) ?? null
+    if (!cumpleOk) redirect(`/perfil/gustos/${solo}?cumple=invalido${volver ? `&volver=${volver}` : ''}`)
+    if (volver === 'lista') {
+      // Desde la tarjeta "Contá tus gustos" de Mi lista: sigue por el próximo que falta y, cuando no queda ninguno más
+      // adelante, termina en "¡Todo listo!" con todo lo que contó.
+      const { siguiente } = gustosPorContar(gustos, solo)
+      redirect(siguiente ? `/perfil/gustos/${siguiente}?volver=lista` : '/bienvenida/listo')
+    }
+    redirect(volver === 'listo' ? '/bienvenida/listo' : volver === 'listo-perfil' ? '/bienvenida/listo?desde=perfil' : `/perfil/gustos?guardado=${solo}`)
   }
-  // volver=perfil: la bienvenida entera desde Perfil, como era antes de Tus gustos (una pestaña que quedó abierta)
-  const desdePerfil = str(formData, 'volver') === 'perfil'
-  const corte = formData.has('corte')
-  // Lo demás ya se guardó: vuelve al primer paso a avisar, en vez de seguir como si el cumple estuviera. Con "Más tarde"
-  // quería salir: va a Perfil, que avisa al lado de su cumple, en vez de dejarlo adentro.
-  if (!cumpleOk) redirect(corte || desdePerfil ? '/perfil?cumple=invalido#cumple' : '/bienvenida?paso=0&cumple=invalido')
-  if (desdePerfil) redirect('/perfil/gustos')
-  // La primera vez, antes de terminar, le pregunta si quiere avisos (ver /bienvenida/avisos); con "Más tarde", después
-  // sigue a su lista, como antes. Con eso ya se le preguntó: el cartel de los que ya estaban no le aparece.
-  await avisosPreguntados(db, session.userId)
-  redirect(corte ? '/bienvenida/avisos?luego=lista' : '/bienvenida/avisos')
+  // Sin un paso: el formulario entero de la bienvenida de antes (los ocho pasos), de una pestaña que quedó abierta. Ya se
+  // guardó todo: sigue como la bienvenida de ahora, a su primer deseo o a su lista (volver=perfil: la había abierto desde
+  // Perfil). Con el cumple que no se guardó, a Perfil, que avisa al lado de su cumple.
+  if (!cumpleOk) redirect('/perfil?cumple=invalido#cumple')
+  if (str(formData, 'volver') === 'perfil') redirect('/perfil/gustos')
+  redirect(await yaAnotoUnDeseo(db, session.userId) ? '/mi-lista' : '/agregar')
 }
 
 export async function joinGroupAction(formData: FormData) {
@@ -388,6 +488,20 @@ export async function newShareLinkAction(formData: FormData) {
   if (nuevo) redirect(grupoId ? `/grupos/${grupoId}?nuevo=regalar` : '/perfil?nuevo=regalar')
 }
 
+/**
+ * "Solo con cuenta se ve quién reservó", de la lista personal (desde Mi lista) o de una en común (con grupoId): prendida
+ * (prendida=1), quien entra sin cuenta ve qué está ocupado pero no por quién.
+ */
+export async function nombresSoloConCuentaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const listId = str(formData, 'grupoId') ?? (await asegurarListaPropia(db, session.userId))?.id
+  if (listId) await guardarNombresSoloConCuenta(db, listId, session.userId, str(formData, 'prendida') === '1')
+  revalidatePath('/mi-lista')
+  revalidatePath('/grupos', 'layout')
+  revalidatePath('/l', 'layout')
+}
+
 /** Saca una lista de Tu gente (y su cumple o fecha de Eventos). */
 export async function unfollowAction(formData: FormData) {
   const session = await auth()
@@ -401,21 +515,32 @@ export async function unfollowAction(formData: FormData) {
  * El que mira. Si no se sabe quién es y el formulario trae un nombre, lo anota como invitado
  * (con la cookie firmada). Un nombre vacío o muy largo vuelve con el motivo, para mostrárselo.
  * Anotarse con su nombre en una lista es decir que no es suya: ve lo que reservaron los demás ahí (y solo ahí).
+ * nuevo: se anotó recién, con este mismo envío (hasta ahora no veía qué estaba reservado).
+ * Un navegador que ya tiene su invitado sigue con ese (no se anota otro), y los nuevos tienen tope: por navegador
+ * (INVITADOS_POR_NAVEGADOR) y por lista (ver anotarInvitado). Si no, cada nombre inventado eran 10 reservas más.
  */
-async function viewerIdentificandoGuest(formData: FormData, listId: string): Promise<{ ok: true; viewer: Viewer } | Extract<NombreValidado, { ok: false }>> {
+async function viewerIdentificandoGuest(
+  formData: FormData, listId: string,
+): Promise<{ ok: true; viewer: Viewer; nuevo: boolean } | { ok: false; motivo: 'vacio' | 'largo' | 'tope'; error: string }> {
   const viewer = await getViewer()
-  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer }
-  const v = validarNombre(formData.get('nombre'))
+  if (identificado(viewer) || !formData.has('nombre')) return { ok: true, viewer, nuevo: false }
+  const v: NombreValidado = validarNombre(formData.get('nombre'))
   if (!v.ok) return v
-  const guest = await createGuest(db, v.nombre)
-  await abrirListaAInvitado(db, guest.id, listId)
   const jar = await cookies()
+  // el día de acá: a la medianoche de Argentina la cuenta del navegador empieza de nuevo
+  const hoy = hoyLocal().toISOString().slice(0, 10)
+  if (anotadosHoy(jar.get(ANOTADOS_COOKIE)?.value, hoy) >= INVITADOS_POR_NAVEGADOR) {
+    return { ok: false, motivo: 'tope', error: 'Hoy ya se anotó mucha gente desde este dispositivo: entrá con Google para reservar.' }
+  }
+  const guest = await anotarInvitado(db, v.nombre, listId)
+  if (!guest) return { ok: false, motivo: 'tope', error: 'Hoy ya se anotó mucha gente en esta lista: entrá con Google para reservar.' }
   jar.set(GUEST_COOKIE, firmarInvitado(guest.id), OPCIONES_COOKIE_INVITADO)
+  jar.set(ANOTADOS_COOKIE, sumarAnotado(jar.get(ANOTADOS_COOKIE)?.value, hoy), OPCIONES_COOKIE_INVITADO)
   // las cuentas anotadas duran desde ahora, como la cookie nueva: si vencieran antes, la dueña sin su sesión volvería a
   // ver como regaladora la lista que este invitado abrió
   renovarCuentas(jar)
   // con las cuentas que tuvieron sesión acá: en sus listas, este invitado nuevo tampoco ve nada
-  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value) }
+  return { ok: true, viewer: viewerSinSesion(guest.id, jar.get(CUENTAS_COOKIE)?.value), nuevo: true }
 }
 
 export async function reserveAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
@@ -425,21 +550,31 @@ export async function reserveAction(_: EstadoForm, formData: FormData): Promise<
   if (!listId) return null
   const quien = await viewerIdentificandoGuest(formData, listId)
   if (!quien.ok) return { error: quien.error }
+  // ¿Veía qué estaba reservado cuando tocó "Reservar"? La abuela abre el link sin anotarse y ve todos los deseos como
+  // libres (puede ser la dueña sin su sesión); elige el Termo, que Rodri reservó la semana pasada, y pone su nombre. Lo
+  // mismo un invitado que todavía no dijo que esta lista no es suya. Se mira antes de reservar: reservar ya le abre la lista.
+  const veia = !!quien.viewer.userId || (!quien.nuevo && (await accesoALista(db, listId, quien.viewer)) === 'regalador')
   const r = await reserveItem(db, itemId, quien.viewer)
   revalidatePath(`/l/${token}`)
   revalidatePath(`/l/${token}/item/${itemId}`)
   const volver = volverALista(formData, token)
   // Un doble toque manda el segundo envío con la reserva del primero ya hecha: reserveItem le devuelve esa.
   if (r.ok) {
+    // Desde la lista (avisar): vuelve parado en ese deseo, con el cartel de hasta cuándo es suyo y qué sigue (y sin el de
+    // una reserva anterior que no salió). Sin sumar una página al historial: reservar no es ir a otro lado.
+    if (str(formData, 'avisar')) redirect(`${conParametro(volver, 'reservado', itemId)}#deseo-${itemId}`, RedirectType.replace)
     // si arriba quedó el cartel de una reserva anterior que no salió (?reserva=), se va
     if (str(formData, 'conCartel')) redirect(volver)
     return null
   }
   // Por qué no se pudo va en la página (?reserva=…), no en el formulario: al recargar, ese deseo ya no tiene
   // el botón (lo agarró otro, o recién ahora se ven los estados) y el mensaje se iría con él.
+  // Sin lugar: si no veía los estados, no se lo ganó nadie de mano (decirle "recién lo reservó otra persona" sería mentirle):
+  // ya estaba elegido y recién ahora lo ve. Si los veía, sí: se lo reservaron mientras miraba.
+  const motivo = r.reason === 'sin_stock' && !veia ? 'ya_elegido' : r.reason
   // Se vuelve a la misma página, con sus filtros; del detalle, a la lista si el deseo ya no está.
   const sigue = r.reason === 'sin_stock' || r.reason === 'sin_identidad' || r.reason === 'muchas'
-  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', r.reason))
+  redirect(conParametro(sigue || !volver.startsWith(`/l/${token}/item/`) ? volver : `/l/${token}`, 'reserva', motivo))
 }
 
 /** "¿Quién sos?" arriba de una lista: se anota con su nombre (sin reservar nada) y pasa a ver la coordinación. */
@@ -492,6 +627,28 @@ export async function salirAction(formData: FormData) {
   jar.delete(NO_SOY_COOKIE)
   revalidatePath(volver, 'layout')
   redirect(volver)
+}
+
+/**
+ * "Borrar mi cuenta" (Perfil → /perfil/borrar): con la palabra escrita (no alcanza un toque de más), borra todo lo suyo
+ * (ver borrarCuenta), cierra la sesión y lo deja en la portada. No se anota la cuenta en este navegador como al cerrar
+ * sesión (ver salirAction): ya no hay listas suyas que cuidar, y su id no queda en ningún lado.
+ */
+export async function borrarCuentaAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  if ((str(formData, 'confirmar') ?? '').toUpperCase() !== 'BORRAR') redirect('/perfil/borrar?aviso=palabra#confirmar')
+  let borrada = false
+  try {
+    borrada = await borrarCuenta(db, session.userId)
+  } catch (e) {
+    console.error('No se pudo borrar la cuenta:', e)
+  }
+  // no se borró nada (va todo junto o nada): que lo sepa y pueda probar de nuevo. Si ya no existía (la borró recién
+  // desde otro dispositivo), solo queda cerrar esta sesión.
+  if (!borrada && await existeUsuario(db, session.userId)) redirect('/perfil/borrar?aviso=error#confirmar')
+  revalidatePath('/', 'layout')
+  await signOut({ redirectTo: '/?cuenta=borrada' })
 }
 
 /**
@@ -552,6 +709,45 @@ export async function boughtAction(formData: FormData) {
   if (!r.ok && r.reason === 'sin_lugar') redirect(`/l/${token}/item/${itemId}?reserva=vencida`)
 }
 
+const ERRORES_APORTE = {
+  propio: 'En tu propia lista no podés anotar un aporte.',
+  archivado: 'Ese deseo ya no está en la lista.',
+  no_existe: 'Ese deseo ya no está en la lista.',
+  sin_identidad: 'Para anotarlo, decinos quién sos.',
+  monto: 'Poné cuánto aportaste en pesos, por ejemplo $20.000. Si preferís no decirlo, dejalo vacío.',
+} as const
+
+/**
+ * "Ya aporté", en un deseo de aporte en plata (ver aportar): queda anotado para él (en Tus regalos) y para los demás que
+ * regalan; al dueño no le llega nada. Con cuánto, si lo quiso decir. Sin nombre todavía, lo pide el mismo formulario y lo
+ * anota como invitado, como al reservar.
+ */
+export async function aportarAction(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const token = str(formData, 'token') ?? ''
+  const itemId = str(formData, 'itemId') ?? ''
+  const listId = await listaDelItem(itemId, token)
+  if (!listId) return null
+  const monto = montoDelAporte(formData.get('monto'))
+  if (monto === undefined) return { error: ERRORES_APORTE.monto }
+  const quien = await viewerIdentificandoGuest(formData, listId)
+  if (!quien.ok) return { error: quien.error }
+  const r = await aportar(db, itemId, quien.viewer, monto)
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath('/regalos')
+  return r.ok ? null : { error: ERRORES_APORTE[r.reason] }
+}
+
+/** "Me equivoqué, no aporté": el aporte propio deja de figurar (ver deshacerAporte). */
+export async function deshacerAporteAction(formData: FormData) {
+  const viewer = await getViewer()
+  const [token, itemId] = [str(formData, 'token') ?? '', str(formData, 'itemId') ?? '']
+  await deshacerAporte(db, str(formData, 'claimId') ?? '', viewer)
+  revalidatePath(`/l/${token}`)
+  revalidatePath(`/l/${token}/item/${itemId}`)
+  revalidatePath('/regalos')
+}
+
 /** "Me equivoqué, no lo compré": la compra suelta vuelve a ser una reserva (si no tiene ya el tope de reservas en la lista). */
 export async function unboughtAction(formData: FormData) {
   const viewer = await getViewer()
@@ -572,7 +768,10 @@ export async function commentAction(formData: FormData) {
   const viewer = await getViewer()
   const token = str(formData, 'token')!
   const itemId = str(formData, 'itemId')!
-  if (!(await listaDelItem(itemId, token))) return
+  const listId = await listaDelItem(itemId, token)
+  // el hilo es de los que lo ven: un invitado sin cuenta en una lista que muestra los nombres solo con cuenta no lo lee,
+  // así que tampoco escribe en él (la sorpresa, siempre con cuenta, tiene su propio control en addComment)
+  if (!listId || !(viewer.userId || (await veQuienReservo(db, listId, viewer)))) return
   await addComment(db, itemId, viewer, str(formData, 'texto') ?? '')
   revalidatePath(`/l/${token}/item/${itemId}`)
   revalidatePath(`/sorpresa/${token}`)
@@ -761,7 +960,7 @@ const ERRORES_COMPRA = {
 /** Qué no cierra, para el formulario: con las partes, cuánto falta o cuánto sobra. */
 function errorDeCompra(r: Exclude<CompraResult, { ok: true }>, p: DatosCompra): string {
   if (r.reason === 'de_la_lista') {
-    return `${r.nombre} se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${plata(r.monto, p.moneda)}.`
+    return `${r.nombre} se sumó a la lista en común después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole ${plata(r.monto, p.moneda)}.`
   }
   if (r.reason !== 'no_suma') return ERRORES_COMPRA[r.reason]
   const suma = Object.values(p.partes ?? {}).reduce((a, b) => a + b, 0)
@@ -886,16 +1085,6 @@ export async function vistaBandejaAction(hasta: string) {
   const viewer = await getViewer()
   if (!viewer.userId || typeof hasta !== 'string') return
   await marcarBandejaVista(db, { ...viewer, userId: viewer.userId }, new Date(hasta))
-}
-
-/** "Limpiar" en Para vos (Inicio): lo que había cuando se armó deja de ser nuevo (ver limpiarParaVos). */
-export async function limpiarParaVosAction(formData: FormData) {
-  const session = await auth()
-  const hasta = str(formData, 'hasta')
-  if (!session?.userId || !hasta) return
-  await limpiarParaVos(db, session.userId, new Date(hasta))
-  // también el número de la campanita, que está en el encabezado de cada sección
-  revalidatePath('/', 'layout')
 }
 
 /** Para vos: deslizar un aviso y "Archivar" (o deslizarlo hasta el final) lo saca de ahí (ver marcarAvisoVisto). */
@@ -1023,6 +1212,19 @@ export async function cambiarUsuarioAction(formData: FormData) {
   redirect(`/perfil?usuario=${r.ok ? 'ok' : r.error}#usuario`)
 }
 
+/**
+ * "Tu alias o CVU" en Perfil (ver guardarAliasPago): vacío lo borra. Cuentas se vuelve a armar: ahí deja de invitarlo a
+ * cargarlo, y los que le deben ya lo ven.
+ */
+export async function guardarAliasAction(formData: FormData) {
+  const session = await auth()
+  if (!session?.userId) redirect('/')
+  const r = await guardarAliasPago(db, session.userId, formData.get('alias'))
+  revalidatePath('/perfil')
+  revalidatePath('/cuentas')
+  redirect(`/perfil?alias=${!r.ok ? r.error : r.alias ? 'ok' : 'borrado'}#alias`)
+}
+
 // ---------------------------------------------------------------- lo nuevo de tus amigos y "Me lo robo"
 
 /** Lo que muestra la tarjeta de una novedad (con el "hace 3 h" ya escrito: así el servidor y el teléfono dicen lo mismo). */
@@ -1077,7 +1279,7 @@ function revalidarJuego(id: string) {
   revalidatePath('/fechas', 'layout')
 }
 
-/** "Armarlo e invitarlos": el juego, con los amigos que eligió (ver crearAmigoInvisible). Va al juego. */
+/** "Armarlo": el juego, con los amigos que eligió si eligió alguno (ver crearAmigoInvisible). Va al juego, donde está el link para invitar. */
 export async function crearAmigoInvisibleAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const datos = datosJuego(formData)
@@ -1120,6 +1322,57 @@ export async function invitarAlJuegoAction(formData: FormData) {
   revalidarJuego(id)
 }
 
+/**
+ * "Sumarme", en la pantalla del link del juego (ver unirsePorLink). Pide un toque (POST): WhatsApp abre los links solo
+ * para armar la vista previa, y eso no tiene que sumar a nadie. Si no entra (cambió el link, cerraron las altas, se
+ * llenó), vuelve a la invitación, que dice por qué.
+ */
+export async function unirseAlJuegoAction(formData: FormData) {
+  const token = str(formData, 'token') ?? ''
+  if (!esToken(token)) redirect('/regalos')
+  const session = await auth()
+  if (!session?.userId || !(await existeUsuario(db, session.userId))) redirect(`/invisible/unirme/${token}`)
+  const r = await unirsePorLink(db, token, session.userId)
+  if (!r.ok) redirect(`/invisible/unirme/${token}`)
+  revalidarJuego(r.id)
+  redirect(rutaJuego(r.id))
+}
+
+/** "Cambiar el link": el de antes deja de servir (ver cambiarLinkDelJuego). */
+export async function cambiarLinkDelJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await cambiarLinkDelJuego(db, id, userId)
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}#invitar`)
+}
+
+/** "Cerrar las altas" (cerrar=1) o abrirlas de nuevo: si el link suma gente o no. */
+export async function cerrarAltasAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await cerrarAltas(db, id, userId, str(formData, 'cerrar') === '1')
+  revalidatePath(rutaJuego(id))
+  redirect(`${rutaJuego(id)}#invitar`)
+}
+
+/** El que organiza saca a alguien del juego (ver sacarDelJuego). */
+export async function sacarDelJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await sacarDelJuego(db, id, userId, str(formData, 'userId') ?? '')
+  revalidarJuego(id)
+  redirect(rutaJuego(id))
+}
+
+/** "Dejar que vuelva": el que había sacado puede sumarse otra vez. */
+export async function dejarVolverAlJuegoAction(formData: FormData) {
+  const userId = await usuarioRegalador()
+  const id = str(formData, 'id') ?? ''
+  await dejarVolverAlJuego(db, id, userId, str(formData, 'userId') ?? '')
+  revalidatePath(rutaJuego(id))
+}
+
 /** "Que no se toquen" (excluir=1) o volver a dejar que se toquen. */
 export async function cambiarExcluidosAction(formData: FormData) {
   const userId = await usuarioRegalador()
@@ -1129,7 +1382,7 @@ export async function cambiarExcluidosAction(formData: FormData) {
   if (!ok) redirect(`${rutaJuego(id)}?excluir=error#no-se-tocan`)
 }
 
-/** "Sortear": si no alcanza o no hay forma, vuelve diciendo por qué. */
+/** "Sortear" (o "Volver a sortear", si después alguien se bajó o se sumó): si no alcanza o no hay forma, vuelve diciendo por qué. */
 export async function sortearAction(formData: FormData) {
   const userId = await usuarioRegalador()
   const id = str(formData, 'id') ?? ''

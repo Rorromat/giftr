@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
 import { parse as parseUrl } from 'node:url'
 import webpush from 'web-push'
-import { codazos, config, lists, pushSubs, users } from '@/db/schema'
+import { codazos, config, items, lists, pushSubs, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import type { Viewer } from '@/lib/types'
 import { duenosDeLista, esDuenoSql, esToken } from '@/lib/groups'
@@ -77,18 +77,28 @@ async function podarSuscripciones(db: Db, userId: string) {
   await db.delete(pushSubs).where(and(eq(pushSubs.userId, userId), notInArray(pushSubs.id, masNuevas)))
 }
 
+/** Cuánto después de la bienvenida se le pregunta por los avisos a quien todavía no anotó ningún deseo (ver preguntarAvisos). */
+export const AVISOS_SIN_DESEOS_HORAS = 24
+
 /**
- * Si hay que preguntarle por los avisos con el cartel de una sola vez (a los que ya estaban antes de que la bienvenida lo
- * preguntara): ya pasó la bienvenida, nunca se le preguntó y no los tiene activados en ningún dispositivo.
+ * Si hay que preguntarle por los avisos con el cartel de una sola vez (ver PreguntaAvisos): ya pasó la bienvenida, nunca se
+ * le preguntó, no los tiene activados en ningún dispositivo y ya hizo algo. Antes la bienvenida lo preguntaba antes del
+ * primer deseo, cuando todavía no había nada de qué avisarle. Ahora, cuando hay algún deseo en una lista suya (la propia o
+ * una en común que arma: el cartel sale al cerrar "¡Anotado!") o, si entró solo a regalar, cuando vuelve otro día: a él
+ * también le puede llegar un codazo.
  */
-export async function preguntarAvisos(db: Db, userId: string): Promise<boolean> {
+export async function preguntarAvisos(db: Db, userId: string, ahora = new Date()): Promise<boolean> {
   const [u] = await db.select({ bienvenida: users.bienvenidaAt, preguntados: users.avisosPreguntadosAt }).from(users).where(eq(users.id, userId))
   if (!u?.bienvenida || u.preguntados) return false
   const [sub] = await db.select({ id: pushSubs.id }).from(pushSubs).where(eq(pushSubs.userId, userId)).limit(1)
-  return !sub
+  if (sub) return false
+  if (ahora.getTime() - u.bienvenida.getTime() >= AVISOS_SIN_DESEOS_HORAS * 3_600_000) return true
+  const [deseo] = await db.select({ id: items.id }).from(items).innerJoin(lists, eq(items.listId, lists.id))
+    .where(esDuenoSql(db, userId)).limit(1)
+  return !!deseo
 }
 
-/** Ya se le preguntó por los avisos (en la bienvenida o con el cartel): no se le vuelve a preguntar. */
+/** Ya se le preguntó por los avisos (con el cartel, o en la bienvenida de antes): no se le vuelve a preguntar. */
 export async function avisosPreguntados(db: Db, userId: string) {
   await db.update(users).set({ avisosPreguntadosAt: new Date() }).where(and(eq(users.id, userId), isNull(users.avisosPreguntadosAt)))
 }
@@ -152,21 +162,23 @@ const enviarConWebPush: Enviar = async (s, aviso, vapid) => {
 }
 
 /**
- * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí; tipo: qué es, para "Para vos" en
- * Inicio) y le llega al celular (ver mandarPush). Devuelve a cuántos dispositivos llegó.
+ * Un aviso: queda en su bandeja (ver guardarAviso; de: quién lo manda, para su foto ahí; tipo: qué es, para su ícono y
+ * para "Para vos" en Inicio; null en los que van con el emoji de su título, como los recordatorios) y le llega al celular
+ * (ver mandarPush). Devuelve a cuántos dispositivos llegó.
  */
-export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null; tipo: TipoEnBandeja }, enviar: Enviar = enviarConWebPush): Promise<number> {
+export async function avisar(db: Db, userId: string, aviso: Aviso & { de?: string | null; tipo: TipoEnBandeja | null }, enviar: Enviar = enviarConWebPush): Promise<number> {
   const { de = null, tipo, ...push } = aviso
-  await guardarAviso(db, userId, { ...push, tipo }, de)
+  await guardarAviso(db, userId, { ...push, tipo: tipo ?? undefined }, de)
   return mandarPush(db, userId, push, enviar)
 }
 
 /**
  * Manda un aviso a todos los dispositivos del usuario, a la vez (un servicio lento no hace esperar a los demás). Borra los
  * que ya no existen (404/410) y los de antes de los controles de guardarSuscripcion que no los pasan (otro host, claves que
- * no sirven, más de 10), sin mandarles nada. Devuelve a cuántos llegó.
+ * no sirven, más de 10), sin mandarles nada. Devuelve a cuántos llegó. Solo el celular: lo que además queda en la bandeja
+ * va con avisar; esto es para lo que ya tiene su cartel en otro lado (los avisos sobre un deseo, ver dejarAviso).
  */
-async function mandarPush(db: Db, userId: string, aviso: Aviso, enviar: Enviar): Promise<number> {
+export async function mandarPush(db: Db, userId: string, aviso: Aviso, enviar: Enviar = enviarConWebPush): Promise<number> {
   const subs = (await db.select().from(pushSubs).where(eq(pushSubs.userId, userId)).orderBy(desc(pushSubs.createdAt), desc(pushSubs.id)))
     .map((s) => ({ id: s.id, suscripcion: { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } } }))
   const sirven = subs.filter((s) => esSuscripcion(s.suscripcion)).slice(0, SUSCRIPCIONES_POR_USUARIO)
@@ -248,7 +260,7 @@ export async function mandarCodazo(db: Db, token: string, viewer: Viewer, deNomb
       tipo: 'codazo',
       title: `👉 ¡Codazo de ${primer}!`,
       body: list.tipo === 'grupo'
-        ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'el grupo'}".`
+        ? `Quiere saber qué regalarles. Cargá cosas en "${list.nombre ?? 'la lista en común'}".`
         : 'Quiere saber qué regalarte. Cargá lo que querés en tu lista.',
       url: list.tipo === 'grupo' ? `/grupos/${list.id}` : '/mi-lista',
     }, enviar)

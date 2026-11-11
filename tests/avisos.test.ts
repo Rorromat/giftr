@@ -1,13 +1,16 @@
 import { expect, test } from 'vitest'
+import { createECDH, randomBytes } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { createTestDb, seedOwnerAndGiver, seguir } from './helpers'
 import { items, lists, notifications } from '@/db/schema'
+import type { Db } from '@/db/types'
 import { reserveItem } from '@/lib/claims'
 import { abrirListaAInvitado } from '@/lib/acceso'
+import { guardarSuscripcion, type Aviso, type Enviar } from '@/lib/codazos'
 import { createGuest } from '@/lib/guest'
 import { archiveItem, createItem, updateItem } from '@/lib/items'
 import { cambiarLinkParaRegalar } from '@/lib/lists'
-import { getUnreadNotifications } from '@/lib/notifications'
+import { dejarAviso, getUnreadNotifications } from '@/lib/notifications'
 import { crearGrupo, unirseAGrupo } from '@/lib/groups'
 import { cancelarRegalo, iniciarRegaloGrupal, misCuentas, sumarseARegalo } from '@/lib/regalos'
 import { upsertUserFromGoogle } from '@/lib/users'
@@ -119,4 +122,24 @@ test('cuando el regalo se cancela, al que quedó organizándolo no le queda "Aho
   expect(await cancelarRegalo(db, regalos[1], sofi.id)).toBe(true)
   expect(await tipos()).toEqual(['regalo_baja Bici'])
   for (const u of [delfina, rodri]) expect(await db.select().from(notifications).where(eq(notifications.userId, u.id))).toEqual([])
+})
+
+test('fuera de un pedido (un script) el push de un aviso sale en el momento; adentro de una transacción queda solo el cartel', async () => {
+  // con un pedido en curso sale después de contestar: ver avisos-push.test.ts
+  const { db, giver, termo, mate } = await setup()
+  const ecdh = createECDH('prime256v1')
+  const keys = { p256dh: ecdh.generateKeys().toString('base64url'), auth: randomBytes(16).toString('base64url') }
+  await guardarSuscripcion(db, giver.id, { endpoint: 'https://fcm.googleapis.com/fcm/send/rodri', keys })
+  const enviados: Aviso[] = []
+  const enviar: Enviar = async (_, aviso) => { enviados.push(aviso); return 201 }
+  await dejarAviso(db, termo.id, 'item_editado', [{ userId: giver.id, guestId: null }], enviar)
+  expect(enviados).toEqual([{ title: '✏️ "Termo" fue editado por su dueño', body: 'Revisá los detalles.', url: `/l/tok-euge/item/${termo.id}` }])
+  // si el servicio de push se cae, el aviso queda igual y quien lo dejó no se entera
+  await dejarAviso(db, mate.id, 'item_editado', [{ userId: giver.id, guestId: null }], async () => { throw new Error('sin red') })
+  await db.transaction(async (tx) => {
+    await dejarAviso(tx as unknown as Db, mate.id, 'item_vuelve', [{ userId: giver.id, guestId: null }], enviar)
+  })
+  expect(enviados).toHaveLength(1)
+  expect((await getUnreadNotifications(db, { userId: giver.id })).map((n) => `${n.tipo} ${n.itemTitulo}`).sort())
+    .toEqual(['item_editado Mate', 'item_editado Termo', 'item_vuelve Mate'])
 })

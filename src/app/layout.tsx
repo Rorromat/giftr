@@ -5,7 +5,7 @@ import { ICONO_INICIO_DEV } from '@/app/icono-inicio-dev'
 import { Arranque } from '@/components/Arranque'
 import { Refrescar } from '@/components/Refrescar'
 import { RegistrarSW } from '@/components/RegistrarSW'
-import { ATRAPAR_PEDIDO_INSTALAR, SIN_ZOOM } from '@/lib/app-instalable'
+import { ATRAPAR_PEDIDO_INSTALAR } from '@/lib/app-instalable'
 import { DE_PRUEBA, NOMBRE_APP } from '@/lib/entorno'
 import './globals.css'
 
@@ -37,12 +37,14 @@ export const metadata: Metadata = {
   other: { 'apple-mobile-web-app-capable': 'yes' },
 }
 
-// Como una app: sin zoom (ni con dos dedos, ni con doble toque, ni el que hace el iPhone al tocar un campo). Safari en
-// iPhone no respeta userScalable para el pellizco: ahí lo frenan touch-action (tokens.css) y SIN_ZOOM. La barra del sistema
-// toma el fondo de la app, de día y de noche.
+// El zoom queda libre, con dos dedos y con doble toque: hay quien lo necesita para leer (antes estaba trabado acá, con
+// touch-action y con un script). El que hace solo el iPhone al tocar un campo se evita con la letra de los campos, de 16 px
+// o más (ver tokens.css). viewportFit cover: la app llega a los bordes de la pantalla y env(safe-area-inset-*) deja de
+// valer 0 en iPhone, así lo fijo de abajo (la barra, los botones) queda arriba de la barra de gestos. La barra del
+// sistema toma el fondo de la app, de día y de noche.
 export const viewport: Viewport = {
   themeColor: [{ media: '(prefers-color-scheme: light)', color: '#F6F6F8' }, { media: '(prefers-color-scheme: dark)', color: '#0C0C0E' }],
-  colorScheme: 'light dark', width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false,
+  colorScheme: 'light dark', width: 'device-width', initialScale: 1, viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -51,19 +53,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* el pedido de instalar de Chrome, si llega antes de que hidrate (texto fijo, no viene del pedido) */}
         <script dangerouslySetInnerHTML={{ __html: ATRAPAR_PEDIDO_INSTALAR }} />
-        <script dangerouslySetInnerHTML={{ __html: SIN_ZOOM }} />
       </head>
       <body className="min-h-screen font-sans">
-        <div className="mx-auto max-w-md px-[18px]">{children}</div>
-        {/* GiftR va en vertical: en un teléfono de costado, que lo vuelva a poner derecho (la app instalada en Android ya
-            no gira, ver manifest; el navegador y el iPhone no dejan trabarla) */}
-        <div className="gr-girar">
-          <svg aria-hidden width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="gr-girar__tel">
-            <rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" />
-          </svg>
-          <p className="text-lg font-semibold">Girá el teléfono</p>
-          <p className="text-sm text-gr-muted">GiftR se usa en vertical.</p>
-        </div>
+        {/* una columna angosta: con el teléfono de costado se usa igual (antes un cartel la tapaba y pedía girarlo). En
+            tablet y escritorio el marco se ensancha (.gr-marco, ver "Pantallas anchas" en tokens.css) */}
+        <div className="gr-marco">{children}</div>
         <Arranque />
         <Refrescar />
         {/* acá y no en el menú: también lo registran la portada, las listas compartidas (/l/…) y la bienvenida */}

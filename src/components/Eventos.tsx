@@ -99,7 +99,8 @@ export function Proximos({ eventos, hoy, especiales = [] }: { eventos: Evento[];
   ].sort((a, b) => a.dias - b.dias))
   if (!primeros.length) return null
   return (
-    <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none]">
+    // en escritorio, una grilla con todo a la vista: una fila que se desliza, con el mouse, no hay cómo moverla
+    <ul className="-mx-[18px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-2 pt-1 [scroll-padding-inline:18px] [scrollbar-width:none] lg:mx-0 lg:grid lg:gr-columnas lg:overflow-visible lg:px-0 lg:[&>li]:w-auto">
       {primeros.map((p) => p.tarjeta)}
       <li className="w-[160px] flex-none snap-start">
         <Link href="/eventos" className="gr-card flex h-full flex-col items-center justify-center gap-2 p-4 text-center">

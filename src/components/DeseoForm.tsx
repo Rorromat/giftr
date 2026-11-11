@@ -6,8 +6,11 @@ import { DetallesDeseo } from '@/components/DetallesDeseo'
 import { FotoField } from '@/components/FotoField'
 import { QueQueres } from '@/components/QueQueres'
 import { RecibirCompartido, type CompartidoAlForm } from '@/components/RecibirCompartido'
-import { Hearts, PRIORIDADES, PriorityTag, type Prioridad } from '@/components/ui'
+import Link from 'next/link'
+import { Hearts, Icon, PRIORIDADES, PriorityTag, type Prioridad } from '@/components/ui'
 import { LARGO } from '@/lib/limites'
+import { PrecioAlDia } from '@/components/PrecioAlDia'
+import { antiguedadDelPrecio } from '@/lib/presupuesto'
 import type { OwnerItemView } from '@/lib/serialize'
 
 /** Las tres etiquetas de "¿Cuánto lo querés?" sobre la foto: se ve la elegida (con CSS, sin esperar a que cargue nada). */
@@ -22,7 +25,7 @@ const ETIQUETA_ELEGIDA: Record<Prioridad, string> = {
  * a ver tus amigos (la foto, el nombre, el precio y cuánto lo querés) y se completa ahí mismo; pegar el link de la tienda
  * trae nombre, foto y precio. Abajo, cuánto lo querés, si sirve algo parecido y los detalles, de a uno.
  */
-export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, compartido }: {
+export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, compartido, aporte }: {
   action: (formData: FormData) => Promise<void>
   deseo?: OwnerItemView
   /** Solo al agregar, si tiene grupos: en qué lista va. */
@@ -31,12 +34,16 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
   boton: string
   /** Solo al agregar: lo compartido a GiftR desde otra app (ver RecibirCompartido). */
   compartido?: CompartidoAlForm
+  /** Solo al agregar: adónde ir para pedir plata en vez de un objeto (el formulario de un aporte, ver AporteForm). */
+  aporte?: string
 }) {
+  // un precio de hace más de dos meses (ver antiguedadDelPrecio): al editar se le pregunta si sigue igual
+  const precioDe = deseo && (deseo.precio ?? deseo.rangoPrecio) ? antiguedadDelPrecio(deseo.precioAt) : null
   return (
     <form action={action} className="group/deseo mt-1 flex flex-col gap-4">
       {deseo && <input type="hidden" name="itemId" value={deseo.id} />}
       {grupos.length > 0 && (
-        <label className="flex items-center gap-1.5 self-center rounded-full border border-gr-line bg-gr-surface py-1 pl-3.5 pr-2 text-sm font-semibold">
+        <label className="flex items-center gap-1.5 self-center rounded-full border border-gr-line bg-gr-surface py-1 pl-3.5 pr-2 text-base font-semibold">
           En
           <select name="listaId" defaultValue={grupoElegido ?? ''} aria-label="¿En qué lista?"
                   className="cursor-pointer rounded-lg bg-transparent py-1 pr-1 font-semibold underline underline-offset-4">
@@ -64,9 +71,11 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
         <QueQueres defaultValue={deseo?.titulo ?? compartido?.link ?? compartido?.titulo} />
         {/* $45.000 o 45000 (al dejarlo, y en el servidor, queda $45.000) */}
         <CampoPrecio name="precio" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Precio" defaultValue={deseo?.precio ?? ''}
-               aria-label="Precio" className="min-h-11 w-full rounded-xl bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
+               aria-label="Precio" className="min-h-11 w-full rounded-gr-sm bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
         {/* un rango de antes ("$10–30k") queda como estaba: ya no se carga aparte, alcanza con el precio */}
         <input type="hidden" name="rangoPrecio" value={deseo?.rangoPrecio ?? ''} />
+        {/* al editar: decir que el precio sigue igual (si es de hace rato) o traerlo de nuevo de la tienda */}
+        {deseo && (deseo.linkTienda || precioDe) && <PrecioAlDia conLink={!!deseo.linkTienda} viejo={precioDe} />}
       </div>
       {compartido && !deseo && <RecibirCompartido {...compartido} />}
 
@@ -84,7 +93,7 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       </div>
 
       {/* "Algo así" (una idea): sirve algo parecido. Tildado, tipo llega como idea antes que el exacto de abajo (vale el primero) */}
-      <div className="flex flex-col rounded-[18px] border border-gr-line bg-gr-surface">
+      <div className="flex flex-col rounded-gr-md border border-gr-line bg-gr-surface">
         <label className="flex min-h-[64px] cursor-pointer items-center gap-3 px-3.5 py-2.5">
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold">Me sirve algo parecido</span>
@@ -102,6 +111,20 @@ export function DeseoForm({ action, deseo, grupos = [], grupoElegido, boton, com
       </div>
 
       <DetallesDeseo deseo={deseo} notas={compartido?.notas} />
+
+      {/* lo que más se pide en un casamiento o un baby shower no es un objeto: es plata, y va por otro formulario */}
+      {aporte && (
+        <Link href={aporte} className="flex min-h-[64px] items-center gap-3 rounded-gr-md border border-gr-line bg-gr-surface px-3.5 py-2.5">
+          <span aria-hidden className="flex size-10 flex-none items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
+            <Icon name="wallet" size={20} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">¿Preferís plata?</span>
+            <span className="block text-[13px] leading-snug text-gr-muted">Pedí un aporte: para la luna de miel, el cochecito, lo que sea</span>
+          </span>
+          <Icon name="chevron" size={18} className="flex-none text-gr-muted" />
+        </Link>
+      )}
 
       {/* Fijo abajo, sin tapar nada (lo de abajo deja su lugar). Sin nombre se ve apagado y dice por qué; igual se puede
           tocar: el navegador marca el campo que falta. */}

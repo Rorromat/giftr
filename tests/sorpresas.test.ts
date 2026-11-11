@@ -71,7 +71,7 @@ test('armar una sorpresa: el regalo grupal con el que la armó de encargado, y l
   expect(enviados[0].aviso).toEqual({
     title: '🤫 Euge te propone una sorpresa',
     body: '"Tocadiscos vintage" para Rodri: no está en su lista y no se entera. En partes iguales, ¿te sumás?',
-    url: '/inicio#invitaciones',
+    url: '/avisos#invitaciones',
   })
   const [inv] = await invitacionesPendientes(s.db, s.sofi.id)
   expect(inv).toMatchObject({ titulo: 'Tocadiscos vintage', para: 'Rodri', sorpresa: true, href: `/sorpresa/${token}`, somos: 1 })

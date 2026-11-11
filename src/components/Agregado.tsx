@@ -1,27 +1,32 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from 'react'
+import { useEffect, useEffectEvent, useRef, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
-import { updatePriorityAction } from '@/app/actions'
-import { dejarPendiente } from '@/components/AlLlegarDelAgregado'
+import { dejarPendiente, loCopiadoParaAgregar } from '@/components/AlLlegarDelAgregado'
 import { leerCopiado } from '@/components/QueQueres'
 import { IlustracionAgregado } from '@/components/IlustracionAgregado'
 import { ArmandoRegalo } from '@/components/ArmandoRegalo'
-import { Arte, Hearts, PRIORIDADES, type Prioridad } from '@/components/ui'
-import { linkEnTexto, linkHttp, sitioDeLaTienda } from '@/lib/links'
+import { Arte, Icon } from '@/components/ui'
+import { sitioDeLaTienda } from '@/lib/links'
 
 // El agregado: el + de la barra de abajo se abre en un círculo del acento que llena la pantalla, y las cuatro maneras de
 // sumar un deseo caen como cartas. La elegida crece, las demás se caen y sale la tarjeta del deseo mientras se abre Agregar
 // con eso ya puesto (el link copiado, la foto, o el título para escribir): el formulario es el de siempre. Al guardar, en la
-// lista aparece "¡Anotado!" con su foto (ver RecienAgregado) y al cerrarlo el círculo vuelve al + y el deseo
-// nuevo entra primero. La animación es CSS (.gr-agr en tokens.css); acá, en qué paso está.
+// lista aparece "¡Anotado!" con su foto (ver RecienAgregado), con mandar la lista por WhatsApp a mano, y al cerrarlo el
+// círculo vuelve al + y el deseo nuevo entra primero. La animación es CSS (.gr-agr en tokens.css); acá, en qué paso está.
 
 type Paso = '' | 'abierto' | 'pegando' | 'listo'
 type Tipo = 'link' | 'foto' | 'galeria' | 'escribir'
 
 /** El deseo recién agregado, para "¡Anotado!". */
-export type Anotado = { id: string; titulo: string; foto: string | null; prioridad: Prioridad; grupo: boolean }
+export type Anotado = {
+  id: string; titulo: string; foto: string | null; grupo: boolean
+  /** Mandar la lista por WhatsApp, la misma acción que en Mi lista (en una lista en común no va: se comparte desde ahí). */
+  waHref?: string
+  /** El primero que anota: lo que sigue es mandar la lista, y va como lo principal. */
+  primero?: boolean
+}
 
 type Estado = {
   paso: Paso
@@ -61,7 +66,7 @@ const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').match
 
 /**
  * Pasado "¡Anotado!", el ?agregado= se saca de la dirección: al volver a entrar (o tirar para actualizar) ya no es el recién
- * agregado. Mientras se ve, queda: si cambia cuánto lo querés, la lista se vuelve a armar con él primero.
+ * agregado. Mientras se ve, queda: el cartel de los avisos espera a que se cierre (ver PreguntaAvisos).
  */
 function olvidarAgregado() {
   const url = new URL(location.href)
@@ -96,9 +101,12 @@ export function cerrarAgregado() {
 /** Cuándo empezó a verse la tarjeta mientras carga (ver PREVIA_MS). */
 let pegandoDesde = 0
 
-/** Lo elegido: las cartas se caen y sale la tarjeta del deseo mientras se abre Agregar. */
-function pegar(tipo: Tipo, cambio: Partial<Estado>) {
-  pegandoDesde = Date.now()
+/**
+ * Lo elegido: las cartas se caen y sale la tarjeta del deseo mientras se abre Agregar. Sin tipo no hay tarjeta ni espera:
+ * no hay nada que traer (ver elegir).
+ */
+function pegar(tipo: Tipo | null, cambio: Partial<Estado>) {
+  pegandoDesde = tipo ? Date.now() : 0
   poner({ ...cambio, paso: 'pegando', tipo })
 }
 
@@ -132,9 +140,6 @@ export function Agregado() {
   const e = useAgregado()
   const router = useRouter()
   const path = usePathname()
-  const [, empezar] = useTransition()
-  // cuánto lo querés, marcado en "¡Anotado!" (de ese deseo: el próximo arranca con lo que se eligió en el formulario)
-  const [prioridad, setPrioridad] = useState<{ id: string; p: Prioridad } | null>(null)
   const camara = useRef<HTMLInputElement>(null)
   const galeria = useRef<HTMLInputElement>(null)
   const raiz = useRef<HTMLDivElement>(null)
@@ -171,7 +176,7 @@ export function Agregado() {
     return () => clearTimeout(t)
   }, [e.paso])
 
-  function irA(tipo: Tipo, cambio: Partial<Estado>, ruta: string) {
+  function irA(tipo: Tipo | null, cambio: Partial<Estado>, ruta: string) {
     pegar(tipo, cambio)
     despues(sinMovimiento() ? 0 : CAEN_MS, () => router.push(ruta))
   }
@@ -185,10 +190,11 @@ export function Agregado() {
       return irA('escribir', { link: null, foto: null }, '/agregar')
     }
     // el link copiado se lee acá, con el toque (después de navegar, el navegador ya no deja)
-    const copiado = await leerCopiado()
-    const link = linkHttp(copiado) ?? linkEnTexto(copiado)?.link ?? null
-    dejarPendiente(copiado ? { tipo: 'link', texto: copiado } : null)
-    irA('link', { link, foto: null }, '/agregar')
+    const { link, pendiente } = loCopiadoParaAgregar(await leerCopiado())
+    dejarPendiente(pendiente)
+    // Sin un link copiado no hay nada que traer: entra directo al formulario, que dice cómo copiarlo. Antes mostraba casi
+    // dos segundos "Trayendo nombre, foto y precio…" y dejaba el formulario vacío, sin decir por qué.
+    irA(link ? 'link' : null, { link, foto: null }, '/agregar')
   }
 
   function conFoto(tipo: 'foto' | 'galeria', archivo: File | undefined) {
@@ -197,19 +203,15 @@ export function Agregado() {
     irA(tipo, { link: null, foto: URL.createObjectURL(archivo) }, '/agregar')
   }
 
-  function cuanto(p: Prioridad) {
-    const a = estado.anotado
-    if (!a) return
-    setPrioridad({ id: a.id, p })
-    const fd = new FormData()
-    fd.set('itemId', a.id)
-    fd.set('prioridad', p)
-    empezar(() => updatePriorityAction(fd))
-  }
-
   const abierto = e.paso !== ''
   const a = e.anotado
-  const elegida = (prioridad && prioridad.id === a?.id ? prioridad.p : a?.prioridad) ?? 'gustaria'
+  const compartirPrimero = !!a?.waHref && !!a.primero
+  const mandar = a?.waHref && (
+    <a href={a.waHref} target="_blank" className={`gr-btn w-full gap-2 ${compartirPrimero ? 'gr-btn--blanco min-h-[50px]' : 'gr-btn--vidrio'}`}>
+      <Icon name="chat" size={19} />
+      Mandar mi lista por WhatsApp
+    </a>
+  )
   const tienda = e.link ? sitioDeLaTienda(e.link) : null
   const previa = e.tipo && (
     <div className="gr-previa">
@@ -251,18 +253,22 @@ export function Agregado() {
               <p className="text-base opacity-85 [overflow-wrap:anywhere]" style={{ '--i': 2 } as React.CSSProperties}>
                 {a.titulo} ya está en {a.grupo ? 'la lista' : 'tu lista'}.
               </p>
-              <div className="gr-cuanto" role="group" aria-label="Cuánto lo querés" style={{ '--i': 3 } as React.CSSProperties}>
-                {(['suelta', 'gustaria', 'mucho'] as const).map((p) => (
-                  <button key={p} type="button" aria-pressed={elegida === p} onClick={() => cuanto(p)} className="inline-flex items-center gap-1.5">
-                    <Hearts n={PRIORIDADES[p].corazones} />{PRIORIDADES[p].label}
+              {/* Lo que sigue a anotar es mandar la lista: con el primero, lo principal (blanco); después, a mano. Cuánto lo
+                  querés ya se eligió en el formulario: acá era elegirlo dos veces. */}
+              {compartirPrimero && (
+                <p className="text-[15px] leading-snug opacity-85" style={{ '--i': 3 } as React.CSSProperties}>
+                  Ahora mandásela a tu gente: eligen y reservan sin que te enteres.
+                </p>
+              )}
+              <div className="flex w-full max-w-[300px] flex-col gap-2" style={{ '--i': 4 } as React.CSSProperties}>
+                {compartirPrimero && mandar}
+                <div className="flex gap-2">
+                  <button type="button" onClick={cerrarAgregado} className={`gr-btn flex-1 px-3 ${compartirPrimero ? 'gr-btn--vidrio' : 'gr-btn--blanco'}`}>
+                    Ver {a.grupo ? 'la lista' : 'mi lista'}
                   </button>
-                ))}
-              </div>
-              <div className="flex w-full max-w-[280px] gap-2" style={{ '--i': 4 } as React.CSSProperties}>
-                <button type="button" onClick={cerrarAgregado} className="gr-btn gr-btn--blanco flex-[1.4]">
-                  Ver en {a.grupo ? 'la lista' : 'mi lista'}
-                </button>
-                <button type="button" onClick={abrirAgregado} className="gr-btn gr-btn--vidrio flex-1">Otro</button>
+                  <button type="button" onClick={abrirAgregado} className="gr-btn gr-btn--vidrio flex-1 px-3">Agregar otro</button>
+                </div>
+                {!compartirPrimero && mandar}
               </div>
             </div>
           )}

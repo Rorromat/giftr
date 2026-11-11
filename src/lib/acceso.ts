@@ -51,6 +51,25 @@ export async function accesoALista(db: Db, listId: string, viewer: Viewer): Prom
 }
 
 /**
+ * Con "Solo con cuenta se ve quién reservó" prendida en la lista, a quien la ve sin cuenta (un invitado, con el nombre que
+ * quiso poner) se le muestra qué está ocupado, pero no por quién: ni nombres, ni el hilo, ni quiénes están en un regalo
+ * grupal. Es lo que la regla de la sorpresa no podía cerrar sola: la dueña abría su link en una ventana privada, se anotaba
+ * como "Tía" y veía quién le regalaba qué. Con su cuenta no puede: de sus listas es dueña.
+ */
+export const sinNombresPara = (lista: { nombresSoloConCuenta: boolean }, viewer: Viewer) => lista.nombresSoloConCuenta && !viewer.userId
+
+/**
+ * Si el que mira ve la coordinación con nombres (quién reservó, el hilo, los regalos grupales, el historial): los que la
+ * ven (accesoALista), salvo un invitado sin cuenta en una lista que los muestra solo con cuenta (sinNombresPara).
+ */
+export async function veQuienReservo(db: Db, listId: string, viewer: Viewer): Promise<boolean> {
+  if ((await accesoALista(db, listId, viewer)) !== 'regalador') return false
+  if (viewer.userId) return true
+  const [lista] = await db.select({ nombresSoloConCuenta: lists.nombresSoloConCuenta }).from(lists).where(eq(lists.id, listId))
+  return !!lista && !sinNombresPara(lista, viewer)
+}
+
+/**
  * El invitado dijo que esta lista no es suya (se anotó acá, reservó o tocó "Ver lo reservado"): desde ahora la ve. Si ya
  * lo había dicho, se anota la hora nueva (vuelve a valer después de que se sumó alguien). Todos los que llaman a esto
  * vienen con el link para regalar de ahora, que es lo que esa hora dice para los avisos (ver tieneElLinkSql).

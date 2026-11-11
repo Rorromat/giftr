@@ -261,7 +261,7 @@ export async function misEventos(db: Db, userId: string, hoy = hoyLocal()): Prom
         href: sorpresa ? `/sorpresa/${list.shareToken}` : propio ? `/grupos/${list.id}` : `/l/${list.shareToken}`,
         personas: sorpresa || conFoto ? [list.nombre ?? 'Alguien'] : delGrupo.map((m) => m.nombre),
         caras: sorpresa ? [null] : conFoto ? [list.fotoUrl] : delGrupo.map(urlFoto),
-        contexto: sorpresa ? 'No usa GiftR' : relacion || (propio ? 'Tu grupo' : 'Grupo'),
+        contexto: sorpresa ? 'No usa GiftR' : relacion || (propio ? 'Tu lista en común' : 'Lista en común'),
       })
     }
   }
@@ -377,6 +377,18 @@ export async function eventoDeLista(db: Db, listId: string, hoy = hoyLocal()) {
   const fecha = f && proximaVez(f, hoy)
   if (!f || !fecha) return null
   return { esCumple: f.esCumple, fecha, dias: diasEntre(hoy, fecha) }
+}
+
+/**
+ * El último evento de una lista que ya pasó (el cumple del dueño o la fecha del grupo), con hace cuántos días fue: para lo
+ * de después del evento (ver post-evento.ts). El día del evento todavía no pasó: hace es 1 desde el día siguiente. Null
+ * si la lista no tiene fecha o todavía no cayó nunca.
+ */
+export async function eventoAnteriorDeLista(db: Db, listId: string, hoy = hoyLocal()) {
+  const { f } = await fechaDeLista(db, listId)
+  const fecha = f && vezAnterior(f, hoy)
+  if (!f || !fecha) return null
+  return { esCumple: f.esCumple, fecha, hace: diasEntre(fecha, hoy) }
 }
 
 /**

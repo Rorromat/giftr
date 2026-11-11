@@ -5,13 +5,14 @@ coordina los regalos en secreto: reservan, se avisan y nadie se duplica. Vos nun
 reservó qué.
 
 - Concepto de producto: [wishy-concepto.md](./wishy-concepto.md)
+- Brief de diseño (el sistema visual "Tapas", como está en el código): [docs/wishy-brief-diseno.md](./docs/wishy-brief-diseno.md)
 - Diseño técnico de la Fase 1: [docs/superpowers/specs/2026-08-08-wishy-fase1-design.md](./docs/superpowers/specs/2026-08-08-wishy-fase1-design.md)
 
 ## Estructura
 
 ```
 src/app/          Pantallas (Next.js App Router) y server actions
-src/components/   Componentes del sistema visual "Sticker" (ui.tsx) y piezas con estado
+src/components/   Componentes del sistema visual "Tapas" (ui.tsx, con los tokens en src/app/tokens.css) y piezas con estado
 src/lib/          Reglas de negocio: regla de la sorpresa, reservas, invitados, avisos, grupos
 src/db/           Esquema Drizzle y cliente de Neon
 drizzle/          Migraciones SQL
@@ -53,6 +54,7 @@ para el login.
    | `NEXT_PUBLIC_BASE_URL` | `https://TU-PROYECTO.vercel.app` (arma el link que se comparte) |
    | `MELI_CLIENT_ID` | opcional: el *App ID* de una aplicación de [developers.mercadolibre.com.ar](https://developers.mercadolibre.com.ar). Con `MELI_CLIENT_SECRET`, al pegar el link de una publicación de MercadoLibre en un deseo, el nombre, la foto y el precio salen de su API oficial (la página tiene un muro para los servidores). Sin las dos, se usa la página |
    | `MELI_CLIENT_SECRET` | opcional: la *Clave secreta* de esa aplicación |
+   | `CRON_SECRET` | una clave larga al azar (`openssl rand -base64 32`). Con ella Vercel llama una vez por día a `/api/cron/diario`, que manda los recordatorios ("¿Ya lo compraste?", "Tu reserva vence mañana", los cumples que se acercan, las cuentas pendientes). Sin ella, los recordatorios no salen |
 
 5. **Redeploy.** *Deployments → … → Redeploy*. El build (`npm run vercel-build`) compila y, si
    salió bien y es el deploy a producción, aplica las migraciones: la base queda lista sola en cada

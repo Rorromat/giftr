@@ -39,9 +39,9 @@ function EntrarParaSumarte({ token, itemId, texto }: Ctx & { texto: string }) {
   )
 }
 
-/** "Armar regalo grupal" (o convertir la reserva propia en uno). */
+/** "Armar regalo grupal". convertir: con la reserva propia, que pasa a ser uno (la acción se llama igual; lo dice abajo). */
 export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }: Ctx & { logueado: boolean; convertir?: boolean }) {
-  const texto = convertir ? 'Hacerlo regalo grupal' : 'Armar regalo grupal'
+  const texto = 'Armar regalo grupal'
   return (
     <div className="flex flex-col gap-1.5">
       {logueado ? (
@@ -52,7 +52,9 @@ export function ArmarRegaloGrupal({ token, itemId, logueado, convertir = false }
           </BotonEnviar>
         </form>
       ) : <EntrarParaSumarte token={token} itemId={itemId} texto={texto} />}
-      <p className="text-xs leading-snug text-gr-muted">Lo comprás vos, los demás se suman y te pagan su parte. Queda todo anotado en Cuentas.</p>
+      <p className="text-xs leading-snug text-gr-muted">
+        {convertir && 'Tu reserva pasa a ser un regalo grupal. '}Lo comprás vos, los demás se suman y te pagan su parte. Queda todo anotado en Cuentas.
+      </p>
     </div>
   )
 }
@@ -76,7 +78,7 @@ export function SacarDelRegalo({ giftId, otros, sacados, token, itemId, comprado
   return (
     <details className="group flex flex-col">
       <summary className={linkSubrayado}>¿Se sumó alguien que no va?</summary>
-      <div className="mt-1 flex flex-col gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3 py-2.5">
+      <div className="mt-1 flex flex-col gap-1 rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5">
         {otros.length > 0 && (
           <>
             <p className="text-[13px] font-medium leading-snug">
@@ -136,7 +138,7 @@ const CORRECCION: Record<string, string> = {
 export function CartelCorreccion({ motivo, cerrar }: { motivo?: string; cerrar: string }) {
   if (!motivo || !Object.hasOwn(CORRECCION, motivo)) return null
   return (
-    <div role="status" className="flex items-start gap-2 rounded-2xl bg-gr-soft py-1.5 pl-3.5 pr-1.5 text-sm font-semibold">
+    <div role="status" className="flex items-start gap-2 rounded-gr-md bg-gr-soft py-1.5 pl-3.5 pr-1.5 text-sm font-semibold">
       <p className="flex-1 py-1.5">{CORRECCION[motivo]}</p>
       <Link href={cerrar} replace scroll={false} aria-label="Cerrar" className="-my-1 flex size-11 flex-none items-center justify-center">
         <Icon name="close" size={16} strokeWidth={3} />
@@ -179,7 +181,7 @@ export function RegaloGrupal({
   logueado: boolean
   /** Por qué no se puede sumar (ya lo reservó o compró suelto, o está en otro regalo de este deseo). */
   ocupado?: string | null
-  /** Para el que lo organiza: a quiénes les propuso dividirlo y qué contestaron, abierto o comprado (ver InvitadosDelRegalo). */
+  /** Para el que lo organiza: a quiénes les propuso el regalo grupal y qué contestaron, abierto o comprado (ver InvitadosDelRegalo). */
   invitar?: React.ReactNode
   /** Para el que lo organiza, mientras está abierto: a los que se lo propuso y no contestaron (si se suman después, se redivide). */
   sinContestar?: string[]
@@ -251,7 +253,7 @@ export function RegaloGrupal({
 
           {regalo.soyParte && !regalo.soyEncargado && (
             <>
-              <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug">
+              <p className="rounded-gr-md bg-gr-soft px-3 py-2.5 text-sm leading-snug">
                 Estás adentro. Cuando {regalo.encargado.nombre} lo compre, te va a aparecer cuánto le debés.
               </p>
               <form action={leaveGroupGiftAction}>
@@ -271,7 +273,7 @@ export function RegaloGrupal({
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
                   {sinContestar.length > 0 && (
-                    <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug">
+                    <p className="rounded-gr-md bg-gr-soft px-3 py-2.5 text-sm leading-snug">
                       {juntarNombres(sinContestar)} todavía no {sinContestar.length === 1 ? 'contestó' : 'contestaron'}: se divide entre
                       los que ya están, y si después {sinContestar.length === 1 ? 'se suma' : 'se suman'}, se vuelve a dividir.
                     </p>
@@ -313,7 +315,7 @@ export function RegaloGrupal({
         <>
           {/* Comprado: quién puso cuánto y quién ya le pagó al encargado (o a quién le devuelve), a lo Splitwise */}
           {nota && <p className="text-sm"><span className="font-semibold">Compró:</span> {nota}</p>}
-          <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3">
+          <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-gr-md border border-gr-line bg-gr-surface px-3">
             {regalo.miembros.map((m) => {
               const puedoMarcar = !m.esEncargado && (regalo.soyEncargado || m.esYo)
               const saldo = m.saldo ?? 0
@@ -373,7 +375,7 @@ export function RegaloGrupal({
           )}
           {/* el que se sumó a uno dividido a mano entra en 0: que no quede así sin querer */}
           {regalo.soyEncargado && sinParte.length > 0 && (
-            <p className="rounded-2xl bg-gr-soft px-3 py-2.5 text-sm leading-snug">
+            <p className="rounded-gr-md bg-gr-soft px-3 py-2.5 text-sm leading-snug">
               {juntarNombres(sinParte)} en {p(0)}: lo dividiste a mano, así que si {sinParte.length === 1 ? 'va' : 'van'} a poner, corregí la compra.
             </p>
           )}

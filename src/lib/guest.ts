@@ -1,10 +1,11 @@
-import { and, asc, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
-import { claims, codazos, comments, guestIdentities, items, listFollows, lists, notifications, users } from '@/db/schema'
+import { and, asc, count, eq, gt, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
+import { claims, codazos, comments, guestIdentities, items, listasDeInvitado, listFollows, lists, notifications, users } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { NOMBRE_INVITADO_MAXIMO, RESERVAS_POR_LISTA, type Viewer } from '@/lib/types'
-import { esOFueDuenoSql } from '@/lib/groups'
+import { esOFueDuenoSql, esToken } from '@/lib/groups'
 import { desdeQueOcupa, loQueYaTiene, tomadasEnLista } from '@/lib/claims'
-import { dijoQueNoEs, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
+import { claveParaVolver, dijoQueNoEs, leerClaveParaVolver, leerCuentas, leerInvitado } from '@/lib/cookie-invitado'
+import { abrirListaAInvitado } from '@/lib/acceso'
 import { sinControl, sinZalgo } from '@/lib/limites'
 
 export type NombreValidado = { ok: true; nombre: string } | { ok: false; motivo: 'vacio' | 'largo'; error: string }
@@ -26,6 +27,65 @@ export async function createGuest(db: Db, nombre: string) {
   if (!v.ok) throw new Error(`Nombre de invitado inválido: ${v.motivo}`)
   const [g] = await db.insert(guestIdentities).values({ nombre: v.nombre }).returning({ id: guestIdentities.id })
   return g
+}
+
+/**
+ * Cuántos invitados nuevos se pueden anotar en una lista en 24 horas. Cada uno puede tomar RESERVAS_POR_LISTA cosas, y
+ * anotarse no pedía más que un nombre: con una ventana privada tras otra, una sola persona con el link dejaba la lista
+ * entera tomada, y el dueño no lo ve ni lo puede arreglar. Holgado a propósito: el día que se manda el link al grupo de la
+ * familia se anotan veinte, y una oficina entera abre el mismo link desde la misma wifi. El que queda afuera reserva igual,
+ * con su Google.
+ */
+export const INVITADOS_POR_LISTA_Y_DIA = 40
+
+/**
+ * Anota un invitado nuevo en una lista (se anotó con su nombre ahí: es decir que no es suya, ver abrirListaAInvitado),
+ * salvo que ya se hayan anotado demasiados en el último día (INVITADOS_POR_LISTA_Y_DIA): entonces null, sin anotar a
+ * nadie. El nombre tiene que venir validado (validarNombre).
+ */
+export async function anotarInvitado(db: Db, nombre: string, listId: string): Promise<{ id: string } | null> {
+  const v = validarNombre(nombre)
+  if (!v.ok) throw new Error(`Nombre de invitado inválido: ${v.motivo}`)
+  return db.transaction(async (tx) => {
+    const t = tx as unknown as Db
+    // lock de la lista: cien pedidos a la vez no pasan todos juntos la cuenta de abajo. "No key": no frena a los que
+    // mientras tanto agregan un deseo o la siguen (solo miran que la lista exista).
+    const [lista] = await t.select({ id: lists.id }).from(lists).where(eq(lists.id, listId)).for('no key update')
+    if (!lista) return null
+    const [{ hoy }] = await t.select({ hoy: count() }).from(guestIdentities)
+      .where(and(eq(guestIdentities.anotadoEn, listId), gt(guestIdentities.createdAt, sql`now() - interval '24 hours'`)))
+    if (hoy >= INVITADOS_POR_LISTA_Y_DIA) return null
+    const [g] = await t.insert(guestIdentities).values({ nombre: v.nombre, anotadoEn: listId }).returning({ id: guestIdentities.id })
+    await abrirListaAInvitado(t, g.id, listId)
+    return g
+  })
+}
+
+/**
+ * El link para volver a su reserva (ver claveParaVolver), para un invitado sin cuenta en una lista donde reservó. Con
+ * cuenta no hace falta: entra con Google desde donde sea.
+ */
+export function linkParaVolver(viewer: Viewer, listId: string, shareToken: string): string | undefined {
+  if (viewer.userId || !viewer.guestId) return undefined
+  return `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/l/${shareToken}/volver/${claveParaVolver(viewer.guestId, listId)}`
+}
+
+/**
+ * El invitado que vuelve a su reserva con su link (/l/<token>/volver/<clave>, ver claveParaVolver), si el link es de él y
+ * de esta lista con su link para regalar de ahora, el invitado sigue existiendo sin haberse unido a una cuenta (ahí lo suyo
+ * ya está en la cuenta: se entra con Google) y esta lista la tenía abierta (dijo que no es suya: reservó acá). Si no, null.
+ * Solo lee: lo abre también la vista previa de WhatsApp cuando se lo manda a sí mismo. Qué ve después lo decide
+ * accesoALista como siempre: en un navegador donde tuvo sesión alguien de la lista, nada.
+ */
+export async function invitadoQueVuelve(db: Db, shareToken: string, clave: string): Promise<{ guestId: string; nombre: string } | null> {
+  if (!esToken(shareToken)) return null
+  const [lista] = await db.select({ id: lists.id }).from(lists).where(and(eq(lists.shareToken, shareToken), ne(lists.tipo, 'sorpresa')))
+  const guestId = lista && leerClaveParaVolver(clave, lista.id)
+  if (!guestId) return null
+  const [g] = await db.select({ nombre: guestIdentities.nombre }).from(guestIdentities)
+    .innerJoin(listasDeInvitado, and(eq(listasDeInvitado.guestId, guestIdentities.id), eq(listasDeInvitado.listId, lista.id)))
+    .where(and(eq(guestIdentities.id, guestId), isNull(guestIdentities.promotedToUserId)))
+  return g ? { guestId, nombre: g.nombre } : null
 }
 
 /**

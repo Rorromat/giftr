@@ -63,7 +63,7 @@ test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contest
 
   h.session = { userId: rodri.id }
   const abierto = await deseo()
-  expect(abierto).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
+  expect(abierto).toContain('Les propusiste el regalo grupal S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
   // al dividirlo, que sepa que Caro todavía puede entrar
   expect(abierto).toContain('Caro todavía no contestó: se divide entre los que ya están, y si después se suma, se vuelve a dividir.')
   // los que se sumaron no ven a quiénes les llegó la propuesta
@@ -75,7 +75,7 @@ test('en el deseo, el que lo organiza ve a quiénes se lo propuso y qué contest
   const comprado = await deseo()
   // la división, y a quiénes se lo propuso: Caro todavía puede contestar
   expect(comprado).toContain('Vos compraste el regalo $45.000 Puso Sofi $45.000 Debe')
-  expect(comprado).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
+  expect(comprado).toContain('Les propusiste el regalo grupal S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
   expect(comprado).toContain('Invitar por WhatsApp')
   // Caro, antes de contestar, ve cuánto le tocaría
   h.session = { userId: caro.id }
@@ -105,5 +105,5 @@ test('en una sorpresa ya comprada, también', async () => {
 
   h.session = { userId: rodri.id }
   const pagina = delRegalo(renderToStaticMarkup(await Sorpresa({ params: Promise.resolve({ token: s.token }), searchParams: Promise.resolve({}) })))
-  expect(pagina).toContain('Les propusiste dividirlo S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
+  expect(pagina).toContain('Les propusiste el regalo grupal S Sofi Se sumó ✓ J Juan No puede C Caro Esperando')
 })

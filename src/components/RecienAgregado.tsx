@@ -5,13 +5,13 @@ import { mostrarAnotado, type Anotado } from '@/components/Agregado'
 import { Icon } from '@/components/ui'
 
 /**
- * Después de agregar un deseo: "¡Anotado!" con su foto, donde se marca cuánto lo querés (ver Agregado). Al
+ * Después de agregar un deseo: "¡Anotado!" con su foto y, en Mi lista, mandar la lista por WhatsApp (ver Agregado). Al
  * cerrarlo, la lista va hasta él, que entra primero (ver OwnerItemsGrid), y el ?agregado= se saca de la dirección.
  */
 export function RecienAgregado({ deseo }: { deseo: Anotado }) {
   const { id } = deseo
   const anotar = useEffectEvent(() => mostrarAnotado(deseo))
-  // una vez por deseo agregado (lo que se vuelva a armar la lista, al cambiar cuánto lo querés, no lo vuelve a abrir)
+  // una vez por deseo agregado (que la lista se vuelva a armar no lo vuelve a abrir)
   useEffect(() => { anotar() }, [id])
   return null
 }

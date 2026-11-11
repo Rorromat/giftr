@@ -5,10 +5,10 @@ import { SelloDibujo } from '@/components/SelloDibujo'
 import { Icon, PriorityTag } from '@/components/ui'
 import { ONDAS } from '@/lib/ondas'
 
-// La portada: lo que hace la app, una carta por función, como un mazo. Pasan solas y despacio (la de arriba se va
-// volando de costado y sube la de abajo) o a mano: arrastrándola, con las flechas o con los puntitos. Cada carta con su
-// dibujo, para qué sirve y un ejemplo de verdad abajo. Los dibujos van con los colores de la app; cómo se mueven, en
-// gr-portada (tokens.css).
+// La portada: lo que hace la app, una carta por función, como un mazo. Pasan solas y despacio, una vuelta (la de arriba
+// se va volando de costado y sube la de abajo) o a mano: arrastrándola, con las flechas o con los puntitos. Cada carta
+// con su dibujo, para qué sirve y un ejemplo de verdad abajo. Los dibujos van con los colores de la app; cómo se mueven,
+// en gr-portada (tokens.css).
 
 const TINTA = 'var(--gr-ink)'
 const linea = { stroke: TINTA, strokeWidth: 4, strokeLinejoin: 'round', strokeLinecap: 'round' } as const
@@ -49,7 +49,7 @@ function Regalo() {
   )
 }
 
-/** Entre todos: el regalo en el medio y los que ponen alrededor. */
+/** El regalo grupal: el regalo en el medio y los que ponen alrededor. */
 function EntreTodos() {
   const caras = [[42, 52, 'var(--gr-acento)', 'C'], [198, 52, '#FFD43B', 'M'], [42, 158, '#FF7FA8', 'E'], [198, 158, 'var(--gr-surface)', 'R']] as const
   return (
@@ -129,7 +129,7 @@ const FUNCIONES: Funcion[] = [
   { Dibujo: Regalo, fondo: '#EAF7C4', nombre: 'En secreto', titulo: 'Te lo regalan en secreto',
     texto: 'Tu gente reserva y vos no ves nada: ni quién, ni qué.',
     ejemplo: <><Icon name="lock" size={15} strokeWidth={2.2} className="flex-none" />Lo reservaste vos. Euge no se entera.</> },
-  { Dibujo: EntreTodos, fondo: '#FFE1D6', nombre: 'Entre todos', titulo: 'Lo pagan entre todos',
+  { Dibujo: EntreTodos, fondo: '#FFE1D6', nombre: 'Regalo grupal', titulo: 'Lo pagan entre todos',
     texto: 'Uno lo compra y la app le hace las cuentas a cada uno.',
     ejemplo: <><Caras letras={['C', 'M', 'E', 'R']} />$12.000 cada uno</> },
   { Dibujo: Papelitos, fondo: '#E7E2FF', nombre: 'Amigo invisible', titulo: 'Amigo invisible sin papelitos',
@@ -162,9 +162,11 @@ const useSinMovimiento = () => useSyncExternalStore(
 /** Cuánto hay que arrastrar la carta para pasar a la otra. */
 const UMBRAL = 60
 
-export function Portada() {
+/** className: dónde va en la pantalla (en escritorio, la columna de la derecha de la portada). */
+export function Portada({ className = '' }: { className?: string }) {
   const [actual, setActual] = useState(0)
-  // pasan solas hasta que la mueven a mano; mientras el mouse o el foco están encima, esperan
+  // pasan solas hasta que la mueven a mano o hasta dar la vuelta (para siempre, no dejan leer la que querían y en el
+  // teléfono no hay cómo frenarlas); mientras el mouse o el foco están encima, esperan
   const [aMano, setAMano] = useState(false)
   const [encima, setEncima] = useState(false)
   const quieto = useSinMovimiento()
@@ -174,7 +176,12 @@ export function Portada() {
 
   useEffect(() => {
     if (aMano || encima || quieto) return
-    const t = setTimeout(() => setActual((a) => (a + 1) % FUNCIONES.length), 4200)
+    const t = setTimeout(() => {
+      const sigue = (actual + 1) % FUNCIONES.length
+      setActual(sigue)
+      // de nuevo en la primera: ya se vieron todas
+      if (sigue === 0) setAMano(true)
+    }, 4200)
     return () => clearTimeout(t)
   }, [actual, aMano, encima, quieto])
 
@@ -184,21 +191,21 @@ export function Portada() {
   }
 
   return (
-    <section aria-label="Lo que hace GiftR" className="flex w-full flex-col items-center gap-2"
+    <section aria-label="Lo que hace GiftR" className={`flex w-full flex-col items-center gap-2 ${className}`}
              onMouseEnter={() => setEncima(true)} onMouseLeave={() => setEncima(false)}
              onFocus={() => setEncima(true)} onBlur={() => setEncima(false)}>
-      {/* en cuál vas, y para pasar a mano */}
-      <div className="flex items-center gap-1">
-        <button type="button" onClick={() => ir(actual - 1)} aria-label="Anterior" className="flex size-10 items-center justify-center rounded-full text-gr-muted">
+      {/* en cuál vas, y para pasar a mano. Cada puntito se toca en 44 × 44 (antes, en 11 × 40: con el dedo se le erraba) */}
+      <div className="flex w-full max-w-[320px] items-center justify-center">
+        <button type="button" onClick={() => ir(actual - 1)} aria-label="Anterior" className="flex size-11 items-center justify-center rounded-full text-gr-muted">
           <Icon name="chevron" size={18} strokeWidth={2.4} className="rotate-180" />
         </button>
         {FUNCIONES.map((f, i) => (
           <button key={f.nombre} type="button" onClick={() => ir(i)} aria-label={f.nombre} aria-current={i === actual}
-                  className="flex h-10 items-center px-[2.5px]">
+                  className="flex size-11 items-center justify-center">
             <span className="gr-portada__punto" />
           </button>
         ))}
-        <button type="button" onClick={() => ir(actual + 1)} aria-label="Siguiente" className="flex size-10 items-center justify-center rounded-full text-gr-muted">
+        <button type="button" onClick={() => ir(actual + 1)} aria-label="Siguiente" className="flex size-11 items-center justify-center rounded-full text-gr-muted">
           <Icon name="chevron" size={18} strokeWidth={2.4} />
         </button>
       </div>
@@ -225,8 +232,8 @@ export function Portada() {
             setArrastre(null)
           }}>
         {/* la pila: las otras cartas debajo */}
-        <li aria-hidden className="absolute inset-x-6 top-4 h-[322px] -rotate-6 rounded-[22px] bg-gr-surface shadow-card" />
-        <li aria-hidden className="absolute inset-x-6 top-2 h-[322px] rotate-[5deg] rounded-[22px] bg-gr-surface shadow-card" />
+        <li aria-hidden className="absolute inset-x-6 top-4 h-[322px] -rotate-6 rounded-gr-lg bg-gr-surface shadow-card" />
+        <li aria-hidden className="absolute inset-x-6 top-2 h-[322px] rotate-[5deg] rounded-gr-lg bg-gr-surface shadow-card" />
         {/* todas del mismo alto: la que espera abajo no asoma */}
         {FUNCIONES.map((f, i) => {
           const donde = lugar(i, actual)

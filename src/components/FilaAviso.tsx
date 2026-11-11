@@ -47,12 +47,27 @@ const ICONOS: Record<TipoEnBandeja, { fondo: string; dibujo: ReactNode; mueve: M
 }
 
 /**
- * El ícono de un aviso según su tipo, con la foto de quien lo mandó en la esquina. animar: se mueve (lo nuevo); i: su
- * lugar en la lista, para que no se muevan todos a la vez. Sin tipo (los avisos sobre deseos y los de antes), el emoji.
+ * El cuadradito de un tipo de aviso, con su dibujo. animar: se mueve (lo nuevo); i: su lugar en la lista, para que no se
+ * muevan todos a la vez. También para lo que espera en "Para vos" sin haber llegado como aviso (ver ParaVos).
+ */
+export function IconoDeTipo({ tipo, animar = false, i = 0 }: { tipo: TipoEnBandeja; animar?: boolean; i?: number }) {
+  const icono = ICONOS[tipo]
+  return (
+    <span aria-hidden data-mueve={animar ? icono.mueve : undefined} style={{ '--i': i } as CSSProperties}
+          className={`gr-aviso-icono flex size-11 flex-none items-center justify-center rounded-gr-sm ${icono.fondo}`}>
+      <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        {icono.dibujo}
+      </svg>
+    </span>
+  )
+}
+
+/**
+ * El ícono de un aviso según su tipo, con la foto de quien lo mandó en la esquina. animar e i: ver IconoDeTipo. Sin tipo
+ * (los avisos sobre deseos y los de antes), el emoji.
  */
 export function IconoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; animar?: boolean; i?: number }) {
-  const icono = e.tipo && ICONOS[e.tipo]
-  if (!icono) {
+  if (!e.tipo) {
     return (
       <span className="relative flex-none">
         {e.de
@@ -68,12 +83,7 @@ export function IconoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; an
   }
   return (
     <span className="relative flex-none">
-      <span aria-hidden data-mueve={animar ? icono.mueve : undefined} style={{ '--i': i } as CSSProperties}
-            className={`gr-aviso-icono flex size-11 items-center justify-center rounded-[14px] ${icono.fondo}`}>
-        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          {icono.dibujo}
-        </svg>
-      </span>
+      <IconoDeTipo tipo={e.tipo} animar={animar} i={i} />
       {e.de && <AvatarSticker nombre={e.de.nombre} foto={e.de.foto} size={22} className="absolute -bottom-1.5 -right-1.5 ring-2 ring-gr-surface" />}
     </span>
   )
@@ -96,7 +106,7 @@ export function ContenidoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja
 
 /**
  * Un aviso de la bandeja en una fila que lleva adonde dice (va dentro de una lista `gr-card`), en Avisos. En "Para vos" de
- * Inicio va en una que se desliza (ver AvisoDeslizable). animar e i: ver IconoAviso.
+ * Inicio va en una con su "Listo" (ver ParaVos). animar e i: ver IconoDeTipo.
  */
 export function FilaAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; animar?: boolean; i?: number }) {
   return (

@@ -45,7 +45,7 @@ test('a quiénes se les puede proponer: mis amigos, nunca el del cumple', async 
   expect(await amigosParaDividir(db, euge.id, 'cualquier-cosa')).toEqual([])
 })
 
-test('Lo dividimos: les llega la propuesta a los amigos elegidos (y a nadie más)', async () => {
+test('Armar regalo grupal con amigos: les llega la propuesta a los amigos elegidos (y a nadie más)', async () => {
   const { db, euge, sofi, juan, rodri, ana, mate } = await setup()
   const r = await iniciarRegaloGrupal(db, mate.id, euge.id)
   if (!r.ok) throw new Error('no se armó')
@@ -53,7 +53,7 @@ test('Lo dividimos: les llega la propuesta a los amigos elegidos (y a nadie más
   // Rodri es el del cumple, Ana no es amiga, Euge es el que lo arma: solo Sofi y Juan
   expect(await invitarARegalo(db, r.giftId, euge.id, [sofi.id, juan.id, rodri.id, ana.id, euge.id, sofi.id], enviar)).toBe(2)
   expect(enviados.map((e) => e.para).sort()).toEqual([juan.id, sofi.id].sort())
-  expect(enviados[0].aviso).toEqual({ title: '🎁 Euge te propone dividir un regalo', body: '"Mate imperial" para Rodri, en partes iguales. ¿Te sumás?', url: '/inicio#invitaciones' })
+  expect(enviados[0].aviso).toEqual({ title: '🎁 Euge te propone un regalo grupal', body: '"Mate imperial" para Rodri, en partes iguales. ¿Te sumás?', url: '/avisos#invitaciones' })
   // otra vez, o alguien que no lo organiza: nada
   expect(await invitarARegalo(db, r.giftId, euge.id, [sofi.id], enviar)).toBe(0)
   expect(await invitarARegalo(db, r.giftId, sofi.id, [juan.id], enviar)).toBe(0)

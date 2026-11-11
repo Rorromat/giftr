@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useId, useState } from 'react'
 import { buyGroupGiftAction, fixGroupGiftAction } from '@/app/actions'
 import { dividir, parsePesos, partePesos, pesos, plata, type Moneda } from '@/lib/pesos'
 import { BotonEnviar } from '@/components/BotonEnviar'
@@ -30,6 +30,10 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
   corregir?: { total: number; moneda: Moneda; partes: Record<string, number>; nota: string | null }
 }) {
   const [estado, enviar] = useActionState(corregir ? fixGroupGiftAction : buyGroupGiftAction, null)
+  // el error del servidor y la cuenta de abajo ("Faltan $ 5.000") se leen con el campo: si no, con lector de pantalla hay
+  // que salir a buscarlos
+  const id = useId()
+  const idError = `${id}-error`, idCuenta = `${id}-cuenta`
   const [total, setTotal] = useState(String(corregir?.total ?? sugerido ?? ''))
   const [moneda, setMoneda] = useState<Moneda>(corregir?.moneda ?? monedaSugerida)
   const signo = moneda === 'USD' ? 'US$' : '$'
@@ -58,7 +62,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
 
   return (
     <form action={enviar} className="flex flex-col gap-3">
-      {estado?.error && <p role="alert" className="rounded-2xl bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
+      {estado?.error && <p id={idError} role="alert" className="rounded-gr-md bg-gr-brand px-3 py-2.5 text-sm font-semibold text-gr-bg">{estado.error}</p>}
       <input type="hidden" name="giftId" value={giftId} />
       {token && itemId && (
         <>
@@ -80,9 +84,11 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
 
       <label className="flex flex-col gap-1.5">
         <span className="gr-label">¿Cuánto salió en total?</span>
-        <span className="flex items-center gap-1 rounded-2xl border border-gr-line bg-gr-surface px-3.5">
+        <span className="flex items-center gap-1 rounded-gr-md border border-gr-line bg-gr-surface px-3.5">
           <span className="text-xl font-semibold">{signo}</span>
           <input name="total" inputMode="numeric" required autoComplete="off" placeholder="90.000"
+                 aria-invalid={estado?.error ? true : undefined}
+                 aria-describedby={estado?.error ? `${idError} ${idCuenta}` : idCuenta}
                  value={conPuntos(total)} onChange={(e) => setTotal(soloDigitos(e.target.value))}
                  className="min-h-[50px] w-full bg-transparent text-xl font-semibold outline-none" />
         </span>
@@ -93,14 +99,15 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
         <button type="button" aria-pressed={manual} onClick={pasarAMano}>A mano</button>
       </div>
 
-      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-2xl border border-gr-line bg-gr-surface px-3.5">
+      <ul className="flex flex-col divide-y divide-dashed divide-gr-dot rounded-gr-md border border-gr-line bg-gr-surface px-3.5">
         {miembros.map((m, i) => (
           <li key={m.userId} className="flex min-h-12 items-center justify-between gap-3 py-1.5">
             <span className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">{m.esYo ? 'Vos' : m.nombre}</span>
             {manual ? (
-              <span className="flex items-center gap-1 rounded-xl border border-gr-line px-2">
+              <span className="flex items-center gap-1 rounded-gr-sm border border-gr-line px-2">
                 <span className="font-semibold">{signo}</span>
                 <input name={`parte:${m.userId}`} inputMode="numeric" aria-label={`Parte de ${m.nombre}`} placeholder="0"
+                       aria-invalid={totalN > 0 && diferencia !== 0 ? true : undefined} aria-describedby={idCuenta}
                        value={conPuntos(partes[m.userId] ?? '')} onChange={(e) => setPartes({ ...partes, [m.userId]: soloDigitos(e.target.value) })}
                        className="min-h-10 w-24 bg-transparent text-right text-lg font-semibold outline-none" />
               </span>
@@ -111,7 +118,7 @@ export function CompraGrupalForm({ giftId, token, itemId, miembros, sugerido, mo
         ))}
       </ul>
 
-      <p aria-live="polite" className={`text-sm font-semibold ${valido || !totalN ? 'text-gr-muted' : ''}`}>
+      <p id={idCuenta} aria-live="polite" className={`text-sm font-semibold ${valido || !totalN ? 'text-gr-muted' : ''}`}>
         {!totalN ? 'Poné el total y se divide solo.'
           : diferencia === 0 ? `Suma justo ${p(totalN)}. Tu parte ya cuenta como paga.`
           : diferencia > 0 ? `Faltan ${p(diferencia)} para llegar al total.`

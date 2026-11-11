@@ -8,13 +8,14 @@ import type { FechaEspecial } from '@/lib/fechas-especiales'
 // - formas redondeadas, sin puntas, salvo la estrella de GiftR, que va como firma;
 // - cada fecha con sus colores: Navidad, roja con el árbol verde y dorado; el Día del Amigo, noche violeta con la Luna y el
 //   mate de calabaza; el del Padre, azul marino con la corbata mostaza; el de la Madre, frambuesa con flores rosas; el del
-//   Niño, verde agua con el barrilete amarillo y naranja; el aparte, negro con lima.
+//   Niño, verde agua con el barrilete amarillo y naranja; el aparte, negro con el verde de la marca.
 // Cada una es una sola idea: el arbolito con un regalo abajo, el mate (con la Luna del 20 de julio de 1969 atrás), la camisa
 // con corbata, el ramo, el barrilete y el regalo con antifaz. En chico va IconoFecha, la misma idea simplificada.
 
 const BLANCO = '#FFFFFF'
 const TINTA = '#141414'
-const LIMA = '#C8F31D'
+// el verde de la marca en su tono claro (el arranque de --gr-acento-degrade): sobre los fondos oscuros se ve más que el liso
+const VERDE = '#3CD592'
 
 /** Las puntas de la estrella de GiftR (la del logo), centrada en cx, cy. */
 function puntas(cx: number, cy: number, afuera: number, adentro: number, n = 12) {
@@ -24,7 +25,7 @@ function puntas(cx: number, cy: number, afuera: number, adentro: number, n = 12)
     return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`
   }).join(' ')
 }
-const Estrella = ({ cx, cy, r, fill = LIMA }: { cx: number; cy: number; r: number; fill?: string }) => (
+const Estrella = ({ cx, cy, r, fill = VERDE }: { cx: number; cy: number; r: number; fill?: string }) => (
   <polygon points={puntas(cx, cy, r, r * 0.63)} fill={fill} />
 )
 
@@ -183,16 +184,16 @@ export function IlustracionFecha({ fecha, size = 150, firma = true, className = 
     }
     default: {
       // el amigo invisible aparte: un regalo con antifaz (un regalo y un secreto)
-      const limaSombra = '#A3C90B', azul = '#2F5BEA'
+      const verdeSombra = '#10B66E', azul = '#2F5BEA'
       const caja = 'M44 76 h72 v48 a8 8 0 0 1 -8 8 h-56 a8 8 0 0 1 -8 -8 Z'
       const tapa = 'M44 60 h72 a6 6 0 0 1 6 6 v6 a6 6 0 0 1 -6 6 h-72 a6 6 0 0 1 -6 -6 v-6 a6 6 0 0 1 6 -6 Z'
       dibujo = (
         <>
           <defs>{mitad(84)}</defs>
           {escenario}
-          <path d={caja} fill={LIMA} /><path d={caja} fill={limaSombra} clipPath={enSombra(84)} />
+          <path d={caja} fill={VERDE} /><path d={caja} fill={verdeSombra} clipPath={enSombra(84)} />
           <rect x="76" y="60" width="8" height="72" fill={BLANCO} />
-          <path d={tapa} fill={LIMA} /><path d={tapa} fill={limaSombra} clipPath={enSombra(84)} />
+          <path d={tapa} fill={VERDE} /><path d={tapa} fill={verdeSombra} clipPath={enSombra(84)} />
           <rect x="76" y="60" width="8" height="18" fill={BLANCO} />
           <path d="M80 60 C70 39 49 45 66 60 Z M80 60 C90 39 111 45 94 60 Z" fill={BLANCO} /><circle cx="80" cy="59" r="6" fill={BLANCO} />
           <path d="M47 100 Q33 93 29 104 M47 105 Q36 111 35 121" stroke={azul} strokeWidth="5" fill="none" strokeLinecap="round" />

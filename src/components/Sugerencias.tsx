@@ -35,7 +35,7 @@ export function SugerenciaAmigo({ p, enComun }: { p: Persona; enComun: string })
           <form action={noSugerirAction}>
             <input type="hidden" name="para" value={p.id} />
             <BotonEnviar aria-label={`Ahora no: no sugerir a ${p.nombre}`} title="Ahora no"
-                         className="flex size-11 items-center justify-center rounded-xl text-gr-muted">
+                         className="flex size-11 items-center justify-center rounded-gr-sm text-gr-muted">
               <Icon name="close" size={18} strokeWidth={2.4} />
             </BotonEnviar>
           </form>

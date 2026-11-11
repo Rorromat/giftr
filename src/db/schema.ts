@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { pgTable, uuid, text, integer, smallint, boolean, timestamp, date, jsonb, primaryKey, index, uniqueIndex, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Gustos } from '@/lib/gustos'
+import type { Ocasion } from '@/lib/ocasiones'
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -36,6 +37,13 @@ export const users = pgTable('users', {
   nombreElegidoAt: timestamp('nombre_elegido_at', { withTimezone: true }),
   // Cuándo abrió Avisos por última vez: los de después son nuevos (la campanita los cuenta).
   avisosVistosAt: timestamp('avisos_vistos_at', { withTimezone: true }),
+  // Su alias o CVU/CBU, para que le transfieran su parte de un regalo grupal (lo carga en Perfil; ver validarAliasPago).
+  // No es parte del perfil: solo le llega a quien le debe plata en Cuentas (ver misCuentas y avisarCompra).
+  aliasPago: text('alias_pago'),
+  // Solo en la fila que queda en lugar de una cuenta borrada ("Cuenta eliminada", ver borrarCuenta): la que sostiene lo
+  // que esa persona compartía con otros (un regalo grupal ya comprado, un amigo invisible sorteado). No es de nadie: sin
+  // mail ni foto, con un google_id que Google no da, y no aparece en búsquedas ni se le manda nada.
+  eliminadaAt: timestamp('eliminada_at', { withTimezone: true }),
 }, (t) => [
   // las solicitudes de amistad por mail: a quién le llegan (el mail de Google, sin importar mayúsculas)
   index('users_email_lower_idx').on(sql`lower(${t.email})`),
@@ -115,6 +123,18 @@ export const lists = pgTable('lists', {
   esCumple: boolean('es_cumple').notNull().default(false),
   // La foto de un grupo (la cara de Juancito), subida como la de un deseo: /foto/deseo/:id (ver guardarFotoDeseo).
   fotoUrl: text('foto_url'),
+  // "Solo con cuenta se ve quién reservó": quien entra sin cuenta (un invitado, con el nombre que quiera) ve qué está
+  // ocupado pero no por quién (ver veQuienReservo). Sin esto, la dueña abría su link en una ventana privada, se anotaba como
+  // "Tía" y veía todo. Apagada por defecto en la columna (las listas de antes siguen como estaban); las nuevas nacen con
+  // ella prendida, puesta a mano donde se crean (upsertUser, asegurarListaPropia, crearGrupo).
+  nombresSoloConCuenta: boolean('nombres_solo_con_cuenta').notNull().default(false),
+  // De qué evento ya cerró "¿Qué te regalaron?" (la fecha de ese cumple): marcó lo que recibió o tocó "Ahora no", y la
+  // tarjeta no vuelve hasta el evento que viene (ver post-evento.ts). Vacío: nunca la cerró.
+  postEventoHecho: date('post_evento_hecho'),
+  // Solo en una lista en común: para qué es (un casamiento, un baby shower, la casa nueva…), elegida al crearla. De ahí
+  // salen el nombre que se sugiere, la tapa, los deseos para empezar y lo que se manda por WhatsApp (ver ocasiones.ts).
+  // Que es un cumple lo sigue diciendo es_cumple, que se cambia con la fecha: para leerla, siempre ocasionDeLista.
+  ocasion: text('ocasion').$type<Ocasion>().notNull().default('otra'),
 }, (t) => [
   // las sorpresas para alguien: en su lista, para los que le regalan (ver sorpresasPara)
   index('lists_para_user_id_idx').on(t.paraUserId).where(sql`${t.paraUserId} is not null`),
@@ -149,17 +169,30 @@ export const listMembers = pgTable('list_members', {
 export const items = pgTable('items', {
   id: uuid('id').defaultRandom().primaryKey(),
   listId: uuid('list_id').notNull().references(() => lists.id),
-  tipo: text('tipo', { enum: ['exacto', 'idea'] }).notNull(),
+  // aporte: plata y no un objeto ("Luna de miel", "Cochecito"): no se reserva, aportan todos los que quieran, por
+  // transferencia al alias del deseo (ver aportar, en claims.ts). Se elige al cargarlo y no cambia.
+  tipo: text('tipo', { enum: ['exacto', 'idea', 'aporte'] }).notNull(),
   titulo: text('titulo').notNull(),
   notas: text('notas'),
   fotoUrl: text('foto_url'),
   precio: text('precio'),
   rangoPrecio: text('rango_precio'),
+  // El precio en número, al lado del texto (que es lo que se muestra, tal cual lo escribió): quien abre la lista con un
+  // presupuesto filtra "hasta $X". Se lee del texto al guardar (ver leerPrecio y numerosDelPrecio): el piso, el techo si es
+  // un rango ("$20.000 a $40.000") y la moneda. Null: sin precio, o uno que no se pudo leer ("a consultar").
+  precioMin: integer('precio_min'),
+  precioMax: integer('precio_max'),
+  precioMoneda: text('precio_moneda', { enum: ['ARS', 'USD'] }),
+  // Cuándo se cargó o cambió el precio (o el dueño dijo que sigue igual): con inflación, uno de hace cuatro meses ya no es
+  // el de hoy, y se le avisa a quien regala (ver antiguedadDelPrecio).
+  precioAt: timestamp('precio_at', { withTimezone: true }),
   categoria: text('categoria'),
   prioridad: text('prioridad', { enum: ['mucho', 'gustaria', 'suelta'] }).notNull().default('gustaria'),
   cantidad: integer('cantidad').notNull().default(1),
   repetible: boolean('repetible').notNull().default(false),
-  estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero'] }).notNull().default('activo'),
+  // me_lo_regalaron: lo marcó recibido después del evento (ver post-evento.ts). Sale de la lista como los otros dos, pero
+  // va a "Recibidos" y a los que regalan no les libera nada: lo reservado queda como comprado.
+  estadoDueno: text('estado_dueno', { enum: ['activo', 'lo_tengo', 'no_lo_quiero', 'me_lo_regalaron'] }).notNull().default('activo'),
   // "Eliminar" (ver borrarDeseo): para los que regalan es "Ya no lo quiero" (estadoDueno), así nadie pierde lo que ya
   // compró ni el dueño se entera de si alguien lo había reservado; para el dueño desaparece, también de los archivados.
   borradoAt: timestamp('borrado_at', { withTimezone: true }),
@@ -170,6 +203,16 @@ export const items = pgTable('items', {
   // Al volverlo a poner (ver restoreItem), lo comprado para un evento anterior ya se regaló: lo de antes de esta fecha no
   // ocupa (ver ocupaSql). Null: nunca volvió, ocupa todo lo comprado (salvo en una idea que se puede repetir).
   ocupaDesde: timestamp('ocupa_desde', { withTimezone: true }),
+  // Solo en uno que le regalaron (estado_dueno me_lo_regalaron): cuándo lo marcó y para qué evento fue (la fecha de ese
+  // cumple: "Recibidos · cumple 2026"). Las reservas que ese toque dejó como compradas llevan esa misma hora (ver
+  // archiveItem): con "Me equivoqué" vuelven a ser reservas.
+  recibidoAt: timestamp('recibido_at', { withTimezone: true }),
+  recibidoEvento: date('recibido_evento'),
+  // Solo en un aporte en plata: el alias o CVU a donde transferir y, si quiso, cuánto quiere juntar (en pesos). El alias
+  // es de este deseo y no el del perfil (users.alias_pago, que solo ve quien le debe plata): este lo ve cualquiera que
+  // tenga el link de la lista, y lo carga quien crea el deseo sabiéndolo (ver validarAliasPago).
+  aporteAlias: text('aporte_alias'),
+  aporteMeta: integer('aporte_meta'),
 }, (t) => [
   index('items_foto_deseo_idx').on(idDeFotoDeseo(t.fotoUrl)),
   // los deseos de una lista, en el orden en que se cargaron: cada vista de lista, la vista previa y Eventos
@@ -183,7 +226,14 @@ export const guestIdentities = pgTable('guest_identities', {
   // De antes: ya no se pide ni se usa para unirlo a una cuenta (nadie lo verificaba).
   email: text('email'),
   promotedToUserId: uuid('promoted_to_user_id').references(() => users.id),
-})
+  // En qué lista se anotó con su nombre y cuándo: para el tope de invitados nuevos por lista y por día (ver
+  // anotarInvitado). Vacío en los de antes de que hubiera tope (no cuentan).
+  anotadoEn: uuid('anotado_en').references(() => lists.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // contar los que se anotaron hoy en una lista, antes de anotar a otro
+  index('guest_identities_anotado_en_idx').on(t.anotadoEn, t.createdAt).where(sql`${t.anotadoEn} is not null`),
+])
 
 // Listas donde un invitado dijo que no son suyas (se anotó ahí, reservó o tocó "Ver lo reservado"): solo en esas ve
 // la capa oculta. Su nombre vale para todo el navegador, y en otra lista puede ser el dueño sin su sesión.
@@ -204,6 +254,15 @@ export const claims = pgTable('claims', {
   notaQueCompre: text('nota_que_compre'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // Cuándo quien lo compró eligió contarle al dueño que fue suyo (ver revelarRegalo): solo después del evento, solo si lo
+  // elige y regalo por regalo. Es lo único de una reserva que le llega al dueño, y solo con esto puesto. En un regalo
+  // grupal no se usa: cada uno se revela por su cuenta (ver group_gift_members).
+  reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  // Cuándo el dueño le mandó las gracias por ese regalo revelado: una vez por regalo (ver agradecer).
+  agradecidoAt: timestamp('agradecido_at', { withTimezone: true }),
+  // Solo en el aporte a un deseo de aporte en plata (un claim que nace comprado: "Ya aporté"): cuánto dijo que aportó, en
+  // pesos; vacío si no lo dijo. Lo ve quien lo anotó y nadie más: al dueño no le llega ni esto ni que existe.
+  aporteMonto: integer('aporte_monto'),
 }, (t) => [
   // lo reservado de un deseo (cada vista, y el conteo de reserveItem con el deseo bloqueado)
   index('claims_item_id_estado_idx').on(t.itemId, t.estado),
@@ -285,6 +344,9 @@ export const groupGiftMembers = pgTable('group_gift_members', {
   pagado: boolean('pagado').notNull().default(false),
   pagadoAt: timestamp('pagado_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Como en claims, pero de cada uno: en un regalo grupal el dueño ve solo el nombre de quien eligió contárselo.
+  reveladoAt: timestamp('revelado_at', { withTimezone: true }),
+  agradecidoAt: timestamp('agradecido_at', { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.giftId, t.userId] }), index('group_gift_members_user_id_idx').on(t.userId)])
 
 // A quién sacó el encargado de un regalo grupal: no se vuelve a sumar con un toque (ver sacarDeRegalo), salvo que el
@@ -395,6 +457,16 @@ export const avisos = pgTable('avisos', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('avisos_user_id_created_at_idx').on(t.userId, t.createdAt)])
 
+// Los recordatorios programados que ya salieron (ver recordatorios.ts): uno por persona, tipo y motivo. clave es el
+// motivo (la reserva y la fecha del evento, el cumple de ese año…): si el cron del día corre dos veces, o al otro día el
+// motivo sigue siendo el mismo, no se repite.
+export const recordatoriosEnviados = pgTable('recordatorios_enviados', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tipo: text('tipo').notNull(),
+  clave: text('clave').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.tipo, t.clave] })])
+
 // Amigo invisible: alguien arma el juego (con un nombre, una temática, presupuesto y la fecha en que se dan los regalos;
 // puede ser de una fecha especial, ver fechas-especiales.ts), invita amigos suyos y, cuando están, lo sortea. Cada uno ve
 // solo a quién le regala (ver amigo-invisible.ts).
@@ -411,16 +483,27 @@ export const amigosInvisibles = pgTable('amigos_invisibles', {
   fecha: date('fecha').notNull(),
   // de qué fecha especial es (navidad, amigo, padre, madre, ninos); vacío: de ninguna
   fechaEspecial: text('fecha_especial'),
+  // el último sorteo (se puede volver a sortear si después alguien se bajó o se sumó)
   sorteadoAt: timestamp('sorteado_at', { withTimezone: true }),
+  // el link para sumarse (/invisible/unirme/…): lo manda el que organiza por WhatsApp y entra cualquiera con cuenta, sin
+  // ser su amigo. Lo puede cambiar (el anterior deja de servir). Vacío en los juegos de antes, hasta que lo pide.
+  inviteToken: text('invite_token').unique(),
+  // el que organiza cerró las altas: el link no suma a nadie más (hasta que las abra de nuevo)
+  altasCerradasAt: timestamp('altas_cerradas_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('amigos_invisibles_organizador_id_idx').on(t.organizadorId)])
 
 // Los que juegan (o los invitados que todavía no contestaron). regalaA: a quién le regala, desde el sorteo; solo lo ve él.
+// sacado: lo sacó el que organiza; no ve el juego ni vuelve a entrar con el link.
 export const amigoInvisibleGente = pgTable('amigo_invisible_gente', {
   amigoInvisibleId: uuid('amigo_invisible_id').notNull().references(() => amigosInvisibles.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id),
-  estado: text('estado', { enum: ['invitado', 'juega', 'no_juega'] }).notNull().default('invitado'),
+  estado: text('estado', { enum: ['invitado', 'juega', 'no_juega', 'sacado'] }).notNull().default('invitado'),
   regalaA: uuid('regala_a').references(() => users.id),
+  // se sumó con el sorteo ya hecho: juega, pero no le toca nadie (ni él a nadie) hasta que se sortee de nuevo
+  esperaSorteo: boolean('espera_sorteo').notNull().default(false),
+  // se bajó (o lo sacaron) con el sorteo ya hecho: para decírselo al que organiza. Se limpia al sortear de nuevo
+  salioAt: timestamp('salio_at', { withTimezone: true }),
   // cuándo vio a quién le regala (para que el que organiza sepa si falta alguien)
   vioAt: timestamp('vio_at', { withTimezone: true }),
   // cuándo pidió saber quién le regaló (solo después de la fecha, y solo si lo pide)

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
+/* Los deseos, de a cuántos por fila: dos en el teléfono, tres en tablet y cuatro en escritorio (--gr-columnas, en
+   tokens.css). Una utilidad y no un número en cada grilla: así todas cambian juntas, y acepta lg: adelante. */
+@utility gr-columnas {
+  grid-template-columns: repeat(var(--gr-columnas), minmax(0, 1fr));
+}
+
 @theme inline {
   --color-gr-bg: var(--gr-bg);
   --color-gr-ink: var(--gr-ink);
@@ -27,7 +33,10 @@
   --font-display: var(--gr-font-display);
   --font-sans: var(--gr-font-body);
   --font-brand: var(--gr-font-display);
+  --radius-gr-sm: var(--gr-radius-sm);
+  --radius-gr-md: var(--gr-radius-md);
+  --radius-gr-lg: var(--gr-radius-lg);
+  --radius-gr-xl: var(--gr-radius-xl);
   --shadow-card: var(--gr-shadow);
   --shadow-float: var(--gr-shadow-float);
-  --radius-sticker: var(--gr-radius-lg);
 }

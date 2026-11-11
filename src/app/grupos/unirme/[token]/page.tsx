@@ -24,9 +24,9 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
       <p className="text-[15px] font-medium">{invitan} a armar juntos</p>
       <h1 className="text-[32px] leading-tight font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{grupo.nombre}</h1>
       {grupo.descripcion && <p className="text-[15px] font-medium">{grupo.descripcion}</p>}
-      <p className="mt-1 rounded-[22px] bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
+      <p className="mt-1 rounded-gr-lg bg-gr-soft px-4 py-3 text-sm font-medium leading-snug">
         Vas a poder agregar y editar deseos de esta lista. Como es tuya también, no vas a ver quién regala qué, y aunque
-        después salgas (o te saquen) del grupo no vas a poder reservar en ella. Si te llegó para regalar, no te sumes:
+        después salgas (o te saquen) de la lista no vas a poder reservar en ella. Si te llegó para regalar, no te sumes:
         pedí el link para regalar.
       </p>
       {/* lo mismo para todos: unirseAGrupo lo resuelve en el servidor */}
@@ -38,7 +38,7 @@ export default async function Unirme({ params }: { params: Promise<{ token: stri
         <form action={joinGroupAction} className="mt-2 flex w-full flex-col gap-4 text-left">
           <input type="hidden" name="invite" value={token} />
           <CampoParentesco etiqueta={`¿Qué es ${grupo.nombre} para vos? (opcional)`} />
-          <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-14 w-full">Unirme al grupo</BotonEnviar>
+          <BotonEnviar pendiente="Uniéndote…" className="gr-btn-primary h-14 w-full">Unirme a la lista en común</BotonEnviar>
         </form>
       ) : (
         <form action={async () => { 'use server'; await signIn('google', { redirectTo: `/grupos/unirme/${token}` }) }} className="mt-2 w-full">

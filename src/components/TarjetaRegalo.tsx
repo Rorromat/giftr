@@ -20,7 +20,7 @@ export function TarjetaRegalo({ href, foto, titulo, precio, apagado = false, cor
   return (
     <Link href={href} className="gr-regalo">
       <div className="relative">
-        <Arte src={foto} titulo={titulo} apagado={apagado} className="rounded-[16px]" />
+        <Arte src={foto} titulo={titulo} apagado={apagado} className="rounded-gr-md" />
         <Mono borde="#FFFFFF" className="gr-regalo__mono" />
       </div>
       <div className="flex flex-1 flex-col gap-1 px-1.5 pb-1">

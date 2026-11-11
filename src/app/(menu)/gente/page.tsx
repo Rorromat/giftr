@@ -21,6 +21,10 @@ import { AvisoAmigo, InvitarAmigos, SolicitudRecibida } from '@/components/Amigo
 import { SugerenciaAmigo } from '@/components/Sugerencias'
 import { AvatarSticker, Icon, Seccion, AppHeader } from '@/components/ui'
 import { AvatarDeLista } from '@/components/ListaEnComun'
+import { conVolver } from '@/lib/volver'
+
+/** El link a su lista, avisando que se abre desde acá: su "Volver" trae de vuelta a Tu gente (ver lib/volver.ts). */
+const aSuLista = (href: string) => (href.startsWith('/l/') ? conVolver(href, '/gente') : href)
 
 /**
  * "Cumple el 22 de agosto · en 14 días" (el de una persona o el de una lista en común que es un cumple), "El 12 de
@@ -43,10 +47,10 @@ function Opciones({ nombre, children }: { nombre: string; children: React.ReactN
   return (
     <details className="relative flex-none">
       <summary aria-label={`Opciones de ${nombre}`}
-               className="flex size-11 cursor-pointer list-none items-center justify-center rounded-xl [&::-webkit-details-marker]:hidden">
+               className="flex size-11 cursor-pointer list-none items-center justify-center rounded-gr-sm [&::-webkit-details-marker]:hidden">
         <Icon name="more" size={22} strokeWidth={2.2} />
       </summary>
-      <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-2xl border border-gr-line bg-gr-surface p-3 shadow-float">
+      <div className="absolute right-0 top-full z-20 mt-1 flex w-64 flex-col gap-3 rounded-gr-md border border-gr-line bg-gr-surface p-3 shadow-float">
         {children}
       </div>
     </details>
@@ -69,7 +73,7 @@ function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: bo
   return (
     <li data-buscar={paraBuscar([c.nombre, ...(usuario ? [usuario] : [])].join(' '))}
         className="gr-card flex items-center gap-1 overflow-visible py-3 pl-3.5 pr-1.5">
-      <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">
+      <Link href={aSuLista(c.href)} className="flex min-w-0 flex-1 items-center gap-3">
         <AvatarSticker nombre={c.nombre} foto={dueno?.foto} size={48} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex flex-wrap items-center gap-x-2 text-base leading-tight font-semibold [overflow-wrap:anywhere]">
@@ -84,7 +88,7 @@ function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: bo
         {amigo && dueno ? (
           <form action={dejarDeSerAmigosAction} className="flex flex-col gap-2">
             <input type="hidden" name="userId" value={dueno.id} />
-            <p className="text-[13px] font-medium leading-snug">Ninguno de los dos va a ver más al otro acá ni en Eventos.</p>
+            <p className="text-[13px] font-medium leading-snug">Ninguno de los dos va a ver más al otro acá ni en Todo el año.</p>
             <BotonEnviar className="gr-btn gr-btn--sm min-h-11 text-sm">Dejar de ser amigos</BotonEnviar>
           </form>
         ) : (
@@ -96,7 +100,7 @@ function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: bo
                 <BotonEnviar className="gr-btn-primary gr-btn--sm min-h-11 text-sm">Sumar como amigo</BotonEnviar>
               </form>
             )}
-            <Quitar listId={c.listId} texto="Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve." />
+            <Quitar listId={c.listId} texto="Deja de aparecer acá y en Todo el año. Si volvés a abrir su lista, vuelve." />
           </>
         )}
       </Opciones>
@@ -107,7 +111,7 @@ function Persona({ c, hoy, amigo, usuario }: { c: Contacto; hoy: Date; amigo: bo
 /**
  * Una lista en común (la de Juancito, la de la abuela), como una persona más pero en azul: su foto con la de sus dueños,
  * su cumple o fecha y qué es para ellos. La de un amigo que no agregaste va punteada y sin link, con "Agregar": recién
- * agregada entra su fecha en tus Eventos.
+ * agregada entra su fecha en Todo el año.
  */
 function EnComun({ c, hoy, deAmigo }: { c: Contacto; hoy: Date; deAmigo: boolean }) {
   const fecha = cuando(c, hoy)
@@ -134,7 +138,7 @@ function EnComun({ c, hoy, deAmigo }: { c: Contacto; hoy: Date; deAmigo: boolean
   const buscar = paraBuscar([c.nombre, relacion, ...c.duenos.map((d) => d.nombre)].join(' '))
   if (!c.agregada) {
     return (
-      <li data-buscar={buscar} className="flex items-center gap-2 rounded-[22px] border-[1.5px] border-dashed border-gr-comun-line py-3 pl-3.5 pr-2">
+      <li data-buscar={buscar} className="flex items-center gap-2 rounded-gr-lg border-[1.5px] border-dashed border-gr-comun-line py-3 pl-3.5 pr-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">{contenido}</div>
         <form action={agregarListaAction} className="flex-none">
           <input type="hidden" name="listId" value={c.listId} />
@@ -148,11 +152,11 @@ function EnComun({ c, hoy, deAmigo }: { c: Contacto; hoy: Date; deAmigo: boolean
   }
   return (
     <li data-buscar={buscar} className="gr-card flex items-center gap-1 overflow-visible border-gr-comun-line bg-gr-comun py-3 pl-3.5 pr-1.5">
-      <Link href={c.href} className="flex min-w-0 flex-1 items-center gap-3">{contenido}</Link>
+      <Link href={aSuLista(c.href)} className="flex min-w-0 flex-1 items-center gap-3">{contenido}</Link>
       <Opciones nombre={c.nombre}>
         <Quitar listId={c.listId} texto={deAmigo
-          ? 'Su fecha sale de tus Eventos. La lista sigue acá por si la querés agregar de nuevo.'
-          : 'Deja de aparecer acá y en Eventos. Si volvés a abrir su lista, vuelve.'} />
+          ? 'Su fecha sale de Todo el año. La lista sigue acá por si la querés agregar de nuevo.'
+          : 'Deja de aparecer acá y en Todo el año. Si volvés a abrir su lista, vuelve.'} />
       </Opciones>
     </li>
   )
@@ -177,7 +181,7 @@ export default async function Gente({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
-      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} />
+      <AppHeader nombre={nombre ?? session.user?.name ?? 'Vos'} foto={foto} avisos={avisos} desde="/gente" />
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="gr-title">Tu gente</h1>

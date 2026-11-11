@@ -71,7 +71,7 @@ test('el regalador ve el cumple de su gente con los 3 que más quiere sin reserv
   })
   expect(cumple.fecha).toEqual(dia('2026-08-22'))
   expect(cumple.href).toMatch(/^\/l\//)
-  expect(grupo).toMatchObject({ tipo: 'grupo', titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Grupo', fotos: [] })
+  expect(grupo).toMatchObject({ tipo: 'grupo', titulo: 'Cumple de los mellizos', dias: 65, personas: ['Caro'], contexto: 'Lista en común', fotos: [] })
   // quien reservó se ve a sí mismo
   const [deRodri] = await misEventos(db, rodri.id, HOY)
   expect(deRodri.misReservas).toBe(1)
@@ -98,7 +98,7 @@ test('REGLA DE LA SORPRESA: en sus propios eventos el dueño no recibe nada de r
   const json = JSON.stringify(await misEventos(db, euge.id, HOY)).toLowerCase()
   for (const palabra of ['rodri', 'sofi', 'caro', 'reserv', 'claim', 'comprado', 'grupal']) expect(json).not.toContain(palabra)
   const [mellizos] = await misEventos(db, caro.id, HOY)
-  expect(mellizos).toMatchObject({ titulo: 'Cumple de los mellizos', propio: true, contexto: 'Tu grupo' })
+  expect(mellizos).toMatchObject({ titulo: 'Cumple de los mellizos', propio: true, contexto: 'Tu lista en común' })
   expect(mellizos).not.toHaveProperty('misReservas')
 })
 
@@ -408,8 +408,8 @@ test('una anual que ya cayó este año: cambiarle solo el día por uno que todav
   expect(rotuloFechaGrupo(await fechaDe(juan), true, hoy)).toBe('Domingo 25 de octubre · en 4 días')
   expect(await eventoDeLista(db, juan, hoy)).toMatchObject({ fecha: dia('2026-10-25'), dias: 4 })
   expect((await misEventos(db, rodri.id, hoy)).find((e) => e.listId === juan)).toMatchObject({ dias: 4 })
-  // las reservas se acortan para el 25 (nunca menos de 24 horas)
-  expect(await vencimientoDeReserva(db, juan, ahora)).toEqual(new Date('2026-10-22T15:00:00Z'))
+  // las reservas miran el 25: tan cerca no vencen antes, duran hasta el final del día siguiente al cumple
+  expect(await vencimientoDeReserva(db, juan, ahora)).toEqual(new Date('2026-10-27T03:00:00Z'))
   // Rodri le compró algo el 24 para el 25: pasado el cumple, ya es historial
   const [remera] = await db.insert(items).values({ listId: juan, tipo: 'exacto', titulo: 'Remera' }).returning()
   await db.insert(claims).values({

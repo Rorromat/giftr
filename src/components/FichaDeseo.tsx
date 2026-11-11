@@ -37,7 +37,7 @@ export function FotoDeLaFicha({ foto, titulo, apagado = false, volver, volverLab
   return (
     <div className="gr-ficha__portada">
       <FotoAmpliable src={foto} titulo={titulo} pastilla className="h-full">
-        <Arte src={foto} titulo={titulo} apagado={apagado} className="gr-ficha__foto" />
+        <Arte src={foto} titulo={titulo} apagado={apagado} pronto className="gr-ficha__foto" />
       </FotoAmpliable>
       <div className="gr-ficha__arriba">
         <BackLink href={volver} label={volverLabel} vidrio="oscuro" />
@@ -111,7 +111,7 @@ export function FichasDeseo({ deseo, voz, cupo }: {
     <>
       <ul className="grid auto-cols-fr grid-flow-col gap-2">
         {fichas.map((f) => (
-          <li key={f.clave} className="flex min-w-0 flex-col gap-2.5 rounded-[18px] border border-gr-line bg-gr-surface p-3">
+          <li key={f.clave} className="flex min-w-0 flex-col gap-2.5 rounded-gr-md border border-gr-line bg-gr-surface p-3">
             <span aria-hidden className="flex h-10 min-w-10 items-center justify-center gap-0.5 self-start rounded-full bg-gr-soft px-2.5 text-gr-acento-texto">
               {f.visual}
             </span>

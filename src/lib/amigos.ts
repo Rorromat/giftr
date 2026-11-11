@@ -84,6 +84,12 @@ export async function cambiarUsuario(db: Db, userId: string, escrito: unknown): 
 }
 
 export type Persona = { id: string; nombre: string; usuario: string | null; foto: string | null }
+/**
+ * La fila "Cuenta eliminada" (lo que queda de alguien que borró su cuenta, ver borrarCuenta) no es de nadie: no se la
+ * encuentra por usuario, mail ni link, y nadie le manda una solicitud aunque tenga su id (sale en Cuentas y en un amigo
+ * invisible ya sorteado).
+ */
+const noEliminada = isNull(users.eliminadaAt)
 const camposPersona = { id: users.id, nombre: users.nombre, usuario: users.usuario, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }
 const persona = (u: { id: string; nombre: string; usuario: string | null; fotoAt: Date | null; avatarUrl: string | null }): Persona =>
   ({ id: u.id, nombre: u.nombre, usuario: u.usuario, foto: urlFoto(u) })
@@ -99,7 +105,7 @@ export async function personas(db: Db, ids: string[]): Promise<Persona[]> {
 export async function buscarPorUsuario(db: Db, escrito: unknown): Promise<Persona | null> {
   const usuario = normalizarUsuario(escrito)
   if (!usuario) return null
-  const [u] = await db.select(camposPersona).from(users).where(eq(users.usuario, usuario))
+  const [u] = await db.select(camposPersona).from(users).where(and(eq(users.usuario, usuario), noEliminada))
   return u ? persona(u) : null
 }
 
@@ -177,7 +183,7 @@ export async function pedirAmistad(db: Db, de: string, para: string, enviar?: En
   const r = await db.transaction(async (tx) => {
     const t = tx as unknown as Db
     await bloquearPar(t, de, para)
-    const [existe] = await t.select({ id: users.id }).from(users).where(eq(users.id, para))
+    const [existe] = await t.select({ id: users.id }).from(users).where(and(eq(users.id, para), noEliminada))
     if (!existe) return { ok: false, reason: 'no_existe' } as const
     const f = await filaEntre(t, de, para)
     if (f?.estado === 'aceptada') return { ok: true, estado: 'amigos', avisar: null } as const
@@ -217,7 +223,7 @@ export async function pedirAmistadPorMail(db: Db, de: string, escrito: unknown, 
   const [yo] = await db.select({ email: users.email }).from(users).where(eq(users.id, de))
   if (!yo) return { ok: false, reason: 'no_existe' }
   if (yo.email.toLowerCase() === email) return { ok: false, reason: 'yo' }
-  const cuentas = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${email}`, ne(users.id, de)))
+  const cuentas = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${email}`, ne(users.id, de), noEliminada))
   if (cuentas.length) {
     let amigos = false
     for (const c of cuentas) {
@@ -419,7 +425,7 @@ export async function miAmigoToken(db: Db, userId: string): Promise<string | nul
 /** De quién es un link de amigo. */
 export async function duenoDeAmigoToken(db: Db, token: string): Promise<Persona | null> {
   if (!esToken(token)) return null
-  const [u] = await db.select(camposPersona).from(users).where(eq(users.amigoToken, token))
+  const [u] = await db.select(camposPersona).from(users).where(and(eq(users.amigoToken, token), noEliminada))
   return u ? persona(u) : null
 }
 

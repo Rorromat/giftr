@@ -48,7 +48,7 @@ export function QueQueres({ defaultValue, placeholder = '¿Qué querés?' }: { d
       <label htmlFor={ID_TITULO} className="sr-only">{placeholder}</label>
       {/* entra un link entero (pasa a "Link a la tienda", ver deseoDesdeForm); si el texto se pasa, avisa antes de mandar */}
       <CampoTitulo id={ID_TITULO} name="titulo" required placeholder={placeholder} defaultValue={defaultValue}
-                   className="block min-h-12 w-full rounded-xl bg-transparent px-1.5 text-[22px] leading-tight font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
+                   className="block min-h-12 w-full rounded-gr-sm bg-transparent px-1.5 text-[22px] leading-tight font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
     </>
   )
 }

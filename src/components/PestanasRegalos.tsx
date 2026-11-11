@@ -6,12 +6,12 @@ import { useState } from 'react'
 
 // Sin bajada debajo del título: la de una ocupaba dos renglones y la de la otra uno, y las pestañas se corrían al cambiar.
 const PESTANAS = [
-  { href: '/regalos', nombre: 'Mis regalos', titulo: 'Tus regalos' },
+  { href: '/regalos', nombre: 'Tus regalos', titulo: 'Tus regalos' },
   { href: '/cuentas', nombre: 'Cuentas', titulo: 'Cuentas' },
 ]
 
 /**
- * El título y las pestañas de Mis regalos y Cuentas. Vive en el layout de las dos (ver (regalos)/layout.tsx), así que al
+ * El título y las pestañas de Tus regalos y Cuentas (la pestaña y el título dicen lo mismo: la app le habla de vos). Vive en el layout de las dos (ver (regalos)/layout.tsx), así que al
  * pasar de una a otra no se vuelve a montar: la pastilla negra se desliza y el título cambia desde el toque mismo, como
  * la barra de abajo (ver BottomNav). Las dos se precargan completas, así el cambio suele ser instantáneo; si no, lo de
  * abajo se apaga hasta que llega la otra.

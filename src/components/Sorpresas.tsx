@@ -41,7 +41,7 @@ export function SorpresasEnLista({ token, nombre, enComun = false, sorpresas }: 
   return (
     <section aria-labelledby="sorpresas-titulo" className="flex flex-col gap-3">
       <Link href={`/sorpresa/nueva?para=${token}`}
-            className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
+            className="flex items-center gap-3.5 rounded-gr-lg border-2 border-dashed border-gr-line-strong px-4 py-3.5">
         <span aria-hidden className="flex size-12 flex-none items-center justify-center rounded-full bg-gr-soft">
           <Icon name="gift" size={24} />
         </span>
@@ -93,7 +93,7 @@ export function SorpresasEnLista({ token, nombre, enComun = false, sorpresas }: 
 /** "Armar una sorpresa" (en Tu gente y en Regalos): para un amigo o para alguien sin GiftR. */
 export function ArmarSorpresa() {
   return (
-    <Link href="/sorpresa/nueva" className="flex items-center gap-3.5 rounded-[22px] border-2 border-dashed border-gr-line-strong px-4 py-3.5">
+    <Link href="/sorpresa/nueva" className="flex items-center gap-3.5 rounded-gr-lg border-2 border-dashed border-gr-line-strong px-4 py-3.5">
       <span aria-hidden className="flex size-11 flex-none items-center justify-center rounded-full bg-gr-soft"><Icon name="gift" size={22} /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] leading-snug font-semibold">Armar una sorpresa</span>
@@ -122,7 +122,7 @@ export function ElegirParaQuien({ amigos }: { amigos: Persona[] }) {
         <>
           <p className="gr-label mt-2">O uno de tus amigos</p>
           {amigos.length >= BUSCAR_DESDE && <Buscador ambito="para-quien" placeholder="Buscar un amigo" vacio="No tenés un amigo con «%s»." />}
-          <ul id="para-quien" className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+          <ul id="para-quien" className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line bg-gr-surface px-3">
             {amigos.map((a) => (
               <li key={a.id} data-buscar={paraBuscar(`${a.nombre} ${a.usuario ?? ''}`)}>
                 <Link href={`/sorpresa/nueva?amigo=${a.id}`} className="flex min-h-14 items-center gap-3 py-2">
@@ -167,13 +167,13 @@ export function FormSorpresa({ para, amigos, hoy, error, editar }: {
       {!editar && para.tipo === 'amigo' && <input type="hidden" name="paraAmigo" value={para.id} />}
 
       {error && (
-        <p role="alert" className="rounded-[18px] bg-gr-soft px-4 py-3 text-sm font-medium">
+        <p role="alert" className="rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           {editar ? 'No la pudimos guardar. Fijate que tenga nombre (y para quién) y probá de nuevo.'
             : 'No la pudimos armar. Fijate que tenga nombre (y para quién) y probá de nuevo.'}
         </p>
       )}
 
-      <p className="flex items-start gap-2.5 rounded-[18px] bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
+      <p className="flex items-start gap-2.5 rounded-gr-md bg-gr-brand px-4 py-3 text-sm font-medium text-gr-on-brand">
         <span aria-hidden>🤫</span>
         {para.tipo === 'lista' && para.enComun ? `No la ven nunca ni ${quien} ni los que arman su lista: solo los que le regalan.`
           : quien ? `${quien} no la ve nunca: solo los que le regalan.` : 'Como no usa GiftR, la ven solo los que la arman con vos.'}
@@ -198,7 +198,7 @@ export function FormSorpresa({ para, amigos, hoy, error, editar }: {
         <CompletarDesdeLink guardado={deseo?.linkTienda ?? null} tituloGuardado={deseo?.titulo ?? null} />
         <QueQueres placeholder="¿Qué le regalan?" defaultValue={deseo?.titulo} />
         <CampoPrecio name="precio" maxLength={LARGO.precio} inputMode="decimal" placeholder="$ Precio" aria-label="Precio" defaultValue={deseo?.precio ?? ''}
-                     className="min-h-11 w-full rounded-xl bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
+                     className="min-h-11 w-full rounded-gr-sm bg-transparent px-1.5 text-lg font-semibold outline-none placeholder:font-medium placeholder:text-gr-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gr-ink" />
       </div>
       <DetallesDeseo deseo={deseo} solo={['notas', 'link', 'video']} textoNotas="Detalles" />
 

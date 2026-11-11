@@ -9,6 +9,12 @@ export const LARGO = {
 /** Cuántas unidades puede pedir un deseo (más que eso no es un regalo, y la columna tiene su tope). */
 export const CANTIDAD_MAXIMA = 99
 
+/** Hasta cuánto puede ser la meta de un aporte en plata, o lo que alguien anota que aportó (pesos). */
+export const APORTE_MAXIMO = 100_000_000
+
+/** Una plata que vale como meta o como aporte: pesos enteros, de 1 a APORTE_MAXIMO. */
+export const esMontoDeAporte = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= APORTE_MAXIMO
+
 export const acotarCantidad = (n: number, tope = CANTIDAD_MAXIMA) => (Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 1), tope) : 1)
 
 // Intl.Segmenter se crea recién cuando hace falta, y si no existe se cuenta por puntos de código: este archivo también va

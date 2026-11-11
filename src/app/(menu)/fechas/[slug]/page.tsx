@@ -39,7 +39,7 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
     <Seccion className="flex flex-col gap-5 pb-36 pt-2">
       <PageHeader title={v.nombre} back="/inicio" backLabel="Volver a Inicio" />
 
-      <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-[26px] p-[18px] pr-[132px] text-white shadow-card"
+      <div className="relative flex min-h-[184px] flex-col gap-2.5 overflow-hidden rounded-gr-xl p-[18px] pr-[132px] text-white shadow-card"
            style={{ background: paletaDe(slug).fondo }}>
         <IlustracionFecha fecha={slug} size={150} className="absolute -right-3 -bottom-3" />
         <span className="self-start whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold" style={{ color: paletaDe(slug).fondo }}>
@@ -59,7 +59,7 @@ export default async function FechaEspecialPage({ params }: { params: Promise<{ 
       <section aria-labelledby="gente-titulo" className="flex flex-col gap-2.5">
         <h2 id="gente-titulo" className="gr-label">Regalale a tu gente</h2>
         {personales.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-gr-line rounded-2xl border border-gr-line bg-gr-surface px-3">
+          <ul className="flex flex-col divide-y divide-gr-line rounded-gr-md border border-gr-line bg-gr-surface px-3">
             {personales.map((c) => (
               <li key={c.listId} className="flex min-h-16 items-center gap-3 py-2">
                 <AvatarSticker nombre={c.nombre} foto={c.duenos[0]?.foto} size={38} />

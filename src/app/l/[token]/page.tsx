@@ -1,16 +1,17 @@
+import { Fragment } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getListForViewer } from '@/lib/lists'
-import { getViewer } from '@/lib/viewer'
+import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
 import { eventoDeLista, fechaLarga, seguirLista } from '@/lib/events'
 import { relacionCon } from '@/lib/amigos'
 import { AmigoEnLista, AvisoAmigo } from '@/components/Amigos'
 import { BotonRobar } from '@/components/Novedades'
-import { avisoDeCupo, type ClaimView, type OwnerItemView } from '@/lib/serialize'
+import { avisoDeCupo, esAporte, type ClaimView, type OwnerItemView } from '@/lib/serialize'
 import { identificado } from '@/lib/types'
-import { nombreDeViewer } from '@/lib/guest'
+import { linkParaVolver, nombreDeViewer } from '@/lib/guest'
 import { historialDeLista } from '@/lib/regalos'
 import { listaParaCompartir } from '@/lib/compartir'
 import { gustosDeLista } from '@/lib/bienvenida'
@@ -20,30 +21,42 @@ import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { Buscador } from '@/components/Buscador'
 import { BUSCAR_DESDE, paraBuscar } from '@/lib/buscar'
 import { QuienSeOcupo } from '@/components/QuienSeOcupo'
-import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, QuienSos } from '@/components/Identidad'
+import { ConfirmarLista, ExDueno, NoSoyYo, OtraCuenta, PreguntaInvitado, QuienSos } from '@/components/Identidad'
+import { ReservaConfirmada, ultimoDia } from '@/components/ReservaConfirmada'
+import { SoloConCuenta } from '@/components/SoloConCuenta'
 import { Banners } from '@/components/Banners'
 import { SorpresasEnLista } from '@/components/Sorpresas'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { esSorpresa, sorpresasPara } from '@/lib/sorpresas'
 import { Arte, AvatarStack, AvatarSticker, BackLink, Icon, PriorityTag, LogoSticker, Tapa } from '@/components/ui'
-import { TAPA_EN_COMUN, TAPA_PERSONA } from '@/lib/tapas'
+import { TAPA_PERSONA } from '@/lib/tapas'
+import { tapaDeOcasion } from '@/lib/ocasiones'
+import { TarjetaAporte } from '@/components/Aporte'
 import { AvatarDeLista } from '@/components/ListaEnComun'
 import { iconoDeCategoria } from '@/components/FichaDeseo'
+import { ChipPresupuesto, TopesPresupuesto } from '@/components/FiltroPresupuesto'
+import { partirPorTope, presupuestoDeLista, topeDeLaUrl } from '@/lib/presupuesto'
+import { plata } from '@/lib/pesos'
 
 // Lo que se dibuja de cada deseo. Sin identificarse no hay estados: todos se ven igual y "Reservar" pide el nombre.
-type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null }
+type Tarjeta = OwnerItemView & { claims: ClaimView[]; disponible: boolean; quedan: number | null; juntado: number | null }
 
-function estadoNoDisponible(item: Tarjeta) {
+/** sinNombres: al que mira no le toca saber quién (ver sinNombresPara): "Reservado" a secas; lo suyo, sí. */
+function estadoNoDisponible(item: Tarjeta, sinNombres: boolean) {
   // comprado solo si ya se compró todo; si no, quién se ocupa (sin esconder a los demás detrás del primero)
   if (item.claims.length && item.claims.every((c) => c.estado === 'comprado')) return '✓ Comprado'
   const grupal = item.claims.find((c) => c.grupal && c.estado === 'reservado')?.grupal
   if (grupal && item.claims.length === 1) {
     if (grupal.soyParte) return 'Estás en el regalo grupal'
-    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo)
-    return `Regalo grupal de ${grupal.personas.length}${grupal.meSacaron ? '' : ' · sumate'}`
+    // al que sacó el encargado no se lo invita: no se puede sumar (ver sumarseARegalo); sin cuenta, tampoco
+    return `Regalo grupal de ${grupal.cuantos}${grupal.meSacaron || sinNombres ? '' : ' · sumate'}`
   }
   const primero = item.claims.find((c) => c.esMia) ?? item.claims[0]
   const otros = item.claims.length - 1
+  if (sinNombres) {
+    if (primero?.esMia) return `Lo reservaste vos${otros > 0 ? ` y ${otros} más` : ''}`
+    return otros > 0 ? `Reservado por ${otros + 1} personas` : 'Reservado'
+  }
   return `Reservado por ${primero ? (primero.esMia ? 'vos' : primero.claimerNombre) : 'alguien'}${otros > 0 ? ` y ${otros} más` : ''}`
 }
 
@@ -89,7 +102,8 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const l = await listaParaCompartir(db, token)
   if (!l) return {}
   const titulo = l.grupoNombre ?? `Lista de ${l.para.split(' ')[0]}`
-  const descripcion = `${l.cantidad} ${l.cantidad === 1 ? 'deseo' : 'deseos'}. Elegí, reservá y no te duplicás con nadie.`
+  // con un aporte en plata en la lista (un casamiento, un baby shower), la vista previa ya dice que se puede aportar
+  const descripcion = `${l.cantidad} ${l.cantidad === 1 ? 'deseo' : 'deseos'}. ${l.conAportes ? 'Elegí un regalo y reservalo, o aportá lo que quieras.' : 'Elegí, reservá y no te duplicás con nadie.'}`
   return { title: titulo, description: descripcion, openGraph: { title: titulo, description: descripcion, url: `/l/${token}` } }
 }
 
@@ -97,10 +111,10 @@ export default async function ListaAjena({
   params, searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ cat?: string; disp?: string; codazo?: string; reserva?: string; amigo?: string }>
+  searchParams: Promise<{ cat?: string; disp?: string; hasta?: string; codazo?: string; reserva?: string; reservado?: string; amigo?: string }>
 }) {
   const { token } = await params
-  const { cat, disp, codazo, reserva, amigo } = await searchParams
+  const { cat, disp, hasta, codazo, reserva, reservado, amigo } = await searchParams
   const viewer = await getViewer()
   const vista = await getListForViewer(db, token, viewer)
   if (!vista) {
@@ -110,21 +124,26 @@ export default async function ListaAjena({
   }
   if (vista.role === 'owner') redirect(vista.tipo === 'grupo' ? `/grupos/${vista.listId}` : '/mi-lista')
 
-  // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en tus Eventos.
+  // Abrirla con sesión la guarda entre las listas que seguís: su cumple o fecha aparece en Todo el año.
   // veTodo: ve la coordinación. identified: tiene nombre (sesión o invitado), aunque en esta lista todavía no la vea.
   const veTodo = vista.role === 'giver'
+  // ve qué está ocupado pero no por quién: sin cuenta, en una lista que lo muestra solo con cuenta (ver sinNombresPara)
+  const sinNombres = vista.role === 'giver' && vista.sinNombres
   const identified = identificado(viewer)
   // con tu cuenta, en la lista personal de alguien: sumarlo como amigo (ver AmigoEnLista). En la de una persona y en una
   // en común: regalarle algo que no está en la lista (las sorpresas, solo para los que ven la coordinación con sesión)
   const dueno = !vista.grupoNombre && vista.perfiles.length === 1 ? vista.perfiles[0] : null
-  const [evento, historial, gustos, quien, sorpresas] = await Promise.all([
+  const [evento, historial, gustos, quien, sorpresas, invitado] = await Promise.all([
     eventoDeLista(db, vista.listId),
     // el historial de quién compró qué es para los que regalan con nombre, no para cualquiera con el link
-    veTodo ? historialDeLista(db, vista.listId, viewer) : null,
+    veTodo && !sinNombres ? historialDeLista(db, vista.listId, viewer) : null,
     gustosDeLista(db, vista.listId),
     identified ? nombreDeViewer(db, viewer) : null,
     veTodo && viewer.userId && (dueno || vista.grupoNombre)
       ? sorpresasPara(db, dueno ? { userId: dueno.id } : { listId: vista.listId }, viewer.userId) : null,
+    // volviendo de "Entrá con Google y te avisamos antes de que venza": lo que reservó con su nombre sigue siendo del
+    // invitado hasta que diga que es él (nunca se une solo, ver PreguntaInvitado)
+    viewer.userId ? invitadoParaPreguntar(viewer.userId) : null,
     viewer.userId ? seguirLista(db, viewer.userId, vista.listId, token) : null,
   ])
   const relacion = viewer.userId && dueno ? await relacionCon(db, viewer.userId, dueno.id) : null
@@ -132,217 +151,322 @@ export default async function ListaAjena({
     ? `${evento.esCumple ? 'Cumple' : 'Es'} ${evento.dias === 0 ? 'hoy' : evento.dias === 1 ? 'mañana' : `en ${evento.dias} días`} · ${fechaLarga(evento.fecha)}`
     : null
 
-  const tarjetas: Tarjeta[] = vista.role === 'giver'
+  const todas: Tarjeta[] = vista.role === 'giver'
     ? vista.items
-    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null }))
-  const categorias = [...new Set(tarjetas.map((i) => i.categoria).filter(Boolean))] as string[]
+    : vista.items.map((i) => ({ ...i, claims: [], disponible: true, quedan: null, juntado: null }))
+  // Los aportes en plata ("Luna de miel", "Cochecito") van aparte y arriba de todo: en un casamiento o un baby shower es
+  // lo que más se elige. No son un deseo de la grilla: no tienen foto, precio ni "Reservar", y nunca quedan ocupados. Con
+  // los filtros: siempre están "Disponibles" y entran en cualquier "Hasta $X" (cada uno pone lo que quiere); con una
+  // categoría elegida van solo si son de esa.
+  const aportes = todas.filter((i) => esAporte(i) && (!cat || i.categoria === cat))
+  const tarjetas = todas.filter((i) => !esAporte(i))
+  const categorias = [...new Set(todas.map((i) => i.categoria).filter(Boolean))] as string[]
   let mostrados = tarjetas
   if (cat) mostrados = mostrados.filter((i) => i.categoria === cat)
   if (disp === '1' && veTodo) mostrados = mostrados.filter((i) => i.disponible)
   // disponibles primero, comprados al fondo
   mostrados = [...mostrados].sort((a, b) => Number(b.disponible) - Number(a.disponible))
-  // Todos iguales, en la grilla, y agrupados por categoría como en Mi lista: las categorías en el orden en que aparecen y
-  // lo que no tiene, al final. Con una categoría elegida, o si ninguno tiene, sin títulos.
-  const grupos = Object.entries(Object.groupBy(mostrados, (i) => i.categoria ?? ''))
-    .sort(([a], [b]) => Number(a === '') - Number(b === ''))
-  const conTitulos = !cat && grupos.some(([c]) => c !== '')
+  // "Hasta $X": el que llega con un presupuesto ve lo que entra. Los topes salen de los precios de toda la lista (no de lo
+  // filtrado, así no cambian al elegir una categoría). Lo que no tiene un precio que se pueda comparar no desaparece: va
+  // al final, aparte (ver partirPorTope). Sin filtro para ofrecer (pocos precios), un ?hasta= de un link viejo no hace nada.
+  const presupuesto = presupuestoDeLista(tarjetas)
+  const tope = presupuesto ? topeDeLaUrl(hasta) : null
+  const porTope = presupuesto && tope ? partirPorTope(mostrados, tope, presupuesto.moneda) : null
+  const sinPrecio = porTope?.sinPrecio ?? []
+  const enPresupuesto = porTope?.dentro ?? mostrados
+  if (porTope) mostrados = [...enPresupuesto, ...sinPrecio]
+  // Todos iguales, en la grilla. Agrupados por categoría (en el orden en que aparecen, y lo que no tiene, al final) solo
+  // si alguna junta 3 o más: con uno o dos por categoría, cada título quedaba con una tarjeta sola al lado de un hueco, y
+  // para ir a una categoría ya están los chips. Con una categoría elegida, o si ninguno tiene, sin títulos.
+  const porCategoria = Object.entries(Object.groupBy(enPresupuesto, (i) => i.categoria ?? ''))
+    .sort(([a], [b]) => Number(a === '') - Number(b === '')) as [string, Tarjeta[]][]
+  const conTitulos = !cat && porCategoria.some(([c, deseos]) => c !== '' && deseos.length >= 3)
+  const grupos: [string, Tarjeta[]][] = conTitulos ? porCategoria : enPresupuesto.length ? [['', enPresupuesto]] : []
 
   // Si una reserva no sale, se vuelve acá con los mismos filtros (y sin el cartel cuando la próxima sale bien).
-  const filtros = new URLSearchParams({ ...(cat && { cat }), ...(disp === '1' && { disp }) }).toString()
-  const aqui = `/l/${token}${filtros ? `?${filtros}` : ''}`
-  // Sin nombre, "Reservar" lo pide. Un invitado que todavía no dijo que esta lista no es suya, primero lo dice (así ve
-  // qué está libre de verdad); en un navegador donde entró con su cuenta alguien de la lista, no (ver accesoALista).
-  // Con cuenta o con su nombre, "Reservar" lleva al deseo, que pregunta cómo: lo compra él o lo dividen con amigos (ver
-  // ComoLoRegalas). Un invitado sin nombre solo puede reservarlo: lo hace acá, como siempre.
+  // El tope se combina con los otros filtros: elegir una categoría o "Disponibles" no lo saca, y al revés.
+  const conFiltros = (f: { cat?: string; disp?: string; hasta?: number | null }) => {
+    const q = new URLSearchParams({ ...(f.cat && { cat: f.cat }), ...(f.disp === '1' && { disp: '1' }), ...(f.hasta && { hasta: String(f.hasta) }) }).toString()
+    return `/l/${token}${q ? `?${q}` : ''}`
+  }
+  const aqui = conFiltros({ cat, disp, hasta: tope })
+  const plural = vista.duenos.length > 1
+  // "Reservar" reserva acá mismo, para él, de un toque: es lo que vino a hacer (el regalo grupal se arma desde el deseo).
+  // Sin nombre, se lo pide ahí (ver GuestGate). Un invitado que todavía no dijo que esta lista no es suya, primero lo dice
+  // (así ve qué está libre de verdad); en un navegador donde entró con su cuenta alguien de la lista, no (ver accesoALista).
   const reservar = (itemId: string) => vista.role === 'anonimo' && vista.motivo !== 'sin_identidad'
     ? null
-    : vista.role === 'giver'
-      ? <Link href={`/l/${token}/item/${itemId}?reservar=1#reservar`} className="gr-btn gr-btn--sm w-full">Reservar</Link>
-      : <GuestGate token={token} itemId={itemId} identified={identified} volver={aqui} conCartel={!!reserva} />
+    : <GuestGate token={token} itemId={itemId} identified={veTodo} variant="tarjeta" volver={aqui} avisar para={vista.ownerNombre} plural={plural} />
 
-  // su tapa: la de las personas (el verde, igual para todos) o la de las listas en común (ver lib/tapas.ts)
-  const color = vista.grupoNombre ? TAPA_EN_COMUN : TAPA_PERSONA
+  // Recién reservó (?reservado=, ver reserveAction): hasta cuándo es suyo y qué sigue, abajo de ese deseo. Solo si la
+  // reserva es suya y sigue en pie: el link con ?reservado= lo puede abrir cualquiera. Si el filtro elegido lo esconde
+  // ("Disponibles": ya no lo está), arriba de la grilla.
+  const miReserva = (item?: Tarjeta) => item?.claims.find((c) => c.esMia && !c.grupal && c.estado === 'reservado')
+  const recien = reservado ? tarjetas.find((i) => i.id === reservado) : undefined
+  const confirmacion = recien && miReserva(recien) && (
+    <ReservaConfirmada cartel vence={miReserva(recien)!.vence} deseo={`/l/${token}/item/${recien.id}`} entrar={viewer.userId ? undefined : aqui}
+                       recuperar={linkParaVolver(viewer, vista.listId, token)} />
+  )
+  // Sin cuenta, "¿Y vos qué querés?" flota abajo recién cuando ya reservó algo; antes va al final, quieto (ver abajo)
+  const yaReservo = todas.some((i) => i.claims.some((c) => c.esMia || c.grupal?.soyParte))
+  // quién puede dejar anotado un aporte: como reservar, el que ve la coordinación o el que todavía no dijo quién es
+  const anotaAportes = veTodo || (vista.role === 'anonimo' && vista.motivo === 'sin_identidad')
+
+  // su tapa: la de las personas (el verde, igual para todos) o la de las listas en común, con el color de su ocasión (un
+  // casamiento, un baby shower: ver ocasiones.ts; las demás, la de siempre, ver lib/tapas.ts)
+  const color = vista.grupoNombre ? tapaDeOcasion(vista.ocasion) : TAPA_PERSONA
   // En una lista en común, arriba todo es de la lista (Bauti, sus regalos); el perfil y los gustos de cada uno de los que
   // la arman van al final, abajo del historial. En la de una persona, su perfil va arriba: la lista es suya.
   const enComun = !!vista.grupoNombre
   const perfilDe = (id: string) => `/l/${token}/perfil${vista.perfiles[0]?.id === id ? '' : `?quien=${id}`}`
 
-  /** Un deseo en la grilla: la foto (con su sello si te toca, y "Me lo robo"), qué es, cuánto sale y reservarlo. */
+  /**
+   * Un deseo en la grilla: la foto (con su sello si te toca, y "Me lo robo"), qué es, cuánto sale y reservarlo. La tarjeta
+   * entera abre el deseo: el link del título se estira sobre toda la tarjeta, y los botones (reservar, robar) van arriba.
+   */
   const tarjeta = (item: Tarjeta) => {
     const yaEsMio = item.claims.some((c) => c.esMia || c.grupal?.soyParte)
     const cuantas = cupo(item)
     const sello = selloDe(item)
+    const vence = miReserva(item)?.vence
+    const boton = item.disponible && !yaEsMio && reservar(item.id)
     return (
-      <li key={item.id} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)} className="relative flex flex-col gap-2">
-        <div className="relative">
-          {/* la foto lleva al deseo, como "Ver más" (que ya lo dice para los lectores de pantalla) */}
-          <Link href={`/l/${token}/item/${item.id}`} aria-hidden tabIndex={-1} className="block">
+      <Fragment key={item.id}>
+        <li id={`deseo-${item.id}`} data-buscar={paraBuscar(`${item.titulo} ${item.categoria ?? ''} ${item.notas ?? ''}`)}
+            className="relative flex scroll-mt-4 flex-col gap-2">
+          <div className="relative">
             <Arte src={item.fotoUrl} titulo={item.titulo} apagado={!item.disponible} />
-          </Link>
-          {sello && <Sello chico tipo={sello} clave={item.id} size={44} className="absolute left-1.5 top-1.5" />}
-          {item.videoUrl && <ConVideo className={`absolute top-2 ${sello ? 'left-12' : 'left-2'}`} />}
-          {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
-          {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
-        </div>
-        <div className="flex flex-1 flex-col gap-1 px-0.5">
-          <Link href={`/l/${token}/item/${item.id}`} className="line-clamp-2 text-[15px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]">
-            {item.titulo}
-          </Link>
-          <div className="flex items-center gap-1.5">
-            {(item.precio ?? item.rangoPrecio) && <p className="text-[13px] text-gr-muted tabular-nums">{item.precio ?? item.rangoPrecio}</p>}
-            {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
+            {sello && <Sello chico tipo={sello} clave={item.id} size={44} className="absolute left-1.5 top-1.5" />}
+            {item.videoUrl && <ConVideo className={`absolute top-2 ${sello ? 'left-12' : 'left-2'}`} />}
+            {/* "Me lo robo": con tu cuenta, sumarlo a tu lista */}
+            {viewer.userId && <BotonRobar token={token} itemId={item.id} variante="icono" className="absolute right-2 top-2 z-[2]" />}
           </div>
-          {/* lo que ya no está libre, con el puntito del acento */}
-          {!item.disponible && (
-            <p className="flex items-start gap-1.5 text-xs leading-snug font-bold [overflow-wrap:anywhere]">
-              <i aria-hidden className="mt-[5px] size-[7px] flex-none rounded-full bg-gr-acento" />{estadoNoDisponible(item)}
-            </p>
-          )}
-          {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
-          <div className="mt-auto flex flex-col items-stretch gap-0.5 pt-1.5">
-            {item.disponible && (yaEsMio ? <YaLoReservaste item={item} /> : reservar(item.id))}
+          <div className="flex flex-1 flex-col gap-1 px-0.5">
             <Link href={`/l/${token}/item/${item.id}`}
-                  className="inline-flex min-h-11 items-center justify-center text-[13px] font-semibold">
-              Ver más
+                  className="block text-[15px] leading-tight font-bold tracking-[-0.01em] after:absolute after:inset-0 after:z-[1] after:content-['']">
+              <span className="line-clamp-2 [overflow-wrap:anywhere]">{item.titulo}</span>
             </Link>
+            <div className="flex items-center gap-1.5">
+              {(item.precio ?? item.rangoPrecio) && <p className="text-[13px] text-gr-muted tabular-nums">{item.precio ?? item.rangoPrecio}</p>}
+              {item.disponible && <PriorityTag prioridad={item.prioridad} className="h-6 px-2" />}
+            </div>
+            {/* lo que ya no está libre, con el puntito del acento */}
+            {!item.disponible && (
+              <p className="flex items-start gap-1.5 text-xs leading-snug font-bold [overflow-wrap:anywhere]">
+                <i aria-hidden className="mt-[5px] size-[7px] flex-none rounded-full bg-gr-acento" />{estadoNoDisponible(item, sinNombres)}
+              </p>
+            )}
+            {cuantas && <p className="text-xs text-gr-muted">{cuantas}</p>}
+            {/* su reserva vence: que se vea sin tener que entrar al deseo */}
+            {vence && <p className="text-xs text-gr-muted">Tuyo hasta el {ultimoDia(vence)}</p>}
+            {item.disponible && yaEsMio && <div className="mt-auto flex flex-col pt-1.5"><YaLoReservaste item={item} /></div>}
+            {/* un control aparte, arriba del link que cubre la tarjeta */}
+            {boton && <div className="relative z-[2] mt-auto pt-1.5">{boton}</div>}
           </div>
-        </div>
-      </li>
+        </li>
+        {confirmacion && recien?.id === item.id && <li className="col-span-full">{confirmacion}</li>}
+      </Fragment>
     )
   }
 
   return (
-    <main className="flex flex-col gap-4 pb-36">
-      {/* Su tapa: su color pinta media pantalla y se funde con el fondo, con su foto y su nombre enormes */}
+    <main className={`gr-ancha flex flex-col ${viewer.userId || yaReservo ? 'pb-36' : 'pb-10'}`}>
+      {/* Su tapa, compacta: de quién es y cuándo, en dos renglones. El que abre el link en el teléfono tiene que ver los
+          primeros deseos (y "Reservar") sin scrollear; su perfil y sus gustos quedan a un toque, en un chip. */}
       <Tapa color={color}>
-        <header className="grid min-h-14 grid-cols-[44px_1fr_44px] items-center">
-          {/* con tu cuenta, abajo está la barra; volver lleva a tu gente */}
-          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio />}</div>
+        <header className="grid min-h-11 grid-cols-[44px_1fr_44px] items-center">
+          {/* con tu cuenta, abajo está la barra; volver lleva a donde estabas (Inicio, Todo el año…) y, si no se sabe, a tu gente */}
+          <div>{viewer.userId && <BackLink href="/gente" label="Volver a tu gente" vidrio origen={{ pantalla: `/l/${token}` }} />}</div>
           <LogoSticker sobreTapa className="justify-self-center" />
         </header>
-        <div className="mt-1.5 flex flex-col items-center gap-3 text-center">
+        <div className="mt-1 flex items-center gap-3">
           {/* la de una persona: su foto lleva a su perfil. La de una lista en común, no: es de la lista, no de uno de ellos */}
           {enComun ? (
             vista.grupoFoto
-              ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={104} />
-              : <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={72} />
+              ? <AvatarDeLista nombre={vista.grupoNombre ?? ''} foto={vista.grupoFoto} duenos={vista.perfiles} size={56} />
+              : <AvatarStack nombres={vista.duenos} fotos={vista.perfiles.map((d) => d.foto)} size={44} />
           ) : (
             <Link href={`/l/${token}/perfil`} aria-label={`Ver el perfil de ${vista.ownerNombre}`} className="flex-none rounded-full">
-              <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={104} className="bg-gr-surface" />
+              <AvatarSticker nombre={vista.ownerNombre} foto={vista.perfiles[0]?.foto} size={56} className="bg-gr-surface" />
             </Link>
           )}
-          <div className="flex flex-col gap-1">
-            <h1 className="gr-title text-[40px] [overflow-wrap:anywhere]">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h1 className="gr-title text-[26px] [overflow-wrap:anywhere]">
               {vista.grupoNombre ?? <><span className="sr-only">Lista de </span>{vista.ownerNombre}</>}
             </h1>
-            <p className="gr-tapa__sub text-sm">
+            <p className="gr-tapa__sub text-[13px] leading-snug">
               {cuenta ?? <>{vista.grupoNombre && `${vista.relacion ?? `De ${vista.ownerNombre}`}. `}Elegí, reservá y no te duplicás con nadie.</>}
             </p>
           </div>
-          {!enComun && <Link href={`/l/${token}/perfil`} className="gr-btn gr-btn--vidrio w-full">Su perfil y sus gustos</Link>}
-          {veTodo && (
-            <p className="gr-tapa__sub flex items-center gap-1.5 text-[12.5px]">
-              <Icon name="lock" size={13} className="flex-none" />
-              {vista.ownerNombre} no {vista.duenos.length > 1 ? 'ven' : 've'} quién reserva qué
-            </p>
-          )}
         </div>
+        {(!enComun || veTodo) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {/* el chip mide 36, pero se toca en 44 */}
+            {!enComun && (
+              <Link href={`/l/${token}/perfil`}
+                    className="gr-btn gr-btn--vidrio relative min-h-9 gap-1 pr-2.5 pl-3.5 text-[13px] after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']">
+                Su perfil y sus gustos<Icon name="chevron" size={14} strokeWidth={2.4} />
+              </Link>
+            )}
+            {veTodo && (
+              <p className="gr-tapa__sub flex items-center gap-1.5 text-[12.5px]">
+                <Icon name="lock" size={13} className="flex-none" />
+                {vista.ownerNombre} no {plural ? 'ven' : 've'} quién reserva qué
+              </p>
+            )}
+          </div>
+        )}
       </Tapa>
 
-      <AvisoAmigo amigo={amigo} />
-      {dueno && relacion && <AmigoEnLista dueno={{ ...dueno, usuario: null }} relacion={relacion} volver={`/l/${token}`} />}
+      {/* Lo que sigue se monta sobre el fundido de la tapa (sus últimos 84 px, donde el color se va al fondo): cada pieza
+          trae su propia superficie, y así la tapa no deja una franja vacía antes de los deseos */}
+      <div className="relative -mt-14 flex flex-col gap-4">
+        <AvisoAmigo amigo={amigo} />
+        {invitado && <PreguntaInvitado nombre={invitado} />}
 
-      {!veTodo && (vista.motivo === 'ex_dueno' ? <ExDueno />
-        : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
-          : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
-            : <QuienSos token={token} volver={aqui} />)}
+        {/* sin nombre, "¿Quién sos?" es una franja de un renglón: el nombre se le pide de verdad al tocar "Reservar" */}
+        {!veTodo && (vista.motivo === 'ex_dueno' ? <ExDueno />
+          : vista.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
+            : vista.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
+              : <QuienSos token={token} volver={aqui} />)}
 
-      <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
+        {/* por qué ve "Reservado" a secas, y cómo ver quién */}
+        {sinNombres && <SoloConCuenta volver={aqui} />}
 
-      {!enComun && gustos.map((g) => (
-        <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
-                       href={perfilDe(g.id)} />
-      ))}
+        <CartelReserva motivo={reserva} veTodo={veTodo} conNombre={identified} />
 
-      {/* los avisos van en Inicio (y en la campanita); quien entró sin cuenta no tiene Inicio: los suyos (una reserva que
-          vence, lo que reservó y ya no está) los ve acá */}
-      {!viewer.userId && <Banners />}
+        {/* los avisos van en Inicio (y en la campanita); quien entró sin cuenta no tiene Inicio: los suyos (una reserva que
+            vence, lo que reservó y ya no está) los ve acá */}
+        {!viewer.userId && <Banners />}
 
-      <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
-        <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' ? 'page' : undefined} className="gr-chip">Todos</Link>
-        {veTodo && <Link href={`/l/${token}?disp=1`} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
-        {categorias.map((c) => (
-          <Link key={c} href={`/l/${token}?cat=${encodeURIComponent(c)}`} aria-current={cat === c ? 'page' : undefined}
-                className="gr-chip">
-            {c}
-          </Link>
-        ))}
-      </nav>
-
-      {mostrados.length === 0 && (
-        <p className="gr-empty mt-4 py-8 text-center">
-          {tarjetas.length ? 'No hay nada con ese filtro.' : `Todavía no ${vista.duenos.length > 1 ? 'cargaron' : 'cargó'} nada.`}
-        </p>
-      )}
-
-      {/* una lista larga: buscar algo puntual (en lo que se ve con el filtro elegido) */}
-      {mostrados.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
-
-      <div id="su-lista" className="flex flex-col gap-7">
-        {grupos.map(([categoria, items]) => (
-          <section key={categoria} data-buscar-grupo aria-label={conTitulos ? undefined : 'Sus deseos'} className="flex flex-col gap-3">
-            {conTitulos && (
-              <h2 className="flex items-center gap-2.5 text-[18px] font-extrabold tracking-[-0.02em]">
-                <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
-                  <Icon name={categoria ? iconoDeCategoria(categoria) : 'gift'} size={18} strokeWidth={2.2} />
-                </span>
-                {categoria || 'Sin categoría'}
-                <span className="font-semibold text-gr-muted tabular-nums">{items!.length}</span>
-              </h2>
-            )}
-            <ul className="grid grid-cols-2 items-stretch gap-x-3 gap-y-[18px]">
-              {items!.map(tarjeta)}
-            </ul>
-          </section>
-        ))}
-      </div>
-
-      {sorpresas && (
-        <SorpresasEnLista token={token} nombre={dueno?.nombre ?? vista.grupoNombre ?? vista.ownerNombre} enComun={!dueno} sorpresas={sorpresas} />
-      )}
-
-      <div className="mt-2">
-        <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={vista.duenos.length > 1}
-                identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
-      </div>
-
-      {/* lo que le regalaron: a la persona, o en una lista en común, a Bauti (no a los que la arman) */}
-      {historial && <QuienSeOcupo historial={historial} para={vista.grupoNombre ?? vista.ownerNombre} />}
-
-      {/* en una lista en común, al final: cada uno de los que la arman, con su perfil y sus gustos (aunque no los haya cargado) */}
-      {enComun && (
-        <section aria-labelledby="quienes-la-arman" className="mt-6 flex flex-col gap-3">
-          <h2 id="quienes-la-arman" className="gr-heading">{vista.perfiles.length > 1 ? 'Quiénes la arman' : 'Quién la arma'}</h2>
-          {vista.perfiles.map((d) => (
-            <TarjetaPerfil key={d.id} nombre={d.nombre} foto={d.foto} secciones={gustos.find((g) => g.id === d.id)?.secciones ?? []}
-                           href={perfilDe(d.id)} />
+        {/* group/presupuesto: "Hasta $…" (un casillero en la fila) abre los topes de abajo con CSS, sin JS */}
+        <div className="group/presupuesto flex flex-col gap-1">
+        <nav aria-label="Filtros" className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-1 [scrollbar-width:none]">
+          <Link href={`/l/${token}`} aria-current={!cat && disp !== '1' && !tope ? 'page' : undefined} className="gr-chip">Todos</Link>
+          {veTodo && <Link href={conFiltros({ disp: '1', hasta: tope })} aria-current={disp === '1' ? 'page' : undefined} className="gr-chip">Disponibles</Link>}
+          {presupuesto && <ChipPresupuesto presupuesto={presupuesto} tope={tope} sinTope={conFiltros({ cat, disp })} />}
+          {categorias.map((c) => (
+            <Link key={c} href={conFiltros({ cat: c, hasta: tope })} aria-current={cat === c ? 'page' : undefined}
+                  className="gr-chip">
+              {c}
+            </Link>
           ))}
-        </section>
-      )}
-
-      {/* un invitado: el nombre con el que reserva solo sale acá (con "¿Es tu lista?" arriba, el link ya va ahí). Con cuenta,
-          no: la sesión se cierra desde Perfil */}
-      {quien && !viewer.userId && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
-        <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} /></div>
-      )}
-
-      {/* con cuenta ya tiene su lista, y abajo va la barra (ver el layout) */}
-      {!viewer.userId && (
-        <div className="gr-floatbar">
-          <p className="text-sm font-medium">¿Y vos qué querés?</p>
-          <Link href="/" className="gr-btn gr-btn--accent gr-btn--sm">Armá tu lista →</Link>
+        </nav>
+        {presupuesto && <TopesPresupuesto presupuesto={presupuesto} tope={tope} href={(t) => conFiltros({ cat, disp, hasta: t })} />}
         </div>
-      )}
+
+        {/* lo que acaba de reservar no está entre lo que se ve con este filtro: el cartel, igual */}
+        {confirmacion && !mostrados.includes(recien!) && confirmacion}
+
+        {mostrados.length === 0 && aportes.length === 0 && (
+          <p className="gr-empty mt-4 py-8 text-center">
+            {todas.length ? 'No hay nada con ese filtro.' : `Todavía no ${plural ? 'cargaron' : 'cargó'} nada.`}
+          </p>
+        )}
+
+        {/* una lista larga: buscar algo puntual (en lo que se ve con el filtro elegido) */}
+        {mostrados.length + aportes.length >= BUSCAR_DESDE && <Buscador ambito="su-lista" placeholder="Buscar en la lista" vacio="No hay nada con «%s» en esta lista." />}
+
+        <div id="su-lista" className="gr-categorias flex flex-col gap-7">
+          {/* los aportes en plata, arriba de todo y a lo ancho, cada uno con su "Aportar" */}
+          {aportes.length > 0 && (
+            <section data-buscar-grupo data-a-lo-ancho aria-label={aportes.length > 1 ? 'Aportes en plata' : 'Aporte en plata'}>
+              <ul className="flex flex-col gap-3">
+                {aportes.map((a) => (
+                  <TarjetaAporte key={a.id} item={a} token={token} anotar={anotaAportes} identified={veTodo}
+                                 para={vista.ownerNombre} plural={plural} volver={aqui} />
+                ))}
+              </ul>
+            </section>
+          )}
+          {grupos.map(([categoria, deseos]) => (
+            <section key={categoria} data-buscar-grupo aria-label={conTitulos ? undefined : 'Sus deseos'} className="flex flex-col gap-3">
+              {conTitulos && (
+                <h2 className="flex items-center gap-2.5 text-[18px] font-extrabold tracking-[-0.02em]">
+                  <span aria-hidden className="flex size-9 flex-none items-center justify-center rounded-full bg-gr-soft text-gr-acento-texto">
+                    <Icon name={categoria ? iconoDeCategoria(categoria) : 'gift'} size={18} strokeWidth={2.2} />
+                  </span>
+                  {categoria || 'Sin categoría'}
+                  <span className="font-semibold text-gr-muted tabular-nums">{deseos.length}</span>
+                </h2>
+              )}
+              {/* dense: el cartel de lo recién reservado ocupa las dos columnas y no deja un hueco al lado de su tarjeta */}
+              <ul className="grid grid-flow-row-dense gr-columnas items-stretch gap-x-3 gap-y-[18px]">
+                {deseos.map(tarjeta)}
+              </ul>
+            </section>
+          ))}
+          {/* con un tope elegido, lo que no se puede comparar: sin precio, en otra moneda o escrito de otra forma. No se
+              esconde (capaz entra justo), pero va aparte y al final */}
+          {presupuesto && tope && sinPrecio.length > 0 && (
+            <section data-buscar-grupo aria-labelledby="sin-precio" className="flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <h2 id="sin-precio" className="text-[18px] font-extrabold tracking-[-0.02em]">
+                  {sinPrecio.some((i) => i.precio ?? i.rangoPrecio) ? 'Sin precio para comparar' : 'Sin precio'}
+                  <span className="ml-2 font-semibold text-gr-muted tabular-nums">{sinPrecio.length}</span>
+                </h2>
+                <p className="text-[13px] leading-snug text-gr-muted">
+                  {enPresupuesto.length
+                    ? 'No sabemos si entran en lo que querés gastar: fijate en cada uno.'
+                    : `No hay nada con precio hasta ${plata(tope, presupuesto.moneda)}. De estos no sabemos si entran.`}
+                </p>
+              </div>
+              <ul className="grid grid-flow-row-dense gr-columnas items-stretch gap-x-3 gap-y-[18px]">
+                {sinPrecio.map(tarjeta)}
+              </ul>
+            </section>
+          )}
+        </div>
+
+        {/* sumarlo como amigo, su perfil y sus gustos: después de los deseos (arriba ya está el chip de la tapa). "Sumar",
+            en verde y arriba de todo, le ganaba a "Reservar" y lo empujaba abajo de la barra */}
+        {dueno && relacion && <AmigoEnLista dueno={{ ...dueno, usuario: null }} relacion={relacion} volver={`/l/${token}`} />}
+        {!enComun && gustos.map((g) => (
+          <TarjetaPerfil key={g.id} nombre={g.nombre} foto={vista.perfiles.find((d) => d.id === g.id)?.foto ?? null} secciones={g.secciones}
+                         href={perfilDe(g.id)} />
+        ))}
+
+        {sorpresas && (
+          <SorpresasEnLista token={token} nombre={dueno?.nombre ?? vista.grupoNombre ?? vista.ownerNombre} enComun={!dueno} sorpresas={sorpresas} />
+        )}
+
+        <div className="mt-2">
+          <Codazo token={token} para={vista.grupoNombre ? vista.ownerNombre : vista.ownerNombre.split(' ')[0]} plural={plural}
+                  identified={identified} conGoogle={vista.role === 'anonimo' && vista.motivo === 'otra_cuenta'} resultado={codazo} />
+        </div>
+
+        {/* lo que le regalaron: a la persona, o en una lista en común, a Bauti (no a los que la arman) */}
+        {historial && <QuienSeOcupo historial={historial} para={vista.grupoNombre ?? vista.ownerNombre} />}
+
+        {/* en una lista en común, al final: cada uno de los que la arman, con su perfil y sus gustos (aunque no los haya cargado) */}
+        {enComun && (
+          <section aria-labelledby="quienes-la-arman" className="mt-6 flex flex-col gap-3">
+            <h2 id="quienes-la-arman" className="gr-heading">{vista.perfiles.length > 1 ? 'Quiénes la arman' : 'Quién la arma'}</h2>
+            {vista.perfiles.map((d) => (
+              <TarjetaPerfil key={d.id} nombre={d.nombre} foto={d.foto} secciones={gustos.find((g) => g.id === d.id)?.secciones ?? []}
+                             href={perfilDe(d.id)} />
+            ))}
+          </section>
+        )}
+
+        {/* un invitado: el nombre con el que reserva solo sale acá (con "¿Es tu lista?" arriba, el link ya va ahí). Con cuenta,
+            no: la sesión se cierra desde Perfil */}
+        {quien && !viewer.userId && !(vista.role === 'anonimo' && vista.motivo === 'confirmar') && (
+          <div className="mt-2"><NoSoyYo nombre={quien} volver={`/l/${token}`} /></div>
+        )}
+
+        {/* Con cuenta ya tiene su lista, y abajo va la barra (ver el layout). Sin cuenta, "¿Y vos qué querés?" es una invitación,
+            no lo que vino a hacer: va neutra (el verde es de "Reservar") y al final de la página, sin tapar nada. Flota abajo
+            recién cuando ya reservó algo: ahí sí es el momento de ofrecerle armar la suya. */}
+        {!viewer.userId && (
+          <div className={yaReservo
+            ? 'gr-floatbar border border-gr-line bg-gr-surface text-gr-ink'
+            : 'mt-2 flex min-h-16 items-center justify-between gap-2.5 rounded-full border border-gr-line bg-gr-surface py-2 pr-2 pl-5'}>
+            <p className="text-sm font-medium">¿Y vos qué querés?</p>
+            <Link href="/" className="gr-btn gr-btn--sm flex-none">Armá tu lista →</Link>
+          </div>
+        )}
+      </div>
     </main>
   )
 }

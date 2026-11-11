@@ -97,7 +97,7 @@ export function AvisoAmigo({ amigo }: { amigo?: string }) {
   const m = amigo && Object.hasOwn(MENSAJES, amigo) ? MENSAJES[amigo] : null
   if (!m) return null
   return (
-    <p role="status" className={`flex items-start gap-2.5 rounded-[18px] px-4 py-3 text-sm font-medium ${m.bien ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
+    <p role="status" className={`flex items-start gap-2.5 rounded-gr-md px-4 py-3 text-sm font-medium ${m.bien ? 'bg-gr-brand text-gr-on-brand' : 'bg-gr-soft'}`}>
       {m.bien && <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />}{m.texto}
     </p>
   )

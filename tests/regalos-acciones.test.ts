@@ -206,7 +206,7 @@ test('corregir la parte del que después se sumó al grupo: el formulario dice d
   expect(await fixGroupGiftAction(null, compra({
     giftId: g.giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '60.000', [`parte:${sofi.id}`]: '30.000', [`parte:${tia.id}`]: '',
   }, todos))).toEqual({
-    error: 'Tía se sumó al grupo después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole $30.000.',
+    error: 'Tía se sumó a la lista en común después de la compra y ya no ve este regalo: su parte no se puede cambiar. Corregilo "A mano" dejándole $30.000.',
   })
   await expect(fixGroupGiftAction(null, compra({
     giftId: g.giftId, modo: 'manual', total: '90.000', [`parte:${rodri.id}`]: '45.000', [`parte:${sofi.id}`]: '15.000', [`parte:${tia.id}`]: '30.000',

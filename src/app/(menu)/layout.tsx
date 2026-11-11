@@ -15,7 +15,7 @@ async function SiFaltaAnotarCuenta() {
   return <AnotarCuenta />
 }
 
-/** A los que ya estaban antes de que la bienvenida preguntara por los avisos: el cartel, una sola vez. */
+/** La pregunta de los avisos, una sola vez y cuando ya hizo algo (ver preguntarAvisos): el cartel. */
 async function SiFaltaPreguntarAvisos() {
   const session = await auth()
   if (!session?.userId || !(await preguntarAvisos(db, session.userId))) return null
