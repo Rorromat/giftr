@@ -329,23 +329,26 @@ export function RegaloGrupal({
                   <input type="hidden" name="pagado" value={pagado ? '1' : '0'} />
                   {/* la parte que ve: si justo la corrigieron o se volvió a dividir, no queda saldada una que no vio */}
                   <input type="hidden" name="monto" value={m.monto ?? 0} />
-                  <BotonEnviar className={pagado ? 'gr-btn min-h-11 px-2.5 text-[13px]' : 'min-h-11 px-1 text-xs font-semibold underline underline-offset-4'}>
+                  <BotonEnviar className={pagado ? 'gr-btn min-h-11 whitespace-nowrap px-2.5 text-[13px]' : 'min-h-11 px-1 text-xs font-semibold underline underline-offset-4'}>
                     {texto}
                   </BotonEnviar>
                 </form>
               )
               return (
                 <li key={m.userId} className="flex flex-col py-1.5">
-                  <div className="flex min-h-12 items-center gap-2">
-                    <span className="min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">
+                  {/* nombre y monto arriba; si el estado y el botón no entran al lado, bajan juntos a otro renglón */}
+                  <div className="flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="min-w-[45%] flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">
                       {m.esYo ? 'Vos' : m.nombre}
                       {m.esEncargado && <span className="block text-xs font-medium text-gr-muted">{m.esYo ? 'compraste el regalo' : 'compró el regalo'}</span>}
                     </span>
-                    <span className="text-lg font-semibold tabular-nums">{p(m.monto ?? 0)}</span>
-                    <span className={`flex-none rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-soft' : 'bg-gr-brand text-gr-bg'}`}>
-                      {estado}
-                    </span>
-                    {puedoMarcar && (saldar ? marcar(true, saldar) : m.puso && marcar(false, 'Deshacer'))}
+                    <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{p(m.monto ?? 0)}</span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className={`flex-none whitespace-nowrap rounded-full border border-gr-line px-2 py-0.5 text-xs font-semibold ${m.pagado ? 'bg-gr-soft' : 'bg-gr-brand text-gr-bg'}`}>
+                        {estado}
+                      </span>
+                      {puedoMarcar && (saldar ? marcar(true, saldar) : m.puso && marcar(false, 'Deshacer'))}
+                    </div>
                   </div>
                   {/* pagó y después le cambió la parte: lo que figura que puso también se deshace */}
                   {puedoMarcar && saldar && m.puso && <div className="flex justify-end">{marcar(false, 'Deshacer el pago')}</div>}
