@@ -1,13 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { EntradaBandeja, TipoEnBandeja } from '@/lib/bandeja'
 import { hace } from '@/lib/novedades'
-import { AvatarSticker, QuizasLink } from '@/components/ui'
+import { AvatarSticker, Icon, QuizasLink } from '@/components/ui'
 
 // Cada tipo de aviso con su ícono: un cuadradito de color con un dibujo que se mueve como lo que pasó (la moneda cae, el
 // ticket se imprime, el regalo se sacude, el codazo empuja), mientras es nuevo; las animaciones están en tokens.css
 // (.gr-aviso-icono). La plata en lima (te pagaron) o en negro (te toca pagar, como "Debés" en Cuentas); el amigo invisible
 // y los codazos en azul, como sus tarjetas; la gente en lima o en gris. Las personas van en círculo y las cosas en
-// cuadradito: la foto de quien lo mandó queda chiquita, en la esquina.
+// cuadradito: la foto de quien lo mandó queda chiquita, en la esquina. Un mensaje en el hilo de un regalo es al revés: lo
+// que importa es quién habló, así que va su foto grande y el globito de charla en la esquina.
 
 const AZUL = 'bg-gr-blue text-gr-on-blue'
 const VERDE = 'bg-gr-acento text-gr-on-acento'
@@ -44,6 +45,8 @@ const ICONOS: Record<TipoEnBandeja, { fondo: string; dibujo: ReactNode; mueve: M
   amistad_aceptada: { fondo: GRIS, dibujo: DIBUJO.gente, mueve: 'late' },
   // en el azul suave de las listas en común, como en Tu gente
   lista_en_comun: { fondo: 'bg-gr-comun text-gr-comun-ink', dibujo: DIBUJO.gente, mueve: 'saluda' },
+  // de un invitado (sin foto); con foto, ver IconoAviso
+  comentario: { fondo: VERDE, dibujo: DIBUJO.charla, mueve: 'escribe' },
 }
 
 /**
@@ -64,9 +67,20 @@ export function IconoDeTipo({ tipo, animar = false, i = 0 }: { tipo: TipoEnBande
 
 /**
  * El ícono de un aviso según su tipo, con la foto de quien lo mandó en la esquina. animar e i: ver IconoDeTipo. Sin tipo
- * (los avisos sobre deseos y los de antes), el emoji.
+ * (los avisos sobre deseos y los de antes), el emoji. Un mensaje en el hilo de un regalo, con la foto de quien lo escribió
+ * grande y el globito en la esquina.
  */
 export function IconoAviso({ e, animar = false, i = 0 }: { e: EntradaBandeja; animar?: boolean; i?: number }) {
+  if (e.tipo === 'comentario' && e.de) {
+    return (
+      <span className="relative flex-none">
+        <AvatarSticker nombre={e.de.nombre} foto={e.de.foto} size={44} />
+        <span aria-hidden className="absolute -bottom-1 -right-1.5 flex size-6 items-center justify-center rounded-full bg-gr-acento text-gr-on-acento ring-2 ring-gr-surface">
+          <Icon name="chat" size={13} strokeWidth={2.6} />
+        </span>
+      </span>
+    )
+  }
   if (!e.tipo) {
     return (
       <span className="relative flex-none">

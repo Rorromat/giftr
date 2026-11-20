@@ -28,7 +28,7 @@ const MOTIVOS: Record<string, string> = {
   // "Me equivoqué, todavía no lo compré" con el tope lleno: volvería a ser una reserva más
   muchas_deshacer: `Ya tenés ${RESERVAS_POR_LISTA} cosas reservadas de esta lista. Para que esta vuelva a quedar reservada, marcá las que ya compraste o liberá alguna.`,
   // "Ya lo compré" sobre una reserva que había vencido, cuando el lugar ya lo tomó otro
-  vencida: 'Tu reserva ya había vencido y ahora no queda lugar. Si lo habías comprado, contalo en el hilo de abajo.',
+  vencida: 'Tu reserva ya había vencido y ahora no queda lugar. Si lo habías comprado, contalo en los mensajes.',
 }
 
 /**

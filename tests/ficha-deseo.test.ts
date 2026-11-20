@@ -5,6 +5,8 @@ import type { Db } from '@/db/types'
 import { items } from '@/db/schema'
 import { reserveItem } from '@/lib/claims'
 import { sitioDeLaTienda } from '@/lib/links'
+import { addComment } from '@/lib/comments'
+import { upsertUserFromGoogle } from '@/lib/users'
 
 // La ficha del deseo: quien lo abre ve todo lo que cargó el dueño (la categoría, cuánto lo quiere, si sirve algo
 // parecido, cuántos pide, su nota y de qué tienda es), y el dueño lo mismo con sus palabras.
@@ -23,6 +25,7 @@ vi.mock('next/navigation', () => ({
 
 import DetalleItem from '@/app/l/[token]/item/[itemId]/page'
 import Deseo from '@/app/(menu)/deseo/[id]/page'
+import { A_LA_VISTA } from '@/components/Hilo'
 
 const deQuienRegala = async (itemId: string) =>
   renderToStaticMarkup(await DetalleItem({ params: Promise.resolve({ token: 'tok-euge', itemId }), searchParams: Promise.resolve({}) }))
@@ -61,4 +64,49 @@ test('la tienda del botón: el sitio sin www, MercadoLibre por su nombre; un lin
   expect(sitioDeLaTienda('https://meli.la/abc')).toBe('Mercado Libre')
   expect(sitioDeLaTienda('https://m.tiendamia.com/p/1')).toBe('tiendamia.com')
   expect(sitioDeLaTienda('no es un link')).toBeNull()
+})
+
+test('los mensajes del hilo van arriba, destacados, con la foto de quien escribió; sin mensajes, el campo queda al final', async () => {
+  h.db = await createTestDb()
+  const { giver, list } = await seedOwnerAndGiver(h.db)
+  const caro = await upsertUserFromGoogle(h.db, { googleId: 'g-caro', email: 'caro@test.com', nombre: 'Caro', avatarUrl: 'https://lh3.googleusercontent.com/caro' })
+  const [termo, mate] = await h.db.insert(items).values([
+    { listId: list.id, tipo: 'exacto', titulo: 'Termo', prioridad: 'mucho' },
+    { listId: list.id, tipo: 'exacto', titulo: 'Mate', prioridad: 'mucho' },
+  ]).returning()
+  await reserveItem(h.db, termo.id, { userId: giver.id })
+  h.session = { userId: giver.id }
+
+  // sin mensajes: el campo para empezar a coordinar, al final (después de "Lo quiere mucho")
+  const sinMensajes = await deQuienRegala(mate.id)
+  expect(sinMensajes).toContain('id="mensajes"')
+  expect(sinMensajes).toContain('Coordiná con los demás…')
+  expect(sinMensajes.indexOf('id="mensajes"')).toBeGreaterThan(sinMensajes.indexOf('Lo quiere mucho'))
+
+  // Caro pregunta y Rodri contesta: arriba, apenas abajo del nombre, con la foto de Caro; lo de Rodri dice "Vos"
+  expect(await addComment(h.db, termo.id, { userId: caro.id }, '¿Alguien sabe el talle?')).toBe(true)
+  expect(await addComment(h.db, termo.id, { userId: giver.id }, 'El mediano')).toBe(true)
+  const p = await deQuienRegala(termo.id)
+  const hilo = p.indexOf('id="mensajes"')
+  expect(hilo).toBeGreaterThan(p.indexOf('<h1'))
+  expect(hilo).toBeLessThan(p.indexOf('Lo quiere mucho'))
+  expect(p).toContain('2 mensajes')
+  expect(p).toContain('Esto no lo ve Euge')
+  expect(p).toContain('src="https://lh3.googleusercontent.com/caro"')
+  expect(p.indexOf('Caro', hilo)).toBeLessThan(p.indexOf('¿Alguien sabe el talle?'))
+  expect(p.indexOf('>Vos<', hilo)).toBeLessThan(p.indexOf('El mediano'))
+  expect(p.indexOf('¿Alguien sabe el talle?')).toBeLessThan(p.indexOf('El mediano'))
+  expect(p).toContain('Contestá…')
+  expect(p).not.toContain('Ver los')
+
+  // con muchos, los últimos a la vista y los de antes plegados (siguen en la página, en orden)
+  for (const t of ['¿Lo dividimos?', 'Dale', 'Pongo yo el resto']) expect(await addComment(h.db, termo.id, { userId: caro.id }, t)).toBe(true)
+  const largo = await deQuienRegala(termo.id)
+  expect(largo).toContain('5 mensajes')
+  expect(largo).toContain(`Ver los ${5 - A_LA_VISTA} anteriores`)
+  const plegados = largo.slice(largo.indexOf('<details'), largo.indexOf('</details>'))
+  expect(plegados).toContain('¿Alguien sabe el talle?')
+  expect(plegados).toContain('El mediano')
+  expect(plegados).not.toContain('¿Lo dividimos?')
+  expect(largo.indexOf('</details>')).toBeLessThan(largo.indexOf('Pongo yo el resto'))
 })

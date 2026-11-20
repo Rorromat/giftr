@@ -8,7 +8,7 @@ import { cupoDe, esAporte, esRepetible, juntadoAprox, pickItemFields, type Claim
 import { ocasionDeLista, type Ocasion } from '@/lib/ocasiones'
 import { duenosDeLista, esDuenoSql, esToken, esUuid, juntarNombres, relacionDeLista, type Dueno } from '@/lib/groups'
 import { regalosDeItem, type RegaloView } from '@/lib/regalos'
-import { asegurarListaPropia, newShareToken } from '@/lib/users'
+import { asegurarListaPropia, newShareToken, urlFoto } from '@/lib/users'
 import { volverASeguirAmigos } from '@/lib/amigos'
 import { accesoALista, sinNombresPara, type MotivoAnonimo } from '@/lib/acceso'
 
@@ -31,7 +31,8 @@ export type ListView =
   | ({ role: 'giver'; sinNombres: boolean; shareToken: string; items: GiverItemView[] } & ListaRegalador)
   | ({ role: 'anonimo'; motivo: MotivoAnonimo; shareToken: string; items: OwnerItemView[] } & ListaRegalador)
 
-export type CommentView = { id: string; autorNombre: string; texto: string; createdAt: Date }
+/** Un mensaje del hilo: quién lo escribió (su foto; un invitado no tiene) y si es del que mira ("Vos"). */
+export type CommentView = { id: string; autorNombre: string; autorFoto: string | null; esMio: boolean; texto: string; createdAt: Date }
 
 /**
  * Las reservas de unos deseos de una lista, como las ve quien regala. sinNombres: qué está ocupado y nada más (ver
@@ -259,19 +260,23 @@ export async function getItemForViewer(db: Db, shareToken: string, itemId: strin
     item: toGiverView(pickItemFields(row.item), itemClaims, juntado.get(itemId) ?? null),
     regalos,
     miVencida: itemClaims.some((c) => c.esMia) || regalos.some((r) => r.soyParte) ? null : vencida,
-    comments: sinNombres ? [] : await comentariosDe(db, itemId),
+    comments: sinNombres ? [] : await comentariosDe(db, itemId, viewer),
   }
 }
 
-/** El hilo de un deseo (lo que no ve el dueño): solo para quien ve la capa oculta. */
-export async function comentariosDe(db: Db, itemId: string): Promise<CommentView[]> {
+/** El hilo de un deseo (lo que no ve el dueño): solo para quien ve la capa oculta. Del más viejo al más nuevo. */
+export async function comentariosDe(db: Db, itemId: string, viewer: Viewer): Promise<CommentView[]> {
   const filas = await db.select({
-    id: comments.id, texto: comments.texto, createdAt: comments.createdAt,
-    userNombre: users.nombre, guestNombre: guestIdentities.nombre,
+    id: comments.id, texto: comments.texto, createdAt: comments.createdAt, authorUserId: comments.authorUserId, authorGuestId: comments.authorGuestId,
+    user: { id: users.id, nombre: users.nombre, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }, guestNombre: guestIdentities.nombre,
   }).from(comments)
     .leftJoin(users, eq(comments.authorUserId, users.id))
     .leftJoin(guestIdentities, eq(comments.authorGuestId, guestIdentities.id))
     .where(eq(comments.itemId, itemId))
     .orderBy(comments.createdAt)
-  return filas.map((c) => ({ id: c.id, texto: c.texto, createdAt: c.createdAt, autorNombre: c.userNombre ?? c.guestNombre ?? 'Alguien' }))
+  return filas.map((c) => ({
+    id: c.id, texto: c.texto, createdAt: c.createdAt,
+    autorNombre: c.user?.nombre ?? c.guestNombre ?? 'Alguien', autorFoto: c.user ? urlFoto(c.user) : null,
+    esMio: viewer.userId ? c.authorUserId === viewer.userId : !!viewer.guestId && c.authorGuestId === viewer.guestId,
+  }))
 }

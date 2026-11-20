@@ -8,6 +8,7 @@ import { genteDelDeseo } from '@/lib/items'
 import { recienHecho } from '@/lib/repetido'
 import { esUuid } from '@/lib/groups'
 import { LARGO, recortar } from '@/lib/limites'
+import { urlFoto } from '@/lib/users'
 
 /**
  * Un comentario en la coordinación de un deseo, de hasta 500 caracteres (lo que entra en el input). A los demás del hilo
@@ -44,14 +45,18 @@ export async function addComment(db: Db, itemId: string, viewer: Viewer, comenta
 /** Cuánto del comentario entra en el aviso (el resto, en el hilo). */
 const EN_EL_AVISO = 140
 
+/** El id del hilo en la página del deseo (y en la de la sorpresa): el aviso lleva directo ahí (ver Hilo). */
+export const ANCLA_DEL_HILO = 'mensajes'
+
 /**
  * "Caro comentó en Termo": a los demás que escribieron en el hilo y a quienes regalan ese deseo (lo reservaron, lo
- * compraron o están en su regalo grupal), en la bandeja y en el celular. Sin esto, "¿alguien sabe el talle?" quedaba ahí
- * hasta que el otro volviera a abrir justo ese deseo. Nunca a quien lo escribió ni a un dueño de la lista (tampoco al que
- * salió del grupo, ni a quien recibe la sorpresa: ver accesoALista): el hilo es de la capa oculta. Los invitados sin
- * cuenta no tienen bandeja ni dispositivo: lo ven al volver al deseo.
- * Lleva al deseo solo a quien tiene el link para regalar de ahora (lo sigue, o nunca lo cambiaron); si no, a su bandeja.
- * Devuelve a cuántos les avisó.
+ * compraron o están en su regalo grupal), en la bandeja, arriba en Inicio ("Para vos": es un mensaje para leer, y quizás
+ * contestar) y en el celular, con la foto de quien lo escribió. Sin esto, "¿alguien sabe el talle?" quedaba ahí hasta que
+ * el otro volviera a abrir justo ese deseo. Nunca a quien lo escribió ni a un dueño de la lista (tampoco al que salió del
+ * grupo, ni a quien recibe la sorpresa: ver accesoALista): el hilo es de la capa oculta. Los invitados sin cuenta no tienen
+ * bandeja ni dispositivo: lo ven al volver al deseo.
+ * Lleva directo a los mensajes del deseo solo a quien tiene el link para regalar de ahora (lo sigue, o nunca lo
+ * cambiaron); si no, a su bandeja. Devuelve a cuántos les avisó.
  */
 async function avisarComentario(db: Db, itemId: string, viewer: Viewer, texto: string, enviar?: Enviar): Promise<number> {
   const [d] = await db.select({
@@ -62,12 +67,15 @@ async function avisarComentario(db: Db, itemId: string, viewer: Viewer, texto: s
     db.selectDistinct({ userId: comments.authorUserId }).from(comments).where(and(eq(comments.itemId, itemId), isNotNull(comments.authorUserId))),
     genteDelDeseo(db, itemId, d.listId),
     viewer.userId
-      ? db.select({ nombre: users.nombre }).from(users).where(eq(users.id, viewer.userId))
+      ? db.select({ nombre: users.nombre, id: users.id, fotoAt: users.fotoAt, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, viewer.userId))
       : db.select({ nombre: guestIdentities.nombre }).from(guestIdentities).where(eq(guestIdentities.id, viewer.guestId!)),
   ])
   const quien = (autor?.nombre ?? 'Alguien').trim().split(/\s+/)[0]
+  // su foto, para el aviso del celular (un invitado no tiene)
+  const foto = autor && 'id' in autor ? urlFoto(autor) : null
   const ids = new Set([...delHilo, ...regalan].flatMap((p) => (p.userId && p.userId !== viewer.userId ? [p.userId] : [])))
-  const adonde = d.tipo === 'sorpresa' ? `/sorpresa/${d.token}` : d.activo === 'activo' ? `/l/${d.token}/item/${itemId}` : `/l/${d.token}`
+  const adonde = d.tipo === 'sorpresa' ? `/sorpresa/${d.token}#${ANCLA_DEL_HILO}`
+    : d.activo === 'activo' ? `/l/${d.token}/item/${itemId}#${ANCLA_DEL_HILO}` : `/l/${d.token}`
   const cuerpo = texto.length > EN_EL_AVISO ? `${texto.slice(0, EN_EL_AVISO - 1).trimEnd()}…` : texto
   const avisados = await Promise.all([...ids].map(async (userId) => {
     if ((await accesoALista(db, d.listId, { userId })) !== 'regalador') return 0
@@ -75,7 +83,8 @@ async function avisarComentario(db: Db, itemId: string, viewer: Viewer, texto: s
       ? await db.select({ id: listFollows.listId }).from(listFollows).where(and(eq(listFollows.userId, userId), eq(listFollows.listId, d.listId)))
       : [true]
     await avisar(db, userId, {
-      tipo: null, de: viewer.userId ?? null, title: `💬 ${quien} comentó en "${d.titulo}"`, body: cuerpo, url: sigue ? adonde : '/avisos',
+      tipo: 'comentario', de: viewer.userId ?? null, title: `💬 ${quien} comentó en "${d.titulo}"`, body: cuerpo, url: sigue ? adonde : '/avisos',
+      ...(foto ? { icon: foto } : {}),
     }, enviar)
     return 1
   }))

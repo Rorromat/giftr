@@ -76,6 +76,9 @@ tenga, así que primero hay que marcarlos como leídos) y trata como co-dueños 
 un grupo o a los que sacaron (las filas de `list_members` con `salio_at`: volverían a editar y a
 figurar como dueños). La cookie de los invitados cambió de nombre para que el código de antes no se
 caiga con ella: para ese código, los invitados anotados después son visitantes sin nombre.
+Tampoco a uno de antes de que los mensajes del hilo de un regalo llegaran como aviso de tipo
+`comentario`: ese código no conoce el tipo y se le caen Avisos e Inicio a quien tenga uno. Antes de
+volver, `UPDATE avisos SET tipo = NULL WHERE tipo = 'comentario'` (sin tipo se ven como antes).
 
 **Región.** `vercel.json` corre las funciones en `gru1` (São Paulo), la misma región que la base
 Neon. Si la base se crea en otra región, cambiá `regions` a esa: cada pantalla hace varias consultas

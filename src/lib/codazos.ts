@@ -145,7 +145,11 @@ export async function tieneAvisos(db: Db, userId: string): Promise<boolean> {
   return !!s
 }
 
-export type Aviso = { title: string; body: string; url: string }
+/**
+ * icon: la foto de quien lo manda, para el aviso del celular (sin ella, el moño de GiftR). En la bandeja no se guarda: ahí
+ * sale de quién es (ver guardarAviso).
+ */
+export type Aviso = { title: string; body: string; url: string; icon?: string }
 /** Cómo se manda un aviso (en los tests se reemplaza). Devuelve el status HTTP del servicio de push. */
 export type Enviar = (s: SuscripcionPush, aviso: Aviso, vapid: { publica: string; privada: string }) => Promise<number>
 

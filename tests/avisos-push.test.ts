@@ -6,7 +6,7 @@ import { avisos, items, lists } from '@/db/schema'
 import type { Db } from '@/db/types'
 import { reserveItem } from '@/lib/claims'
 import { abrirListaAInvitado } from '@/lib/acceso'
-import { bandeja } from '@/lib/bandeja'
+import { bandeja, paraVos } from '@/lib/bandeja'
 import { guardarSuscripcion, type Aviso, type Enviar } from '@/lib/codazos'
 import { addComment } from '@/lib/comments'
 import { createGuest } from '@/lib/guest'
@@ -134,24 +134,32 @@ test('si cambiaron el link para regalar y no lo abrió después, el push no se l
 
 test('un comentario les avisa a los demás del hilo y a quienes regalan ese deseo; nunca al dueño ni a quien lo escribió', async () => {
   const { db, owner, giver, list, termo, mate } = await setup()
-  const usuario = (nombre: string) => upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre}@test.com`, nombre })
-  const [caro, sofi, nico] = [await usuario('Caro'), await usuario('Sofi'), await usuario('Nico')]
+  const usuario = (nombre: string, avatarUrl?: string) => upsertUserFromGoogle(db, { googleId: `g-${nombre}`, email: `${nombre}@test.com`, nombre, avatarUrl })
+  const FOTO_DE_CARO = 'https://lh3.googleusercontent.com/caro'
+  const [caro, sofi, nico] = [await usuario('Caro', FOTO_DE_CARO), await usuario('Sofi'), await usuario('Nico')]
   for (const u of [owner, giver, caro, sofi, nico]) await conAvisos(db, u)
   const push = pushFalso()
   await reserveItem(db, termo.id, { userId: giver.id })
   // Nico reservó otro deseo: el hilo del termo no es con él
   await reserveItem(db, mate.id, { userId: nico.id })
 
-  // Caro pregunta: le llega a Rodri, que lo tiene reservado
+  // Caro pregunta: le llega a Rodri, que lo tiene reservado, con la foto de Caro y directo a los mensajes del deseo
   expect(await addComment(db, termo.id, { userId: caro.id }, '¿Alguien sabe el talle?', push.enviar)).toBe(true)
-  expect(push.enviados).toEqual([{ para: 'Rodri', aviso: { title: '💬 Caro comentó en "Termo"', body: '¿Alguien sabe el talle?', url: `/l/tok-euge/item/${termo.id}` } }])
+  expect(push.enviados).toEqual([{
+    para: 'Rodri', aviso: { title: '💬 Caro comentó en "Termo"', body: '¿Alguien sabe el talle?', url: `/l/tok-euge/item/${termo.id}#mensajes`, icon: FOTO_DE_CARO },
+  }])
+  // y arriba en Inicio ("Para vos"), con su foto
+  expect((await paraVos(db, giver.id)).entradas).toMatchObject([
+    { tipo: 'comentario', titulo: 'Caro comentó en "Termo"', cuerpo: '¿Alguien sabe el talle?', de: { nombre: 'Caro', foto: FOTO_DE_CARO }, nuevo: true },
+  ])
   // Sofi contesta: a Rodri y a Caro, que ya escribió en el hilo
   expect(await addComment(db, termo.id, { userId: sofi.id }, 'El mediano, me dijo la hermana', push.enviar)).toBe(true)
   expect(push.enviados.slice(1).map((e) => e.para).sort()).toEqual(['Caro', 'Rodri'])
-  // queda en la bandeja, con quién lo escribió
+  // queda en la bandeja, con quién lo escribió (Sofi no tiene foto: el aviso del celular lleva el moño)
   expect((await bandeja(db, { userId: caro.id })).entradas).toMatchObject([
-    { emoji: '💬', titulo: 'Sofi comentó en "Termo"', cuerpo: 'El mediano, me dijo la hermana', href: `/l/tok-euge/item/${termo.id}`, de: { nombre: 'Sofi' }, nuevo: true },
+    { emoji: '💬', tipo: 'comentario', titulo: 'Sofi comentó en "Termo"', cuerpo: 'El mediano, me dijo la hermana', href: `/l/tok-euge/item/${termo.id}#mensajes`, de: { nombre: 'Sofi' }, nuevo: true },
   ])
+  expect(push.enviados[1].aviso).not.toHaveProperty('icon')
   // un doble toque en "Enviar" no lo deja dos veces, ni avisa dos veces
   expect(await addComment(db, termo.id, { userId: sofi.id }, 'El mediano, me dijo la hermana', push.enviar)).toBe(true)
   expect(push.enviados).toHaveLength(3)
@@ -162,8 +170,8 @@ test('un comentario les avisa a los demás del hilo y a quienes regalan ese dese
   expect(await addComment(db, termo.id, { guestId: abuela.id }, 'a'.repeat(200), push.enviar)).toBe(true)
   const deLaAbuela = push.enviados.slice(3)
   expect(deLaAbuela.map((e) => e.para).sort()).toEqual(['Caro', 'Rodri', 'Sofi'])
-  // el aviso lleva el principio; el resto, en el hilo
-  expect(deLaAbuela[0].aviso).toEqual({ title: '💬 Abuela comentó en "Termo"', body: `${'a'.repeat(139)}…`, url: `/l/tok-euge/item/${termo.id}` })
+  // el aviso lleva el principio; el resto, en el hilo. Ella no tiene foto
+  expect(deLaAbuela[0].aviso).toEqual({ title: '💬 Abuela comentó en "Termo"', body: `${'a'.repeat(139)}…`, url: `/l/tok-euge/item/${termo.id}#mensajes` })
   expect(await addComment(db, termo.id, { userId: sofi.id }, 'Gracias', push.enviar)).toBe(true)
   expect(push.enviados.slice(6).map((e) => e.para).sort()).toEqual(['Caro', 'Rodri'])
 
@@ -196,6 +204,20 @@ test('el aviso de un comentario no pasa el link para regalar nuevo, ni le llega 
   // Rodri la abre con el link nuevo: desde ahí, al deseo
   await seguir(db, rodri.id, casa)
   expect(await addComment(db, mesa.id, { userId: sofi.id }, 'Avisen', push.enviar)).toBe(true)
-  expect(push.de('Rodri')[1].url).toBe(`/l/${nuevo}/item/${mesa.id}`)
+  expect(push.de('Rodri')[1].url).toBe(`/l/${nuevo}/item/${mesa.id}#mensajes`)
   expect([...push.de('Martin'), ...push.de('Delfina')]).toEqual([])
+})
+
+test('el aviso de un comentario se ve con la foto grande de quien lo escribió; el de un invitado, con el globito', async () => {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { IconoAviso } = await import('@/components/FilaAviso')
+  const base = { id: 'a', emoji: '💬', titulo: 'Caro comentó en "Termo"', cuerpo: '¿Talle?', href: '/l/t/item/1#mensajes', tipo: 'comentario' as const, createdAt: new Date(), nuevo: true }
+  const deCaro = renderToStaticMarkup(IconoAviso({ e: { ...base, de: { nombre: 'Caro', foto: 'https://lh3.googleusercontent.com/caro' } } }))
+  expect(deCaro).toContain('src="https://lh3.googleusercontent.com/caro"')
+  expect(deCaro).toContain('width:44px')
+  expect(deCaro).not.toContain('gr-aviso-icono')
+  // sin foto, sus iniciales
+  expect(renderToStaticMarkup(IconoAviso({ e: { ...base, de: { nombre: 'Caro Pérez', foto: null } } }))).toContain('>CP<')
+  // de un invitado no se sabe quién (no tiene cuenta): el cuadradito con la charla
+  expect(renderToStaticMarkup(IconoAviso({ e: { ...base, de: null } }))).toContain('gr-aviso-icono')
 })

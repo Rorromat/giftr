@@ -442,11 +442,12 @@ export const avisos = pgTable('avisos', {
   deUserId: uuid('de_user_id').references(() => users.id, { onDelete: 'set null' }),
   // qué es: de esto sale si va en "Para vos", en Inicio (ver PARA_VOS). Los de antes de la migración 0034 no lo tienen.
   // regalo_comprado: el que organiza un regalo grupal lo compró y te toca tu parte. pago: te pagaron tu parte de uno.
-  // lista_en_comun: te sumaron a una lista en común (ver invitarAGrupo).
+  // lista_en_comun: te sumaron a una lista en común (ver invitarAGrupo). comentario: alguien escribió en el hilo de un deseo
+  // que regalás (ver avisarComentario); los de antes no tienen tipo.
   tipo: text('tipo', {
     enum: [
       'codazo', 'amistad_pedida', 'amistad_aceptada', 'propuesta_regalo', 'respuesta_propuesta', 'regalo_comprado', 'pago',
-      'invisible_invitacion', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun',
+      'invisible_invitacion', 'invisible_sorteo', 'invisible_pregunta', 'invisible_respuesta', 'lista_en_comun', 'comentario',
     ],
   }),
   titulo: text('titulo').notNull(),

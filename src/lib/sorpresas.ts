@@ -228,7 +228,7 @@ export async function sorpresaParaViewer(db: Db, token: string, viewer: Viewer):
   ])
   if (!item || item.estadoDueno !== 'activo') return { estado: 'cancelada', para }
   const [regalos, reservas, comments, creador, fecha] = await Promise.all([
-    regalosDeItem(db, item.id, yo), loadClaimViews(db, list.id, [item], yo), comentariosDe(db, item.id),
+    regalosDeItem(db, item.id, yo), loadClaimViews(db, list.id, [item], yo), comentariosDe(db, item.id, yo),
     personas(db, list.creadaPor ? [list.creadaPor] : []), eventoDeLista(db, list.id),
   ])
   return {

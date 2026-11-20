@@ -120,9 +120,10 @@ self.addEventListener('push', (event) => {
   } catch {
     aviso = { body: event.data ? event.data.text() : '' }
   }
+  // icon: la foto de quien lo manda (un comentario en el hilo de un regalo), si la tiene; si no, el moño
   event.waitUntil(self.registration.showNotification(aviso.title || 'GiftR', {
     body: aviso.body || '',
-    icon: '/icon-192.png',
+    icon: (typeof aviso.icon === 'string' && aviso.icon) || '/icon-192.png',
     badge: '/icon-192.png',
     tag: 'giftr-codazo',
     renotify: true,

@@ -2,16 +2,14 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/db'
-import { commentAction } from '@/app/actions'
 import { getViewer } from '@/lib/viewer'
 import { sorpresaParaViewer } from '@/lib/sorpresas'
 import { amigosParaDividir, invitadosDeRegalo } from '@/lib/invitaciones'
 import { fechaLarga } from '@/lib/events'
 import { enDolares, parseDolares, parsePesos } from '@/lib/pesos'
-import { LARGO } from '@/lib/limites'
-import { BotonEnviar } from '@/components/BotonEnviar'
 import { InvitadosDelRegalo } from '@/components/Dividir'
 import { FotoAmpliable } from '@/components/FotoAmpliable'
+import { Hilo } from '@/components/Hilo'
 import { VideoDeseo } from '@/components/VideoDeseo'
 import { EntrarConGoogle } from '@/components/Identidad'
 import { RegaloGrupal } from '@/components/RegaloGrupal'
@@ -82,6 +80,11 @@ export default async function Sorpresa({ params, searchParams }: {
   const yaEstan = new Set([...(mio?.miembros.map((m) => m.userId) ?? []), ...invitados.map((i) => i.persona.id)])
   const precio = item.precio ?? item.rangoPrecio
   const enUnRegalo = regalos.some((r) => r.soyParte)
+  // el hilo para coordinar: con mensajes, arriba (apenas abajo de qué le regalan, destacado); sin mensajes, al final
+  const hilo = (
+    <Hilo token={token} itemId={item.id} comments={comments}
+          privado={s.para.userId ? `Esto no lo ve ${quien}` : s.para.esLista ? 'Esto no lo ven los que arman su lista' : 'Para coordinar entre ustedes'} />
+  )
   const cuando = s.fecha && `${s.para.userId ? 'Su cumple' : 'Es'} ${s.fecha.dias === 0 ? 'hoy' : s.fecha.dias === 1 ? 'mañana' : `en ${s.fecha.dias} días`} · ${fechaLarga(s.fecha.fecha)}`
 
   return (
@@ -131,6 +134,8 @@ export default async function Sorpresa({ params, searchParams }: {
         </div>
       </article>
 
+      {comments.length > 0 && hilo}
+
       {deRegalo === 'sumado' && enUnRegalo && (
         <p role="status" className="flex items-start gap-2.5 rounded-gr-md bg-gr-soft px-4 py-3 text-sm font-medium">
           <Icon name="check" size={18} strokeWidth={2.6} className="mt-px flex-none" />
@@ -153,25 +158,7 @@ export default async function Sorpresa({ params, searchParams }: {
         ))}
       </div>
 
-      <section className="mt-2 flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-          <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />
-          {s.para.userId ? `Esto no lo ve ${quien}` : s.para.esLista ? 'Esto no lo ven los que arman su lista' : 'Para coordinar entre ustedes'}
-        </h2>
-        <ul className="flex flex-col gap-2">
-          {comments.map((c) => (
-            <li key={c.id} className="rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
-              <span className="font-semibold">{c.autorNombre}:</span> {c.texto}
-            </li>
-          ))}
-        </ul>
-        <form action={commentAction} className="flex gap-2">
-          <input type="hidden" name="token" value={token} />
-          <input type="hidden" name="itemId" value={item.id} />
-          <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
-          <BotonEnviar className="gr-btn gr-btn--dark min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
-        </form>
-      </section>
+      {!comments.length && hilo}
 
       {s.para.token && (
         <Link href={`/l/${s.para.token}`} className="self-center text-sm font-semibold underline underline-offset-4">

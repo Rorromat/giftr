@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { getItemForViewer } from '@/lib/lists'
 import { getViewer, invitadoParaPreguntar } from '@/lib/viewer'
-import { boughtAction, commentAction, releaseAction, unboughtAction } from '@/app/actions'
+import { boughtAction, releaseAction, unboughtAction } from '@/app/actions'
 import { BotonEnviar } from '@/components/BotonEnviar'
 import { CartelReserva, GuestGate } from '@/components/GuestGate'
 import { BotonRobar } from '@/components/Novedades'
@@ -24,6 +24,7 @@ import { pesos } from '@/lib/pesos'
 import { BarraDeLaFicha, BotonTienda, FichasDeseo, FotoDeLaFicha, NombreDeLaFicha, NotaDeseo } from '@/components/FichaDeseo'
 import { Sello, type TipoSello } from '@/components/Sello'
 import { VideoDeseo } from '@/components/VideoDeseo'
+import { Hilo } from '@/components/Hilo'
 import { ComoLoRegalas } from '@/components/ComoLoRegalas'
 import { ReservaConfirmada, ultimoDia } from '@/components/ReservaConfirmada'
 import { SoloConCuenta } from '@/components/SoloConCuenta'
@@ -40,7 +41,7 @@ import { antiguedadDelPrecio } from '@/lib/presupuesto'
 function cupo(giver: GiverItemView | null) {
   const c = giver && avisoDeCupo(giver, giver.claims.length)
   if (!c) return null
-  return c.deMas ? { texto: `Hay ${c.reservas} reservas: arréglenlo en el hilo de abajo.`, alerta: true } : { texto: `Quedan ${c.quedan}`, alerta: false }
+  return c.deMas ? { texto: `Hay ${c.reservas} reservas: arréglenlo en los mensajes.`, alerta: true } : { texto: `Quedan ${c.quedan}`, alerta: false }
 }
 
 // La vista previa al compartir (WhatsApp): qué es, para quién y cuánto sale. La imagen sale de opengraph-image.
@@ -132,28 +133,14 @@ export default async function DetalleItem({ params, searchParams }: {
     : detalle.motivo === 'otra_cuenta' ? <OtraCuenta volver={aqui} />
       : detalle.motivo === 'confirmar' && quien ? <ConfirmarLista token={token} nombre={quien} volver={aqui} />
         : <QuienSos token={token} volver={aqui} />)
-  // el hilo para coordinar, que no ven los dueños: solo para quien ve la coordinación con nombres
+  // El hilo para coordinar, que no ven los dueños: solo para quien ve la coordinación con nombres. Con mensajes va arriba,
+  // destacado, apenas abajo del nombre del regalo (es a lo que lleva su aviso, y lo que hay que leer antes de comprar);
+  // sin mensajes, al final, para empezar a coordinar.
   const hilo = giver && !sinNombres && (
-    <section className="mt-2 flex flex-col gap-3">
-      <h2 className="flex items-center gap-2 self-start rounded-full bg-gr-brand px-3.5 py-2 text-sm font-semibold text-gr-bg">
-        <Icon name="lock" size={16} strokeWidth={2} className="text-gr-acento-sobre-tinta" />
-        Esto no lo {plural ? 'ven' : 've'} {ownerNombre}
-      </h2>
-      <ul className="flex flex-col gap-2">
-        {comments.map((c) => (
-          <li key={c.id} className="rounded-gr-md border border-gr-line bg-gr-surface px-3 py-2.5 text-sm [overflow-wrap:anywhere]">
-            <span className="font-semibold">{c.autorNombre}:</span> {c.texto}
-          </li>
-        ))}
-      </ul>
-      <form action={commentAction} className="flex gap-2">
-        <input type="hidden" name="token" value={token} />
-        <input type="hidden" name="itemId" value={item.id} />
-        <input name="texto" required maxLength={LARGO.comentario} placeholder="Coordiná con los demás…" className="gr-input min-w-0 flex-1 shadow-none" />
-        <BotonEnviar className="gr-btn gr-btn--dark min-h-[50px] px-4 text-[15px]">Enviar</BotonEnviar>
-      </form>
-    </section>
+    <Hilo token={token} itemId={item.id} comments={comments} privado={`Esto no lo ${plural ? 'ven' : 've'} ${ownerNombre}`} />
   )
+  const hiloArriba = comments.length > 0 && hilo
+  const hiloAbajo = !comments.length && hilo
   // un invitado (con "¿Es tu lista?" arriba, el link ya va ahí). Con cuenta, no: la sesión se cierra desde Perfil
   const noSoyYo = quien && !logueado && !(detalle.role === 'anonimo' && detalle.motivo === 'confirmar') && <NoSoyYo nombre={quien} volver={aqui} />
 
@@ -182,6 +169,7 @@ export default async function DetalleItem({ params, searchParams }: {
             <p className="text-sm leading-snug text-gr-muted">No se reserva: cada uno pone lo que quiere, y pueden aportar todos.</p>
           </div>
           {invitado && <PreguntaInvitado nombre={invitado} />}
+          {hiloArriba}
           {nota}
         </article>
 
@@ -195,7 +183,7 @@ export default async function DetalleItem({ params, searchParams }: {
                    para={ownerNombre} plural={plural} volver={aqui} />
         </section>
 
-        {hilo}
+        {hiloAbajo}
         {noSoyYo}
       </main>
     )
@@ -223,6 +211,7 @@ export default async function DetalleItem({ params, searchParams }: {
         <NombreDeLaFicha titulo={item.titulo} categoria={item.categoria} precio={precio} lista={nombreDeLaLista} />
         {precioDe && <p className="-mt-3 text-[13px] leading-snug text-gr-muted">Precio de {precioDe}: puede haber cambiado.</p>}
         {invitado && <PreguntaInvitado nombre={invitado} />}
+        {hiloArriba}
         {/* lo que hace falta para acertar: cuánto lo quiere, si sirve algo parecido, cuántos pide; y lo que dice */}
         <FichasDeseo deseo={item} voz={plural ? 'varios' : 'uno'} cupo={cupo(giver?.item ?? null)} />
         {nota}
@@ -266,7 +255,7 @@ export default async function DetalleItem({ params, searchParams }: {
           <div className="gr-card flex flex-col gap-3 p-3.5">
             <p className="text-sm font-medium leading-snug">
               <span className="font-semibold">Tu reserva venció el {ultimoDia(vencida.vencio)}.</span>{' '}
-              {disponible ? '¿Ya lo compraste? Marcalo. Si no, reservalo de nuevo.' : 'Ahora lo tiene otra persona: si lo habías comprado, contalo en el hilo de abajo.'}
+              {disponible ? '¿Ya lo compraste? Marcalo. Si no, reservalo de nuevo.' : 'Ahora lo tiene otra persona: si lo habías comprado, contalo en los mensajes.'}
             </p>
             {disponible && (
               <>
@@ -344,7 +333,7 @@ export default async function DetalleItem({ params, searchParams }: {
         )}
       </section>
 
-      {hilo}
+      {hiloAbajo}
       {noSoyYo}
 
     </main>

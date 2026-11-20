@@ -81,6 +81,20 @@ test('registra install, activate, fetch, push y notificationclick', () => {
   expect(Object.keys(cargar().handlers).sort()).toEqual(['activate', 'fetch', 'install', 'notificationclick', 'push'])
 })
 
+test('el aviso del celular lleva la foto de quien lo manda (un comentario en un regalo); sin foto, el moño', async () => {
+  const sw = cargar()
+  const push = (aviso: unknown) => conEspera(sw.handlers.push, { data: { json: () => aviso, text: () => JSON.stringify(aviso) } })
+  await push({ title: '💬 Caro comentó en "Termo"', body: '¿Alguien sabe el talle?', url: '/l/tok/item/1#mensajes', icon: '/foto/caro?v=1' })
+  await push({ title: '👉 Codazo', body: 'Sofi quiere saber qué regalarte', url: '/mi-lista' })
+  await push({ title: 'Raro', body: '', url: '/', icon: { no: 'es un texto' } })
+  const mostrados = sw.self.registration.showNotification.mock.calls as unknown as [string, { icon: string; body: string; data: { url: string } }][]
+  expect(mostrados.map(([titulo, o]) => [titulo, o.icon, o.data.url])).toEqual([
+    ['💬 Caro comentó en "Termo"', '/foto/caro?v=1', '/l/tok/item/1#mensajes'],
+    ['👉 Codazo', '/icon-192.png', '/mi-lista'],
+    ['Raro', '/icon-192.png', '/'],
+  ])
+})
+
 describe('el POST de compartir', () => {
   test('guarda los textos y la foto en el buzón y manda con un 303 a /agregar?compartido=<id>; leerCompartido lo lee igual', async () => {
     const sw = cargar()
